@@ -66,8 +66,6 @@ jobs:
         with:
           context: frontend
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-frontend:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-frontend:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -60,8 +60,6 @@ jobs:
         with:
           context: ai-service
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-ai-service:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-ai-service:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-ai-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
