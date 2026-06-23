@@ -13,7 +13,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository_owner }}/fintwin-backend
 
 jobs:
   build:
@@ -26,6 +25,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -55,7 +57,7 @@ jobs:
           context: backend
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-backend:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
