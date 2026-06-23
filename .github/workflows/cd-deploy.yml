@@ -108,21 +108,32 @@ jobs:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
     needs: build-and-push
-    # Requires KUBECONFIG secret — add it in GitHub repo Settings → Secrets
-    if: ${{ secrets.KUBECONFIG != '' }}
     environment: production
 
     steps:
+      - name: Skip if no KUBECONFIG
+        id: check
+        run: |
+          if [ -z "${{ secrets.KUBECONFIG }}" ]; then
+            echo "KUBECONFIG secret not configured — skipping deploy"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up kubectl
+        if: steps.check.outputs.skip == 'false'
         uses: azure/setup-kubectl@v3
 
       - name: Configure kubeconfig
+        if: steps.check.outputs.skip == 'false'
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
       - name: Update image tags
+        if: steps.check.outputs.skip == 'false'
         env:
           SHA: ${{ needs.build-and-push.outputs.sha }}
           FULL_SHA: ${{ github.sha }}
@@ -142,10 +153,12 @@ jobs:
             -n fintwin
 
       - name: Wait for rollout
+        if: steps.check.outputs.skip == 'false'
         run: |
           kubectl rollout status deployment/backend   -n fintwin --timeout=300s
           kubectl rollout status deployment/frontend  -n fintwin --timeout=300s
           kubectl rollout status deployment/ai-service -n fintwin --timeout=300s
 
       - name: Verify pods
+        if: steps.check.outputs.skip == 'false'
         run: kubectl get pods -n fintwin
