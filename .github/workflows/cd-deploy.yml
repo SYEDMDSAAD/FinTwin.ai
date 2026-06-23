@@ -50,7 +50,7 @@ jobs:
 
       - name: Package backend
         working-directory: backend
-        run: mvn package -q -DskipTests
+        run: mvn package -q
 
       - name: Build & push — backend
         uses: docker/build-push-action@v5

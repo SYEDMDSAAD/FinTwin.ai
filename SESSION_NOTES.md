@@ -441,11 +441,61 @@ Structured release history. v0.1.0 entry documents everything built to date.
 
 ---
 
-## 7. What Remains (Next Sessions)
+## 7. CI/CD — GitHub Actions
+
+**Date:** 2026-06-24  
+**Branch merged:** `fix/ci-workflows` → `main` (squash merge)
+
+### 7.1 Workflows Created
+
+| File | Trigger | What it does |
+|---|---|---|
+| `ci-backend.yml` | PR to main/develop (always); push to main/develop/release/hotfix (backend/** paths only) | Java 21, `mvn package -DskipTests`, build + push Docker image to GHCR |
+| `ci-frontend.yml` | PR to main/develop (always); push (frontend/** paths only) | Node 20, `npm ci`, `npm run lint`, `npm run build`, build + push Docker image |
+| `ci-ai-service.yml` | PR to main/develop (always); push (ai-service/** paths only) | Python 3.11, `pip install`, `py_compile` syntax check, build + push Docker image |
+| `cd-deploy.yml` | Push to main only | Builds all 3 images tagged with full SHA + `latest`, then `kubectl set image` on all 3 deployments |
+| `security.yml` | Weekly Sunday 02:00 UTC + push to main | OWASP dep check (fail on CVSS≥9), Trivy container scan (CRITICAL/HIGH), TruffleHog secret detection |
+
+**Registry:** GHCR (`ghcr.io/OWNER/fintwin-{backend,frontend,ai-service}`) — uses built-in `GITHUB_TOKEN`.
+
+**k8s deploy prerequisite:** Add `KUBECONFIG` secret (base64-encoded kubeconfig) in GitHub repo Settings → Secrets. Deploy steps are individually gated and skip gracefully when absent.
+
+### 7.2 Bugs Fixed During CI/CD Setup
+
+#### Bug 1 — Required checks stuck as "Expected — Waiting for status"
+**Root cause:** `pull_request` triggers had `paths:` filters on `ci-backend.yml` and `ci-ai-service.yml`. When a PR only touched `.github/workflows/` files, those workflows never ran — but branch protection was waiting for them as required checks.  
+**Fix:** Removed `paths:` from `pull_request` triggers. Path filtering kept only for `push` events (where skipping is safe). PRs now always trigger all 3 CI checks.
+
+#### Bug 2 — `cd-deploy.yml` failed with "workflow file issue" (no jobs ran)
+**Root cause:** Job-level `if: ${{ secrets.KUBECONFIG != '' }}` — the `secrets` context is NOT allowed in job-level `if` conditions in GitHub Actions. GitHub rejects the entire workflow file.  
+**Fix:** Removed the job-level condition. Added a first step `Skip if no KUBECONFIG` that sets a `skip` output, and gated all subsequent deploy steps with `if: steps.check.outputs.skip == 'false'`.
+
+#### Bug 3 — Docker image tags invalid on PR events
+**Root cause:** Tag used `${{ github.head_ref }}` which contains `/` in branch names like `fix/ci-workflows` — Docker rejects tag names with slashes.  
+**Fix:** Use SHA-only tags (`${{ github.sha }}`); add branch name tag only on push events using a separate `meta` step.
+
+#### Bug 4 — GHCR push failed with "unauthorized"
+**Root cause:** `github.repository_owner` preserves original casing (e.g. `SYEDMDSAAD`) but GHCR requires lowercase registry paths.  
+**Fix:** Added `Lowercase owner` step: `echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV`
+
+### 7.3 Branch Protection (restored after ruleset deleted)
+Applied via GitHub API — no review requirement, CI checks required:
+- Require status checks: `Build & Package`, `Check & Build`, `Lint & Build`
+- Block force pushes ✅
+- Block branch deletion ✅
+- Require approving review ❌ (removed — solo repo)
+
+### 7.4 Repo Visibility
+Made private (2026-06-24) to prevent public forks. CI/CD unaffected. GHCR images are now private — k8s cluster will need `imagePullSecret` when connected.
+
+---
+
+## 8. What Remains (Next Sessions)
 
 | Area | Status |
 |---|---|
-| CI/CD — GitHub Actions pipelines | Not started |
+| Tests — unit + integration (backend CI uses -DskipTests) | Not started |
+| Monitoring — Prometheus + Grafana | Not started |
 | ShedLock for ScheduledPriceRefreshService | Not started (comment added) |
 | Read replica support (AbstractRoutingDataSource) | Not started |
 | DB backup strategy documentation | Not started |
