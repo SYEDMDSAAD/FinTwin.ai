@@ -1,0 +1,69 @@
+# NOTE: For production at scale, use a managed database instead of running
+# PostgreSQL in Kubernetes. Managed options:
+#   AWS RDS PostgreSQL, Google Cloud SQL, Azure Database for PostgreSQL, Supabase
+#
+# Benefits of managed DB: automated backups, point-in-time recovery, read replicas,
+# automated failover, no stateful workload in k8s to manage.
+#
+# If you must run Postgres in k8s, consider the CloudNativePG operator:
+# https://cloudnative-pg.io — it handles HA, backups, and failover automatically.
+#
+# This manifest is for single-node dev/staging setups.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: fintwin
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: fintwin
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fintwin-secrets
+                  key: DB_PASSWORD
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc

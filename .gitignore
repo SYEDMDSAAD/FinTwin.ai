@@ -1,0 +1,43 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+.env
+backend/.env
+ai-service/.env
+
+# ── Java / Maven ──────────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.suo
+*.swp
+*.DS_Store
+
+# ── Local tooling ─────────────────────────────────────────────────────────────
+.claude/
+*.deb
+*.rpm
