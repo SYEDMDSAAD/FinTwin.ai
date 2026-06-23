@@ -8,8 +8,6 @@ on:
       - '.github/workflows/ci-ai-service.yml'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'ai-service/**'
 
 env:
   REGISTRY: ghcr.io
