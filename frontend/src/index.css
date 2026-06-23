@@ -1,0 +1,1055 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens — dark (default) ───────────────────── */
+:root {
+    --bg-base:            #080A0F;
+    --bg-sidebar:         #090B11;
+    --bg-card:            rgba(255,255,255,0.025);
+    --bg-card-hover:      rgba(255,255,255,0.045);
+    --bg-input:           rgba(255,255,255,0.04);
+    --bg-subtle:          rgba(255,255,255,0.03);
+    --bg-floating:        #0e1018;
+    --border-card:        rgba(255,255,255,0.07);
+    --border-card-hover:  rgba(255,255,255,0.13);
+    --border-sidebar:     rgba(255,255,255,0.05);
+    --border-subtle:      rgba(255,255,255,0.06);
+    --border-floating:    rgba(255,255,255,0.08);
+    --text-primary:       #e2e8f0;
+    --text-secondary:     rgba(148,163,184,0.75);
+    --text-muted:         rgba(100,116,139,0.6);
+    --text-label:         rgba(148,163,184,0.5);
+    --text-dim:           rgba(148,163,184,0.40);
+    --text-dimmer:        rgba(148,163,184,0.35);
+    --scrollbar-thumb:    rgba(255,255,255,0.10);
+    --scrollbar-hover:    rgba(255,255,255,0.18);
+}
+
+/* ── Design tokens — light ─────────────────────────────── */
+:root[data-theme="light"] {
+    --bg-base:            linear-gradient(150deg, #f0f2ff 0%, #f8f5ff 50%, #f2f8ff 100%);
+    --bg-sidebar:         #ffffff;
+    --bg-card:            #ffffff;
+    --bg-card-hover:      #fafafe;
+    --bg-input:           rgba(15,23,42,0.045);
+    --bg-subtle:          rgba(15,23,42,0.03);
+    --bg-floating:        #ffffff;
+    --border-card:        rgba(109,40,217,0.10);
+    --border-card-hover:  rgba(109,40,217,0.30);
+    --border-sidebar:     rgba(15,23,42,0.07);
+    --border-subtle:      rgba(15,23,42,0.09);
+    --border-floating:    rgba(15,23,42,0.12);
+    --text-primary:       #0f172a;
+    --text-secondary:     rgba(30,41,59,0.85);
+    --text-muted:         rgba(51,65,85,0.80);
+    --text-label:         rgba(51,65,85,0.70);
+    --text-dim:           rgba(30,41,59,0.60);
+    --text-dimmer:        rgba(30,41,59,0.50);
+    --scrollbar-thumb:    rgba(109,40,217,0.15);
+    --scrollbar-hover:    rgba(109,40,217,0.25);
+}
+
+html,
+body,
+#root {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background: var(--bg-base);
+    scroll-behavior: smooth;
+    transition: background 0.3s ease;
+}
+
+/* ── Dark mode: native form elements ───────────────────── */
+/* Prevents the browser from applying OS-light-mode white backgrounds to form controls */
+:root:not([data-theme="light"]) input,
+:root:not([data-theme="light"]) select,
+:root:not([data-theme="light"]) textarea {
+  color-scheme: dark;
+}
+
+/* Force dark background on <select> box itself */
+:root:not([data-theme="light"]) select {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Force dark background on the dropdown options popup */
+:root:not([data-theme="light"]) select option {
+  background-color: #13151e;
+  color: #e2e8f0;
+}
+
+:root:not([data-theme="light"]) select option:hover,
+:root:not([data-theme="light"]) select option:focus,
+:root:not([data-theme="light"]) select option:checked {
+  background-color: #1e2130;
+  color: #a78bfa;
+}
+
+/* ── Light mode: Tailwind class overrides ───────────────── */
+
+/* Page / sidebar backgrounds */
+[data-theme="light"] .bg-\[#080A0F\],
+[data-theme="light"] .bg-\[#080a0f\]          { background: var(--bg-base)          !important; }
+[data-theme="light"] .bg-\[#090B11\],
+[data-theme="light"] .bg-\[#090b11\]          { background-color: var(--bg-sidebar) !important; }
+[data-theme="light"] .bg-\[#0d0f17\]          { background-color: #ffffff           !important; }
+[data-theme="light"] .bg-\[#0e1018\]          { background-color: #ffffff           !important; }
+[data-theme="light"] .bg-\[#090B11\]\/95      { background-color: rgba(255,255,255,0.97) !important; }
+
+/* Sidebar tooltip: keep dark so it reads as a proper tooltip against light page bg */
+[data-theme="light"] .bg-\[#1a1d27\] {
+  background-color: #1e293b !important;
+  color: #f1f5fb !important;
+  box-shadow: 0 4px 16px rgba(15,23,42,0.18) !important;
+}
+
+/* Dark zinc chart/container backgrounds */
+[data-theme="light"] .bg-zinc-900\/40,
+[data-theme="light"] .bg-zinc-900\/50,
+[data-theme="light"] .bg-zinc-900\/60       { background-color: rgba(15,23,42,0.04) !important; }
+[data-theme="light"] .bg-zinc-900           { background-color: #f8fafc             !important; }
+[data-theme="light"] .bg-zinc-950           { background:       var(--bg-base)      !important; }
+
+/* Budget/form dark inputs */
+[data-theme="light"] .bg-zinc-800           { background-color: var(--bg-input)     !important; color: var(--text-primary) !important; border: 1px solid var(--border-subtle) !important; }
+[data-theme="light"] .bg-zinc-700           { background-color: rgba(15,23,42,0.08) !important; }
+[data-theme="light"] input.bg-zinc-800::placeholder,
+[data-theme="light"] textarea.bg-zinc-800::placeholder { color: var(--text-muted)   !important; }
+
+/* Disable backdrop-blur repaints in light mode (solid card bg handles appearance) */
+[data-theme="light"] [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Disable backdrop-blur during sidebar animation in dark mode to prevent black box artifacts */
+body.sidebar-animating [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Sidebar borders */
+[data-theme="light"] .border-white\/\[0\.05\] { border-color: var(--border-sidebar) !important; }
+[data-theme="light"] .border-white\/\[0\.06\] { border-color: var(--border-subtle)  !important; }
+[data-theme="light"] .border-white\/\[0\.07\] { border-color: var(--border-card)    !important; }
+[data-theme="light"] .border-white\/10        { border-color: rgba(15,23,42,0.10)   !important; }
+
+/* Card / glass backgrounds */
+[data-theme="light"] .bg-white\/\[0\.02\]     { background-color: rgba(15,23,42,0.03) !important; }
+[data-theme="light"] .bg-white\/\[0\.03\],
+[data-theme="light"] .bg-white\/\[0\.025\]    { background-color: var(--bg-card)    !important;
+                                                  box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .bg-white\/\[0\.04\]     { background-color: var(--bg-input)   !important; }
+[data-theme="light"] .bg-white\/\[0\.05\],
+[data-theme="light"] .bg-white\/\[0\.06\],
+[data-theme="light"] .bg-white\/\[0\.07\]     { background-color: rgba(15,23,42,0.06) !important; }
+
+/* Hover backgrounds */
+[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(15,23,42,0.03) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(15,23,42,0.04) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(15,23,42,0.05) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(15,23,42,0.06) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover { background-color: rgba(15,23,42,0.07) !important; }
+
+/* Text colours */
+[data-theme="light"] .text-white                          { color: var(--text-primary)   !important; }
+[data-theme="light"] .text-zinc-100                       { color: #1e293b               !important; }
+[data-theme="light"] .text-zinc-200                       { color: #334155               !important; }
+[data-theme="light"] .text-zinc-300                       { color: #475569               !important; }
+[data-theme="light"] .text-zinc-400                       { color: #64748b               !important; }
+[data-theme="light"] .text-zinc-500                       { color: #94a3b8               !important; }
+[data-theme="light"] .text-zinc-600                       { color: #94a3b8               !important; }
+[data-theme="light"] .hover\:text-zinc-100:hover          { color: #0f172a               !important; }
+[data-theme="light"] .hover\:text-zinc-200:hover          { color: #1e293b               !important; }
+[data-theme="light"] .group:hover .group-hover\:text-zinc-200 { color: #1e293b          !important; }
+[data-theme="light"] .group:hover .group-hover\:bg-white\/\[0\.07\] { background-color: rgba(15,23,42,0.06) !important; }
+
+/* Bottom nav border */
+[data-theme="light"] .border-t { border-top-color: var(--border-sidebar) !important; }
+
+/* ── Component CSS-class overrides for light mode ──────── */
+
+/* Header */
+[data-theme="light"] .profile-item           { color: var(--text-primary) !important; }
+[data-theme="light"] .profile-item:hover     { background: rgba(15,23,42,0.04) !important; }
+[data-theme="light"] .hdr-btn {
+  background: #ffffff !important;
+  border: 1px solid rgba(109,40,217,0.14) !important;
+  box-shadow: 0 1px 3px rgba(109,40,217,0.07), 0 2px 8px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .hdr-btn:hover {
+  background: #ffffff !important;
+  border-color: rgba(109,40,217,0.28) !important;
+  box-shadow: 0 2px 6px rgba(109,40,217,0.12), 0 4px 16px rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] .notif-item:hover       { background: rgba(15,23,42,0.04) !important; }
+
+/* NetWorthSection cards */
+[data-theme="light"] .nw-card      { background: var(--bg-card)   !important; border-color: var(--border-card) !important; box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .nw-card:hover { border-color: var(--border-card-hover) !important; }
+
+/* SpendingCoachPage cards + tips */
+[data-theme="light"] .coach-card   { background: var(--bg-card)   !important; border-color: var(--border-card) !important; box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .coach-tip    { background: rgba(109,40,217,0.05) !important; border-color: rgba(109,40,217,0.15) !important; }
+[data-theme="light"] .coach-tip:hover { background: rgba(109,40,217,0.09) !important; }
+
+/* NetWorthManagement cards + inputs */
+[data-theme="light"] .nwm-card     { background: var(--bg-card)   !important; border-color: var(--border-card) !important; box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .nwm-input    { background: var(--bg-input)  !important; border-color: var(--border-subtle) !important; color: var(--text-primary) !important; }
+[data-theme="light"] .nwm-input::placeholder { color: var(--text-muted) !important; }
+
+/* Modals (EditProfile / ChangePassword / DeleteAccount) */
+[data-theme="light"] .modal-box         { background: rgba(255,255,255,0.98) !important; border-color: var(--border-card) !important; box-shadow: 0 40px 100px rgba(15,23,42,0.18) !important; }
+[data-theme="light"] .modal-input-wrap  { background: var(--bg-input) !important; border-color: var(--border-subtle) !important; }
+[data-theme="light"] .modal-input       { color: var(--text-primary) !important; }
+[data-theme="light"] .modal-input::placeholder { color: var(--text-muted) !important; }
+[data-theme="light"] .modal-btn-cancel  { background: rgba(15,23,42,0.05) !important; border-color: var(--border-card) !important; color: var(--text-secondary) !important; }
+[data-theme="light"] .modal-btn-cancel:hover { background: rgba(15,23,42,0.08) !important; }
+
+/* Auth pages (Login / Register) */
+[data-theme="light"] .auth-input-wrap   { background: var(--bg-input) !important; border-color: var(--border-subtle) !important; }
+[data-theme="light"] .auth-input        { color: var(--text-primary) !important; }
+[data-theme="light"] .auth-input::placeholder { color: var(--text-muted) !important; }
+
+/* Small bg-white variants used in AffordabilitySection, CopilotSection etc */
+[data-theme="light"] .bg-white\/\[0\.02\]     { background-color: rgba(15,23,42,0.03) !important; }
+
+/* Prose typography overrides for Copilot AI messages */
+[data-theme="light"] .prose-invert {
+  --tw-prose-body:        var(--text-primary);
+  --tw-prose-headings:    var(--text-primary);
+  --tw-prose-lead:        var(--text-secondary);
+  --tw-prose-bold:        var(--text-primary);
+  --tw-prose-counters:    var(--text-muted);
+  --tw-prose-bullets:     var(--text-muted);
+  --tw-prose-code:        #7c3aed;
+  --tw-prose-pre-bg:      rgba(15,23,42,0.06);
+}
+[data-theme="light"] .prose-invert p,
+[data-theme="light"] .prose-invert h1,
+[data-theme="light"] .prose-invert h2,
+[data-theme="light"] .prose-invert h3,
+[data-theme="light"] .prose-invert li,
+[data-theme="light"] .prose-invert strong   { color: var(--text-primary)   !important; }
+[data-theme="light"] .prose-invert em,
+[data-theme="light"] .prose-invert blockquote p { color: var(--text-secondary) !important; }
+
+/* prose modifier classes (prose-p:text-zinc-200, prose-li:text-zinc-300 etc.) */
+[data-theme="light"] .prose-p\:text-zinc-200 :where(p),
+[data-theme="light"] .prose-headings\:text-white :where(h1,h2,h3,h4,h5,h6),
+[data-theme="light"] .prose-li\:text-zinc-300 :where(li)  { color: var(--text-primary)   !important; }
+[data-theme="light"] .prose-strong\:text-purple-300 :where(strong) { color: #6d28d9      !important; }
+
+/* ── Light mode: inline-style text color overrides ─────────
+   CSS !important overrides inline styles. Attribute selectors
+   match the browser-normalised style attribute string.        */
+
+/* White → dark primary (exclude <button> and gradient divs) */
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color:#fff"],
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: #fff"] {
+  color: var(--text-primary) !important;
+}
+
+/* slate-200 (#e2e8f0) → dark primary */
+[data-theme="light"] [style*="color: rgb(226, 232, 240)"],
+[data-theme="light"] [style*="color:#e2e8f0"],
+[data-theme="light"] [style*="color: #e2e8f0"] {
+  color: var(--text-primary) !important;
+}
+
+/* Faded labels rgba(148,163,184 @ 0.4–0.5) → legible label */
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.4)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.4)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.5)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.5)"] {
+  color: var(--text-label) !important;
+}
+
+/* Secondary text rgba(148,163,184 @ 0.6–0.75) → legible secondary */
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.6)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.6)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.7)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.7)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.75)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.75)"] {
+  color: var(--text-secondary) !important;
+}
+
+/* Muted text rgba(100,116,139,...) → legible muted */
+[data-theme="light"] [style*="color: rgba(100, 116, 139, 0.6)"],
+[data-theme="light"] [style*="color:rgba(100,116,139,0.6)"],
+[data-theme="light"] [style*="color: rgba(100, 116, 139, 0.5)"],
+[data-theme="light"] [style*="color:rgba(100,116,139,0.5)"] {
+  color: var(--text-muted) !important;
+}
+
+/* Semi-transparent white rgba(255,255,255,0.4–0.6) → muted */
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.4)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.4)"],
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.5)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.5)"],
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.6)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.6)"] {
+  color: var(--text-muted) !important;
+}
+
+/* Semi-transparent white rgba(255,255,255,0.7–0.9) → secondary */
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.7)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.7)"],
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.8)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.8)"],
+[data-theme="light"] [style*="color: rgba(255, 255, 255, 0.9)"],
+[data-theme="light"] [style*="color:rgba(255,255,255,0.9)"] {
+  color: var(--text-secondary) !important;
+}
+
+/* Gray text (#d1d5db gray-300, #94a3b8 slate-400) → secondary */
+[data-theme="light"] [style*="color: rgb(209, 213, 219)"],
+[data-theme="light"] [style*="color:#d1d5db"],
+[data-theme="light"] [style*="color: rgb(148, 163, 184)"],
+[data-theme="light"] [style*="color:#94a3b8"] {
+  color: var(--text-secondary) !important;
+}
+
+/* ── Light mode: inline-style background overrides ──────── */
+
+/* Nearly-transparent white bg → light card bg
+   Note: browser normalises rgba(255,255,255,0.025) → 0.024 */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.024)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.024)"],
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.025)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.025)"],
+[data-theme="light"] [style*="background-color: rgba(255, 255, 255, 0.025)"],
+[data-theme="light"] [style*="background-color:rgba(255,255,255,0.025)"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 32px rgba(15,23,42,0.07) !important;
+}
+
+/* Subtle input/hover tints → light input bg */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.03)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.03)"],
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.04)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.04)"] {
+  background: var(--bg-input) !important;
+}
+
+/* Dropdown / panel dark hex backgrounds → light surface */
+[data-theme="light"] [style*="background: rgb(14, 16, 24)"],
+[data-theme="light"] [style*="background:#0e1018"],
+[data-theme="light"] [style*="background: #0e1018"],
+[data-theme="light"] [style*="background: rgb(13, 15, 23)"],
+[data-theme="light"] [style*="background:#0d0f17"],
+[data-theme="light"] [style*="background: #0d0f17"],
+[data-theme="light"] [style*="background: rgb(26, 29, 39)"],
+[data-theme="light"] [style*="background:#1a1d27"],
+[data-theme="light"] [style*="background: #1a1d27"] {
+  background: rgba(255,255,255,0.98) !important;
+  border-color: rgba(15,23,42,0.09) !important;
+  box-shadow: 0 16px 48px rgba(15,23,42,0.12) !important;
+}
+
+/* Page-level dark hex backgrounds → light base */
+[data-theme="light"] [style*="background: rgb(8, 10, 15)"],
+[data-theme="light"] [style*="background:#080A0F"],
+[data-theme="light"] [style*="background: #080A0F"],
+[data-theme="light"] [style*="background: rgb(9, 11, 17)"],
+[data-theme="light"] [style*="background:#090B11"],
+[data-theme="light"] [style*="background: #090B11"] {
+  background: var(--bg-base) !important;
+}
+
+/* Dark card/panel borders (inline rgba) → light border */
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.06)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.06)"],
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.07)"],
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.08)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.08)"],
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.09)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.09)"],
+[data-theme="light"] [style*="border-color: rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="borderColor:rgba(255,255,255,0.07)"] {
+  border-color: var(--border-card) !important;
+}
+
+/* Pure black overlay backgrounds (coach insight, dark cards) → light subtle bg */
+[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.2)"],
+[data-theme="light"] [style*="background:rgba(0,0,0,0.2)"],
+[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.3)"],
+[data-theme="light"] [style*="background:rgba(0,0,0,0.3)"],
+[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.1)"],
+[data-theme="light"] [style*="background:rgba(0,0,0,0.1)"] {
+  background: rgba(15,23,42,0.04) !important;
+  border-color: var(--border-card) !important;
+}
+
+/* Inline divider lines with low-opacity white → visible in light */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.05)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.05)"],
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.06)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.06)"] {
+  background: rgba(15,23,42,0.07) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE — COMPREHENSIVE GLOBAL OVERRIDES v2
+   DO NOT touch dark mode. All rules are scoped to
+   [data-theme="light"] or body.sidebar-animating (dark-mode
+   animation helper, already present above).
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 1. CSS token upgrades for light mode ───────────────── */
+/* Full-white card background for maximum contrast */
+:root[data-theme="light"] {
+    --bg-card:     #ffffff;
+    --bg-card-hover: #f8fafc;
+}
+
+/* ── 2. Missing Tailwind border variants ────────────────── */
+[data-theme="light"] .border-white\/5    { border-color: rgba(15,23,42,0.06) !important; }
+[data-theme="light"] .border-white\/8    { border-color: rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .border-white\/15   { border-color: rgba(15,23,42,0.12) !important; }
+[data-theme="light"] .border-white\/20   { border-color: rgba(15,23,42,0.15) !important; }
+
+/* ── 3. Missing Tailwind background variants ────────────── */
+[data-theme="light"] .bg-white\/5        { background-color: rgba(15,23,42,0.04) !important; }
+[data-theme="light"] .bg-white\/10       { background-color: rgba(15,23,42,0.06) !important; }
+
+/* ── 4. Tailwind accent text — darken for light contrast ── */
+[data-theme="light"] .text-green-400,
+[data-theme="light"] .text-green-300     { color: #16a34a !important; }
+[data-theme="light"] .text-emerald-400,
+[data-theme="light"] .text-emerald-300   { color: #059669 !important; }
+[data-theme="light"] .text-cyan-400,
+[data-theme="light"] .text-cyan-300      { color: #0891b2 !important; }
+[data-theme="light"] .text-blue-400,
+[data-theme="light"] .text-blue-300      { color: #1d4ed8 !important; }
+[data-theme="light"] .text-red-400,
+[data-theme="light"] .text-red-300       { color: #dc2626 !important; }
+[data-theme="light"] .text-orange-400,
+[data-theme="light"] .text-orange-300    { color: #ea580c !important; }
+[data-theme="light"] .text-yellow-400,
+[data-theme="light"] .text-yellow-300    { color: #d97706 !important; }
+[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-amber-300     { color: #d97706 !important; }
+[data-theme="light"] .text-purple-400,
+[data-theme="light"] .text-purple-300    { color: #7c3aed !important; }
+[data-theme="light"] .text-violet-400,
+[data-theme="light"] .text-violet-300    { color: #6d28d9 !important; }
+
+/* ── 5. Top glow strips — hide entirely in light mode ────
+   These are always h-px / w-px absolute gradient divs with
+   a via-white/* colour that is invisible on white anyway.  */
+[data-theme="light"] .h-px[class*="via-white"],
+[data-theme="light"] .w-px[class*="via-white"] { display: none !important; }
+
+/* ── 6. SVG ring track — score/donut ring background arc ─ */
+[data-theme="light"] circle[stroke*="rgba(255,255,255"],
+[data-theme="light"] circle[stroke*="255, 255, 255"] {
+  stroke: rgba(15,23,42,0.10) !important;
+}
+
+/* ── 7. SVG chart grid lines (CartesianGrid, TrendChart) ─ */
+[data-theme="light"] line[stroke*="rgba(255,255,255"],
+[data-theme="light"] line[stroke*="255, 255, 255"] {
+  stroke: rgba(15,23,42,0.08) !important;
+}
+
+/* ── 8. Inline backgrounds — card-level and divider ─────── */
+/* Card-level (0.025 / 0.03) → full white card with shadow */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.025)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.025)"] {
+  background: var(--bg-card) !important;
+  box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important;
+}
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.03)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.03)"] {
+  background: var(--bg-card) !important;
+  box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important;
+}
+/* Subtle overlays / dividers (0.04 / 0.07 / 0.08) → faint dark tint */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.04)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.04)"]  { background: rgba(15,23,42,0.06) !important; }
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.07)"]  { background: rgba(15,23,42,0.07) !important; }
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.08)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.08)"]  { background: rgba(15,23,42,0.07) !important; }
+
+/* ── 9. Inline border-bottom / border-top dividers ─────── */
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.05)"],
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.06)"],
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.08)"] {
+  border-bottom-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.05)"],
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.06)"],
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.08)"] {
+  border-top-color: rgba(15,23,42,0.08) !important;
+}
+
+/* ── 10. Inline accent text — hex values too neon on white ─ */
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(74, 222, 128)"],
+[data-theme="light"] :not(button)[style*="color: #4ade80"],
+[data-theme="light"] :not(button)[style*="color:#4ade80"]    { color: #16a34a !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(34, 211, 238)"],
+[data-theme="light"] :not(button)[style*="color: #22d3ee"],
+[data-theme="light"] :not(button)[style*="color:#22d3ee"]    { color: #0891b2 !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(248, 113, 113)"],
+[data-theme="light"] :not(button)[style*="color: #f87171"],
+[data-theme="light"] :not(button)[style*="color:#f87171"]    { color: #dc2626 !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(251, 191, 36)"],
+[data-theme="light"] :not(button)[style*="color: #fbbf24"],
+[data-theme="light"] :not(button)[style*="color:#fbbf24"]    { color: #d97706 !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(167, 139, 250)"],
+[data-theme="light"] :not(button)[style*="color: #a78bfa"],
+[data-theme="light"] :not(button)[style*="color:#a78bfa"]    { color: #7c3aed !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(196, 181, 253)"],
+[data-theme="light"] :not(button)[style*="color: #c4b5fd"],
+[data-theme="light"] :not(button)[style*="color:#c4b5fd"]    { color: #6d28d9 !important; }
+
+[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(163, 230, 53)"],
+[data-theme="light"] :not(button)[style*="color: #a3e635"],
+[data-theme="light"] :not(button)[style*="color:#a3e635"]    { color: #65a30d !important; }
+
+/* ── 11. Inline accent backgrounds — colored info boxes ─── */
+/* Green */
+[data-theme="light"] :not(button)[style*="background: rgba(74, 222, 128"],
+[data-theme="light"] :not(button)[style*="background:rgba(74,222,128"]  {
+  background: rgba(22,163,74,0.08) !important;
+  border-color: rgba(22,163,74,0.25) !important;
+}
+/* Cyan */
+[data-theme="light"] :not(button)[style*="background: rgba(34, 211, 238"],
+[data-theme="light"] :not(button)[style*="background:rgba(34,211,238"]  {
+  background: rgba(8,145,178,0.08) !important;
+  border-color: rgba(8,145,178,0.25) !important;
+}
+/* Red */
+[data-theme="light"] :not(button)[style*="background: rgba(248, 113, 113"],
+[data-theme="light"] :not(button)[style*="background:rgba(248,113,113"] {
+  background: rgba(220,38,38,0.08) !important;
+  border-color: rgba(220,38,38,0.25) !important;
+}
+/* Purple */
+[data-theme="light"] :not(button)[style*="background: rgba(167, 139, 250"],
+[data-theme="light"] :not(button)[style*="background:rgba(167,139,250"] {
+  background: rgba(109,40,217,0.08) !important;
+  border-color: rgba(109,40,217,0.25) !important;
+}
+/* Yellow/amber */
+[data-theme="light"] :not(button)[style*="background: rgba(251, 191, 36"],
+[data-theme="light"] :not(button)[style*="background:rgba(251,191,36"]  {
+  background: rgba(217,119,6,0.08) !important;
+  border-color: rgba(217,119,6,0.25) !important;
+}
+/* Orange */
+[data-theme="light"] :not(button)[style*="background: rgba(234, 179, 8"],
+[data-theme="light"] :not(button)[style*="background:rgba(234,179,8"]   {
+  background: rgba(161,98,7,0.08) !important;
+  border-color: rgba(161,98,7,0.25) !important;
+}
+
+/* ── 12. Ambient radial glow blobs — remove in light mode ─ */
+[data-theme="light"] [style*="radial-gradient"] {
+  opacity: 0 !important;
+}
+
+/* ── 13. stat-card / nwm-row / nwm-select (NetWorthManagement) ── */
+[data-theme="light"] .stat-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 2px 16px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .stat-card::after { display: none !important; }
+[data-theme="light"] .nwm-row {
+  background: rgba(15,23,42,0.03) !important;
+  border-color: var(--border-card) !important;
+}
+[data-theme="light"] .nwm-row:hover {
+  background: rgba(15,23,42,0.06) !important;
+  border-color: var(--border-card-hover) !important;
+}
+[data-theme="light"] .nwm-select {
+  background: var(--bg-input) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── 14. Settings page cards / toggle track ─────────────── */
+[data-theme="light"] .sp-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 1px 0 rgba(109,40,217,0.04), 0 2px 8px rgba(109,40,217,0.05), 0 8px 28px rgba(15,23,42,0.07) !important;
+}
+[data-theme="light"] .sp-card-label {
+  border-bottom-color: var(--border-card) !important;
+}
+[data-theme="light"] .sp-conn-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+}
+[data-theme="light"] .sp-ai-card {
+  background: rgba(15,23,42,0.02) !important;
+  border-color: var(--border-card) !important;
+}
+[data-theme="light"] .sp-ai-card:hover:not(.selected) {
+  background: rgba(15,23,42,0.05) !important;
+  border-color: var(--border-card-hover) !important;
+}
+/* Toggle off-state track (rgba(255,255,255,0.1)) is invisible on white */
+[data-theme="light"] .sp-toggle[style*="rgba(255, 255, 255, 0.1)"],
+[data-theme="light"] .sp-toggle[style*="rgba(255,255,255,0.1)"] {
+  background: rgba(15,23,42,0.15) !important;
+}
+[data-theme="light"] .sp-toggle-thumb {
+  background: #fff !important;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.25) !important;
+}
+
+/* ── 15. Amber-500 rgba(245,158,11,...) accent (Investment Portfolio row) ── */
+[data-theme="light"] :not(button)[style*="background: rgba(245, 158, 11"],
+[data-theme="light"] :not(button)[style*="background:rgba(245,158,11"] {
+  background: rgba(161,98,7,0.07) !important;
+  border-color: rgba(161,98,7,0.2) !important;
+}
+[data-theme="light"] :not(button)[style*="color: rgb(245, 158, 11)"],
+[data-theme="light"] :not(button)[style*="color: #f59e0b"],
+[data-theme="light"] :not(button)[style*="color:#f59e0b"] {
+  color: #b45309 !important;
+}
+
+/* ── 16. Progress bar track rgba(255,255,255,0.07) inside stat-card ── */
+[data-theme="light"] .stat-card [style*="background: rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] .stat-card [style*="background:rgba(255,255,255,0.07)"] {
+  background: rgba(15,23,42,0.10) !important;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* ── Mobile safe area (iPhone notch / home bar) ────────── */
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Touch targets — buttons at least 44px tall on mobile ─ */
+@media (max-width: 767px) {
+    button {
+        min-height: 36px;
+    }
+}
+
+/* ── Custom scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* ── Text selection ───────────────────────────────────── */
+::selection {
+    background: rgba(167, 139, 250, 0.25);
+    color: var(--text-primary);
+}
+
+.no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.goal-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.goal-input:focus {
+    border-color: rgba(167,139,250,0.4);
+}
+
+.goal-input::placeholder {
+    color: var(--text-muted);
+}
+
+.goal-input::-webkit-outer-spin-button,
+.goal-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.goal-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.g-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 10px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.g-btn:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+
+.g-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── 17. Onboarding page — light mode class overrides ───── */
+
+[data-theme="light"] .ob-breadcrumb-bar {
+    background: rgba(255,255,255,0.92) !important;
+    border-bottom: 1px solid rgba(109,40,217,0.08) !important;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 1px 0 rgba(109,40,217,0.06) !important;
+}
+
+[data-theme="light"] .ob-input {
+    background: rgba(255,255,255,0.82) !important;
+    border-color: rgba(15,23,42,0.16) !important;
+    color: #0f172a !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .ob-input::placeholder { color: rgba(71,85,105,0.55) !important; }
+[data-theme="light"] .ob-input:focus {
+    background: #ffffff !important;
+    border-color: rgba(124,58,237,0.42) !important;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.08) !important;
+}
+
+[data-theme="light"] .otp-box {
+    background: rgba(255,255,255,0.82) !important;
+    border-color: rgba(15,23,42,0.16) !important;
+    color: #0f172a !important;
+}
+[data-theme="light"] .otp-box:focus {
+    background: #ffffff !important;
+    border-color: rgba(124,58,237,0.42) !important;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.08) !important;
+}
+
+[data-theme="light"] .goal-chip {
+    background: rgba(255,255,255,0.80) !important;
+    border-color: rgba(15,23,42,0.14) !important;
+    color: rgba(30,41,59,0.80) !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .goal-chip:hover {
+    background: rgba(109,40,217,0.07) !important;
+    border-color: rgba(109,40,217,0.28) !important;
+    color: #4c1d95 !important;
+}
+[data-theme="light"] .goal-chip.active {
+    background: rgba(109,40,217,0.12) !important;
+    border-color: rgba(109,40,217,0.40) !important;
+    color: #3b0764 !important;
+}
+
+[data-theme="light"] .ai-mode-card {
+    background: rgba(255,255,255,0.78) !important;
+    border-color: rgba(15,23,42,0.12) !important;
+    box-shadow: 0 1px 4px rgba(15,23,42,0.05) !important;
+}
+[data-theme="light"] .ai-mode-card:hover:not(.selected) {
+    background: rgba(255,255,255,0.95) !important;
+    border-color: rgba(15,23,42,0.18) !important;
+}
+[data-theme="light"] .ai-mode-card.selected {
+    background: rgba(109,40,217,0.08) !important;
+    border-color: rgba(109,40,217,0.35) !important;
+}
+
+[data-theme="light"] .review-card {
+    background: rgba(255,255,255,0.88) !important;
+    border-color: rgba(15,23,42,0.10) !important;
+    box-shadow: 0 2px 12px rgba(15,23,42,0.07) !important;
+}
+
+[data-theme="light"] .ob-toggle[style*="rgba(255, 255, 255, 0.08)"],
+[data-theme="light"] .ob-toggle[style*="rgba(255,255,255,0.08)"] {
+    background: rgba(15,23,42,0.10) !important;
+}
+[data-theme="light"] .ob-toggle-thumb {
+    background: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.22) !important;
+}
+
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.1)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.1)"],
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.10)"] {
+    border-color: rgba(15,23,42,0.11) !important;
+}
+/* ── 18. Comprehensive light mode fixes ─────────────────────── */
+
+/* ── 18a. Missing inline-style patterns ── */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.018)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.018)"] {
+  background: rgba(15,23,42,0.025) !important;
+}
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.02)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.02)"] {
+  background: rgba(15,23,42,0.03) !important;
+}
+
+/* ── 18b. Profile page ── */
+[data-theme="light"] .profile-page { color: var(--text-primary) !important; }
+[data-theme="light"] .p-stat-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .p-stat-card::after { display: none !important; }
+[data-theme="light"] .p-stat-card:hover { border-color: var(--border-card-hover) !important; transform: translateY(-2px); }
+/* Avatar ring — match page gradient bg so the punched-out effect works */
+[data-theme="light"] .profile-page [style*="border: 4px solid"] { border-color: #f0f2ff !important; }
+
+/* ── 18c. NetWorthPage cards/rows ── */
+[data-theme="light"] .nwp-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.06) !important;
+}
+[data-theme="light"] .nwp-card::after { display: none !important; }
+[data-theme="light"] .nwp-card:hover { border-color: var(--border-card-hover) !important; }
+[data-theme="light"] .nwp-row {
+  background: rgba(15,23,42,0.03) !important;
+  border-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] .nwp-row:hover { background: rgba(15,23,42,0.06) !important; }
+
+/* ── 18d. Settings page — missing class overrides ── */
+[data-theme="light"] .sp-otp-box {
+  background: rgba(255,255,255,0.85) !important;
+  border-color: rgba(15,23,42,0.16) !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .sp-otp-box:focus {
+  background: #ffffff !important;
+  border-color: rgba(124,58,237,0.42) !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08) !important;
+}
+[data-theme="light"] .sp-action-btn {
+  background: rgba(15,23,42,0.04) !important;
+  border-color: rgba(15,23,42,0.12) !important;
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .sp-action-btn:hover {
+  background: rgba(15,23,42,0.08) !important;
+  border-color: rgba(15,23,42,0.18) !important;
+}
+[data-theme="light"] .sp-tab-btn {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .sp-tab-btn:hover {
+  background: rgba(15,23,42,0.05) !important;
+}
+
+/* ── 18e. HelpWidget ── */
+[data-theme="light"] .help-link-row {
+  background: rgba(15,23,42,0.03) !important;
+  border-color: rgba(15,23,42,0.09) !important;
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] .help-link-row:hover {
+  background: rgba(15,23,42,0.06) !important;
+}
+
+/* ── 18f. Admin page (all classes scoped to .adm) ── */
+[data-theme="light"] .adm {
+  background: var(--bg-base) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .adm .sidebar {
+  background: #ffffff !important;
+  border-right-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] .adm .topbar {
+  background: rgba(255,255,255,0.92) !important;
+  border-bottom-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] .adm .card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.05) !important;
+}
+[data-theme="light"] .adm .stat-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-card) !important;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.05) !important;
+}
+[data-theme="light"] .adm .nav-item { color: var(--text-secondary) !important; }
+[data-theme="light"] .adm .nav-item:hover {
+  background: rgba(15,23,42,0.04) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .adm .nav-item.active {
+  background: rgba(109,40,217,0.08) !important;
+  border-color: rgba(109,40,217,0.20) !important;
+  color: #6d28d9 !important;
+}
+[data-theme="light"] .adm .section-title { color: rgba(15,23,42,0.38) !important; }
+[data-theme="light"] .adm .tbl th {
+  color: rgba(15,23,42,0.42) !important;
+  border-bottom-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] .adm .tbl td { border-bottom-color: rgba(15,23,42,0.05) !important; }
+[data-theme="light"] .adm .tbl tr:hover td { background: rgba(15,23,42,0.025) !important; }
+[data-theme="light"] .adm .inp,
+[data-theme="light"] .adm .txtarea {
+  background: rgba(255,255,255,0.85) !important;
+  border-color: rgba(15,23,42,0.14) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .adm .inp::placeholder,
+[data-theme="light"] .adm .txtarea::placeholder { color: rgba(100,116,139,0.5) !important; }
+[data-theme="light"] .adm .modal {
+  background: rgba(255,255,255,0.98) !important;
+  border-color: rgba(15,23,42,0.09) !important;
+  box-shadow: 0 32px 80px rgba(15,23,42,0.18) !important;
+}
+/* Admin badges — user badge barely visible on white */
+[data-theme="light"] .adm .b-user {
+  background: rgba(15,23,42,0.05) !important;
+  border-color: rgba(15,23,42,0.12) !important;
+  color: rgba(15,23,42,0.55) !important;
+}
+
+/* ── 18g. Score ring track (SVG attr) ── */
+[data-theme="light"] .hero-wrap svg circle:first-child {
+  stroke: rgba(15,23,42,0.09) !important;
+}
+
+/* ── 18h. Generic dark panel inline border-color fixes ── */
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.07)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.07)"] {
+  border-color: rgba(109,40,217,0.10) !important;
+}
+[data-theme="light"] [style*="border: 1px solid rgba(255, 255, 255, 0.12)"],
+[data-theme="light"] [style*="border:1px solid rgba(255,255,255,0.12)"] {
+  border-color: rgba(15,23,42,0.13) !important;
+}
+[data-theme="light"] [style*="border: 2px solid rgba(255, 255, 255, 0.08)"],
+[data-theme="light"] [style*="border:2px solid rgba(255,255,255,0.08)"] {
+  border-color: rgba(15,23,42,0.10) !important;
+}
+
+/* ── 18i. Near-opaque dark inline panels (HelpWidget, etc.) ── */
+[data-theme="light"] [style*="background: rgba(10, 12, 18"],
+[data-theme="light"] [style*="background:rgba(10,12,18"],
+[data-theme="light"] [style*="background: rgba(10,12,18"] {
+  background: rgba(255,255,255,0.98) !important;
+  border-color: rgba(15,23,42,0.09) !important;
+  box-shadow: 0 24px 60px rgba(15,23,42,0.14) !important;
+}
+
+/* Text inside help panel — white text on white bg fix */
+[data-theme="light"] .help-panel-wrap [style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] .help-panel-wrap [style*="color: #fff"],
+[data-theme="light"] .help-panel-wrap [style*="color:#fff"] {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .help-panel-wrap [style*="color: rgba(148, 163, 184"] {
+  color: var(--text-secondary) !important;
+}
+
+/* ── 18j. DashboardHero score ring track ── */
+[data-theme="light"] .hero-wrap svg circle:first-child {
+  stroke: rgba(15,23,42,0.09) !important;
+}
+
+/* ── 18k. Tab-style row selectors in AnalyticsPage ── */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.05)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.05)"] {
+  background: rgba(15,23,42,0.05) !important;
+}
+
+/* ── 18l. Border-top / border-bottom rgba(255,255,255,0.09) and 0.1 ── */
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.09)"],
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.1)"],
+[data-theme="light"] [style*="border-bottom: 1px solid rgba(255, 255, 255, 0.10)"] {
+  border-bottom-color: rgba(15,23,42,0.08) !important;
+}
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.09)"],
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.1)"],
+[data-theme="light"] [style*="border-top: 1px solid rgba(255, 255, 255, 0.10)"] {
+  border-top-color: rgba(15,23,42,0.08) !important;
+}
+
+/* ── 18m. Dim text colors — faint on white, boost contrast ── */
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.45)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.45)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.5)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.5)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.6)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.6)"],
+[data-theme="light"] [style*="color: rgba(148, 163, 184, 0.7)"],
+[data-theme="light"] [style*="color:rgba(148,163,184,0.7)"] {
+  color: var(--text-secondary) !important;
+}
+[data-theme="light"] [style*="color: rgba(100, 116, 139, 0.6)"],
+[data-theme="light"] [style*="color:rgba(100,116,139,0.6)"],
+[data-theme="light"] [style*="color: rgba(71, 85, 105, 0.6)"],
+[data-theme="light"] [style*="color:rgba(71,85,105,0.6)"] {
+  color: var(--text-label) !important;
+}
+
+/* ── 18n. Profile-page white / near-white text on light bg ──
+   :not([style*="background"]) protects avatar/button elements
+   that deliberately render white text on a colored background. ── */
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color: #fff"],
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color:#fff"],
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color: white"] {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color: #e2e8f0"],
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color:#e2e8f0"],
+[data-theme="light"] .profile-page :not([style*="background"])[style*="color: rgb(226, 232, 240)"] {
+  color: var(--text-primary) !important;
+}

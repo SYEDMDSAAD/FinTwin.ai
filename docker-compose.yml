@@ -1,0 +1,133 @@
+version: "3.9"
+
+# ── Shared internal network — AI service is NOT port-exposed ─────────────────
+networks:
+  fintwin:
+    driver: bridge
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [fintwin]
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-fintwin}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis — distributed rate limiting + AI chat memory ──────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [fintwin]
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redisdata:/data
+
+  # ── AI Service (internal only — no ports exposed to host) ───────────────────
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    networks: [fintwin]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
+      REDIS_URL:        redis://redis:6379
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+    # No `ports:` — only reachable by Spring Boot on the fintwin network
+
+  # ── Spring Boot Backend ─────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    networks: [fintwin]
+    depends_on:
+      db:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      # DB is on the internal Docker network — sslmode=disable is fine here.
+      # For an external managed DB (RDS, Cloud SQL), set DB_URL with ?sslmode=require.
+      DB_URL:                    jdbc:postgresql://db:5432/${POSTGRES_DB:-fintwin}
+      DB_USERNAME:               ${POSTGRES_USER:-postgres}
+      DB_PASSWORD:               ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      JWT_SECRET:                ${JWT_SECRET:?JWT_SECRET is required}
+      FINTWIN_ENCRYPTION_KEY:    ${FINTWIN_ENCRYPTION_KEY:?FINTWIN_ENCRYPTION_KEY is required}
+      AI_SERVICE_URL:            http://ai-service:8000
+      AI_INTERNAL_KEY:           ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
+      REDIS_URL:                 redis://redis:6379
+      DB_POOL_MAX:               ${DB_POOL_MAX:-20}
+      GOOGLE_CLIENT_ID:          ${GOOGLE_CLIENT_ID:-}
+      CORS_ALLOWED_ORIGINS:      ${CORS_ALLOWED_ORIGINS:-https://fintwin.local}
+      SETU_BASE_URL:             ${SETU_BASE_URL:-https://fiu-uat.setu.co}
+      SETU_CLIENT_ID:            ${SETU_CLIENT_ID:-}
+      SETU_CLIENT_SECRET:        ${SETU_CLIENT_SECRET:-}
+      SETU_REDIRECT_URL:         ${SETU_REDIRECT_URL:-}
+      SETU_PRODUCT_INSTANCE_ID:  ${SETU_PRODUCT_INSTANCE_ID:-}
+      SETU_WEBHOOK_SECRET:       ${SETU_WEBHOOK_SECRET:-}
+    # Not exposed directly — Nginx proxies /api/* to this service
+
+  # ── Nginx — TLS termination + frontend serving ──────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [fintwin]
+    depends_on: [backend]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - letsencrypt:/etc/nginx/certs:ro        # certs written by certbot
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - certbot-webroot:/var/www/certbot:ro    # ACME challenge files
+
+  # ── Certbot — Let's Encrypt certificate issuance + auto-renewal ─────────────
+  #
+  # FIRST-TIME SETUP (run before starting nginx with HTTPS):
+  #   ./certbot-init.sh yourdomain.com admin@yourdomain.com
+  #
+  # After init, start the stack normally — certbot renews every 12h automatically.
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - letsencrypt:/etc/letsencrypt:rw
+      - certbot-webroot:/var/www/certbot:rw
+    # Renewal loop: checks every 12h, reloads nginx on success
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do
+               certbot renew --webroot -w /var/www/certbot --quiet 2>/dev/null || true;
+               sleep 12h & wait $${!};
+             done"
+    profiles:
+      - production   # start with: docker compose --profile production up -d
+
+volumes:
+  pgdata:
+  redisdata:
+  letsencrypt:     # shared between nginx (read) and certbot (write)
+  certbot-webroot: # ACME challenge files

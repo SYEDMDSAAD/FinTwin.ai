@@ -1,0 +1,101 @@
+# Production overrides for FinTwin.ai.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What this file does:
+#   - Replaces build: with pre-built registry images (set REGISTRY and TAG env vars)
+#   - Adds CPU + memory resource limits to every service
+#   - Adds structured log rotation
+#   - Overrides DDL_AUTO to validate (schema managed by migrations, not Hibernate)
+#   - Increases connection pool and uvicorn workers for prod load
+#
+# Required env vars (add to your CI secrets or .env.prod):
+#   REGISTRY   — your container registry prefix, e.g. ghcr.io/your-org or docker.io/youruser
+#   TAG        — image tag to deploy, e.g. v1.2.0 or a git SHA
+#   (All other vars from docker-compose.yml are still required)
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # For production at scale, replace this with a managed DB (AWS RDS, Cloud SQL,
+  # Supabase). Managed DBs give you automated backups, read replicas, and HA
+  # without running stateful workloads in containers.
+  db:
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    logging: *default-logging
+
+  # ── AI Service ──────────────────────────────────────────────────────────────
+  ai-service:
+    # Uses pre-built image — no build: in prod
+    image: ${REGISTRY:?REGISTRY is required}/fintwin-ai-service:${TAG:?TAG is required}
+    environment:
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *default-logging
+
+  # ── Spring Boot Backend ─────────────────────────────────────────────────────
+  backend:
+    image: ${REGISTRY:?REGISTRY is required}/fintwin-backend:${TAG:?TAG is required}
+    environment:
+      DDL_AUTO:     validate          # Never auto-alter schema in prod
+      DB_POOL_MAX:  ${DB_POOL_MAX:-30}
+      SHOW_SQL:     "false"
+    deploy:
+      resources:
+        # JVM flag -XX:MaxRAMPercentage=75 → ~576Mi heap inside a 768M container
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *default-logging
+
+  # ── Nginx ───────────────────────────────────────────────────────────────────
+  nginx:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"   # Access logs are high-volume
+        max-file: "10"

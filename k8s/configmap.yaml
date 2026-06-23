@@ -1,0 +1,41 @@
+# Non-sensitive configuration shared across services.
+# Sensitive values (passwords, keys, tokens) live in secret.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fintwin-config
+  namespace: fintwin
+data:
+  # ── Database ─────────────────────────────────────────────────────────────────
+  # When using a managed DB (RDS/Cloud SQL/Supabase), replace with external hosts.
+  # DB_URL       → Session-mode pooler URL (supports HikariCP prepared statements).
+  # FLYWAY_DB_URL → Direct connection URL (preferred for DDL migrations).
+  # For Supabase: set both via secret.yaml; see Supabase Dashboard → Settings → Database.
+  DB_URL:           "jdbc:postgresql://postgres-service:5432/fintwin"
+  FLYWAY_DB_URL:    "jdbc:postgresql://postgres-service:5432/fintwin"
+  DB_USERNAME:      "postgres"
+  DDL_AUTO:         "validate"
+  FLYWAY_ENABLED:   "true"
+  FLYWAY_BASELINE:  "false"
+  SHOW_SQL:         "false"
+  DB_POOL_MAX:      "20"
+  DB_POOL_MIN:      "5"
+
+  # ── Services ──────────────────────────────────────────────────────────────────
+  AI_SERVICE_URL:   "http://ai-service:8000"
+  REDIS_URL:        "redis://redis-service:6379"
+
+  # ── App ───────────────────────────────────────────────────────────────────────
+  SERVER_PORT:      "8080"
+  MAIL_ENABLED:     "false"
+  MAIL_HOST:        "smtp.gmail.com"
+  MAIL_PORT:        "587"
+
+  # ── Setu ─────────────────────────────────────────────────────────────────────
+  SETU_BASE_URL:    "https://fiu-uat.setu.co"
+
+  # ── AI Service ───────────────────────────────────────────────────────────────
+  UVICORN_WORKERS:  "4"
+
+  # ── Actuator ─────────────────────────────────────────────────────────────────
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info"
