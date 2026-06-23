@@ -13,7 +13,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository_owner }}/fintwin-ai-service
 
 jobs:
   build:
@@ -26,6 +25,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -59,7 +61,7 @@ jobs:
           context: ai-service
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-ai-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-ai-service:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
