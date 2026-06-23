@@ -8,12 +8,9 @@ on:
       - '.github/workflows/ci-backend.yml'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'backend/**'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ${{ github.repository_owner }}/fintwin-backend
 
 jobs:
   build:
@@ -26,6 +23,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -54,8 +54,6 @@ jobs:
         with:
           context: backend
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/fintwin-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
