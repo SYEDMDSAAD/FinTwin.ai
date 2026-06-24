@@ -445,6 +445,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const isLoggedIn = !!localStorage.getItem("token");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -472,8 +473,14 @@ export default function LandingPage() {
         <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Security">Security</button>
         <button className="mob-link" onClick={() => scrollTo("pricing")} aria-label="Go to Pricing">Pricing</button>
         <div style={{ width: "100%", height: 1, background: "rgba(255,255,255,0.08)", margin: "8px 0" }} />
-        <button className="mob-link" onClick={() => { setMenuOpen(false); navigate("/login"); }}>Log In</button>
-        <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/register"); }}>Get Started</button>
+        {isLoggedIn ? (
+          <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/dashboard"); }}>Open Dashboard</button>
+        ) : (
+          <>
+            <button className="mob-link" onClick={() => { setMenuOpen(false); navigate("/login"); }}>Log In</button>
+            <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/register"); }}>Get Started</button>
+          </>
+        )}
         <button onClick={() => setMenuOpen(false)} aria-label="Close menu" style={{ position: "absolute", top: 24, right: 28, background: "none", border: "none", cursor: "pointer", fontSize: 28, color: "rgba(148,163,184,0.7)", lineHeight: 1 }}>✕</button>
       </div>
 
@@ -490,8 +497,14 @@ export default function LandingPage() {
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("pricing")}>Pricing</button>
           </div>
           <div className="lnav-right">
-            <button className="btn-ghost" onClick={() => navigate("/login")} aria-label="Log in to your account">Log In</button>
-            <button className="btn-primary" onClick={() => navigate("/register")} aria-label="Create a free account">Get Started</button>
+            {isLoggedIn ? (
+              <button className="btn-primary" onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">Open Dashboard</button>
+            ) : (
+              <>
+                <button className="btn-ghost" onClick={() => navigate("/login")} aria-label="Log in to your account">Log In</button>
+                <button className="btn-primary" onClick={() => navigate("/register")} aria-label="Create a free account">Get Started</button>
+              </>
+            )}
           </div>
           <button className="lnav-ham" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
             <span /><span /><span />
@@ -525,11 +538,20 @@ export default function LandingPage() {
             </p>
 
             <div className="hero-ctas h-el-4">
-              <button className="btn-hero" onClick={() => navigate("/register")} aria-label="Create your free FinTwin account">
-                Get Started — it's free
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Log In</button>
+              {isLoggedIn ? (
+                <button className="btn-hero" onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">
+                  Open Dashboard
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              ) : (
+                <>
+                  <button className="btn-hero" onClick={() => navigate("/register")} aria-label="Create your free FinTwin account">
+                    Get Started — it's free
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Log In</button>
+                </>
+              )}
             </div>
 
             <div className="hero-stats h-el-5">
@@ -947,10 +969,10 @@ export default function LandingPage() {
               <button
                 className="btn-primary"
                 style={{ width: "100%", padding: "16px", fontSize: 16, borderRadius: 14 }}
-                onClick={() => navigate("/register")}
-                aria-label="Create your free FinTwin account"
+                onClick={() => navigate(isLoggedIn ? "/dashboard" : "/register")}
+                aria-label={isLoggedIn ? "Go to your dashboard" : "Create your free FinTwin account"}
               >
-                Get started — no card required
+                {isLoggedIn ? "Open Dashboard" : "Get started — no card required"}
               </button>
               <p style={{ marginTop: 14, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
                 We'll give you 30 days notice before any pricing changes.
@@ -1028,16 +1050,30 @@ export default function LandingPage() {
               Join the people who stopped guessing and started knowing. Free, private, built for India.
             </p>
             <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-              <button
-                className="btn-hero"
-                style={{ fontSize: 17, padding: "17px 40px", borderRadius: 14 }}
-                onClick={() => navigate("/register")}
-                aria-label="Create your free FinTwin account"
-              >
-                Start understanding your money
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Already have an account</button>
+              {isLoggedIn ? (
+                <button
+                  className="btn-hero"
+                  style={{ fontSize: 17, padding: "17px 40px", borderRadius: 14 }}
+                  onClick={() => navigate("/dashboard")}
+                  aria-label="Go to your dashboard"
+                >
+                  Open Dashboard
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn-hero"
+                    style={{ fontSize: 17, padding: "17px 40px", borderRadius: 14 }}
+                    onClick={() => navigate("/register")}
+                    aria-label="Create your free FinTwin account"
+                  >
+                    Start understanding your money
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Already have an account</button>
+                </>
+              )}
             </div>
             <p style={{ marginTop: 20, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
               Free · No credit card · Runs on our servers, not Google's
@@ -1070,7 +1106,7 @@ export default function LandingPage() {
                 <button className="footer-link" onClick={() => scrollTo("features")}>Features</button>
                 <button className="footer-link" onClick={() => scrollTo("security")}>Security</button>
                 <button className="footer-link" onClick={() => scrollTo("pricing")}>Pricing</button>
-                <button className="footer-link" onClick={() => navigate("/register")}>Get started</button>
+                <button className="footer-link" onClick={() => navigate(isLoggedIn ? "/dashboard" : "/register")}>{isLoggedIn ? "Dashboard" : "Get started"}</button>
               </div>
             </div>
 

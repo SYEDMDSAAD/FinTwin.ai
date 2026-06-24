@@ -193,7 +193,7 @@ function Profile() {
               {/* ── Back button + title ── */}
               <div className="prof-fade" style={{ marginBottom: 28 }}>
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/dashboard")}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 7,
                     marginBottom: 18, padding: "7px 14px",

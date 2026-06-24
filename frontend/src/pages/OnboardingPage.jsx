@@ -543,7 +543,7 @@ export default function OnboardingPage() {
       sessionStorage.removeItem("ob-step");
       sessionStorage.removeItem("ob-manual");
       toast.success("Welcome to FinTwin AI! Your financial profile is ready.", { duration: 5000 });
-      setTimeout(() => navigate("/"), 3000);
+      navigate("/dashboard", { replace: true });
     } catch {
       toast.error("Failed to create profile. Please try again.");
       setSubmitting(false);

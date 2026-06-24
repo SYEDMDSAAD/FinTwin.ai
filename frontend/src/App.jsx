@@ -42,13 +42,11 @@ function App() {
             <Routes>
 
                 {/* =========================
-                    LANDING
+                    LANDING  (default root — always shown first)
                 ========================= */}
 
-                <Route
-                    path="/landing"
-                    element={<LandingPage />}
-                />
+                <Route path="/"        element={<LandingPage />} />
+                <Route path="/landing" element={<LandingPage />} />
 
                 {/* =========================
                     AUTH
@@ -79,19 +77,12 @@ function App() {
                 ========================= */}
 
                 <Route
-
-                    path="/"
-
+                    path="/dashboard"
                     element={
-
                         <ProtectedRoute>
-
                             <Dashboard />
-
                         </ProtectedRoute>
-
                     }
-
                 />
 
                 {/* =========================

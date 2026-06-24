@@ -119,7 +119,7 @@ function Register() {
       setOtpLoading(true);
       await API.post("/auth/verify-email", { email: email.toLowerCase().trim(), otp });
       toast.success("Email verified! You can now sign in.");
-      navigate("/login");
+      navigate("/login", { replace: true });
     } catch (e) { toast.error(e.response?.data || "Invalid or expired code"); }
     finally { setOtpLoading(false); }
   };

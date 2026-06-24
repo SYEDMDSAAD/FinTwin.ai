@@ -179,7 +179,7 @@ function Login() {
       login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
       toast.success("Login Successful");
       const me = await API.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/" : "/onboarding");
+      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.error === "ACCOUNT_DISABLED") {
         setAccountBlocked(true); setTicketDefaultEmail(email);
@@ -210,7 +210,7 @@ function Login() {
       login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
       toast.success("Login Successful");
       const me = await API.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/" : "/onboarding");
+      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid code. Try again.";
       toast.error(msg);
@@ -223,7 +223,7 @@ function Login() {
       login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
       toast.success("Google Login Successful");
       const me = await API.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/" : "/onboarding");
+      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch { toast.error("Google Login Failed"); }
   };
   const openTicket = (prefillEmail = "") => { setTicketDefaultEmail(prefillEmail); setShowTicket(true); };
