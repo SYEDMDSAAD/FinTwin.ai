@@ -111,6 +111,14 @@ public class GlobalExceptionHandler {
                         .body(error);
         }
 
+        if (msg != null && (msg.startsWith("You already have a connected bank account")
+                || msg.startsWith("A bank connection is already in progress"))) {
+                error.put("error", msg);
+                return ResponseEntity
+                        .status(409)
+                        .body(error);
+        }
+
         // Never expose internal error details to clients
         error.put("error", "An unexpected error occurred");
         return ResponseEntity

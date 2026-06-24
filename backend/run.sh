@@ -7,6 +7,9 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
+set -a
+# shellcheck source=.env
+source .env
+set +a
 export MAVEN_OPTS="-Xmx512m -Xms256m"
 mvn spring-boot:run

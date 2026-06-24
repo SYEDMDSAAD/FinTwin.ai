@@ -54,4 +54,9 @@ public class BankConnection {
 
     @Column(name = "last_synced_at")
     private LocalDateTime lastSyncedAt;
+
+    // Tracks the last Setu session that was fully processed — prevents duplicate
+    // transactions when Setu retries SESSION_STATUS_UPDATE webhooks
+    @Column(name = "last_processed_session_id")
+    private String lastProcessedSessionId;
 }
