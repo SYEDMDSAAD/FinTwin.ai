@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -128,15 +129,15 @@ public class OnboardingService {
         double curIncome   = request.getIncomeLast3Months();
         double curExpenses = request.getExpensesLast3Months();
 
-        // Previous quarter: slightly lower income, slightly higher expenses
         double prevIncome   = curIncome   * 0.90;
         double prevExpenses = curExpenses * 1.20;
 
-        // Monthly distribution within each quarter
         double[] distribution = { 0.32, 0.28, 0.40 };
 
         LocalDate today = LocalDate.now();
         int startOffset = today.getDayOfMonth() >= 10 ? 5 : 6;
+
+        List<Transaction> batch = new ArrayList<>(80);
 
         for (int i = 0; i < 6; i++) {
             boolean isPrevQuarter = i < 3;
@@ -149,7 +150,7 @@ public class OnboardingService {
 
             LocalDate month = today.minusMonths(startOffset - i);
 
-            saveTransaction(user, month.withDayOfMonth(1).toString(), "Employer", monthIncome, "Income");
+            batch.add(buildTransaction(user, month.withDayOfMonth(1).toString(), "Employer", monthIncome, "Income"));
 
             for (Object[] row : EXPENSE_TEMPLATE) {
                 int    day      = (int)    row[0];
@@ -159,10 +160,12 @@ public class OnboardingService {
 
                 LocalDate txDate = month.withDayOfMonth(day);
                 if (!txDate.isAfter(today)) {
-                    saveTransaction(user, txDate.toString(), merchant, -(monthExpenses * fraction), category);
+                    batch.add(buildTransaction(user, txDate.toString(), merchant, -(monthExpenses * fraction), category));
                 }
             }
         }
+
+        transactionRepository.saveAll(batch);
     }
 
     private FinancialGoal buildGoal(String title, OnboardingRequestDTO req, User user) {
@@ -205,7 +208,7 @@ public class OnboardingService {
         return g;
     }
 
-    private void saveTransaction(User user, String date, String merchant, double amount, String category) {
+    private Transaction buildTransaction(User user, String date, String merchant, double amount, String category) {
         Transaction t = new Transaction();
         t.setUser(user);
         t.setDate(date);
@@ -213,6 +216,6 @@ public class OnboardingService {
         t.setAmount(amount);
         t.setCategory(category);
         t.setSource("SEED");
-        transactionRepository.save(t);
+        return t;
     }
 }
