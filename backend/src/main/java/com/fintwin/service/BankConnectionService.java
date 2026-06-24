@@ -402,10 +402,13 @@ public class BankConnectionService {
         if (conn.getConsentId() == null) {
             return "Consent not yet approved. Please complete the bank consent flow first.";
         }
+        if ("FETCHING".equals(conn.getConsentStatus())) {
+            return "Sync already in progress. Please wait for the current sync to complete.";
+        }
 
         try {
             conn.setConsentStatus("FETCHING");
-            bankRepo.save(conn);
+            bankRepo.saveAndFlush(conn); // flush immediately so concurrent calls see FETCHING
 
             String sessionId = setuAAService.createFISessionAndWait(conn.getConsentId());
             if (sessionId != null) {
@@ -437,7 +440,8 @@ public class BankConnectionService {
 
         List<BankConnection> pending = new ArrayList<>();
         pending.addAll(bankRepo.findByUserAndConsentStatus(user, "PENDING"));
-        pending.addAll(bankRepo.findByUserAndConsentStatus(user, "FETCHING"));
+        // Skip FETCHING connections — forceResync is already processing them.
+        // Adding them here would create a second concurrent Setu session → duplicates.
         // Also recover ACTIVE connections that have never been synced
         bankRepo.findByUserAndConsentStatus(user, "ACTIVE").stream()
                 .filter(c -> c.getLastSyncedAt() == null && c.getConsentId() != null)

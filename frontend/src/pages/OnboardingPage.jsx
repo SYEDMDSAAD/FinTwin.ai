@@ -405,6 +405,28 @@ export default function OnboardingPage() {
     }
   }, [syncStatus]);
 
+  // ── Auto-detect existing bank connection when navigating back to step 1 ───────
+  useEffect(() => {
+    if (step !== 1 || bankPhase !== "connect") return;
+    API.get("/bank/connections").then(res => {
+      const conns = res.data || [];
+      const synced   = conns.find(c => c.consentStatus === "ACTIVE" && c.lastSyncedAt);
+      const fetching = conns.find(c => c.consentStatus === "FETCHING");
+      const active   = conns.find(c => c.consentStatus === "ACTIVE");
+      if (synced) {
+        setIsManualPath(false);
+        setBankPhase("syncing");
+        setSyncStatus("synced");
+        setSyncMsg("All transactions imported successfully!");
+      } else if (fetching || active) {
+        setIsManualPath(false);
+        setBankPhase("syncing");
+        setSyncStatus("consented");
+        setSyncMsg("Fetching your transactions from the bank...");
+      }
+    }).catch(() => {});
+  }, [step, bankPhase]);
+
   // ── Bank sync polling ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (step !== 1 || isManualPath || bankPhase !== "syncing" || syncStatus === "synced") return;
@@ -423,14 +445,26 @@ export default function OnboardingPage() {
 
         if (synced) { setSyncStatus("synced"); setSyncMsg("All transactions imported successfully!"); return; }
 
-        const needsSync = fetching || (approved && !approved.lastSyncedAt);
-        if (needsSync && !resyncTriggered.current) {
+        // Backend is actively fetching — just update UI and wait, don't trigger
+        // another resync (causes duplicate transactions when two sessions overlap)
+        if (fetching) {
+          setSyncStatus("consented");
+          setSyncMsg("Fetching your transactions from the bank...");
+          return;
+        }
+
+        // Consent approved but not synced yet — trigger resync once
+        if (approved && !approved.lastSyncedAt && !resyncTriggered.current) {
           resyncTriggered.current = true;
           setSyncStatus("consented");
           setSyncMsg("Fetching your transactions from the bank...");
-          API.post(`/bank/resync/${needsSync.id}`).catch(() => {});
-          resyncRetryTimer.current = setTimeout(() => { resyncTriggered.current = false; }, 40_000);
-        } else if (pending && !resyncTriggered.current) {
+          API.post(`/bank/resync/${approved.id}`).catch(() => {});
+          // 90s matches the skip-visible timeout so we never retry during a live session
+          resyncRetryTimer.current = setTimeout(() => { resyncTriggered.current = false; }, 90_000);
+          return;
+        }
+
+        if (pending && !resyncTriggered.current) {
           resyncTriggered.current = true;
           API.post("/bank/sync").catch(() => {});
           resyncRetryTimer.current = setTimeout(() => { resyncTriggered.current = false; }, 15_000);
@@ -493,8 +527,13 @@ export default function OnboardingPage() {
         debt:        Number(form.debt)        || 0,
         goals,
       };
-      if (monthlyIncome   && Number(monthlyIncome)   > 0) payload.incomeLast3Months   = Number(monthlyIncome)   * 3;
-      if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * 3;
+      // Only send manual income/expense for the manual path — sending these for
+      // bank users would trick the backend into thinking it's a manual onboarding
+      // and overwrite real bank transactions with synthetic seeded data
+      if (isManualPath) {
+        if (monthlyIncome   && Number(monthlyIncome)   > 0) payload.incomeLast3Months   = Number(monthlyIncome)   * 3;
+        if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * 3;
+      }
       // Store AI preferences locally
       localStorage.setItem("aiMode", JSON.stringify(aiModes));
       localStorage.setItem("dailyInsights", String(dailyInsights));
@@ -889,52 +928,69 @@ export default function OnboardingPage() {
                   A few numbers to set up your net worth, forecasts, and AI insights. All optional — update anytime from your dashboard.
                 </p>
 
-                {/* Income + expenses — always shown; pre-filled from bank when available */}
+                {/* Income + expenses */}
                 <div style={{ marginBottom: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>MONTHLY CASH FLOW</div>
-                    {!isManualPath && summaryData && (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", letterSpacing: "0.06em", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 6, padding: "2px 8px" }}>
-                        AUTO-DETECTED FROM BANK
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
+
+                  {isManualPath ? (
+                    /* Manual path: editable required inputs */
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💰 INCOME</label>
+                        <input
+                          className="ob-input"
+                          type="number"
+                          placeholder="₹ 50,000"
+                          value={monthlyIncome}
+                          onChange={e => { setMonthlyIncome(e.target.value); setManualErrors(p => ({ ...p, income: undefined })); }}
+                          style={manualErrors.income ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
+                        />
+                        {manualErrors.income
+                          ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.income}</div>
+                          : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>Salary, freelance, business…</div>
+                        }
                       </div>
-                    )}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💰 INCOME</label>
-                      <input
-                        className="ob-input"
-                        type="number"
-                        placeholder="₹ 50,000"
-                        value={monthlyIncome}
-                        onChange={e => { setMonthlyIncome(e.target.value); setManualErrors(p => ({ ...p, income: undefined })); }}
-                        style={manualErrors.income ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
-                      />
-                      {manualErrors.income
-                        ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.income}</div>
-                        : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>
-                            {!isManualPath && summaryData ? "Detected from transactions — edit if needed" : "Salary, freelance, business…"}
-                          </div>
-                      }
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💸 EXPENSES</label>
+                        <input
+                          className="ob-input"
+                          type="number"
+                          placeholder="₹ 35,000"
+                          value={monthlyExpenses}
+                          onChange={e => { setMonthlyExpenses(e.target.value); setManualErrors(p => ({ ...p, expenses: undefined })); }}
+                          style={manualErrors.expenses ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
+                        />
+                        {manualErrors.expenses
+                          ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.expenses}</div>
+                          : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>Rent, food, bills, subscriptions…</div>
+                        }
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💸 EXPENSES</label>
-                      <input
-                        className="ob-input"
-                        type="number"
-                        placeholder="₹ 35,000"
-                        value={monthlyExpenses}
-                        onChange={e => { setMonthlyExpenses(e.target.value); setManualErrors(p => ({ ...p, expenses: undefined })); }}
-                        style={manualErrors.expenses ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
-                      />
-                      {manualErrors.expenses
-                        ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.expenses}</div>
-                        : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>
-                            {!isManualPath && summaryData ? "Detected from transactions — edit if needed" : "Rent, food, bills, subscriptions…"}
+                  ) : (
+                    /* Bank path: read-only auto-detected values — user cannot manually enter */
+                    <div style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: 14, padding: "18px 20px" }}>
+                      {summaryData ? (
+                        <div style={{ display: "flex", gap: 32 }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.45)", letterSpacing: "0.08em", marginBottom: 4 }}>💰 INCOME</div>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: "#4ade80" }}>₹{Number(monthlyIncome || 0).toLocaleString("en-IN")}</div>
                           </div>
-                      }
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.45)", letterSpacing: "0.08em", marginBottom: 4 }}>💸 EXPENSES</div>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: "#f87171" }}>₹{Number(monthlyExpenses || 0).toLocaleString("en-IN")}</div>
+                          </div>
+                          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 6, padding: "3px 8px" }}>AUTO-DETECTED FROM BANK</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <RefreshCw size={14} color="#a78bfa" className="spin" />
+                          <span style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>Cash flow will be auto-calculated from your imported transactions</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Savings/investments/debt */}
