@@ -47,8 +47,10 @@ API.interceptors.response.use(
 
     error => {
 
+        // Only auto-logout on 401 for authenticated requests (not auth endpoints themselves)
         if (
-            error.response?.status === 401
+            error.response?.status === 401 &&
+            !error.config?.url?.includes("/auth/")
         ) {
 
             localStorage.removeItem(

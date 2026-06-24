@@ -10,6 +10,9 @@ import com.fintwin.dto.GoogleLoginRequest;
 import com.fintwin.dto.UserMeDTO;
 import com.fintwin.service.AuthService;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,8 +77,14 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest req) {
-        authService.forgotPassword(req.getEmail());
-        return ResponseEntity.ok("If that email is registered, a reset link has been sent.");
+        String devUrl = authService.forgotPassword(req.getEmail());
+        if (devUrl != null) {
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("message", "Email not configured — use the link below to test reset:");
+            body.put("devResetUrl", devUrl);
+            return ResponseEntity.ok(body);
+        }
+        return ResponseEntity.ok(Map.of("message", "Password reset link has been sent to your email."));
     }
 
     // =========================
@@ -104,8 +113,14 @@ public class AuthController {
 
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification(@RequestBody ForgotPasswordRequest req) {
-        authService.resendVerification(req.getEmail());
-        return ResponseEntity.ok("Verification code resent if account exists and is unverified.");
+        String devOtp = authService.resendVerification(req.getEmail());
+        if (devOtp != null) {
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("message", "Email not configured — use OTP below for testing:");
+            body.put("devOtp", devOtp);
+            return ResponseEntity.ok(body);
+        }
+        return ResponseEntity.ok(Map.of("message", "Verification code resent."));
     }
 
     // =========================

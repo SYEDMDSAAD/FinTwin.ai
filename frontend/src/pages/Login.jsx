@@ -232,10 +232,17 @@ function Login() {
     if (!forgotEmail.trim()) { toast.error("Enter your email address"); return; }
     try {
       setForgotLoading(true);
-      await API.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      const res = await API.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      // Dev mode: backend returns the reset URL directly when email is not configured
+      if (res.data?.devResetUrl) {
+        toast.success("Dev mode: opening reset link directly");
+        window.open(res.data.devResetUrl, "_blank");
+      }
       setForgotSent(true);
-    } catch { toast.error("Something went wrong. Try again."); }
-    finally { setForgotLoading(false); }
+    } catch (e) {
+      const msg = e.response?.data?.error || "Something went wrong. Try again.";
+      toast.error(msg);
+    } finally { setForgotLoading(false); }
   };
 
   /* ── theme-derived tokens ─────────────────────────── */

@@ -80,6 +80,29 @@ public class GlobalExceptionHandler {
                         .body(error);
         }
 
+        if ("No account found with that email address".equals(msg)) {
+                error.put("error", msg);
+                return ResponseEntity
+                        .status(404)
+                        .body(error);
+        }
+
+        if (msg != null && msg.startsWith("Invalid or expired reset link")) {
+                error.put("error", msg);
+                return ResponseEntity
+                        .status(400)
+                        .body(error);
+        }
+
+        if ("OTP has expired — please request a new one".equals(msg)
+                || "Incorrect OTP".equals(msg)
+                || "Reset link has expired — please request a new one".equals(msg)) {
+                error.put("error", msg);
+                return ResponseEntity
+                        .status(400)
+                        .body(error);
+        }
+
         if ("Google token verification failed".equals(msg)
                 || "Google credential must not be empty".equals(msg)) {
                 error.put("error", msg);

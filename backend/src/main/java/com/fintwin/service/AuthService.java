@@ -28,6 +28,8 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -62,7 +64,7 @@ public class AuthService {
             resource = "users",
             description = "New user registration"
     )
-    public String register(RegisterRequest request) {
+    public Map<String, Object> register(RegisterRequest request) {
 
         if (request.getEmail() == null
                 || request.getEmail().isBlank()) {
@@ -110,7 +112,14 @@ public class AuthService {
         userRepository.save(user);
         emailService.sendVerificationOtp(normalizedEmail, request.getFullName().trim(), rawOtp);
 
-        return "Registration successful";
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "Registration successful");
+        // Return OTP in response when email is not configured (dev/local mode only)
+        if (!emailService.isConfigured()) {
+            result.put("devOtp", rawOtp);
+            result.put("devNote", "Email not configured — use this OTP directly for testing");
+        }
+        return result;
     }
 
     // =========================
@@ -262,11 +271,13 @@ public class AuthService {
     // FORGOT PASSWORD
     // =========================
 
-    public void forgotPassword(String email) {
-        if (email == null || email.isBlank()) return;
+    public String forgotPassword(String email) {
+        if (email == null || email.isBlank())
+            throw new IllegalArgumentException("Email must not be empty");
+
         String normalized = email.toLowerCase().trim();
-        User user = userRepository.findByEmail(normalized).orElse(null);
-        if (user == null) return; // silent — don't leak whether email exists
+        User user = userRepository.findByEmail(normalized)
+                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
 
         String rawToken = UUID.randomUUID().toString();
         user.setPasswordResetToken(sha256(rawToken));
@@ -275,6 +286,9 @@ public class AuthService {
 
         String resetUrl = appBaseUrl + "/reset-password?token=" + rawToken;
         emailService.sendPasswordResetLink(normalized, user.getFullName(), resetUrl);
+
+        // Return reset URL only when email is not configured (dev/local mode)
+        return emailService.isConfigured() ? null : resetUrl;
     }
 
     // =========================
@@ -335,17 +349,19 @@ public class AuthService {
     // RESEND VERIFICATION OTP
     // =========================
 
-    public void resendVerification(String email) {
-        if (email == null || email.isBlank()) return;
+    public String resendVerification(String email) {
+        if (email == null || email.isBlank()) return null;
         String normalized = email.toLowerCase().trim();
         User user = userRepository.findByEmail(normalized).orElse(null);
-        if (user == null || Boolean.TRUE.equals(user.getEmailVerified())) return;
+        if (user == null || Boolean.TRUE.equals(user.getEmailVerified())) return null;
 
         String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
         user.setEmailVerificationOtp(sha256(rawOtp));
         user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         emailService.sendVerificationOtp(normalized, user.getFullName(), rawOtp);
+
+        return emailService.isConfigured() ? null : rawOtp;
     }
 
     // =========================

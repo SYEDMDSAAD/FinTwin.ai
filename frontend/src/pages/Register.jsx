@@ -84,11 +84,17 @@ function Register() {
     if (!consent) { toast.error("You must accept the Privacy Policy to register."); return; }
     try {
       setLoading(true);
-      await API.post("/auth/register", { fullName, email, password, consentGiven: true });
-      toast.success("Account created! Check your email for a verification code.");
+      const res = await API.post("/auth/register", { fullName, email, password, consentGiven: true });
+      if (res.data?.devOtp) {
+        toast.success(`Dev mode: your OTP is ${res.data.devOtp}`, { duration: 15000 });
+      } else {
+        toast.success("Account created! Check your email for a verification code.");
+      }
       setStep("otp");
-    } catch (e) { toast.error(e.response?.data || "Registration Failed"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      const msg = e.response?.data?.error || (typeof e.response?.data === "string" ? e.response.data : null) || "Registration failed";
+      toast.error(msg);
+    } finally { setLoading(false); }
   };
 
   const handleOtpChange = (i, val) => {
@@ -121,8 +127,12 @@ function Register() {
   const resendOtp = async () => {
     try {
       setResending(true);
-      await API.post("/auth/resend-verification", { email: email.toLowerCase().trim() });
-      toast.success("New code sent!");
+      const res = await API.post("/auth/resend-verification", { email: email.toLowerCase().trim() });
+      if (res.data?.devOtp) {
+        toast.success(`Dev mode: new OTP is ${res.data.devOtp}`, { duration: 15000 });
+      } else {
+        toast.success("New code sent!");
+      }
       setOtpCode(["","","","","",""]);
     } catch { toast.error("Failed to resend"); }
     finally { setResending(false); }
