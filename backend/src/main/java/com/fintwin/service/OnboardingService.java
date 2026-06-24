@@ -183,7 +183,11 @@ public class OnboardingService {
         }
 
         double monthlyTarget  = targetAmount / durationMonths;
-        double monthlySavings = (req.getIncomeLast3Months() - req.getExpensesLast3Months()) / 3.0;
+        // Bank-path users don't supply income/expenses at onboarding time — default
+        // to 0 so goal probability is recalculated later from real transactions
+        double income3m   = req.getIncomeLast3Months()   != null ? req.getIncomeLast3Months()   : 0.0;
+        double expenses3m = req.getExpensesLast3Months()  != null ? req.getExpensesLast3Months()  : 0.0;
+        double monthlySavings = (income3m - expenses3m) / 3.0;
         double probability    = monthlyTarget <= 0 ? 50.0
                 : Math.min(100.0, Math.max(0.0, (monthlySavings / monthlyTarget) * 100));
         String health = probability >= 100 ? "Excellent"
