@@ -1,8 +1,11 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.AnomalyDTO;
+import com.fintwin.dto.DismissAnomalyRequest;
+import com.fintwin.model.DismissedAnomalyPattern;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
+import com.fintwin.repository.DismissedAnomalyRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
@@ -15,12 +18,30 @@ import java.util.stream.Collectors;
 @Service
 public class AnomalyService {
 
-    private final TransactionRepository transactionRepository;
-    private final UserRepository        userRepository;
+    private final TransactionRepository      transactionRepository;
+    private final UserRepository             userRepository;
+    private final DismissedAnomalyRepository dismissedRepository;
 
-    public AnomalyService(TransactionRepository transactionRepository, UserRepository userRepository) {
+    public AnomalyService(TransactionRepository transactionRepository,
+                          UserRepository userRepository,
+                          DismissedAnomalyRepository dismissedRepository) {
         this.transactionRepository = transactionRepository;
         this.userRepository        = userRepository;
+        this.dismissedRepository   = dismissedRepository;
+    }
+
+    public void dismissAnomaly(DismissAnomalyRequest req) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        String merchant = req.getMerchant() != null ? req.getMerchant() : "";
+        String type     = req.getType()     != null ? req.getType()     : "";
+        if (dismissedRepository.existsByUserAndAnomalyTypeAndMerchant(user, type, merchant)) return;
+        DismissedAnomalyPattern p = new DismissedAnomalyPattern();
+        p.setUser(user);
+        p.setAnomalyType(type);
+        p.setMerchant(merchant);
+        p.setCategory(req.getCategory());
+        dismissedRepository.save(p);
     }
 
     public List<AnomalyDTO> detectAnomalies() {
@@ -28,6 +49,10 @@ public class AnomalyService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Set<String> dismissed = dismissedRepository.findByUser(user).stream()
+                .map(p -> p.getAnomalyType() + "|" + (p.getMerchant() != null ? p.getMerchant() : ""))
+                .collect(Collectors.toSet());
 
         List<Transaction> transactions = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
         List<Transaction> expenses = transactions.stream()
@@ -169,6 +194,7 @@ public class AnomalyService {
         }
 
         List<AnomalyDTO> result = new ArrayList<>(deduped.values());
+        result.removeIf(a -> dismissed.contains(a.getType() + "|" + (a.getMerchant() != null ? a.getMerchant() : "")));
         result.sort(Comparator
                 .comparingInt((AnomalyDTO a) -> severityRank(a.getSeverity()))
                 .thenComparingDouble(a -> -a.getAmount()));

@@ -35,4 +35,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Used by signup trend — avoids loading all users when only recently created ones are needed
     java.util.List<User> findByCreatedAtAfter(LocalDateTime date);
+
+    // Password reset flow — token is stored as SHA-256 hash, directly queryable
+    Optional<User> findByPasswordResetToken(String hashedToken);
 }

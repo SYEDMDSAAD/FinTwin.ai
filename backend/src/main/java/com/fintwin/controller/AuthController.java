@@ -3,6 +3,9 @@ package com.fintwin.controller;
 import com.fintwin.dto.LoginRequest;
 import com.fintwin.dto.RegisterRequest;
 import com.fintwin.dto.AuthResponse;
+import com.fintwin.dto.ForgotPasswordRequest;
+import com.fintwin.dto.ResetPasswordRequest;
+import com.fintwin.dto.VerifyEmailRequest;
 import com.fintwin.dto.GoogleLoginRequest;
 import com.fintwin.dto.UserMeDTO;
 import com.fintwin.service.AuthService;
@@ -63,6 +66,46 @@ public class AuthController {
 
                 request.getCredential()
         );
+    }
+
+    // =========================
+    // FORGOT PASSWORD
+    // =========================
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest req) {
+        authService.forgotPassword(req.getEmail());
+        return ResponseEntity.ok("If that email is registered, a reset link has been sent.");
+    }
+
+    // =========================
+    // RESET PASSWORD
+    // =========================
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest req) {
+        authService.resetPassword(req.getToken(), req.getNewPassword());
+        return ResponseEntity.ok("Password updated successfully.");
+    }
+
+    // =========================
+    // VERIFY EMAIL (OTP)
+    // =========================
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody VerifyEmailRequest req) {
+        authService.verifyEmail(req.getEmail(), req.getOtp());
+        return ResponseEntity.ok("Email verified successfully.");
+    }
+
+    // =========================
+    // RESEND VERIFICATION OTP
+    // =========================
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerification(@RequestBody ForgotPasswordRequest req) {
+        authService.resendVerification(req.getEmail());
+        return ResponseEntity.ok("Verification code resent if account exists and is unverified.");
     }
 
     // =========================

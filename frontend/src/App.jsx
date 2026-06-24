@@ -29,6 +29,9 @@ import OnboardingPage from "./pages/OnboardingPage";
 import BankConnectedPage from "./pages/BankConnectedPage";
 
 import LandingPage from "./pages/LandingPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
 
 function App() {
 
@@ -66,6 +69,10 @@ function App() {
                     element={<Register />}
 
                 />
+
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms"          element={<TermsOfServicePage />} />
 
                 {/* =========================
                     DASHBOARD

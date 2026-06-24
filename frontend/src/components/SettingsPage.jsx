@@ -716,11 +716,15 @@ export default function SettingsPage({ navigateTo }) {
                   ))}
                 </div>
                 <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {["Privacy Policy", "Terms of Service", "Support"].map(l => (
-                    <button key={l} className="sp-action-btn" style={{ fontSize: 12 }}>
-                      {l} <ChevronRight size={12} style={{ display: "inline", verticalAlign: "middle" }} />
-                    </button>
-                  ))}
+                  <button className="sp-action-btn" style={{ fontSize: 12 }} onClick={() => window.open('/privacy-policy', '_blank')}>
+                    Privacy Policy <ChevronRight size={12} style={{ display: "inline", verticalAlign: "middle" }} />
+                  </button>
+                  <button className="sp-action-btn" style={{ fontSize: 12 }} onClick={() => window.open('/terms', '_blank')}>
+                    Terms of Service <ChevronRight size={12} style={{ display: "inline", verticalAlign: "middle" }} />
+                  </button>
+                  <button className="sp-action-btn" style={{ fontSize: 12 }} onClick={() => { toast.success("Email us at support@fintwin.ai"); }}>
+                    Support <ChevronRight size={12} style={{ display: "inline", verticalAlign: "middle" }} />
+                  </button>
                 </div>
               </div>
             )}

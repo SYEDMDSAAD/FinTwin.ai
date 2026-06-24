@@ -163,6 +163,12 @@ function Login() {
   const [showTicket,         setShowTicket]         = useState(false);
   const [ticketDefaultEmail, setTicketDefaultEmail] = useState("");
 
+  // Forgot password state
+  const [showForgot,       setShowForgot]       = useState(false);
+  const [forgotEmail,      setForgotEmail]      = useState("");
+  const [forgotLoading,    setForgotLoading]    = useState(false);
+  const [forgotSent,       setForgotSent]       = useState(false);
+
   const handleLogin = async () => {
     if (!email || !password) { toast.error("Enter your email and password"); return; }
     try {
@@ -222,6 +228,16 @@ function Login() {
   };
   const openTicket = (prefillEmail = "") => { setTicketDefaultEmail(prefillEmail); setShowTicket(true); };
 
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.trim()) { toast.error("Enter your email address"); return; }
+    try {
+      setForgotLoading(true);
+      await API.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      setForgotSent(true);
+    } catch { toast.error("Something went wrong. Try again."); }
+    finally { setForgotLoading(false); }
+  };
+
   /* ── theme-derived tokens ─────────────────────────── */
   const pageBg    = isDark ? "#080a0f" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
   const cardBg    = isDark ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.88)";
@@ -243,6 +259,52 @@ function Login() {
     <>
       <style>{CSS}</style>
       {showTicket && <TicketModal defaultEmail={ticketDefaultEmail} onClose={() => setShowTicket(false)}/>}
+
+      {/* Forgot password modal */}
+      {showForgot && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(8px)" }}
+          onClick={e => e.target === e.currentTarget && setShowForgot(false)}>
+          <div className="auth-fade" style={{ width:"100%", maxWidth:420, background:"#0e1018", border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"32px 28px", position:"relative" }}>
+            <button onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}
+              style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"rgba(148,163,184,0.5)", cursor:"pointer", padding:4, display:"flex" }}>
+              <X size={18}/>
+            </button>
+            {forgotSent ? (
+              <div style={{ textAlign:"center", padding:"16px 0" }}>
+                <div style={{ width:52, height:52, borderRadius:"50%", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+                  <Mail size={22} color="#34d399"/>
+                </div>
+                <h2 style={{ fontSize:18, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Check your inbox</h2>
+                <p style={{ fontSize:13, color:"rgba(148,163,184,0.6)", margin:"0 0 24px", lineHeight:1.6 }}>
+                  If <strong style={{ color:"#e2e8f0" }}>{forgotEmail}</strong> is registered, a password reset link has been sent. Check spam if you don't see it.
+                </p>
+                <button className="auth-btn" onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}
+                  style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>Back to Sign In</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom:24 }}>
+                  <h2 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 6px" }}>Reset your password</h2>
+                  <p style={{ fontSize:13, color:"rgba(148,163,184,0.5)", margin:0 }}>Enter your email and we'll send a reset link.</p>
+                </div>
+                <div style={{ marginBottom:20 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>EMAIL ADDRESS</label>
+                  <div className="auth-input-wrap" style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)" }}>
+                    <Mail size={15} color="rgba(148,163,184,0.4)"/>
+                    <input className="auth-input" style={{ color:"#e2e8f0" }} type="email" placeholder="you@example.com"
+                      value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleForgotPassword()} autoFocus/>
+                  </div>
+                </div>
+                <button className="auth-btn" onClick={handleForgotPassword} disabled={forgotLoading || !forgotEmail.trim()}
+                  style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>
+                  {forgotLoading ? "Sending…" : "Send Reset Link →"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="auth-page" style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:pageBg, position:"relative", overflow:"hidden", padding:20 }}>
 
@@ -350,7 +412,7 @@ function Login() {
                 </div>
               </div>
 
-              <div style={{ marginBottom:24 }}>
+              <div style={{ marginBottom:8 }}>
                 <label style={{ fontSize:11, fontWeight:700, color:txtLabel, letterSpacing:"0.08em", display:"block", marginBottom:8 }}>PASSWORD</label>
                 <div className="auth-input-wrap" style={{ background:inputBg, border:inputBdr }}>
                   <Lock size={15} color="rgba(148,163,184,0.5)"/>
@@ -361,6 +423,13 @@ function Login() {
                     {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                   </button>
                 </div>
+              </div>
+
+              <div style={{ textAlign:"right", marginBottom:20 }}>
+                <span className="auth-link" style={{ fontSize:12, color:linkClr }}
+                  onClick={() => { setForgotEmail(email); setForgotSent(false); setShowForgot(true); }}>
+                  Forgot password?
+                </span>
               </div>
 
               <button className="auth-btn" onClick={handleLogin} disabled={loading}
