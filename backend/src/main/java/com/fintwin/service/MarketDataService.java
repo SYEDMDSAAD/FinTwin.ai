@@ -3,17 +3,24 @@ package com.fintwin.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.net.*;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns all Yahoo Finance communication: crumb management, cookie handling,
  * quote fetching, and response parsing.
+ *
+ * Results are cached for 60 seconds (matches MarketTicker's refresh interval)
+ * so repeated page loads return instantly instead of hitting Yahoo Finance each time.
+ * All symbols are fetched in parallel to minimise first-load latency.
  */
 @Service
 public class MarketDataService {
@@ -27,34 +34,48 @@ public class MarketDataService {
     private final HttpClient http = HttpClient.newBuilder()
             .cookieHandler(cookieManager)
             .followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(Duration.ofSeconds(5))
             .build();
     private final ObjectMapper mapper = new ObjectMapper();
     private final AtomicReference<String> crumb = new AtomicReference<>();
 
+    @Cacheable(value = "market-quotes", key = "#symbols")
     public List<Map<String, Object>> getQuotes(String symbols) {
         ensureCrumb();
 
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (String sym : symbols.split(",")) {
+        String[] syms = symbols.split(",");
+        List<CompletableFuture<Map<String, Object>>> futures = new ArrayList<>(syms.length);
+
+        for (String sym : syms) {
             String symbol = sym.trim();
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("symbol", symbol);
-            try {
-                String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
-                HttpResponse<String> resp = fetchQuote(encoded);
+            futures.add(CompletableFuture.supplyAsync(() -> fetchOne(symbol)));
+        }
 
-                if (resp.statusCode() == 401 || resp.statusCode() == 403) {
-                    crumb.set(fetchCrumb());
-                    resp = fetchQuote(encoded);
-                }
-
-                parseQuoteInto(item, resp.body());
-            } catch (Exception e) {
-                log.warn("Failed to fetch quote for {}: {}", symbol, e.getMessage());
-            }
-            results.add(item);
+        List<Map<String, Object>> results = new ArrayList<>(syms.length);
+        for (CompletableFuture<Map<String, Object>> f : futures) {
+            try { results.add(f.get(8, TimeUnit.SECONDS)); }
+            catch (Exception e) { log.warn("Timed out or failed fetching a quote: {}", e.getMessage()); }
         }
         return results;
+    }
+
+    private Map<String, Object> fetchOne(String symbol) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("symbol", symbol);
+        try {
+            String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
+            HttpResponse<String> resp = fetchQuote(encoded);
+
+            if (resp.statusCode() == 401 || resp.statusCode() == 403) {
+                crumb.set(fetchCrumb());
+                resp = fetchQuote(encoded);
+            }
+
+            parseQuoteInto(item, resp.body());
+        } catch (Exception e) {
+            log.warn("Failed to fetch quote for {}: {}", symbol, e.getMessage());
+        }
+        return item;
     }
 
     private void ensureCrumb() {
@@ -70,6 +91,7 @@ public class MarketDataService {
                 .uri(URI.create("https://query2.finance.yahoo.com/v1/test/getcrumb"))
                 .header("User-Agent", UA)
                 .header("Accept", "*/*")
+                .timeout(Duration.ofSeconds(5))
                 .GET().build();
         return http.send(req, HttpResponse.BodyHandlers.ofString()).body().trim();
     }
@@ -83,6 +105,7 @@ public class MarketDataService {
                         + encodedSymbol + "?interval=1d&range=1d" + crumbParam))
                 .header("User-Agent", UA)
                 .header("Accept", "application/json")
+                .timeout(Duration.ofSeconds(7))
                 .GET().build();
         return http.send(req, HttpResponse.BodyHandlers.ofString());
     }

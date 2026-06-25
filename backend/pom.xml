@@ -155,6 +155,16 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Spring Cache + Caffeine — used for server-side TTL caching (e.g. market quotes) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Flyway — versioned DB migrations. Replaces ddl-auto=update in production. -->
         <dependency>
             <groupId>org.flywaydb</groupId>

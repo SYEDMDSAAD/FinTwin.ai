@@ -8,6 +8,7 @@ import com.fintwin.model.User;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,8 @@ public class FinancialScoreService {
     }
 
     @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
+    @Cacheable(value = "user-score",
+               key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
     public FinancialScoreDTO calculateScore() {
 
         String email = SecurityUtils.getCurrentUserEmail();

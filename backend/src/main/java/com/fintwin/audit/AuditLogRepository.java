@@ -169,6 +169,9 @@ public interface AuditLogRepository
     @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.action = 'LOGIN' AND a.success = false AND a.timestamp >= :since")
     long countFailedLoginsAfter(@Param("since") LocalDateTime since);
 
+    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.action = 'LOGIN' AND a.success = true AND a.timestamp >= :since")
+    long countSuccessfulLoginsAfter(@Param("since") LocalDateTime since);
+
     long count();
 
     // ── Security analytics ────────────────────────────────────────────────────

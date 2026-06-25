@@ -10,11 +10,12 @@ import {
   ChevronRight, X, AlertTriangle, CheckCircle, XCircle,
   ArrowUpRight, Clock, Cpu, Database,
   ShieldAlert, MessageSquare, Ban, Send, AlertOctagon,
-  Unlock
+  Unlock, BarChart2, Zap, Server, Wifi, MessageCircle
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer
+  CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, BarChart, Bar
 } from "recharts";
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -86,12 +87,13 @@ const G = `
 `;
 
 const NAV = [
-  { id: "overview",  label: "Overview",        icon: LayoutDashboard },
-  { id: "users",     label: "Users",            icon: Users },
-  { id: "audit",     label: "Audit Logs",       icon: FileText },
-  { id: "platform",  label: "Platform Health",  icon: Activity },
-  { id: "security",  label: "Security",         icon: ShieldAlert },
-  { id: "tickets",   label: "Support Tickets",  icon: MessageSquare },
+  { id: "overview",    label: "Overview",        icon: LayoutDashboard },
+  { id: "users",       label: "Users",            icon: Users },
+  { id: "audit",       label: "Audit Logs",       icon: FileText },
+  { id: "monitoring",  label: "Monitoring",       icon: BarChart2 },
+  { id: "platform",    label: "Platform Health",  icon: Activity },
+  { id: "security",    label: "Security",         icon: ShieldAlert },
+  { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
 ];
 
 const fmt = (dt) =>
@@ -197,7 +199,13 @@ function UsersSection({ user: currentUser, onUserClick }) {
   const [promoting, setPromoting] = useState(false);
 
   const load = useCallback(async () => {
-    try { setLoading(true); const r = await API.get("/admin/users"); setUsers(r.data); }
+    try {
+      setLoading(true);
+      const r = await API.get("/admin/users");
+      // Backend returns { users: [...], totalPages: N } — extract the array
+      // Backend returns { content: [...], totalElements: N, totalPages: N }
+      setUsers(Array.isArray(r.data) ? r.data : (r.data.content ?? []));
+    }
     catch { toast.error("Failed to load users"); }
     finally { setLoading(false); }
   }, []);
@@ -1196,6 +1204,257 @@ function TicketsSection() {
   );
 }
 
+// ─── Monitoring Section ───────────────────────────────────────────────────────
+
+const HISTORY_MAX = 20;
+
+const MetricTip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background:"#0e1018", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 12px", fontSize:11 }}>
+      <div style={{ color:"rgba(148,163,184,0.5)", marginBottom:3 }}>{label}</div>
+      {payload.map(p => (
+        <div key={p.dataKey} style={{ color: p.color, fontWeight:700 }}>{p.name}: {p.value}</div>
+      ))}
+    </div>
+  );
+};
+
+const CB_COLOR = { CLOSED:"#34d399", OPEN:"#f87171", HALF_OPEN:"#fbbf24", UNKNOWN:"rgba(148,163,184,0.4)" };
+
+function MonitoringSection() {
+  const [data,    setData]    = useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastAt,  setLastAt]  = useState(null);
+  const [auto,    setAuto]    = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await API.get("/admin/metrics/live");
+      const snap = { ...r.data, t: new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", second:"2-digit" }) };
+      setData(snap);
+      setHistory(h => [...h.slice(-(HISTORY_MAX - 1)), snap]);
+      setLastAt(new Date());
+    } catch { toast.error("Failed to load metrics"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!auto) return;
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, [auto, load]);
+
+  const StatCard = ({ label, value, sub, color = "#a78bfa", icon }) => (
+    <div className="stat-card">
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+        <span style={{ fontSize:10, fontWeight:700, color:"rgba(148,163,184,0.4)", letterSpacing:"0.08em" }}>{label.toUpperCase()}</span>
+        <span style={{ color, opacity:0.7 }}>{icon}</span>
+      </div>
+      <div style={{ fontSize:28, fontWeight:800, color:"#fff", letterSpacing:"-0.02em" }}>
+        {loading ? "—" : value ?? 0}
+      </div>
+      {sub && <div style={{ fontSize:11, color:"rgba(148,163,184,0.4)", marginTop:4 }}>{sub}</div>}
+    </div>
+  );
+
+  const Spark = ({ dataKey, color, name, unit = "" }) => (
+    <ResponsiveContainer width="100%" height={60}>
+      <AreaChart data={history} margin={{ top:2, right:0, left:0, bottom:0 }}>
+        <defs>
+          <linearGradient id={`g-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor={color} stopOpacity={0.3}/>
+            <stop offset="95%" stopColor={color} stopOpacity={0}/>
+          </linearGradient>
+        </defs>
+        <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5}
+          fill={`url(#g-${dataKey})`} dot={false} isAnimationActive={false}/>
+        <Tooltip content={<MetricTip/>} formatter={v => [`${v}${unit}`, name]}/>
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+
+  const cbState = data?.circuitBreakerState || "UNKNOWN";
+
+  return (
+    <div className="fade-in">
+
+      {/* Controls */}
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+        <button className="ab ab-gray" onClick={load} style={{ padding:"9px 14px" }}>
+          <RefreshCw size={12} className={loading?"spin":""}/> Refresh Now
+        </button>
+        <button className="ab" onClick={()=>setAuto(a=>!a)}
+          style={{ background:auto?"rgba(52,211,153,0.1)":"rgba(255,255,255,0.04)",
+                   color:auto?"#34d399":"rgba(148,163,184,0.5)",
+                   border:`1px solid ${auto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.08)"}`,
+                   padding:"9px 14px" }}>
+          <Zap size={12}/> {auto ? "Auto-refresh ON (30s)" : "Auto-refresh OFF"}
+        </button>
+        {lastAt && (
+          <span style={{ fontSize:11, color:"rgba(148,163,184,0.35)", marginLeft:"auto" }}>
+            Last updated: {lastAt.toLocaleTimeString("en-IN")}
+          </span>
+        )}
+      </div>
+      {/* Circuit Breaker Banner */}
+      <div style={{ background: cbState === "OPEN" ? "rgba(239,68,68,0.08)" : cbState === "HALF_OPEN" ? "rgba(251,191,36,0.08)" : "rgba(52,211,153,0.05)",
+                    border: `1px solid ${CB_COLOR[cbState]}30`, borderRadius:14, padding:"16px 22px",
+                    marginBottom:20, display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+        <div style={{ width:10, height:10, borderRadius:"50%", background:CB_COLOR[cbState],
+                      boxShadow: cbState === "OPEN" ? "0 0 8px #f87171" : cbState === "CLOSED" ? "0 0 8px #34d399" : "none" }}/>
+        <div>
+          <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.5)", letterSpacing:"0.08em" }}>AI SERVICE CIRCUIT BREAKER</div>
+          <div style={{ fontSize:20, fontWeight:800, color:CB_COLOR[cbState], marginTop:2 }}>{cbState}</div>
+        </div>
+        <div style={{ marginLeft:"auto", fontSize:12, color:"rgba(148,163,184,0.4)" }}>
+          {cbState === "CLOSED" && "AI service is healthy — all requests going through normally"}
+          {cbState === "OPEN"   && "AI service is down — all requests are using the statistical fallback"}
+          {cbState === "HALF_OPEN" && "AI service recovering — testing with limited traffic"}
+          {cbState === "UNKNOWN" && "Resilience4j not yet initialized (no AI calls made yet)"}
+        </div>
+      </div>
+
+      {/* Auth + Activity */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>AUTH & ACTIVITY</div>
+      <div className="grid4" style={{ marginBottom:24 }}>
+        <StatCard label="Login Success"        value={data?.loginSuccess?.toLocaleString()}        sub="today"     color="#34d399" icon={<CheckCircle size={15}/>}/>
+        <StatCard label="Login Failures"       value={data?.loginFailure?.toLocaleString()}        sub="today"     color="#f87171" icon={<XCircle size={15}/>}/>
+        <StatCard label="Total Users"          value={data?.registrations?.toLocaleString()}       sub="all-time"  color="#a78bfa" icon={<Users size={15}/>}/>
+        <StatCard label="Total Transactions"   value={data?.transactionsCreated?.toLocaleString()} sub="all-time"  color="#22d3ee" icon={<TrendingUp size={15}/>}/>
+      </div>
+
+      {/* Login trend chart */}
+      {history.length > 1 && (
+        <div className="card" style={{ padding:20, marginBottom:24 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginBottom:14 }}>Login Trend (cumulative)</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={history} margin={{ top:4, right:4, left:-24, bottom:0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)"/>
+              <XAxis dataKey="t" tick={{ fontSize:9, fill:"rgba(148,163,184,0.4)" }} tickLine={false} axisLine={false}/>
+              <YAxis tick={{ fontSize:9, fill:"rgba(148,163,184,0.4)" }} tickLine={false} axisLine={false} allowDecimals={false}/>
+              <Tooltip content={<MetricTip/>}/>
+              <Line type="monotone" dataKey="loginSuccess" stroke="#34d399" strokeWidth={2} dot={false} name="Success" isAnimationActive={false}/>
+              <Line type="monotone" dataKey="loginFailure" stroke="#f87171" strokeWidth={2} dot={false} name="Failure" isAnimationActive={false}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* AI Service */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>AI SERVICE</div>
+      <div className="grid4" style={{ marginBottom:16 }}>
+        <StatCard label="Forecast Calls"    value={data?.aiForecastCalls?.toLocaleString()}    color="#a78bfa" icon={<Cpu size={15}/>}/>
+        <StatCard label="Forecast Fallbacks" value={data?.aiForecastFallbacks?.toLocaleString()} color="#f87171" sub="AI was down — used stats" icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="Chat Calls"        value={data?.aiChatCalls?.toLocaleString()}         color="#22d3ee" icon={<MessageCircle size={15}/>}/>
+        <StatCard label="Forecast P99"      value={data?.aiForecastP99Ms ? `${data.aiForecastP99Ms.toFixed(0)}ms` : "—"} color="#fbbf24" sub="tail latency" icon={<Clock size={15}/>}/>
+      </div>
+
+      {history.length > 1 && (
+        <div className="grid2" style={{ marginBottom:24 }}>
+          <div className="card" style={{ padding:18 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:8 }}>AI Forecast Calls</div>
+            <Spark dataKey="aiForecastCalls" color="#a78bfa" name="Calls"/>
+          </div>
+          <div className="card" style={{ padding:18 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:8 }}>Fallbacks (AI down)</div>
+            <Spark dataKey="aiForecastFallbacks" color="#f87171" name="Fallbacks"/>
+          </div>
+        </div>
+      )}
+
+      {/* Database */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>DATABASE (HikariCP)</div>
+      <div className="grid4" style={{ marginBottom:16 }}>
+        <StatCard label="Active Connections" value={data?.dbActive}  color="#22d3ee" sub={`of ${data?.dbMax ?? 20} max`} icon={<Database size={15}/>}/>
+        <StatCard label="Pending Requests"   value={data?.dbPending} color={data?.dbPending > 5 ? "#f87171" : "#34d399"} sub="waiting for connection" icon={<Clock size={15}/>}/>
+        <StatCard label="Pool Max"           value={data?.dbMax}     color="#a78bfa" icon={<Server size={15}/>}/>
+        <div className="stat-card">
+          <div style={{ fontSize:10, fontWeight:700, color:"rgba(148,163,184,0.4)", letterSpacing:"0.08em", marginBottom:12 }}>POOL UTILISATION</div>
+          <div style={{ height:8, background:"rgba(255,255,255,0.06)", borderRadius:4, overflow:"hidden", marginTop:8 }}>
+            <div style={{
+              height:"100%", borderRadius:4, transition:"width 0.8s ease",
+              width: `${Math.min(100, Math.round(((data?.dbActive||0) / (data?.dbMax||20)) * 100))}%`,
+              background: (data?.dbActive||0) / (data?.dbMax||20) > 0.8 ? "#f87171" : "#22d3ee"
+            }}/>
+          </div>
+          <div style={{ fontSize:11, color:"rgba(148,163,184,0.4)", marginTop:6 }}>
+            {Math.round(((data?.dbActive||0) / (data?.dbMax||20)) * 100)}% used
+          </div>
+        </div>
+      </div>
+
+      {history.length > 1 && (
+        <div className="card" style={{ padding:18, marginBottom:24 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:8 }}>DB Active Connections</div>
+          <Spark dataKey="dbActive" color="#22d3ee" name="Active"/>
+        </div>
+      )}
+
+      {/* JVM */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>JVM & PROCESS</div>
+      <div className="grid4" style={{ marginBottom:16 }}>
+        <StatCard label="Heap Used"   value={data?.jvmHeapUsedMb ? `${data.jvmHeapUsedMb} MB` : "—"}  color="#a78bfa" sub={`of ${data?.jvmHeapMaxMb ?? "?"} MB max`} icon={<Cpu size={15}/>}/>
+        <StatCard label="Heap %"      value={data?.jvmHeapUsedPct ? `${data.jvmHeapUsedPct}%` : "—"} color={data?.jvmHeapUsedPct > 85 ? "#f87171" : "#34d399"} icon={<Activity size={15}/>}/>
+        <StatCard label="CPU Usage"   value={data?.cpuUsagePct != null ? `${data.cpuUsagePct}%` : "—"} color={data?.cpuUsagePct > 80 ? "#f87171" : "#22d3ee"} icon={<Zap size={15}/>}/>
+        <StatCard label="Uptime"      value={data?.uptimeSeconds != null ? fmtUptime(data.uptimeSeconds) : "—"} color="#fbbf24" icon={<Clock size={15}/>}/>
+      </div>
+
+      {history.length > 1 && (
+        <div className="grid2" style={{ marginBottom:24 }}>
+          <div className="card" style={{ padding:18 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:8 }}>JVM Heap (MB)</div>
+            <Spark dataKey="jvmHeapUsedMb" color="#a78bfa" name="Heap MB" unit=" MB"/>
+          </div>
+          <div className="card" style={{ padding:18 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:8 }}>CPU %</div>
+            <Spark dataKey="cpuUsagePct" color="#22d3ee" name="CPU" unit="%"/>
+          </div>
+        </div>
+      )}
+
+      {/* HTTP */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>HTTP REQUESTS</div>
+      <div className="grid4" style={{ marginBottom:24 }}>
+        <StatCard label="Total Requests" value={data?.httpTotal?.toLocaleString()}  color="#22d3ee" icon={<Wifi size={15}/>}/>
+        <StatCard label="5xx Errors"     value={data?.httpErrors?.toLocaleString()} color={data?.httpErrors > 0 ? "#f87171" : "#34d399"} sub={data?.httpTotal ? `${((data.httpErrors/data.httpTotal)*100).toFixed(2)}% error rate` : ""} icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="P99 Latency"    value={data?.httpP99Ms ? `${data.httpP99Ms.toFixed(0)}ms` : "—"} color={data?.httpP99Ms > 1000 ? "#f87171" : "#34d399"} sub="tail latency" icon={<Clock size={15}/>}/>
+        <StatCard label="Error Rate"     value={data?.httpTotal ? `${((data?.httpErrors||0)/data.httpTotal*100).toFixed(1)}%` : "—"}
+          color={((data?.httpErrors||0)/(data?.httpTotal||1)) > 0.05 ? "#f87171" : "#34d399"} icon={<Shield size={15}/>}/>
+      </div>
+
+      {/* SMS */}
+      <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>SMS DELIVERY</div>
+      <div className="grid4" style={{ marginBottom:8 }}>
+        <StatCard label="OTP Sent"   value={data?.smsOtpSent?.toLocaleString()} color="#34d399" icon={<Send size={15}/>}/>
+        <StatCard label="SMS Failed" value={data?.smsFailed?.toLocaleString()}  color={data?.smsFailed > 0 ? "#f87171" : "#34d399"} icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="Success Rate"
+          value={data?.smsOtpSent != null ? `${Math.round(((data.smsOtpSent)/Math.max(1,data.smsOtpSent+data.smsFailed))*100)}%` : "—"}
+          color="#22d3ee" icon={<CheckCircle size={15}/>}/>
+        <div className="stat-card" style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"rgba(148,163,184,0.4)", letterSpacing:"0.08em", marginBottom:8 }}>SMS STATUS</div>
+            <span className={`badge ${data?.smsOtpSent > 0 || data?.smsFailed > 0 ? "b-ok" : "b-user"}`}>
+              {data?.smsOtpSent > 0 || data?.smsFailed > 0 ? "Active" : "Not triggered yet"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+function fmtUptime(seconds) {
+  if (seconds < 60)   return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds/60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
+  return `${Math.floor(seconds/86400)}d ${Math.floor((seconds%86400)/3600)}h`;
+}
+
 // ─── Main Layout ──────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -1282,12 +1541,13 @@ export default function AdminPage() {
           </div>
 
           <div className="content">
-            {tab === "overview"  && <OverviewSection stats={stats} signups={signups} adoption={adoption} loading={overviewLoading}/>}
-            {tab === "users"     && <UsersSection user={user} onUserClick={setSelectedUserId}/>}
-            {tab === "audit"     && <AuditSection/>}
-            {tab === "platform"  && <PlatformSection/>}
-            {tab === "security"  && <SecuritySection/>}
-            {tab === "tickets"   && <TicketsSection/>}
+            {tab === "overview"   && <OverviewSection stats={stats} signups={signups} adoption={adoption} loading={overviewLoading}/>}
+            {tab === "users"      && <UsersSection user={user} onUserClick={setSelectedUserId}/>}
+            {tab === "audit"      && <AuditSection/>}
+            {tab === "monitoring" && <MonitoringSection/>}
+            {tab === "platform"   && <PlatformSection/>}
+            {tab === "security"   && <SecuritySection/>}
+            {tab === "tickets"    && <TicketsSection/>}
           </div>
         </div>
 

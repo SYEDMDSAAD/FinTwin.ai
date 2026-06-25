@@ -14,15 +14,15 @@ public class AiServiceConfig {
 
     /**
      * RestTemplate for all AI service calls.
-     * Hard timeouts prevent a hung Ollama from exhausting the HikariCP thread pool.
-     *   connect: 5 s  — fail fast if the AI service pod is unreachable
-     *   read:    60 s — phi3:mini can take up to 45 s on complex forecasts
+     *   connect: 3 s  — fail fast if the AI service is unreachable
+     *   read:    20 s — phi3:mini on CPU typically responds in 5-15 s; 20 s is safe headroom
+     * The circuit breaker handles repeated failures; keep timeout tight to release threads quickly.
      */
     @Bean("aiRestTemplate")
     public RestTemplate aiRestTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5_000);
-        factory.setReadTimeout(60_000);
+        factory.setConnectTimeout(3_000);
+        factory.setReadTimeout(20_000);
 
         RestTemplate rt = new RestTemplate(factory);
         rt.getInterceptors().add((request, body, execution) -> {

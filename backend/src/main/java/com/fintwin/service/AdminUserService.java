@@ -55,10 +55,12 @@ public class AdminUserService {
 
     @PreAuthorize("hasAuthority('READ_AGGREGATE_ANALYTICS')")
     public AdminStatsDTO getStats() {
-        long total       = userRepository.count();
-        long active      = userRepository.countByEnabledTrue();
-        long newThisWeek = userRepository.countByCreatedAtAfter(LocalDateTime.now().minusDays(7));
-        long admins      = userRepository.countByRole("ADMIN");
+        // Single SQL round-trip to Supabase instead of 4 separate COUNT queries
+        Object[] row     = userRepository.countUserStats(LocalDateTime.now().minusDays(7)).get(0);
+        long total       = ((Number) row[0]).longValue();
+        long active      = ((Number) row[1]).longValue();
+        long newThisWeek = ((Number) row[2]).longValue();
+        long admins      = ((Number) row[3]).longValue();
         return new AdminStatsDTO(total, active, newThisWeek, admins);
     }
 
@@ -266,10 +268,11 @@ public class AdminUserService {
 
     @PreAuthorize("hasAuthority('READ_AGGREGATE_ANALYTICS')")
     public Map<String, Object> getAdoptionStats() {
-        long total     = userRepository.count();
-        long twoFa     = userRepository.countByTwoFactorEnabledTrue();
-        long onboarded = userRepository.countByOnboardingCompletedTrue();
-        // Single COUNT DISTINCT query — does not load any User objects into memory
+        // 2 round-trips instead of 4: one for user counts, one for bank connections
+        Object[] row   = userRepository.countAdoptionStats().get(0);
+        long total     = ((Number) row[0]).longValue();
+        long twoFa     = ((Number) row[1]).longValue();
+        long onboarded = ((Number) row[2]).longValue();
         long bankUsers = bankConnectionRepository.countDistinctUsers();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", total);
