@@ -11,6 +11,7 @@ import com.fintwin.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class ForecastService {
     // instead of crashing with unhandled exception.
     // =========================
 
+    @PreAuthorize("hasAuthority('USE_AI_FORECAST')")
     public ForecastDTO generateForecast() {
 
         String email = SecurityUtils.getCurrentUserEmail();
@@ -118,6 +120,7 @@ public class ForecastService {
     // No logic bugs, added null guard on rows
     // =========================
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     public List<MonthlyExpenseDTO> getMonthlyHistory() {
 
         String email = SecurityUtils.getCurrentUserEmail();
@@ -176,6 +179,7 @@ public class ForecastService {
             "housing",       1.03
     );
 
+    @PreAuthorize("hasAuthority('USE_AI_FORECAST')")
     public List<CategoryForecastDTO> getCategoryForecast() {
 
         String email = SecurityUtils.getCurrentUserEmail();

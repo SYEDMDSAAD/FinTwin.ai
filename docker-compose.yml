@@ -90,6 +90,35 @@ services:
       SETU_WEBHOOK_SECRET:       ${SETU_WEBHOOK_SECRET:-}
     # Not exposed directly — Nginx proxies /api/* to this service
 
+  # ── Identity Service — auth, tokens, 2FA, account management ──────────────
+  identity-service:
+    build: ./identity-service
+    restart: unless-stopped
+    networks: [fintwin]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL:                 jdbc:postgresql://db:5432/${POSTGRES_DB:-fintwin}
+      DB_USERNAME:            ${POSTGRES_USER:-postgres}
+      DB_PASSWORD:            ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      JWT_SECRET:             ${JWT_SECRET:?JWT_SECRET is required}
+      FINTWIN_ENCRYPTION_KEY: ${FINTWIN_ENCRYPTION_KEY:?FINTWIN_ENCRYPTION_KEY is required}
+      REDIS_URL:              redis://redis:6379
+      GOOGLE_CLIENT_ID:       ${GOOGLE_CLIENT_ID:-}
+      CORS_ALLOWED_ORIGINS:   ${CORS_ALLOWED_ORIGINS:-https://fintwin.local}
+      ADMIN_KEY:              ${ADMIN_KEY:-}
+      INTERNAL_KEY:           ${INTERNAL_KEY:-}
+      APP_BASE_URL:           ${APP_BASE_URL:-https://fintwin.local}
+      MAIL_HOST:              ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT:              ${MAIL_PORT:-587}
+      MAIL_USERNAME:          ${MAIL_USERNAME:-}
+      MAIL_PASSWORD:          ${MAIL_PASSWORD:-}
+      MAIL_ENABLED:           ${MAIL_ENABLED:-false}
+    # Not exposed directly — Nginx proxies /api/auth/*, /api/2fa/*, /api/admin/* to this service
+
   # ── Nginx — TLS termination + frontend serving ──────────────────────────────
   nginx:
     image: nginx:alpine

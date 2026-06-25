@@ -4,11 +4,13 @@ import com.fintwin.audit.Audited;
 import com.fintwin.dto.OnboardingRequestDTO;
 import com.fintwin.model.Asset;
 import com.fintwin.model.FinancialGoal;
+import com.fintwin.model.Investment;
 import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.AssetRepository;
 import com.fintwin.repository.FinancialGoalRepository;
+import com.fintwin.repository.InvestmentRepository;
 import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
@@ -44,18 +46,21 @@ public class OnboardingService {
     private final LiabilityRepository       liabilityRepository;
     private final FinancialGoalRepository   goalRepository;
     private final TransactionRepository     transactionRepository;
+    private final InvestmentRepository      investmentRepository;
 
     public OnboardingService(
             UserRepository userRepository,
             AssetRepository assetRepository,
             LiabilityRepository liabilityRepository,
             FinancialGoalRepository goalRepository,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository,
+            InvestmentRepository investmentRepository) {
         this.userRepository       = userRepository;
         this.assetRepository      = assetRepository;
         this.liabilityRepository  = liabilityRepository;
         this.goalRepository       = goalRepository;
         this.transactionRepository = transactionRepository;
+        this.investmentRepository  = investmentRepository;
     }
 
     @Audited(action = "WRITE", resource = "profile", description = "User completed onboarding setup")
@@ -68,6 +73,7 @@ public class OnboardingService {
         goalRepository.deleteByUser(user);
         assetRepository.deleteByUser(user);
         liabilityRepository.deleteByUser(user);
+        investmentRepository.deleteAll(investmentRepository.findByUser(user));
 
         // Savings asset
         if (request.getSavings() > 0) {
@@ -79,14 +85,17 @@ public class OnboardingService {
             assetRepository.save(savings);
         }
 
-        // Investment portfolio
+        // Investment portfolio — stored in investments table so it appears in Portfolio page
+        // and is correctly included in portfolioCurrentValue in NetWorthService
         if (request.getInvestments() > 0) {
-            Asset inv = new Asset();
+            Investment inv = new Investment();
             inv.setName("Investment Portfolio");
-            inv.setType("Investment");
-            inv.setAmount(request.getInvestments());
+            inv.setType("Other");
+            inv.setCurrentValue(request.getInvestments());
+            inv.setInvestedAmount(request.getInvestments());
+            inv.setPurchaseDate(LocalDate.now());
             inv.setUser(user);
-            assetRepository.save(inv);
+            investmentRepository.save(inv);
         }
 
         // Liabilities
@@ -126,31 +135,31 @@ public class OnboardingService {
     // -------------------------------------------------------------------------
 
     private void seedTransactions(OnboardingRequestDTO request, User user) {
-        double curIncome   = request.getIncomeLast3Months();
-        double curExpenses = request.getExpensesLast3Months();
+        int n = request.getNumberOfMonths() != null && request.getNumberOfMonths() >= 2
+                ? request.getNumberOfMonths() : 3;
 
-        double prevIncome   = curIncome   * 0.90;
-        double prevExpenses = curExpenses * 1.20;
+        // Derive monthly average from the total the user provided for n months
+        double monthlyIncome   = request.getIncomeLast3Months()   / n;
+        double monthlyExpenses = request.getExpensesLast3Months() / n;
 
-        double[] distribution = { 0.32, 0.28, 0.40 };
+        // Previous period modelled as slightly lower income / higher expenses (improving trend)
+        double prevMonthlyIncome   = monthlyIncome   * 0.90;
+        double prevMonthlyExpenses = monthlyExpenses * 1.20;
 
-        LocalDate today = LocalDate.now();
-        int startOffset = today.getDayOfMonth() >= 10 ? 5 : 6;
+        LocalDate today      = LocalDate.now();
+        int       total      = 2 * n;  // n previous months + n current months
 
-        List<Transaction> batch = new ArrayList<>(80);
+        List<Transaction> batch = new ArrayList<>(total * 12);
 
-        for (int i = 0; i < 6; i++) {
-            boolean isPrevQuarter = i < 3;
-            double quarterly = isPrevQuarter ? prevIncome   : curIncome;
-            double qExpenses = isPrevQuarter ? prevExpenses : curExpenses;
-            int    qIndex    = i % 3;
+        for (int i = 0; i < total; i++) {
+            boolean isPrev    = i < n;
+            double  mIncome   = isPrev ? prevMonthlyIncome   : monthlyIncome;
+            double  mExpenses = isPrev ? prevMonthlyExpenses : monthlyExpenses;
 
-            double monthIncome   = quarterly * distribution[qIndex];
-            double monthExpenses = qExpenses  * distribution[qIndex];
+            // Oldest month first: (total-1) months ago → 0 months ago
+            LocalDate month = today.minusMonths(total - 1 - i);
 
-            LocalDate month = today.minusMonths(startOffset - i);
-
-            batch.add(buildTransaction(user, month.withDayOfMonth(1).toString(), "Employer", monthIncome, "Income"));
+            batch.add(buildTransaction(user, month.withDayOfMonth(1).toString(), "Employer", mIncome, "Income"));
 
             for (Object[] row : EXPENSE_TEMPLATE) {
                 int    day      = (int)    row[0];
@@ -160,7 +169,7 @@ public class OnboardingService {
 
                 LocalDate txDate = month.withDayOfMonth(day);
                 if (!txDate.isAfter(today)) {
-                    batch.add(buildTransaction(user, txDate.toString(), merchant, -(monthExpenses * fraction), category));
+                    batch.add(buildTransaction(user, txDate.toString(), merchant, -(mExpenses * fraction), category));
                 }
             }
         }
@@ -187,7 +196,9 @@ public class OnboardingService {
         // to 0 so goal probability is recalculated later from real transactions
         double income3m   = req.getIncomeLast3Months()   != null ? req.getIncomeLast3Months()   : 0.0;
         double expenses3m = req.getExpensesLast3Months()  != null ? req.getExpensesLast3Months()  : 0.0;
-        double monthlySavings = (income3m - expenses3m) / 3.0;
+        int    nMonths    = req.getNumberOfMonths()       != null && req.getNumberOfMonths() >= 2
+                            ? req.getNumberOfMonths() : 3;
+        double monthlySavings = (income3m - expenses3m) / nMonths;
         double probability    = monthlyTarget <= 0 ? 50.0
                 : Math.min(100.0, Math.max(0.0, (monthlySavings / monthlyTarget) * 100));
         String health = probability >= 100 ? "Excellent"

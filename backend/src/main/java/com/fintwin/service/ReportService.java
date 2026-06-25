@@ -35,6 +35,7 @@ import com.fintwin.repository
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import org.springframework.web.client.RestTemplate;
@@ -107,6 +108,7 @@ public class ReportService {
     // GENERATE WEEKLY REPORT
     // =====================================
 
+    @PreAuthorize("hasAuthority('USE_AI_REPORT')")
     @Audited(action = "READ", resource = "report", description = "Weekly financial report generated")
     public WeeklyReportDTO
     generateWeeklyReport() {

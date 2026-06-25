@@ -13,6 +13,7 @@ import com.fintwin.repository.*;
 import com.fintwin.security.PasswordValidator;
 import com.fintwin.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ public class ProfileService {
         this.bankConnectionRepository = bankConnectionRepository;
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
     @Audited(action = "READ", resource = "profile", description = "User profile retrieved")
     public ProfileDTO getProfile() {
 
@@ -83,6 +85,7 @@ public class ProfileService {
         );
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     @Audited(action = "WRITE", resource = "auth", description = "User changed password")
     public String changePassword(ChangePasswordDTO dto) {
 
@@ -111,6 +114,7 @@ public class ProfileService {
         return "Password updated successfully";
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     @Audited(action = "WRITE", resource = "profile", description = "User profile updated")
     public String updateProfile(UpdateProfileDTO dto) {
 
@@ -134,6 +138,7 @@ public class ProfileService {
         return "Profile updated successfully";
     }
 
+    @PreAuthorize("hasAuthority('DELETE_OWN_ACCOUNT')")
     @Audited(action = "DELETE", resource = "account", description = "User account and all data permanently deleted")
     @Transactional
     public String deleteAccount() {
@@ -160,6 +165,7 @@ public class ProfileService {
         return "Account deleted successfully";
     }
 
+    @PreAuthorize("hasAuthority('EXPORT_OWN_DATA')")
     @Audited(action = "EXPORT", resource = "account", description = "User exported personal data (GDPR portability)")
     public Map<String, Object> exportData() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -200,6 +206,7 @@ public class ProfileService {
         userRepository.delete(user);
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
     public List<FinancialScoreHistory> getScoreHistory() {
 
         String email = SecurityUtils.getCurrentUserEmail();

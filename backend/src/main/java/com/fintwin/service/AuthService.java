@@ -102,6 +102,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setOnboardingCompleted(false);
         user.setConsentGivenAt(LocalDateTime.now());
+        user.setRole("USER");
 
         userRepository.save(user);
 
@@ -174,7 +175,7 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getEmail());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
 
         return new AuthResponse(
                 token,
@@ -243,13 +244,14 @@ public class AuthService {
                 user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
                 user.setOnboardingCompleted(false);
                 user.setEmailVerified(true); // Google already verified the email
+                user.setRole("USER");
                 userRepository.save(user);
             }
 
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
-            String token = jwtUtil.generateToken(email);
+            String token = jwtUtil.generateToken(email, user.getRole());
 
             return new AuthResponse(
                     token,

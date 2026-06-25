@@ -3,7 +3,10 @@ package com.fintwin.model;
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fintwin.security.EncryptionConverter;
+import com.fintwin.security.Permission;
+import com.fintwin.security.Role;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -76,6 +79,13 @@ public class User {
 
     @Column(name = "password_reset_expiry")
     private LocalDateTime passwordResetExpiry;
+
+    // Account lockout — managed by identity-service
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 
     public User() {
         this.createdAt = LocalDateTime.now();
@@ -199,4 +209,27 @@ public class User {
 
     public LocalDateTime getPasswordResetExpiry() { return passwordResetExpiry; }
     public void setPasswordResetExpiry(LocalDateTime passwordResetExpiry) { this.passwordResetExpiry = passwordResetExpiry; }
+
+    public Integer getFailedLoginAttempts() { return failedLoginAttempts == null ? 0 : failedLoginAttempts; }
+    public void setFailedLoginAttempts(Integer v) { this.failedLoginAttempts = v; }
+    public LocalDateTime getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(LocalDateTime v) { this.lockedUntil = v; }
+
+    // ── RBAC helpers ─────────────────────────────────────────────────
+
+    public Role getRoleEnum() {
+        return Role.fromString(role);
+    }
+
+    public Set<Permission> getAllPermissions() {
+        return getRoleEnum().getPermissions();
+    }
+
+    public boolean hasPermission(Permission permission) {
+        return getAllPermissions().contains(permission);
+    }
+
+    public boolean hasRole(Role r) {
+        return getRoleEnum() == r;
+    }
 }

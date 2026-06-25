@@ -10,6 +10,7 @@ import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -35,6 +36,7 @@ public class CreditScoreService {
     @Autowired private LiabilityRepository   liabilityRepository;
     @Autowired private UserRepository        userRepository;
 
+    @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
     public CreditScoreDTO calculate() {
 
         String email = SecurityUtils.getCurrentUserEmail();

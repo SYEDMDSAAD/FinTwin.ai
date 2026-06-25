@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { GoogleLogin } from "@react-oauth/google";
@@ -174,11 +174,11 @@ function Login() {
     try {
       setLoading(true);
       setAccountBlocked(false);
-      const res = await API.post("/auth/login", { email, password });
+      const res = await identityApi.post("/auth/login", { email, password });
       if (res.data.requires2FA) { setTwoFactorToken(res.data.twoFactorToken); setNeeds2FA(true); return; }
-      login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
+      login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Login Successful");
-      const me = await API.get("/auth/me");
+      const me = await identityApi.get("/auth/me");
       navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {
       if (err.response?.status === 403 && err.response?.data?.error === "ACCOUNT_DISABLED") {
@@ -206,10 +206,10 @@ function Login() {
     if (code.length < 6) { toast.error("Enter the 6-digit code"); return; }
     try {
       setOtpLoading(true);
-      const res = await API.post("/auth/2fa/login", { twoFactorToken, code });
-      login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
+      const res = await identityApi.post("/auth/2fa/login", { twoFactorToken, code });
+      login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Login Successful");
-      const me = await API.get("/auth/me");
+      const me = await identityApi.get("/auth/me");
       navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid code. Try again.";
@@ -219,10 +219,10 @@ function Login() {
   };
   const handleGoogleLogin = async (credentialResponse) => {
     try {
-      const res = await API.post("/auth/google", { credential: credentialResponse.credential });
-      login(res.data.token, { email: res.data.email, fullName: res.data.fullName, role: res.data.role });
+      const res = await identityApi.post("/auth/google", { credential: credentialResponse.credential });
+      login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Google Login Successful");
-      const me = await API.get("/auth/me");
+      const me = await identityApi.get("/auth/me");
       navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch { toast.error("Google Login Failed"); }
   };
@@ -232,7 +232,7 @@ function Login() {
     if (!forgotEmail.trim()) { toast.error("Enter your email address"); return; }
     try {
       setForgotLoading(true);
-      const res = await API.post("/auth/forgot-password", { email: forgotEmail.trim() });
+      const res = await identityApi.post("/auth/forgot-password", { email: forgotEmail.trim() });
       // Dev mode: backend returns the reset URL directly when email is not configured
       if (res.data?.devResetUrl) {
         toast.success("Dev mode: opening reset link directly");

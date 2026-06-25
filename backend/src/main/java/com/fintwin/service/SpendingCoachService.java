@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -34,6 +35,7 @@ public class SpendingCoachService {
     @Qualifier("aiRestTemplate")
     private RestTemplate aiRestTemplate;
 
+    @PreAuthorize("hasAuthority('USE_AI_SPENDING_COACH')")
     public SpendingCoachResponseDTO
     getCoachInsights() {
 

@@ -8,6 +8,8 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,11 +25,13 @@ public class InsurancePolicyService {
         return userRepository.findByEmail(SecurityUtils.getCurrentUserEmail()).orElseThrow();
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_INSURANCE')")
     public List<InsurancePolicyDTO> getAll() {
         return repository.findByUserOrderByCreatedAtDesc(currentUser())
                 .stream().map(InsurancePolicyDTO::from).collect(Collectors.toList());
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INSURANCE')")
     public InsurancePolicyDTO create(InsurancePolicyDTO dto) {
         InsurancePolicy policy = new InsurancePolicy();
         policy.setUser(currentUser());
@@ -35,22 +39,24 @@ public class InsurancePolicyService {
         return InsurancePolicyDTO.from(repository.save(policy));
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INSURANCE')")
     public InsurancePolicyDTO update(Long id, InsurancePolicyDTO dto) {
         User user = currentUser();
         InsurancePolicy policy = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Policy not found"));
         if (!policy.getUser().getId().equals(user.getId()))
-            throw new RuntimeException("Not authorized");
+            throw new AccessDeniedException("Access denied");
         applyFields(policy, dto);
         return InsurancePolicyDTO.from(repository.save(policy));
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INSURANCE')")
     public void delete(Long id) {
         User user = currentUser();
         InsurancePolicy policy = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Policy not found"));
         if (!policy.getUser().getId().equals(user.getId()))
-            throw new RuntimeException("Not authorized");
+            throw new AccessDeniedException("Access denied");
         repository.delete(policy);
     }
 

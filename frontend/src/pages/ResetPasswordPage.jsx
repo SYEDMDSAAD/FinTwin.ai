@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { Lock, Eye, EyeOff } from "lucide-react";
 
@@ -62,7 +62,7 @@ function ResetPasswordPage() {
     if (newPassword !== confirmPassword) { toast.error("Passwords do not match"); return; }
     try {
       setLoading(true);
-      await API.post("/auth/reset-password", { token, newPassword });
+      await identityApi.post("/auth/reset-password", { token, newPassword });
       toast.success("Password updated! You can now sign in.");
       navigate("/login");
     } catch (e) {

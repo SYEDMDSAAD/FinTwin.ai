@@ -5,7 +5,7 @@ import {
   Bell, CheckCircle, ChevronRight, Building2,
   Unlink, Lock, X, ShieldCheck, ShieldOff
 } from "lucide-react";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext";
 import { useCurrency, CURRENCIES } from "../context/CurrencyContext";
@@ -93,7 +93,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
   const loadSetup = async () => {
     setQrLoading(true);
     try {
-      const r = await API.post("/2fa/setup");
+      const r = await identityApi.post("/2fa/setup");
       setQrData(r.data);
     } catch { toast.error("Failed to generate QR. Try again."); }
     finally  { setQrLoading(false); }
@@ -123,7 +123,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
     if (code.length < 6) { toast.error("Enter the 6-digit code"); return; }
     setSubmitting(true);
     try {
-      await API.post("/2fa/enable", { code });
+      await identityApi.post("/2fa/enable", { code });
       toast.success("2FA enabled! You'll need a code on every login.");
       onSuccess(true);
     } catch (err) {
@@ -136,7 +136,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
     if (code.length < 6) { toast.error("Enter the 6-digit code"); return; }
     setSubmitting(true);
     try {
-      await API.post("/2fa/disable", { code });
+      await identityApi.post("/2fa/disable", { code });
       toast.success("2FA disabled.");
       onSuccess(false);
     } catch (err) {
@@ -289,7 +289,7 @@ export default function SettingsPage({ navigateTo }) {
   };
 
   const fetchTwoFAStatus = async () => {
-    try { const r = await API.get("/2fa/status"); setTwoFaEnabled(r.data.enabled); } catch {}
+    try { const r = await identityApi.get("/2fa/status"); setTwoFaEnabled(r.data.enabled); } catch {}
   };
 
   const fetchConnections = async () => {

@@ -36,15 +36,17 @@ public class JwtUtil {
     // GENERATE TOKEN
     // =====================================
 
-    public String generateToken(
+    public String generateToken(String email) {
+        return generateToken(email, "USER");
+    }
 
-            String email
-
-    ) {
+    public String generateToken(String email, String role) {
 
         return Jwts.builder()
 
                 .setSubject(email)
+
+                .claim("role", role != null ? role : "USER")
 
                 .setIssuedAt(
                         new Date()
@@ -67,6 +69,12 @@ public class JwtUtil {
                 )
 
                 .compact();
+    }
+
+    public String extractRole(String token) {
+        Claims claims = extractClaims(token);
+        String role = (String) claims.get("role");
+        return role != null ? role : "USER";
     }
 
     // =====================================

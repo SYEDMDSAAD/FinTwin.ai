@@ -12,6 +12,7 @@ import com.fintwin.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.client.RestTemplate;
@@ -50,6 +51,7 @@ public class GoalPlannerService {
     // at 100 and floored at 0.
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "WRITE", resource = "goals", description = "Financial goal created")
     public FinancialGoal createGoal(GoalRequestDTO dto) {
 
@@ -119,6 +121,7 @@ public class GoalPlannerService {
     // vs. total duration, capped at 100%.
     // =========================
 
+    @PreAuthorize("hasAuthority('READ_OWN_GOALS')")
     @Audited(action = "READ", resource = "goals", description = "All financial goals retrieved")
     public List<FinancialGoal> getGoals() {
 
@@ -161,6 +164,7 @@ public class GoalPlannerService {
     // Also regenerates AI plan after update.
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "WRITE", resource = "goals", description = "Financial goal updated")
     public FinancialGoal updateGoal(Long id, GoalRequestDTO dto) {
 
@@ -229,6 +233,7 @@ public class GoalPlannerService {
     // DELETE GOAL
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "DELETE", resource = "goals", description = "Financial goal deleted")
     public void deleteGoal(Long id) {
 
@@ -261,6 +266,7 @@ public class GoalPlannerService {
     // goal entity — redundant. Now directly passes goal fields.
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "WRITE", resource = "goals", description = "AI plan regenerated for financial goal")
     public FinancialGoal regenerateGoal(Long id) {
 

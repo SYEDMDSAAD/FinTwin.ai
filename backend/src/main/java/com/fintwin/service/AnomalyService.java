@@ -9,6 +9,7 @@ import com.fintwin.repository.DismissedAnomalyRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ public class AnomalyService {
         this.dismissedRepository   = dismissedRepository;
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     public void dismissAnomaly(DismissAnomalyRequest req) {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
@@ -44,6 +46,7 @@ public class AnomalyService {
         dismissedRepository.save(p);
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     public List<AnomalyDTO> detectAnomalies() {
 
         String email = SecurityUtils.getCurrentUserEmail();

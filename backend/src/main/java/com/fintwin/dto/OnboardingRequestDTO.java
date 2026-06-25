@@ -22,6 +22,10 @@ public class OnboardingRequestDTO {
     @Min(value = 0, message = "Debt cannot be negative")
     private Double debt;
 
+    // Number of months the user provided data for (manual path, min 2)
+    // Used to correctly compute monthly savings and to scale transaction seeding
+    private Integer numberOfMonths;
+
     private List<String> goals;
 
     public Double getIncomeLast3Months()   { return incomeLast3Months; }
@@ -29,6 +33,9 @@ public class OnboardingRequestDTO {
 
     public Double getExpensesLast3Months() { return expensesLast3Months; }
     public void   setExpensesLast3Months(Double v) { this.expensesLast3Months = v; }
+
+    public Integer getNumberOfMonths()        { return numberOfMonths; }
+    public void    setNumberOfMonths(Integer v){ this.numberOfMonths = v; }
 
     public Double getSavings()     { return savings     != null ? savings     : 0.0; }
     public void   setSavings(Double v)     { this.savings = v; }

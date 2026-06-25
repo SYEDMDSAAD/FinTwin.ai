@@ -12,6 +12,7 @@ import com.fintwin.audit.Audited;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +29,7 @@ public class AnalyticsService {
     @Autowired
     private UserRepository userRepository;
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     @Audited(action = "READ", resource = "analytics", description = "User viewed monthly financial summary")
     public MonthlySummaryDTO getMonthlySummary() {
 
@@ -179,6 +181,7 @@ public class AnalyticsService {
         return dto;
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     @Audited(action = "READ", resource = "analytics", description = "User viewed recurring expense analysis")
     public List<RecurringExpenseDTO>
     getRecurringExpenses() {

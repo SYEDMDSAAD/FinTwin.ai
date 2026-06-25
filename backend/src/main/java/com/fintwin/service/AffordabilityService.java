@@ -7,6 +7,7 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.dto.ForecastDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -24,6 +25,7 @@ public class AffordabilityService {
     // based on risk level (high risk → smaller EMI, longer term).
     // IMPROVEMENT: added canAffordOutright and monthsToSave fields.
 
+    @PreAuthorize("hasAuthority('USE_AI_BASIC')")
     public Map<String, Object> analyzePurchase(Double price) {
 
         if (price == null || price <= 0) {

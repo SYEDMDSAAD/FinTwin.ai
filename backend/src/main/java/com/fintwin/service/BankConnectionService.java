@@ -13,6 +13,7 @@ import com.fintwin.security.SecurityUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +54,7 @@ public class BankConnectionService {
      * vua — the user's AA Virtual User Address (e.g. 9876543210@onemoney).
      * In sandbox, pass null to use the Setu test number.
      */
+    @PreAuthorize("hasAuthority('CONNECT_BANK_ACCOUNT')")
     @Audited(action = "WRITE", resource = "bank_connection", description = "Bank account connection initiated")
     public Map<String, Object> initiateConnection(String vua) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -389,6 +391,7 @@ public class BankConnectionService {
 
     // ── Force re-sync for a specific connection (any status) ─────────────────
 
+    @PreAuthorize("hasAuthority('CONNECT_BANK_ACCOUNT')")
     public String forceResync(Long connectionId) {
         String email = SecurityUtils.getCurrentUserEmail();
         User user    = userRepo.findByEmail(email).orElseThrow();
@@ -495,6 +498,7 @@ public class BankConnectionService {
 
     // ── List connections ──────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_OWN_BANK_CONNECTIONS')")
     @Audited(action = "READ", resource = "bank_connection", description = "Bank connections retrieved")
     public List<BankConnection> getConnections() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -511,6 +515,7 @@ public class BankConnectionService {
 
     // ── Disconnect ────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('DISCONNECT_BANK_ACCOUNT')")
     @Audited(action = "DELETE", resource = "bank_connection", description = "Bank connection removed")
     public void disconnect(Long id) {
         String email = SecurityUtils.getCurrentUserEmail();

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -52,6 +53,7 @@ public class AdminUserService {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_AGGREGATE_ANALYTICS')")
     public AdminStatsDTO getStats() {
         long total       = userRepository.count();
         long active      = userRepository.countByEnabledTrue();
@@ -62,6 +64,7 @@ public class AdminUserService {
 
     // ── Users list ────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_ALL_USERS')")
     public Map<String, Object> listUsers(int page, int size) {
         var pg = userRepository.findAll(PageRequest.of(page, size, org.springframework.data.domain.Sort.by("createdAt").descending()));
         List<AdminUserDTO> users = pg.getContent().stream()
@@ -82,6 +85,7 @@ public class AdminUserService {
 
     // ── User detail ───────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_ANY_USER_PROFILE')")
     public Optional<UserDetailDTO> getUserDetail(Long id) {
         return userRepository.findById(id).map(u -> {
             UserDetailDTO dto = new UserDetailDTO();
@@ -108,6 +112,7 @@ public class AdminUserService {
 
     // ── Enable / Disable ─────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('FREEZE_ANY_ACCOUNT')")
     public void deactivateUser(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         if (user.getEmail().equals(adminEmail))
@@ -118,6 +123,7 @@ public class AdminUserService {
                 "Deactivated account: " + user.getEmail() + " (id=" + id + ")", ip, ua, method, uri);
     }
 
+    @PreAuthorize("hasAuthority('FREEZE_ANY_ACCOUNT')")
     public void activateUser(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         user.setEnabled(true);
@@ -128,6 +134,7 @@ public class AdminUserService {
 
     // ── Role change ───────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('MANAGE_ROLES')")
     public void changeRole(Long id, String newRole, String adminEmail, String ip, String ua, String method, String uri) {
         if (!"USER".equals(newRole) && !"ADMIN".equals(newRole))
             throw new IllegalArgumentException("Role must be USER or ADMIN.");
@@ -212,6 +219,7 @@ public class AdminUserService {
 
     // ── Delete user ───────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('DELETE_ANY_USER')")
     public void deleteUser(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         if (user.getEmail().equals(adminEmail))
@@ -224,6 +232,7 @@ public class AdminUserService {
 
     // ── Audit logs ────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_AUDIT_LOGS')")
     public Map<String, Object> getAuditLogs(int page, int size, String action) {
         Page<AuditLog> logs = (action != null && !action.isBlank())
                 ? auditLogRepository.findByActionOrderByTimestampDesc(action, PageRequest.of(page, size))
@@ -238,6 +247,7 @@ public class AdminUserService {
 
     // ── Analytics ─────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_AGGREGATE_ANALYTICS')")
     public List<Map<String, Object>> getSignupTrend(int days) {
         LocalDateTime since = LocalDateTime.now().minusDays(days);
         // Fetches only recent users — not all users — via indexed created_at filter
@@ -254,6 +264,7 @@ public class AdminUserService {
                 .collect(Collectors.toList());
     }
 
+    @PreAuthorize("hasAuthority('READ_AGGREGATE_ANALYTICS')")
     public Map<String, Object> getAdoptionStats() {
         long total     = userRepository.count();
         long twoFa     = userRepository.countByTwoFactorEnabledTrue();

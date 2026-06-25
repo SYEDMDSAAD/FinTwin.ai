@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import toast from "react-hot-toast";
 import {
   CheckCircle, Sparkles, ChevronRight, Building2, Plus, RefreshCw,
@@ -31,6 +31,16 @@ const AI_MODES = [
   { id: "Fraud Analyst",      icon: "🔍", desc: "Detect suspicious patterns and protect your finances" },
   { id: "Purchase Advisor",   icon: "🛒", desc: "Analyse affordability before any major purchase" },
 ];
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function getPreviousMonthLabels(n) {
+  const today = new Date();
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - (n - 1 - i), 1);
+    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  });
+}
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -357,6 +367,7 @@ export default function OnboardingPage() {
   const [monthlyExpenses, setMonthlyExpenses] = useState("");
   const [manualErrors,    setManualErrors]    = useState({});
   const [form,            setForm]            = useState({ savings: "", investments: "", debt: "" });
+  const [manualMonths,    setManualMonths]    = useState(3);
 
   // Step 3 — Goals
   const [goals, setGoals] = useState([]);
@@ -370,11 +381,11 @@ export default function OnboardingPage() {
     setQrLoading(true);
     setQrError(false);
     try {
-      const statusRes = await API.get("/2fa/status");
+      const statusRes = await identityApi.get("/2fa/status");
       if (statusRes.data.enabled) {
         setTwoFaAlreadyOn(true);          // already enabled — no QR needed
       } else {
-        const setupRes = await API.post("/2fa/setup");
+        const setupRes = await identityApi.post("/2fa/setup");
         setQrData(setupRes.data);
       }
     } catch {
@@ -515,7 +526,47 @@ export default function OnboardingPage() {
       if (!monthlyExpenses || Number(monthlyExpenses) <= 0) errs.expenses = "Please enter your average monthly expenses";
     }
     setManualErrors(errs);
-    if (Object.keys(errs).length === 0) setStep(3);
+    if (Object.keys(errs).length === 0) {
+      if (isManualPath) {
+        toast.custom((t) => (
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 10,
+            background: "linear-gradient(135deg,#1a1025,#0f1520)",
+            border: "1px solid rgba(167,139,250,0.35)",
+            borderRadius: 16, padding: "16px 18px",
+            maxWidth: 340, width: "100%",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.1)",
+            opacity: t.visible ? 1 : 0,
+            transition: "opacity 0.2s",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🤖</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 3 }}>AI-generated transactions</div>
+                <div style={{ fontSize: 12, color: "rgba(148,163,184,0.65)", lineHeight: 1.55 }}>
+                  FinTwin AI will create {manualMonths * 2} months of realistic transaction history from your data.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { toast.dismiss(t.id); setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Connect bank →
+              </button>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.6)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        ), { duration: 8000, position: "bottom-right" });
+      }
+      setStep(3);
+    }
   };
 
   const handleSubmit = async () => {
@@ -531,8 +582,9 @@ export default function OnboardingPage() {
       // bank users would trick the backend into thinking it's a manual onboarding
       // and overwrite real bank transactions with synthetic seeded data
       if (isManualPath) {
-        if (monthlyIncome   && Number(monthlyIncome)   > 0) payload.incomeLast3Months   = Number(monthlyIncome)   * 3;
-        if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * 3;
+        if (monthlyIncome   && Number(monthlyIncome)   > 0) payload.incomeLast3Months   = Number(monthlyIncome)   * manualMonths;
+        if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * manualMonths;
+        payload.numberOfMonths = manualMonths;
       }
       // Store AI preferences locally
       localStorage.setItem("aiMode", JSON.stringify(aiModes));
@@ -557,7 +609,7 @@ export default function OnboardingPage() {
     if (code.length < 6) { toast.error("Enter the 6-digit code from your authenticator app"); return; }
     setSecuring(true);
     try {
-      await API.post("/2fa/enable", { code });
+      await identityApi.post("/2fa/enable", { code });
       toast.success("2FA enabled! Your account is now secured.");
       setStep(1);
     } catch (err) {
@@ -928,6 +980,42 @@ export default function OnboardingPage() {
                   A few numbers to set up your net worth, forecasts, and AI insights. All optional — update anytime from your dashboard.
                 </p>
 
+                {/* Month count selector — manual path only */}
+                {isManualPath && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 10 }}>HOW MANY MONTHS OF DATA ARE YOU ADDING?</div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      {[2, 3, 4, 5, 6].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setManualMonths(n)}
+                          style={{
+                            padding: "8px 16px", borderRadius: 100,
+                            border: `1px solid ${manualMonths === n ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.09)"}`,
+                            background: manualMonths === n ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.03)",
+                            color: manualMonths === n ? "#fff" : "rgba(148,163,184,0.6)",
+                            fontSize: 13, fontWeight: manualMonths === n ? 700 : 500,
+                            cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(148,163,184,0.45)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "rgba(167,139,250,0.6)" }}>Covering:</span>
+                      {getPreviousMonthLabels(manualMonths).map((lbl, i, arr) => (
+                        <span key={lbl} style={{ color: "rgba(226,232,240,0.7)" }}>
+                          {lbl}{i < arr.length - 1 ? " →" : ""}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 4 }}>
+                      Enter your average monthly income and expenses for this period.
+                    </div>
+                  </div>
+                )}
+
                 {/* Income + expenses */}
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
@@ -1018,6 +1106,25 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* Bank connect nudge — manual path only */}
+                {isManualPath && (
+                  <div style={{ background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.18)", borderRadius: 14, padding: "16px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Building2 size={16} color="#22d3ee" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>Better insights with bank connection</div>
+                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Connect your bank for real transaction data instead of estimates.</div>
+                    </div>
+                    <button
+                      onClick={() => { setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
+                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    >
+                      Connect →
+                    </button>
+                  </div>
+                )}
 
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => setStep(1)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>

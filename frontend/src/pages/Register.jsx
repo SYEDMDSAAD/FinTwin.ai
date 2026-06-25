@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft } from "lucide-react";
 
@@ -84,7 +84,7 @@ function Register() {
     if (!consent) { toast.error("You must accept the Privacy Policy to register."); return; }
     try {
       setLoading(true);
-      const res = await API.post("/auth/register", { fullName, email, password, consentGiven: true });
+      const res = await identityApi.post("/auth/register", { fullName, email, password, consentGiven: true });
       if (res.data?.devOtp) {
         toast.success(`Dev mode: your OTP is ${res.data.devOtp}`, { duration: 15000 });
       } else {
@@ -117,7 +117,7 @@ function Register() {
     if (otp.length < 6) { toast.error("Enter the 6-digit code"); return; }
     try {
       setOtpLoading(true);
-      await API.post("/auth/verify-email", { email: email.toLowerCase().trim(), otp });
+      await identityApi.post("/auth/verify-email", { email: email.toLowerCase().trim(), otp });
       toast.success("Email verified! You can now sign in.");
       navigate("/login", { replace: true });
     } catch (e) { toast.error(e.response?.data || "Invalid or expired code"); }
@@ -127,7 +127,7 @@ function Register() {
   const resendOtp = async () => {
     try {
       setResending(true);
-      const res = await API.post("/auth/resend-verification", { email: email.toLowerCase().trim() });
+      const res = await identityApi.post("/auth/resend-verification", { email: email.toLowerCase().trim() });
       if (res.data?.devOtp) {
         toast.success(`Dev mode: new OTP is ${res.data.devOtp}`, { duration: 15000 });
       } else {
