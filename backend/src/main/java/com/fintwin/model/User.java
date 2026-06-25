@@ -3,7 +3,10 @@ package com.fintwin.model;
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fintwin.security.EncryptionConverter;
+import com.fintwin.security.Permission;
+import com.fintwin.security.Role;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -57,6 +60,32 @@ public class User {
     // GDPR Article 7 — timestamp of explicit user consent at registration
     @Column(name = "consent_given_at")
     private LocalDateTime consentGivenAt;
+
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+
+    // SHA-256 hash of the OTP (raw OTP is only ever in the email)
+    @JsonIgnore
+    @Column(name = "email_verification_otp", length = 64)
+    private String emailVerificationOtp;
+
+    @Column(name = "email_verification_expiry")
+    private LocalDateTime emailVerificationExpiry;
+
+    // SHA-256 hash of the reset token sent via email link
+    @JsonIgnore
+    @Column(name = "password_reset_token", length = 64)
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_expiry")
+    private LocalDateTime passwordResetExpiry;
+
+    // Account lockout — managed by identity-service
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 
     public User() {
         this.createdAt = LocalDateTime.now();
@@ -164,5 +193,43 @@ public class User {
 
     public void setConsentGivenAt(LocalDateTime consentGivenAt) {
         this.consentGivenAt = consentGivenAt;
+    }
+
+    public Boolean getEmailVerified() { return emailVerified; }
+    public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public String getEmailVerificationOtp() { return emailVerificationOtp; }
+    public void setEmailVerificationOtp(String emailVerificationOtp) { this.emailVerificationOtp = emailVerificationOtp; }
+
+    public LocalDateTime getEmailVerificationExpiry() { return emailVerificationExpiry; }
+    public void setEmailVerificationExpiry(LocalDateTime emailVerificationExpiry) { this.emailVerificationExpiry = emailVerificationExpiry; }
+
+    public String getPasswordResetToken() { return passwordResetToken; }
+    public void setPasswordResetToken(String passwordResetToken) { this.passwordResetToken = passwordResetToken; }
+
+    public LocalDateTime getPasswordResetExpiry() { return passwordResetExpiry; }
+    public void setPasswordResetExpiry(LocalDateTime passwordResetExpiry) { this.passwordResetExpiry = passwordResetExpiry; }
+
+    public Integer getFailedLoginAttempts() { return failedLoginAttempts == null ? 0 : failedLoginAttempts; }
+    public void setFailedLoginAttempts(Integer v) { this.failedLoginAttempts = v; }
+    public LocalDateTime getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(LocalDateTime v) { this.lockedUntil = v; }
+
+    // ── RBAC helpers ─────────────────────────────────────────────────
+
+    public Role getRoleEnum() {
+        return Role.fromString(role);
+    }
+
+    public Set<Permission> getAllPermissions() {
+        return getRoleEnum().getPermissions();
+    }
+
+    public boolean hasPermission(Permission permission) {
+        return getAllPermissions().contains(permission);
+    }
+
+    public boolean hasRole(Role r) {
+        return getRoleEnum() == r;
     }
 }

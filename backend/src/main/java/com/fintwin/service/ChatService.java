@@ -11,6 +11,7 @@ import com.fintwin.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,7 @@ public class ChatService {
 
     // ── Chat ─────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
     @Audited(action = "READ", resource = "ai-chat", description = "AI Copilot financial chat session")
     public String chat(String message, String mode) {
         if (message == null || message.isBlank()) {
@@ -65,6 +67,7 @@ public class ChatService {
 
     // ── History ───────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
     public List<Map<String, String>> getChatHistory() {
         User user = resolveCurrentUser();
         List<ChatHistory> history = chatHistoryRepository.findAllByUserOrderByTimestampAsc(user);
@@ -76,6 +79,7 @@ public class ChatService {
         return result;
     }
 
+    @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
     @Transactional
     public void clearChatHistory() {
         chatHistoryRepository.deleteByUser(resolveCurrentUser());

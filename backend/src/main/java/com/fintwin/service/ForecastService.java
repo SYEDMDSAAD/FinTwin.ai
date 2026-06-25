@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.config.FinTwinMetrics;
 import com.fintwin.dto.CategoryForecastDTO;
 import com.fintwin.dto.ForecastDTO;
 import com.fintwin.dto.MonthlyExpenseDTO;
@@ -8,9 +9,14 @@ import com.fintwin.model.User;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,6 +32,9 @@ public class ForecastService {
 
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
+
+    @Autowired
+    private FinTwinMetrics metrics;
 
     @Value("${ai.service.url}")
     private String aiServiceUrl;
@@ -51,6 +60,11 @@ public class ForecastService {
     // instead of crashing with unhandled exception.
     // =========================
 
+    @PreAuthorize("hasAuthority('USE_AI_FORECAST')")
+    @Cacheable(value = "user-forecast",
+               key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    @CircuitBreaker(name = "ai-service", fallbackMethod = "generateForecastFallback")
+    @Retry(name = "ai-service")
     public ForecastDTO generateForecast() {
 
         String email = SecurityUtils.getCurrentUserEmail();
@@ -85,32 +99,42 @@ public class ForecastService {
             txList.add(tx);
         }
 
-        try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("transactions", txList);
+        metrics.aiForecastCalls.increment();
 
-            Map response = aiRestTemplate.postForObject(
-                    aiServiceUrl + "/forecast",
-                    request,
-                    Map.class
-            );
+        Map<String, Object> request = new HashMap<>();
+        request.put("transactions", txList);
 
-            if (response == null) {
-                return buildFallbackForecast(transactions, income);
-            }
+        Map response = aiRestTemplate.postForObject(
+                aiServiceUrl + "/forecast",
+                request,
+                Map.class
+        );
 
-            return new ForecastDTO(
-                    parseDouble(response, "predictedExpenses"),
-                    parseDouble(response, "predictedSavings"),
-                    parseDouble(response, "expenseGrowth"),
-                    response.getOrDefault("insight", "AI insight unavailable")
-                            .toString()
-            );
-
-        } catch (Exception e) {
-            log.warn("AI forecast service unavailable ({}), using statistical fallback", e.getMessage());
+        if (response == null) {
             return buildFallbackForecast(transactions, income);
         }
+
+        return new ForecastDTO(
+                parseDouble(response, "predictedExpenses"),
+                parseDouble(response, "predictedSavings"),
+                parseDouble(response, "expenseGrowth"),
+                response.getOrDefault("insight", "AI insight unavailable")
+                        .toString()
+        );
+    }
+
+    // Resilience4j calls this when the circuit is open or all retries are exhausted
+    @SuppressWarnings("unused")
+    public ForecastDTO generateForecastFallback(Exception ex) {
+        log.warn("AI forecast circuit open or retries exhausted ({}), using statistical fallback", ex.getMessage());
+        metrics.aiForecastFallbacks.increment();
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        List<Transaction> transactions = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
+        double income = transactions.stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
+                .mapToDouble(Transaction::getAmount).sum();
+        return buildFallbackForecast(transactions, income);
     }
 
     // =========================
@@ -118,6 +142,7 @@ public class ForecastService {
     // No logic bugs, added null guard on rows
     // =========================
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     public List<MonthlyExpenseDTO> getMonthlyHistory() {
 
         String email = SecurityUtils.getCurrentUserEmail();
@@ -176,6 +201,7 @@ public class ForecastService {
             "housing",       1.03
     );
 
+    @PreAuthorize("hasAuthority('USE_AI_FORECAST')")
     public List<CategoryForecastDTO> getCategoryForecast() {
 
         String email = SecurityUtils.getCurrentUserEmail();

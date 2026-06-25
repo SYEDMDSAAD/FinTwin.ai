@@ -232,16 +232,6 @@ function Dashboard() {
 
         refreshDashboard();
 
-        fetchNotifications();
-
-        fetchMonthlyHistory();
-
-        fetchNetWorth();
-
-        fetchAssets();
-
-        fetchLiabilities();
-
         const interval = setInterval(() => {
 
             fetchNotifications();

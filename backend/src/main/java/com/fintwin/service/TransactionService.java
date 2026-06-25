@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.util.*;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -67,6 +68,7 @@ public class TransactionService {
     );
     private static final long MAX_CSV_BYTES = 5 * 1024 * 1024; // 5 MB
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",
             resource = "transactions",
@@ -147,6 +149,7 @@ public class TransactionService {
     // financial data must be logged for PCI-DSS 10.2
     // =========================
 
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     @Audited(
             action = "READ",
             resource = "transactions",
@@ -170,6 +173,7 @@ public class TransactionService {
     // ADD EXPENSE BY TEXT
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "WRITE",
             resource = "transactions",
@@ -216,6 +220,7 @@ public class TransactionService {
     // ADD INCOME BY TEXT
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "WRITE",
             resource = "transactions",
@@ -253,6 +258,7 @@ public class TransactionService {
     // ADD MANUAL TRANSACTION (CSV Import)
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     public Transaction addManualTransaction(
             String date, String merchant, Double amount, String category) {
 
@@ -280,6 +286,7 @@ public class TransactionService {
     // Single request for all rows — avoids per-row rate limiting
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",
             resource = "transactions",
@@ -343,6 +350,7 @@ public class TransactionService {
     // UPLOAD SCREENSHOT (OCR)
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",
             resource = "ocr",

@@ -10,6 +10,7 @@ import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -42,6 +43,7 @@ public class BudgetService {
     // Prevent duplicate category budgets per user.
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_BUDGETS')")
     @Audited(action = "WRITE", resource = "budgets", description = "Budget category created")
     public Budget createBudget(Budget budget) {
 
@@ -102,6 +104,7 @@ public class BudgetService {
     // Changed to longValue() comparison.
     // =========================
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_BUDGETS')")
     @Audited(action = "DELETE", resource = "budgets", description = "Budget category deleted")
     public void deleteBudget(Long id) {
 
@@ -140,6 +143,7 @@ public class BudgetService {
     // frontend progress bars without client-side math.
     // =========================
 
+    @PreAuthorize("hasAuthority('READ_OWN_BUDGETS')")
     @Audited(action = "READ", resource = "budgets", description = "Budget status retrieved")
     public List<BudgetStatusDTO> getBudgetStatus() {
 

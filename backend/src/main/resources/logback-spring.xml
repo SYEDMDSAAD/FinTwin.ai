@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <!-- ── Development / staging: human-readable console ── -->
+  <springProfile name="!prod">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder>
+        <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} traceId=%X{traceId:-} userId=%X{userId:-} - %msg%n</pattern>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+    <logger name="com.fintwin" level="DEBUG"/>
+    <logger name="org.springframework.security" level="WARN"/>
+    <logger name="io.github.resilience4j" level="DEBUG"/>
+  </springProfile>
+
+  <!-- ── Production: structured JSON (Loki / ELK / CloudWatch-ready) ── -->
+  <springProfile name="prod">
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+        <includeMdcKeyName>traceId</includeMdcKeyName>
+        <includeMdcKeyName>spanId</includeMdcKeyName>
+        <includeMdcKeyName>userId</includeMdcKeyName>
+        <includeMdcKeyName>requestId</includeMdcKeyName>
+        <customFields>{"service":"fintwin-backend","version":"0.1.0"}</customFields>
+        <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+          <maxDepthPerCause>10</maxDepthPerCause>
+          <rootCauseFirst>true</rootCauseFirst>
+        </throwableConverter>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="JSON"/>
+    </root>
+    <logger name="com.fintwin" level="INFO"/>
+    <logger name="org.springframework.security" level="WARN"/>
+    <logger name="io.github.resilience4j" level="INFO"/>
+    <!-- Suppress noisy Hibernate SQL in prod -->
+    <logger name="org.hibernate.SQL" level="WARN"/>
+  </springProfile>
+
+</configuration>

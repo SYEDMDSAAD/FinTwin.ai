@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,7 @@ public class InvestmentService {
         this.txnRepo  = txnRepo;
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
     @Audited(action = "READ", resource = "portfolio", description = "Portfolio summary retrieved")
     public PortfolioSummaryDTO getSummary() {
         User user = currentUser();
@@ -100,6 +102,7 @@ public class InvestmentService {
      * narration keywords, groups by instrument, and returns as unconfirmed
      * suggestions. Nothing is saved — the frontend presents them for user review.
      */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
     public List<InvestmentDTO> autoDetect() {
         User user = currentUser();
         List<Transaction> txns = txnRepo.findByUser(user);
@@ -151,17 +154,19 @@ public class InvestmentService {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding added")
     public InvestmentDTO add(Investment investment) {
         investment.setUser(currentUser());
         return InvestmentDTO.from(repo.save(investment));
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding updated")
     public InvestmentDTO update(Long id, Investment updated) {
         User user = currentUser();
         Investment inv = repo.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
-        if (!inv.getUser().getId().equals(user.getId())) throw new RuntimeException("Unauthorized");
+        if (!inv.getUser().getId().equals(user.getId())) throw new org.springframework.security.access.AccessDeniedException("Access denied");
 
         if (updated.getName()           != null) inv.setName(updated.getName());
         if (updated.getType()           != null) inv.setType(updated.getType());
@@ -176,6 +181,7 @@ public class InvestmentService {
         return InvestmentDTO.from(repo.save(inv));
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "WRITE", resource = "portfolio", description = "Portfolio prices refreshed from market data")
     public PortfolioSummaryDTO refreshPrices() {
         User user = currentUser();
@@ -231,6 +237,7 @@ public class InvestmentService {
         return getSummary();
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "DELETE", resource = "portfolio", description = "Investment holding deleted")
     public void delete(Long id) {
         User user = currentUser();

@@ -13,7 +13,9 @@ import com.fintwin.security.SecurityUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,10 +54,27 @@ public class BankConnectionService {
      * vua — the user's AA Virtual User Address (e.g. 9876543210@onemoney).
      * In sandbox, pass null to use the Setu test number.
      */
+    @PreAuthorize("hasAuthority('CONNECT_BANK_ACCOUNT')")
     @Audited(action = "WRITE", resource = "bank_connection", description = "Bank account connection initiated")
     public Map<String, Object> initiateConnection(String vua) {
         String email = SecurityUtils.getCurrentUserEmail();
         User user    = userRepo.findByEmail(email).orElseThrow();
+
+        // Prevent duplicate in-flight consent flows. A user should not have two
+        // active consent windows open simultaneously — each creates a separate Setu
+        // consent request that would both fire webhooks and double-insert data.
+        List<BankConnection> activeConns = new ArrayList<>();
+        activeConns.addAll(bankRepo.findByUserAndConsentStatus(user, "ACTIVE"));
+        activeConns.addAll(bankRepo.findByUserAndConsentStatus(user, "FETCHING"));
+        if (!activeConns.isEmpty()) {
+            throw new RuntimeException("You already have a connected bank account. Disconnect it first before adding another.");
+        }
+        bankRepo.findTopByConsentStatusOrderByCreatedAtDesc("PENDING").ifPresent(existing -> {
+            if (existing.getUser().getId().equals(user.getId())
+                    && existing.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(30))) {
+                throw new RuntimeException("A bank connection is already in progress. Please complete it or wait a few minutes before trying again.");
+            }
+        });
 
         // Sandbox test VUA — replace with user's real AA ID in production
         String customerVua = (vua != null && !vua.isBlank()) ? vua : "9876543210@onemoney";
@@ -87,10 +106,13 @@ public class BankConnectionService {
 
     // ── Handle consent approval (called by webhook) ───────────────────────────
 
+    @Transactional
     @SuppressWarnings("unchecked")
     public void handleConsentActive(String consentId, Map<String, Object> data) {
         // Setu webhook has no consentHandle — match by consentId if already stored,
-        // otherwise take the most recent PENDING connection
+        // otherwise take the most recent PENDING connection.
+        // Note: findByConsentId never matches because consentId is AES-encrypted,
+        // so we always fall back to the PENDING status lookup.
         BankConnection conn = bankRepo.findByConsentId(consentId)
                 .orElseGet(() -> bankRepo
                         .findTopByConsentStatusOrderByCreatedAtDesc("PENDING")
@@ -98,6 +120,14 @@ public class BankConnectionService {
 
         if (conn == null) {
             log.warn("No matching BankConnection found for incoming consent event");
+            return;
+        }
+
+        // Idempotency: Setu may retry CONSENT_STATUS_UPDATE. If the connection is
+        // no longer PENDING it was already processed by a prior call — skip.
+        if (!"PENDING".equals(conn.getConsentStatus())) {
+            log.info("Consent event ignored — connection #{} already in status={}",
+                    conn.getId(), conn.getConsentStatus());
             return;
         }
 
@@ -119,17 +149,35 @@ public class BankConnectionService {
 
     // ── Handle FI data ready (called by webhook) ──────────────────────────────
 
+    @Transactional
     public void handleSessionCompleted(String consentId, String sessionId) {
-        // consentId is encrypted in the DB so findByConsentId never matches — fall
-        // back to the most recent FETCHING connection (webhook fires one at a time)
-        BankConnection conn = bankRepo.findByConsentId(consentId)
+        // consentId is AES-encrypted so findByConsentId never matches — fall back
+        // to the most recent FETCHING connection
+        BankConnection approx = bankRepo.findByConsentId(consentId)
                 .orElseGet(() -> bankRepo
                         .findTopByConsentStatusOrderByCreatedAtDesc("FETCHING")
                         .orElse(null));
-        if (conn == null) {
+        if (approx == null) {
             log.warn("No matching BankConnection found for SESSION_STATUS_UPDATE");
             return;
         }
+
+        // Acquire a DB-level write lock so concurrent retries of the same session
+        // webhook are serialized — the second call will block here until the first
+        // transaction commits, then see lastProcessedSessionId already set and exit
+        BankConnection conn = bankRepo.findByIdWithLock(approx.getId()).orElse(approx);
+
+        if (sessionId.equals(conn.getLastProcessedSessionId())) {
+            log.info("Session {} already processed for connection #{} — ignoring duplicate webhook",
+                    sessionId, conn.getId());
+            return;
+        }
+
+        // Stamp the session ID before processing so any concurrent call that
+        // survives the lock check above also skips (belt-and-suspenders)
+        conn.setLastProcessedSessionId(sessionId);
+        bankRepo.saveAndFlush(conn);
+
         processSessionCompleted(conn, sessionId);
     }
 
@@ -343,6 +391,7 @@ public class BankConnectionService {
 
     // ── Force re-sync for a specific connection (any status) ─────────────────
 
+    @PreAuthorize("hasAuthority('CONNECT_BANK_ACCOUNT')")
     public String forceResync(Long connectionId) {
         String email = SecurityUtils.getCurrentUserEmail();
         User user    = userRepo.findByEmail(email).orElseThrow();
@@ -356,10 +405,13 @@ public class BankConnectionService {
         if (conn.getConsentId() == null) {
             return "Consent not yet approved. Please complete the bank consent flow first.";
         }
+        if ("FETCHING".equals(conn.getConsentStatus())) {
+            return "Sync already in progress. Please wait for the current sync to complete.";
+        }
 
         try {
             conn.setConsentStatus("FETCHING");
-            bankRepo.save(conn);
+            bankRepo.saveAndFlush(conn); // flush immediately so concurrent calls see FETCHING
 
             String sessionId = setuAAService.createFISessionAndWait(conn.getConsentId());
             if (sessionId != null) {
@@ -391,7 +443,8 @@ public class BankConnectionService {
 
         List<BankConnection> pending = new ArrayList<>();
         pending.addAll(bankRepo.findByUserAndConsentStatus(user, "PENDING"));
-        pending.addAll(bankRepo.findByUserAndConsentStatus(user, "FETCHING"));
+        // Skip FETCHING connections — forceResync is already processing them.
+        // Adding them here would create a second concurrent Setu session → duplicates.
         // Also recover ACTIVE connections that have never been synced
         bankRepo.findByUserAndConsentStatus(user, "ACTIVE").stream()
                 .filter(c -> c.getLastSyncedAt() == null && c.getConsentId() != null)
@@ -445,6 +498,7 @@ public class BankConnectionService {
 
     // ── List connections ──────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_OWN_BANK_CONNECTIONS')")
     @Audited(action = "READ", resource = "bank_connection", description = "Bank connections retrieved")
     public List<BankConnection> getConnections() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -461,6 +515,7 @@ public class BankConnectionService {
 
     // ── Disconnect ────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('DISCONNECT_BANK_ACCOUNT')")
     @Audited(action = "DELETE", resource = "bank_connection", description = "Bank connection removed")
     public void disconnect(Long id) {
         String email = SecurityUtils.getCurrentUserEmail();

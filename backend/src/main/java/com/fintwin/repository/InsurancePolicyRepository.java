@@ -1,0 +1,11 @@
+package com.fintwin.repository;
+
+import com.fintwin.model.InsurancePolicy;
+import com.fintwin.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface InsurancePolicyRepository extends JpaRepository<InsurancePolicy, Long> {
+    List<InsurancePolicy> findByUserOrderByCreatedAtDesc(User user);
+}

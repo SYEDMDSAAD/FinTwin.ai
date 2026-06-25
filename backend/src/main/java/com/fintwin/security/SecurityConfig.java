@@ -1,7 +1,11 @@
 package com.fintwin.security;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import org.springframework.security.authentication
         .AuthenticationManager;
@@ -38,10 +42,14 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true)
 public class SecurityConfig {
 
         private final JwtFilter jwtFilter;
         private final RateLimitFilter rateLimitFilter;
+
+        @Autowired
+        private FinTwinPermissionEvaluator finTwinPermissionEvaluator;
 
         @Value("${cors.allowed-origins}")
         private String allowedOriginsRaw;
@@ -96,6 +104,13 @@ public class SecurityConfig {
         );
 
         return source;
+        }
+
+        @Bean
+        public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+                DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+                handler.setPermissionEvaluator(finTwinPermissionEvaluator);
+                return handler;
         }
 
         @Bean

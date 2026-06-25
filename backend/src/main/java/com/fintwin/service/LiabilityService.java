@@ -7,6 +7,8 @@ import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +19,7 @@ public class LiabilityService {
     @Autowired private LiabilityRepository liabilityRepository;
     @Autowired private UserRepository userRepository;
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_LIABILITIES')")
     @Audited(action = "WRITE", resource = "liabilities", description = "Liability created")
     public Liability createLiability(Liability liability) {
 
@@ -34,6 +37,7 @@ public class LiabilityService {
         return liabilityRepository.save(liability);
     }
 
+    @PreAuthorize("hasAuthority('READ_OWN_NET_WORTH')")
     @Audited(action = "READ", resource = "liabilities", description = "Liabilities retrieved")
     public List<Liability> getLiabilities() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -41,6 +45,7 @@ public class LiabilityService {
         return liabilityRepository.findByUser(user);
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_LIABILITIES')")
     @Audited(action = "DELETE", resource = "liabilities", description = "Liability deleted")
     public void deleteLiability(Long id) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -50,11 +55,12 @@ public class LiabilityService {
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Liability Access");
+            throw new AccessDeniedException("Access denied");
         }
         liabilityRepository.deleteById(id);
     }
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_LIABILITIES')")
     @Audited(action = "WRITE", resource = "liabilities", description = "Liability updated")
     public Liability updateLiability(Long id, Liability updated) {
 
@@ -72,7 +78,7 @@ public class LiabilityService {
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Liability Access");
+            throw new AccessDeniedException("Access denied");
         }
 
         liability.setName(updated.getName().trim());

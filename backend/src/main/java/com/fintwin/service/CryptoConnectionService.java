@@ -12,6 +12,7 @@ import com.fintwin.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -47,6 +48,7 @@ public class CryptoConnectionService {
 
     // ── Connect a new exchange ────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     public CryptoConnectionDTO connect(String exchange, String apiKey, String apiSecret) {
         User user = currentUser();
 
@@ -71,6 +73,7 @@ public class CryptoConnectionService {
 
     // ── List connections (no credentials) ────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
     public List<CryptoConnectionDTO> list() {
         User user = currentUser();
         return connRepo.findByUser(user).stream()
@@ -80,6 +83,7 @@ public class CryptoConnectionService {
 
     // ── Manual sync ───────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     public CryptoConnectionDTO resync(Long connectionId) {
         User user = currentUser();
         CryptoConnection conn = connRepo.findById(connectionId)
@@ -94,6 +98,7 @@ public class CryptoConnectionService {
 
     // ── Delete connection ─────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     public void disconnect(Long connectionId) {
         User user = currentUser();
         CryptoConnection conn = connRepo.findById(connectionId)

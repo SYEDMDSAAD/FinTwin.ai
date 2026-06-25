@@ -4,12 +4,15 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.util.Collection;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -24,12 +27,13 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        String role = user.getRole() != null ? user.getRole() : "USER";
+        Role role = Role.fromString(user.getRole());
+        Collection<GrantedAuthority> authorities = role.getAuthorities();
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
-                .roles(role)
+                .authorities(authorities)
                 .disabled(!Boolean.TRUE.equals(user.getEnabled()))
                 .build();
     }

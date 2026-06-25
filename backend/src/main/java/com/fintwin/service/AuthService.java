@@ -22,8 +22,15 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -37,8 +44,14 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private EmailService emailService;
+
     @Value("${google.client.id}")
     private String googleClientId;
+
+    @Value("${app.base-url:http://localhost:5173}")
+    private String appBaseUrl;
 
     // =========================
     // REGISTER
@@ -51,7 +64,7 @@ public class AuthService {
             resource = "users",
             description = "New user registration"
     )
-    public String register(RegisterRequest request) {
+    public Map<String, Object> register(RegisterRequest request) {
 
         if (request.getEmail() == null
                 || request.getEmail().isBlank()) {
@@ -89,10 +102,25 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setOnboardingCompleted(false);
         user.setConsentGivenAt(LocalDateTime.now());
+        user.setRole("USER");
 
         userRepository.save(user);
 
-        return "Registration successful";
+        // Send email verification OTP
+        String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+        user.setEmailVerificationOtp(sha256(rawOtp));
+        user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+        emailService.sendVerificationOtp(normalizedEmail, request.getFullName().trim(), rawOtp);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "Registration successful");
+        // Return OTP in response when email is not configured (dev/local mode only)
+        if (!emailService.isConfigured()) {
+            result.put("devOtp", rawOtp);
+            result.put("devNote", "Email not configured — use this OTP directly for testing");
+        }
+        return result;
     }
 
     // =========================
@@ -147,7 +175,7 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getEmail());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
 
         return new AuthResponse(
                 token,
@@ -213,19 +241,17 @@ public class AuthService {
                 user.setEmail(email);
                 user.setEmailHash(EmailHashUtil.hash(email));
                 user.setFullName(fullName);
-                user.setPassword(
-                        passwordEncoder.encode(
-                                java.util.UUID.randomUUID().toString()
-                        )
-                );
+                user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
                 user.setOnboardingCompleted(false);
+                user.setEmailVerified(true); // Google already verified the email
+                user.setRole("USER");
                 userRepository.save(user);
             }
 
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
-            String token = jwtUtil.generateToken(email);
+            String token = jwtUtil.generateToken(email, user.getRole());
 
             return new AuthResponse(
                     token,
@@ -243,9 +269,130 @@ public class AuthService {
         }
     }
 
+    // =========================
+    // FORGOT PASSWORD
+    // =========================
+
+    public String forgotPassword(String email) {
+        if (email == null || email.isBlank())
+            throw new IllegalArgumentException("Email must not be empty");
+
+        String normalized = email.toLowerCase().trim();
+        User user = userRepository.findByEmail(normalized)
+                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+
+        String rawToken = UUID.randomUUID().toString();
+        user.setPasswordResetToken(sha256(rawToken));
+        user.setPasswordResetExpiry(LocalDateTime.now().plusMinutes(30));
+        userRepository.save(user);
+
+        String resetUrl = appBaseUrl + "/reset-password?token=" + rawToken;
+        emailService.sendPasswordResetLink(normalized, user.getFullName(), resetUrl);
+
+        // Return reset URL only when email is not configured (dev/local mode)
+        return emailService.isConfigured() ? null : resetUrl;
+    }
+
+    // =========================
+    // RESET PASSWORD
+    // =========================
+
+    public void resetPassword(String rawToken, String newPassword) {
+        if (rawToken == null || rawToken.isBlank())
+            throw new IllegalArgumentException("Invalid reset token");
+
+        PasswordValidator.validate(newPassword);
+
+        String hashed = sha256(rawToken);
+        User user = userRepository.findByPasswordResetToken(hashed)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired reset link"));
+
+        if (user.getPasswordResetExpiry() == null
+                || user.getPasswordResetExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Reset link has expired — please request a new one");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetExpiry(null);
+        userRepository.save(user);
+    }
+
+    // =========================
+    // VERIFY EMAIL (OTP)
+    // =========================
+
+    public void verifyEmail(String email, String otp) {
+        if (email == null || otp == null)
+            throw new IllegalArgumentException("Email and OTP are required");
+
+        String normalized = email.toLowerCase().trim();
+        User user = userRepository.findByEmail(normalized)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) return; // already verified
+
+        if (user.getEmailVerificationOtp() == null
+                || user.getEmailVerificationExpiry() == null
+                || user.getEmailVerificationExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("OTP has expired — please request a new one");
+        }
+
+        if (!sha256(otp.trim()).equals(user.getEmailVerificationOtp()))
+            throw new RuntimeException("Incorrect OTP");
+
+        user.setEmailVerified(true);
+        user.setEmailVerificationOtp(null);
+        user.setEmailVerificationExpiry(null);
+        userRepository.save(user);
+    }
+
+    // =========================
+    // RESEND VERIFICATION OTP
+    // =========================
+
+    public String resendVerification(String email) {
+        if (email == null || email.isBlank()) return null;
+        String normalized = email.toLowerCase().trim();
+        User user = userRepository.findByEmail(normalized).orElse(null);
+        if (user == null || Boolean.TRUE.equals(user.getEmailVerified())) return null;
+
+        String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+        user.setEmailVerificationOtp(sha256(rawOtp));
+        user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+        emailService.sendVerificationOtp(normalized, user.getFullName(), rawOtp);
+
+        return emailService.isConfigured() ? null : rawOtp;
+    }
+
+    // =========================
+    // GET ME
+    // =========================
+
     public UserMeDTO getMe() {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
-        return new UserMeDTO(user.getEmail(), user.getFullName(), user.getOnboardingCompleted(), user.getRole());
+        return new UserMeDTO(
+                user.getEmail(),
+                user.getFullName(),
+                user.getOnboardingCompleted(),
+                user.getRole(),
+                Boolean.TRUE.equals(user.getEmailVerified())
+        );
+    }
+
+    // =========================
+    // PRIVATE HELPERS
+    // =========================
+
+    private String sha256(String input) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 unavailable", e);
+        }
     }
 }

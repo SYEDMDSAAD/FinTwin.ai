@@ -1,5 +1,8 @@
+import { useState } from "react";
 import GlassCard from "./GlassCard";
-import { AlertTriangle, ShieldCheck, TrendingUp, Zap, BarChart2, Calendar } from "lucide-react";
+import { AlertTriangle, ShieldCheck, TrendingUp, Zap, BarChart2, Calendar, ThumbsDown } from "lucide-react";
+import API from "../services/api";
+import toast from "react-hot-toast";
 
 const SEVERITY = {
   high:   { color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.22)", label: "High Risk" },
@@ -8,17 +11,34 @@ const SEVERITY = {
 };
 
 const TYPE_META = {
-  merchant_spike:  { icon: <TrendingUp size={14} />,  label: "Merchant Spike" },
-  category_spike:  { icon: <BarChart2 size={14} />,   label: "Category Surge" },
-  category_surge:  { icon: <BarChart2 size={14} />,   label: "Category Surge" },
-  large_single:    { icon: <Zap size={14} />,          label: "Large Transaction" },
-  large_transaction: { icon: <Zap size={14} />,        label: "Large Transaction" },
-  burst:           { icon: <Calendar size={14} />,     label: "Spending Burst" },
+  merchant_spike:    { icon: <TrendingUp size={14} />,  label: "Merchant Spike" },
+  category_spike:    { icon: <BarChart2 size={14} />,   label: "Category Surge" },
+  category_surge:    { icon: <BarChart2 size={14} />,   label: "Category Surge" },
+  large_single:      { icon: <Zap size={14} />,          label: "Large Transaction" },
+  large_transaction: { icon: <Zap size={14} />,          label: "Large Transaction" },
+  burst:             { icon: <Calendar size={14} />,     label: "Spending Burst" },
 };
 
-function AnomalyCard({ anomaly }) {
+function AnomalyCard({ anomaly, onDismiss }) {
+  const [dismissing, setDismissing] = useState(false);
   const sev  = SEVERITY[anomaly.severity] || SEVERITY.low;
   const meta = TYPE_META[anomaly.type] || TYPE_META[anomaly.anomaly_type] || { icon: <AlertTriangle size={14} />, label: "Anomaly" };
+
+  const handleDismiss = async () => {
+    setDismissing(true);
+    try {
+      await API.post("/anomalies/dismiss", {
+        type: anomaly.type,
+        merchant: anomaly.merchant,
+        category: anomaly.category,
+      });
+      toast.success("Marked as not an anomaly");
+      onDismiss(anomaly);
+    } catch {
+      toast.error("Failed to dismiss");
+      setDismissing(false);
+    }
+  };
 
   return (
     <div style={{
@@ -88,7 +108,7 @@ function AnomalyCard({ anomaly }) {
       {/* Action */}
       {(anomaly.action) && (
         <div style={{ background: sev.color + "0d", border: `1px solid ${sev.color}25`,
-          borderRadius: 10, padding: "10px 14px" }}>
+          borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: sev.color + "99",
             letterSpacing: "0.08em", marginBottom: 4 }}>WHAT TO DO</div>
           <p style={{ fontSize: 12, color: "#d1d5db", lineHeight: 1.6, margin: 0 }}>
@@ -96,11 +116,37 @@ function AnomalyCard({ anomaly }) {
           </p>
         </div>
       )}
+
+      {/* Dismiss button */}
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={handleDismiss}
+          disabled={dismissing}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "5px 12px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+            color: "rgba(148,163,184,0.6)", fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+            transition: "all 0.15s", opacity: dismissing ? 0.5 : 1,
+          }}
+          onMouseEnter={e => { if (!dismissing) { e.currentTarget.style.color="#e2e8f0"; e.currentTarget.style.background="rgba(255,255,255,0.08)"; }}}
+          onMouseLeave={e => { e.currentTarget.style.color="rgba(148,163,184,0.6)"; e.currentTarget.style.background="rgba(255,255,255,0.04)"; }}
+        >
+          <ThumbsDown size={11} />
+          {dismissing ? "Dismissing…" : "Not an anomaly"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function AnomalyAlerts({ anomalies }) {
+function AnomalyAlerts({ anomalies: initialAnomalies }) {
+  const [anomalies, setAnomalies] = useState(initialAnomalies || []);
+
+  const handleDismiss = (dismissed) => {
+    const key = dismissed.type + "|" + (dismissed.merchant || "");
+    setAnomalies(prev => prev.filter(a => (a.type + "|" + (a.merchant || "")) !== key));
+  };
 
   if (!anomalies?.length) {
     return (
@@ -160,7 +206,9 @@ function AnomalyAlerts({ anomalies }) {
 
       {/* Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14 }}>
-        {anomalies.map((anomaly, i) => <AnomalyCard key={i} anomaly={anomaly} />)}
+        {anomalies.map((anomaly, i) => (
+          <AnomalyCard key={i} anomaly={anomaly} onDismiss={handleDismiss} />
+        ))}
       </div>
 
     </GlassCard>

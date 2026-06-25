@@ -127,7 +127,7 @@ public class TwoFactorService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
-        String realToken = jwtUtil.generateToken(email);
+        String realToken = jwtUtil.generateToken(email, user.getRole());
         return new AuthResponse(realToken, user.getEmail(), user.getFullName(), user.getRole());
     }
 

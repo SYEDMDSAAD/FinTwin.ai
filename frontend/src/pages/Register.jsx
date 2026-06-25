@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import API from "../services/api";
+import API, { identityApi } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
-import { Mail, Lock, User, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle, ArrowLeft } from "lucide-react";
 
 const CSS = `
   .auth-page * { box-sizing: border-box; }
@@ -16,6 +16,8 @@ const CSS = `
   .auth-btn:hover:not(:disabled) { opacity:0.92; transform:translateY(-1px); box-shadow:0 8px 28px rgba(124,58,237,0.30); }
   .auth-btn:disabled { opacity:0.5; cursor:not-allowed; }
   .auth-link { cursor:pointer; font-weight:600; transition:color 0.15s; }
+  .otp-box { width:48px; height:56px; border-radius:13px; font-size:22px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
+  .otp-box:focus { box-shadow:0 0 0 3px rgba(124,58,237,0.10); }
 
   @keyframes authFade { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
   .auth-fade { animation: authFade 0.45s cubic-bezier(0.22,1,0.36,1) both; }
@@ -52,12 +54,19 @@ function Register() {
   const navigate   = useNavigate();
   const { isDark } = useTheme();
 
+  const [step,     setStep]     = useState("register"); // "register" | "otp"
   const [fullName, setFullName] = useState("");
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [consent,  setConsent]  = useState(false);
   const [loading,  setLoading]  = useState(false);
+
+  // OTP step state
+  const [otpCode,    setOtpCode]    = useState(["","","","","",""]);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resending,  setResending]  = useState(false);
+  const otpRefs = useRef([]);
 
   const pwStrength = (() => {
     let s = 0;
@@ -75,11 +84,58 @@ function Register() {
     if (!consent) { toast.error("You must accept the Privacy Policy to register."); return; }
     try {
       setLoading(true);
-      await API.post("/auth/register", { fullName, email, password, consentGiven: true });
-      toast.success("Account Created!");
-      navigate("/login");
-    } catch (e) { toast.error(e.response?.data || "Registration Failed"); }
-    finally { setLoading(false); }
+      const res = await identityApi.post("/auth/register", { fullName, email, password, consentGiven: true });
+      if (res.data?.devOtp) {
+        toast.success(`Dev mode: your OTP is ${res.data.devOtp}`, { duration: 15000 });
+      } else {
+        toast.success("Account created! Check your email for a verification code.");
+      }
+      setStep("otp");
+    } catch (e) {
+      const msg = e.response?.data?.error || (typeof e.response?.data === "string" ? e.response.data : null) || "Registration failed";
+      toast.error(msg);
+    } finally { setLoading(false); }
+  };
+
+  const handleOtpChange = (i, val) => {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otpCode]; next[i] = val; setOtpCode(next);
+    if (val && i < 5) otpRefs.current[i + 1]?.focus();
+  };
+  const handleOtpKeyDown = (i, e) => {
+    if (e.key === "Backspace" && !otpCode[i] && i > 0) otpRefs.current[i - 1]?.focus();
+  };
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
+    if (!pasted) return; e.preventDefault();
+    const next = [...otpCode]; pasted.split("").forEach((ch,i) => { next[i] = ch; }); setOtpCode(next);
+    otpRefs.current[Math.min(pasted.length,5)]?.focus();
+  };
+
+  const verifyOtp = async () => {
+    const otp = otpCode.join("");
+    if (otp.length < 6) { toast.error("Enter the 6-digit code"); return; }
+    try {
+      setOtpLoading(true);
+      await identityApi.post("/auth/verify-email", { email: email.toLowerCase().trim(), otp });
+      toast.success("Email verified! You can now sign in.");
+      navigate("/login", { replace: true });
+    } catch (e) { toast.error(e.response?.data || "Invalid or expired code"); }
+    finally { setOtpLoading(false); }
+  };
+
+  const resendOtp = async () => {
+    try {
+      setResending(true);
+      const res = await identityApi.post("/auth/resend-verification", { email: email.toLowerCase().trim() });
+      if (res.data?.devOtp) {
+        toast.success(`Dev mode: new OTP is ${res.data.devOtp}`, { duration: 15000 });
+      } else {
+        toast.success("New code sent!");
+      }
+      setOtpCode(["","","","","",""]);
+    } catch { toast.error("Failed to resend"); }
+    finally { setResending(false); }
   };
 
   /* ── theme-derived tokens ─────────────────────────── */
@@ -100,6 +156,7 @@ function Register() {
   const barTrack = isDark ? "rgba(255,255,255,0.08)"    : "rgba(15,23,42,0.08)";
   const reqMet   = isDark ? "#34d399"                   : "#059669";
   const reqUnmet = isDark ? "rgba(148,163,184,0.4)"     : "rgba(100,116,139,0.5)";
+  const otpBdr   = isDark ? "rgba(255,255,255,0.09)"    : "rgba(15,23,42,0.10)";
 
   return (
     <>
@@ -143,6 +200,47 @@ function Register() {
             </div>
           </div>
 
+          {/* ── OTP Verification Step ── */}
+          {step === "otp" ? (
+            <div key="otp">
+              <button onClick={() => setStep("register")}
+                style={{ background:"none", border:"none", color:linkClr, fontSize:13, cursor:"pointer", fontFamily:"inherit", padding:0, display:"flex", alignItems:"center", gap:6, marginBottom:24 }}>
+                <ArrowLeft size={14}/> Back
+              </button>
+              <div style={{ marginBottom:24 }}>
+                <h1 style={{ fontSize:22, fontWeight:800, color:txt, margin:"0 0 8px", letterSpacing:"-0.03em" }}>Verify your email</h1>
+                <p style={{ fontSize:13, color:txtSub, margin:0, lineHeight:1.6 }}>
+                  We sent a 6-digit code to <strong style={{ color:txt }}>{email}</strong>. It expires in 10 minutes.
+                </p>
+              </div>
+              <div style={{ display:"flex", gap:10, justifyContent:"center", marginBottom:24 }}>
+                {otpCode.map((digit, i) => (
+                  <input key={i} ref={el => (otpRefs.current[i] = el)} className="otp-box"
+                    style={{ background:inputBg, border:`1px solid ${otpBdr}`, color:inputClr }}
+                    type="text" inputMode="numeric" maxLength={1} value={digit}
+                    onChange={e => handleOtpChange(i, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(i, e)}
+                    onPaste={i === 0 ? handleOtpPaste : undefined}
+                    autoFocus={i === 0}/>
+                ))}
+              </div>
+              <button className="auth-btn" onClick={verifyOtp}
+                disabled={otpLoading || otpCode.join("").length < 6}
+                style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff", marginBottom:16 }}>
+                {otpLoading ? "Verifying…" : "Verify Email →"}
+              </button>
+              <p style={{ textAlign:"center", fontSize:12, color:txtSub, margin:0 }}>
+                Didn't receive it?{" "}
+                <span className="auth-link" style={{ color:linkClr, opacity: resending ? 0.5 : 1 }}
+                  onClick={() => !resending && resendOtp()}>
+                  {resending ? "Sending…" : "Resend code"}
+                </span>
+              </p>
+            </div>
+
+          ) : (
+          /* ── Registration Step ── */
+          <div key="register">
           <div style={{ marginBottom:24 }}>
             <h1 style={{ fontSize:26, fontWeight:800, color:txt, margin:"0 0 6px", letterSpacing:"-0.03em" }}>Create account</h1>
             <p style={{ fontSize:13, color:txtSub, margin:0 }}>Your AI financial twin awaits</p>
@@ -231,6 +329,8 @@ function Register() {
             Already have an account?{" "}
             <span className="auth-link" style={{ color:linkClr }} onClick={() => navigate("/login")}>Sign in</span>
           </p>
+          </div>
+          )}
         </div>
       </div>
     </>

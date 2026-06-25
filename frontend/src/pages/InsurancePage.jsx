@@ -1,14 +1,10 @@
 import { useState, useEffect } from "react";
-import { Plus, ShieldCheck, X, AlertTriangle, Clock } from "lucide-react";
+import { Plus, ShieldCheck, X, AlertTriangle } from "lucide-react";
+import API from "../services/api";
+import toast from "react-hot-toast";
 
 const POLICY_TYPES = ["Life","Health","Term","Vehicle","Home","Travel","Critical Illness"];
 const FREQUENCIES  = ["Monthly","Quarterly","Half-Yearly","Annually"];
-const STORAGE_KEY  = "fintwin-insurance";
-
-function getPolicies() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
-}
-function savePolicies(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
@@ -100,7 +96,7 @@ function PolicyCard({ policy, onDelete }) {
   );
 }
 
-function AddModal({ onClose, onSave }) {
+function AddModal({ onClose, onSave, saving }) {
   const [form, setForm] = useState(EMPTY);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -147,11 +143,11 @@ function AddModal({ onClose, onSave }) {
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
           <button
-            disabled={!form.provider.trim()}
+            disabled={!form.provider.trim() || saving}
             onClick={() => { if (form.provider.trim()) onSave(form); }}
-            style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.provider.trim() ? 1 : 0.4 }}
+            style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: (form.provider.trim() && !saving) ? 1 : 0.4 }}
           >
-            Add Policy
+            {saving ? "Saving…" : "Add Policy"}
           </button>
         </div>
       </div>
@@ -160,19 +156,50 @@ function AddModal({ onClose, onSave }) {
 }
 
 export default function InsurancePage() {
-  const [policies, setPolicies] = useState(getPolicies);
-  const [showAdd, setShowAdd] = useState(false);
+  const [policies, setPolicies] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showAdd, setShowAdd]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => { fetchPolicies(); }, []);
+
+  const fetchPolicies = async () => {
+    try {
+      const r = await API.get("/insurance");
+      setPolicies(r.data || []);
+    } catch { toast.error("Failed to load insurance policies"); }
+    finally { setLoading(false); }
+  };
 
   const totalCoverage = policies.reduce((s,p) => s + parseFloat(p.sumAssured||0), 0);
   const urgentCount = policies.filter(p => { const d = daysUntil(p.renewalDate); return d != null && d < 30; }).length;
 
-  const handleSave = (form) => {
-    const next = [...policies, { id: Date.now().toString(), ...form }];
-    setPolicies(next); savePolicies(next); setShowAdd(false);
+  const handleSave = async (form) => {
+    setSaving(true);
+    try {
+      const payload = {
+        type: form.type,
+        provider: form.provider,
+        premium: form.premium || null,
+        frequency: form.frequency,
+        sumAssured: form.sumAssured || null,
+        renewalDate: form.renewalDate || null,
+        notes: form.notes || null,
+      };
+      const r = await API.post("/insurance", payload);
+      setPolicies(prev => [r.data, ...prev]);
+      setShowAdd(false);
+      toast.success("Policy added");
+    } catch { toast.error("Failed to add policy"); }
+    finally { setSaving(false); }
   };
-  const handleDelete = (id) => {
-    const next = policies.filter(p => p.id !== id);
-    setPolicies(next); savePolicies(next);
+
+  const handleDelete = async (id) => {
+    try {
+      await API.delete(`/insurance/${id}`);
+      setPolicies(prev => prev.filter(p => p.id !== id));
+      toast.success("Policy removed");
+    } catch { toast.error("Failed to remove policy"); }
   };
 
   return (
@@ -208,7 +235,9 @@ export default function InsurancePage() {
       </div>
 
       {/* Policies */}
-      {policies.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)", fontSize: 13 }}>Loading…</div>
+      ) : policies.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dimmer)" }}>
           <ShieldCheck size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No insurance policies tracked</div>
@@ -223,7 +252,7 @@ export default function InsurancePage() {
         </div>
       )}
 
-      {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={handleSave} />}
+      {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={handleSave} saving={saving} />}
     </div>
   );
 }

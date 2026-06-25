@@ -5,6 +5,12 @@ const gotoSection = (name) => {
   localStorage.setItem("activeSection", name);
   window.dispatchEvent(new Event("dashboardNav"));
 };
+
+// Module-level cache — survives remounts within the same browser session.
+// Cleared on hard refresh. Lets the tab render instantly on repeat visits
+// while a background refresh runs silently.
+let _portfolioCache = null;
+let _nwCache = null;
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from "recharts";
@@ -51,8 +57,8 @@ function fmt(n) {
 }
 
 export default function PortfolioTab() {
-    const [summary, setSummary] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [summary, setSummary] = useState(_portfolioCache);
+    const [loading, setLoading] = useState(!_portfolioCache);
     const [showModal, setShowModal] = useState(false);
     const [editId, setEditId] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
@@ -63,17 +69,18 @@ export default function PortfolioTab() {
     const [selected, setSelected] = useState({});
     const [importing, setImporting] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [netWorth, setNetWorth] = useState(null);
+    const [netWorth, setNetWorth] = useState(_nwCache);
 
     const load = async () => {
         try {
-            setLoading(true);
+            if (!_portfolioCache) setLoading(true);
             const [portfolioRes, nwRes] = await Promise.all([
                 API.get("/portfolio"),
                 API.get("/net-worth").catch(() => null),
             ]);
+            _portfolioCache = portfolioRes.data;
             setSummary(portfolioRes.data);
-            if (nwRes) setNetWorth(nwRes.data);
+            if (nwRes) { _nwCache = nwRes.data; setNetWorth(nwRes.data); }
         } catch (err) {
             console.error(err);
         } finally {
@@ -93,6 +100,7 @@ export default function PortfolioTab() {
         setRefreshing(true);
         try {
             const res = await API.post("/portfolio/refresh");
+            _portfolioCache = res.data;
             setSummary(res.data);
         } catch (err) {
             console.error(err);

@@ -10,6 +10,7 @@ import com.fintwin.audit.Audited;
 import com.fintwin.repository.*;
 import com.fintwin.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,6 +33,7 @@ public class NetWorthService {
     @Autowired private UserRepository userRepository;
     @Autowired private InvestmentRepository investmentRepository;
 
+    @PreAuthorize("hasAuthority('READ_OWN_NET_WORTH')")
     @Audited(action = "READ", resource = "net_worth", description = "User viewed net worth dashboard")
     public NetWorthResponseDTO getNetWorth() {
 
@@ -69,7 +71,9 @@ public class NetWorthService {
 
         double transactionalSavings = txIncome - txExpenses;
 
-        double totalSavings = manualSavings + transactionalSavings;
+        // Manual savings is the user's stated current balance — authoritative when present.
+        // For bank users (manualSavings = 0), derive savings from real transaction cash flow.
+        double totalSavings = manualSavings > 0 ? manualSavings : transactionalSavings;
 
         // Total assets excludes ManualSavings (shown separately in savings card)
         // AND excludes investment-type assets (those belong in the Investment Portfolio page)
