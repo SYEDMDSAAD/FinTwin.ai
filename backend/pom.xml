@@ -226,6 +226,7 @@
             <version>2.6.0</version>
         </dependency>
 
+
         <!-- ── Observability ─────────────────────────────────────────── -->
         <dependency>
             <groupId>io.micrometer</groupId>
