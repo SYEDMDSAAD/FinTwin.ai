@@ -10,6 +10,7 @@ import com.fintwin.dto.GoogleLoginRequest;
 import com.fintwin.dto.UserMeDTO;
 import com.fintwin.service.AuthService;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -20,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     @Autowired
@@ -121,6 +122,21 @@ public class AuthController {
             return ResponseEntity.ok(body);
         }
         return ResponseEntity.ok(Map.of("message", "Verification code resent."));
+    }
+
+    // =========================
+    // PHONE VERIFICATION
+    // =========================
+
+    @PostMapping("/phone/send-otp")
+    public ResponseEntity<?> sendPhoneOtp(@RequestBody Map<String, String> req) {
+        return ResponseEntity.ok(authService.sendPhoneOtp(req.get("phone")));
+    }
+
+    @PostMapping("/phone/verify")
+    public ResponseEntity<?> verifyPhone(@RequestBody Map<String, String> req) {
+        authService.verifyPhone(req.get("otp"));
+        return ResponseEntity.ok(Map.of("message", "Phone number verified successfully."));
     }
 
     // =========================

@@ -134,6 +134,43 @@ services:
       - ./frontend/dist:/usr/share/nginx/html:ro
       - certbot-webroot:/var/www/certbot:ro    # ACME challenge files
 
+  # ── Prometheus ─────────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    networks: [fintwin]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      backend:
+        condition: service_started
+
+  # ── Grafana ──────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    networks: [fintwin]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./ops/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./ops/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./k8s/monitoring/fintwin-dashboard.json:/var/lib/grafana/dashboards/fintwin.json:ro
+    depends_on:
+      - prometheus
+
   # ── Certbot — Let's Encrypt certificate issuance + auto-renewal ─────────────
   #
   # FIRST-TIME SETUP (run before starting nginx with HTTPS):
@@ -158,5 +195,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  prometheusdata:
+  grafanadata:
   letsencrypt:     # shared between nginx (read) and certbot (write)
   certbot-webroot: # ACME challenge files

@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.config.FinTwinMetrics;
 import com.fintwin.model.Transaction;
 import com.fintwin.repository.TransactionRepository;
 import com.opencsv.CSVReader;
@@ -15,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.*;
@@ -51,6 +54,12 @@ public class TransactionService {
 
     @Autowired
     private ProfileService profileService;
+
+    @Autowired
+    private SmsService smsService;
+
+    @Autowired
+    private FinTwinMetrics metrics;
 
     @Value("${ai.service.url}")
     private String aiServiceUrl;
@@ -173,6 +182,12 @@ public class TransactionService {
     // ADD EXPENSE BY TEXT
     // =========================
 
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "WRITE",
@@ -211,7 +226,13 @@ public class TransactionService {
         transaction.setUser(user);
 
         Transaction saved = repository.save(transaction);
+        metrics.transactionsCreated.increment();
         profileService.saveScoreSnapshot(user);
+
+        if (user.getPhone() != null && Boolean.TRUE.equals(user.getPhoneVerified())) {
+            smsService.sendTransactionAlert(user.getPhone(), saved.getAmount(),
+                    saved.getMerchant());
+        }
 
         return saved;
     }
@@ -220,6 +241,12 @@ public class TransactionService {
     // ADD INCOME BY TEXT
     // =========================
 
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "WRITE",
@@ -286,6 +313,12 @@ public class TransactionService {
     // Single request for all rows — avoids per-row rate limiting
     // =========================
 
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",

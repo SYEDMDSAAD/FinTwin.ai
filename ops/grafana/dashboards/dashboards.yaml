@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: fintwin
+    folder: FinTwin
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

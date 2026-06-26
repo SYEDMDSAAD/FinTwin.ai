@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +53,7 @@ public class SetuAAService {
 
     // ── Consent creation ──────────────────────────────────────────────────────
 
+    @Retry(name = "setu-api")
     public Map<String, Object> createConsent(String customerVua) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("vua",             customerVua);
@@ -88,6 +90,7 @@ public class SetuAAService {
 
     // ── Consent status poll (recovery for missed webhooks) ────────────────────
 
+    @Retry(name = "setu-api")
     public Map<String, Object> getConsentStatus(String consentHandleOrId) {
         ResponseEntity<Map> response = restTemplate.exchange(
                 baseUrl + "/v2/consents/" + consentHandleOrId,
@@ -166,6 +169,7 @@ public class SetuAAService {
      * Each value is the raw `data.account` map from Setu's response.
      * Accounts with no fiType field default to "DEPOSIT".
      */
+    @Retry(name = "setu-api")
     @SuppressWarnings("unchecked")
     public Map<String, List<Map<String, Object>>> fetchAllFIData(String sessionId) {
         ResponseEntity<Map> response = restTemplate.exchange(

@@ -1,7 +1,9 @@
 package com.fintwin.service;
 
+import com.fintwin.config.FinTwinMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -41,7 +43,14 @@ public class SmsService {
     @Value("${sms.provider.alert-template-id:}")
     private String alertTemplateId;
 
+    @Autowired
+    private FinTwinMetrics metrics;
+
     private final RestTemplate restTemplate = new RestTemplate();
+
+    public boolean isConfigured() {
+        return smsEnabled && apiKey != null && !apiKey.isBlank();
+    }
 
     // ── OTP ──────────────────────────────────────────────────────────────────
 
@@ -129,12 +138,15 @@ public class SmsService {
 
             if (!resp.getStatusCode().is2xxSuccessful()) {
                 log.warn("SMS send failed for {}: HTTP {} — {}", description, resp.getStatusCode(), resp.getBody());
+                metrics.smsFailed.increment();
             } else {
                 log.debug("SMS sent: {}", description);
+                metrics.smsOtpSent.increment();
             }
         } catch (Exception e) {
             // Never let SMS failure propagate — it must not break the main flow
             log.warn("SMS send error for {}: {}", description, e.getMessage());
+            metrics.smsFailed.increment();
         }
     }
 

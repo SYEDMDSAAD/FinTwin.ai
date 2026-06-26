@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * The @PreAuthorize annotations here provide defense-in-depth at the method level.
  */
 @RestController
-@RequestMapping("/api/admin/roles")
+@RequestMapping("/api/v1/admin/roles")
 public class RoleController {
 
     @Autowired

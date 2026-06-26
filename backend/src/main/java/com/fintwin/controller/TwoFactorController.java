@@ -10,7 +10,7 @@ import java.security.Principal;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class TwoFactorController {
 
     @Autowired

@@ -32,6 +32,7 @@ import LandingPage from "./pages/LandingPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
 
@@ -45,32 +46,26 @@ function App() {
                     LANDING  (default root — always shown first)
                 ========================= */}
 
-                <Route path="/"        element={<LandingPage />} />
-                <Route path="/landing" element={<LandingPage />} />
+                <Route path="/"        element={<ErrorBoundary><LandingPage /></ErrorBoundary>} />
+                <Route path="/landing" element={<ErrorBoundary><LandingPage /></ErrorBoundary>} />
 
                 {/* =========================
                     AUTH
                 ========================= */}
 
                 <Route
-
                     path="/login"
-
-                    element={<Login />}
-
+                    element={<ErrorBoundary><Login /></ErrorBoundary>}
                 />
 
                 <Route
-
                     path="/register"
-
-                    element={<Register />}
-
+                    element={<ErrorBoundary><Register /></ErrorBoundary>}
                 />
 
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms"          element={<TermsOfServicePage />} />
+                <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
+                <Route path="/privacy-policy" element={<ErrorBoundary><PrivacyPolicyPage /></ErrorBoundary>} />
+                <Route path="/terms"          element={<ErrorBoundary><TermsOfServicePage /></ErrorBoundary>} />
 
                 {/* =========================
                     DASHBOARD
@@ -79,9 +74,11 @@ function App() {
                 <Route
                     path="/dashboard"
                     element={
-                        <ProtectedRoute>
-                            <Dashboard />
-                        </ProtectedRoute>
+                        <ErrorBoundary>
+                            <ProtectedRoute>
+                                <Dashboard />
+                            </ProtectedRoute>
+                        </ErrorBoundary>
                     }
                 />
 
@@ -90,29 +87,22 @@ function App() {
                 ========================= */}
 
                 <Route
-
                     path="*"
-
-                    element={
-
-                        <Navigate
-                            to="/"
-                        />
-
-                    }
-
+                    element={<Navigate to="/" />}
                 />
 
-                    {/* =========================
+                {/* =========================
                     PROFILE
                 ========================= */}
 
                 <Route
                     path="/profile"
                     element={
-                        <ProtectedRoute>
-                            <Profile />
-                        </ProtectedRoute>
+                        <ErrorBoundary>
+                            <ProtectedRoute>
+                                <Profile />
+                            </ProtectedRoute>
+                        </ErrorBoundary>
                     }
                 />
 
@@ -122,13 +112,13 @@ function App() {
 
                 <Route
                     path="/onboarding"
-                    element={<OnboardingPage />}
+                    element={<ErrorBoundary><OnboardingPage /></ErrorBoundary>}
                 />
 
                 {/* Setu AA redirects here after consent */}
                 <Route
                     path="/bank-connected"
-                    element={<BankConnectedPage />}
+                    element={<ErrorBoundary><BankConnectedPage /></ErrorBoundary>}
                 />
 
                 {/* =========================
@@ -138,9 +128,11 @@ function App() {
                 <Route
                     path="/admin"
                     element={
-                        <AdminRoute>
-                            <AdminPage />
-                        </AdminRoute>
+                        <ErrorBoundary>
+                            <AdminRoute>
+                                <AdminPage />
+                            </AdminRoute>
+                        </ErrorBoundary>
                     }
                 />
 

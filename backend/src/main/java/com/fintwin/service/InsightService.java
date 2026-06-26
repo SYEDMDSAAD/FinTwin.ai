@@ -6,6 +6,7 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,8 @@ public class InsightService {
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private UserRepository userRepository;
 
+    @Cacheable(value = "user-insights",
+               key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
     @PreAuthorize("hasAuthority('USE_AI_BASIC')")
     public List<String> generateInsights() {
 

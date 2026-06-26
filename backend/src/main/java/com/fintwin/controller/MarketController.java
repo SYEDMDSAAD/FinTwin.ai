@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/market")
+@RequestMapping("/api/v1/market")
 public class MarketController {
 
     @Autowired

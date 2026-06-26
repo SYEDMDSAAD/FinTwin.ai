@@ -7,7 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/credit-score")
+@RequestMapping("/api/v1/credit-score")
 public class CreditScoreController {
 
     @Autowired private CreditScoreService creditScoreService;

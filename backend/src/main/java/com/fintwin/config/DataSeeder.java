@@ -5,23 +5,33 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.security.EmailHashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-// Only active in the "dev" profile — never runs in production.
-// To bootstrap a prod admin use POST /admin/promote with the ADMIN_KEY.
-@Profile("dev")
+/**
+ * Seeds the default admin account on first startup if it doesn't exist yet.
+ * Override credentials via env vars: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_ADMIN_NAME.
+ * Set SEED_ADMIN_ENABLED=false to disable seeding entirely in production.
+ */
 @Component
 public class DataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
-    private static final String ADMIN_EMAIL    = "admin@test.com";
-    private static final String ADMIN_PASSWORD = "12345678";
-    private static final String ADMIN_NAME     = "Admin";
+    @Value("${seed.admin.enabled:true}")
+    private boolean enabled;
+
+    @Value("${seed.admin.email:admin@test.com}")
+    private String adminEmail;
+
+    @Value("${seed.admin.password:N@1710862}")
+    private String adminPassword;
+
+    @Value("${seed.admin.name:Admin}")
+    private String adminName;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -33,20 +43,24 @@ public class DataSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (userRepository.findByEmail(ADMIN_EMAIL).isPresent()) {
+        if (!enabled) return;
+
+        if (userRepository.findByEmail(adminEmail).isPresent()) {
+            log.debug("Admin account already exists — skipping seed");
             return;
         }
 
         User admin = new User();
-        admin.setFullName(ADMIN_NAME);
-        admin.setEmail(ADMIN_EMAIL);
-        admin.setEmailHash(EmailHashUtil.hash(ADMIN_EMAIL));
-        admin.setPassword(passwordEncoder.encode(ADMIN_PASSWORD));
+        admin.setFullName(adminName);
+        admin.setEmail(adminEmail);
+        admin.setEmailHash(EmailHashUtil.hash(adminEmail));
+        admin.setPassword(passwordEncoder.encode(adminPassword));
         admin.setRole("ADMIN");
         admin.setEnabled(true);
+        admin.setEmailVerified(true);
         admin.setOnboardingCompleted(true);
 
         userRepository.save(admin);
-        log.info("Seeded default admin account: {}", ADMIN_EMAIL);
+        log.info("Seeded admin account: {}", adminEmail);
     }
 }

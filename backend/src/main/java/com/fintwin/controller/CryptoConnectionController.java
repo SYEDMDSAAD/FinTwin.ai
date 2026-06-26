@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/crypto")
+@RequestMapping("/api/v1/crypto")
 public class CryptoConnectionController {
 
     private final CryptoConnectionService service;

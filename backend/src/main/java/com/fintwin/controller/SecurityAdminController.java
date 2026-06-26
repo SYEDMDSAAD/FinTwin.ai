@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/security")
+@RequestMapping("/api/v1/admin/security")
 public class SecurityAdminController {
 
     @Autowired

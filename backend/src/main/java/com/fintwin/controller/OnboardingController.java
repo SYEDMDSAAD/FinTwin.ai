@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 
-@RequestMapping("/api/onboarding")
+@RequestMapping("/api/v1/onboarding")
 
 
 public class OnboardingController {
