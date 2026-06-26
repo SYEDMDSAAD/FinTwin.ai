@@ -21,6 +21,10 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Override Spring Boot 3.3.0's managed 1.19.8 (docker-java 3.3.3, API 1.32).
+             Docker 29.x requires minimum API 1.40; Testcontainers 1.20+ uses
+             docker-java 3.4.x which targets API 1.41 by default. -->
+        <testcontainers.version>1.20.6</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -189,6 +193,39 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Apache HttpClient 5 — makes TestRestTemplate use HttpComponentsClientHttpRequestFactory
+             instead of SimpleClientHttpRequestFactory (HttpURLConnection), which throws
+             HttpRetryException on 401 POST responses in JDK 17+. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers — real PostgreSQL for integration tests -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- OpenAPI / Swagger UI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.6.0</version>
+        </dependency>
+
         <!-- ── Observability ─────────────────────────────────────────── -->
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -223,6 +260,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Surefire explicitly declared so its version aligns with Spring Boot parent
+                 and can be extended later (e.g. parallel test execution). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
 
         </plugins>
