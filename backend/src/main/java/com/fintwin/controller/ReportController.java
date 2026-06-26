@@ -11,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 
 @RestController
 
-@RequestMapping("/api/reports")
+@RequestMapping("/api/v1/reports")
 
 
 public class ReportController {

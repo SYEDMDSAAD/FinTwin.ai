@@ -12,6 +12,9 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.audit.Audited;
 import com.fintwin.security.PasswordValidator;
 
+import com.fintwin.config.FinTwinMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +38,8 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     @Autowired
     private UserRepository userRepository;
 
@@ -46,6 +51,12 @@ public class AuthService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private SmsService smsService;
+
+    @Autowired
+    private FinTwinMetrics metrics;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -105,6 +116,7 @@ public class AuthService {
         user.setRole("USER");
 
         userRepository.save(user);
+        metrics.registrations.increment();
 
         // Send email verification OTP
         String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
@@ -160,20 +172,29 @@ public class AuthService {
                 request.getPassword(),
                 user.getPassword()
         )) {
+            metrics.loginFailure.increment();
             throw new RuntimeException("Invalid credentials");
         }
 
         if (!Boolean.TRUE.equals(user.getEnabled())) {
+            metrics.loginFailure.increment();
             throw new RuntimeException("Account has been disabled");
         }
 
         if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
             String tempToken = jwtUtil.generateTempToken(user.getEmail());
+            metrics.loginSuccess.increment();
             return new AuthResponse(tempToken);
         }
 
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
+
+        metrics.loginSuccess.increment();
+        // SMS login alert — fire-and-forget, never blocks the login response
+        if (user.getPhone() != null && Boolean.TRUE.equals(user.getPhoneVerified())) {
+            smsService.sendLoginAlert(user.getPhone(), "India");
+        }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
 
@@ -380,6 +401,60 @@ public class AuthService {
                 user.getRole(),
                 Boolean.TRUE.equals(user.getEmailVerified())
         );
+    }
+
+    // =========================
+    // PHONE VERIFICATION
+    // =========================
+
+    public Map<String, Object> sendPhoneOtp(String phone) {
+        if (phone == null || phone.isBlank())
+            throw new IllegalArgumentException("Phone number must not be empty");
+
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setPhone(phone.trim());
+        String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+        user.setPhoneVerificationOtp(sha256(rawOtp));
+        user.setPhoneVerificationExpiry(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+
+        smsService.sendOtp(phone.trim(), rawOtp);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", "OTP sent to your phone number");
+        if (!smsService.isConfigured()) {
+            result.put("devOtp", rawOtp);
+            result.put("devNote", "SMS not configured — use this OTP directly for testing");
+        }
+        return result;
+    }
+
+    public void verifyPhone(String otp) {
+        if (otp == null || otp.isBlank())
+            throw new IllegalArgumentException("OTP must not be empty");
+
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (Boolean.TRUE.equals(user.getPhoneVerified())) return;
+
+        if (user.getPhoneVerificationOtp() == null
+                || user.getPhoneVerificationExpiry() == null
+                || user.getPhoneVerificationExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("OTP has expired — please request a new one");
+        }
+
+        if (!sha256(otp.trim()).equals(user.getPhoneVerificationOtp()))
+            throw new RuntimeException("Incorrect OTP");
+
+        user.setPhoneVerified(true);
+        user.setPhoneVerificationOtp(null);
+        user.setPhoneVerificationExpiry(null);
+        userRepository.save(user);
     }
 
     // =========================

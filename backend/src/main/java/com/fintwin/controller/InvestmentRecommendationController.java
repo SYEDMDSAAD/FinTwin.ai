@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping(
-        "/api/investments"
+        "/api/v1/investments"
 )
 public class InvestmentRecommendationController {
 

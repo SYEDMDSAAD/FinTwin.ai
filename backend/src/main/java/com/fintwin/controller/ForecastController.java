@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 
-@RequestMapping("/api/forecast")
+@RequestMapping("/api/v1/forecast")
 
 
 public class ForecastController {

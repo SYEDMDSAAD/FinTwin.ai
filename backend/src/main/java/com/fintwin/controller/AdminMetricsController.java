@@ -17,7 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/metrics")
+@RequestMapping("/api/v1/admin/metrics")
 @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
 public class AdminMetricsController {
 

@@ -17,7 +17,7 @@ public class TicketController {
 
     // ── Public: submit a ticket ───────────────────────────────────────────────
 
-    @PostMapping("/api/tickets")
+    @PostMapping("/api/v1/tickets")
     public ResponseEntity<?> submitTicket(@RequestBody Map<String, String> body) {
         String email   = body.get("email");
         String message = body.get("message");
@@ -34,14 +34,14 @@ public class TicketController {
 
     // ── Admin: list all tickets ───────────────────────────────────────────────
 
-    @GetMapping("/api/admin/tickets")
+    @GetMapping("/api/v1/admin/tickets")
     public ResponseEntity<?> listTickets(@RequestParam(required = false) String status) {
         return ResponseEntity.ok(ticketService.listAll(status));
     }
 
     // ── Admin: mark in-progress ───────────────────────────────────────────────
 
-    @PutMapping("/api/admin/tickets/{id}/in-progress")
+    @PutMapping("/api/v1/admin/tickets/{id}/in-progress")
     public ResponseEntity<?> markInProgress(@PathVariable Long id) {
         try {
             ticketService.markInProgress(id);
@@ -53,7 +53,7 @@ public class TicketController {
 
     // ── Admin: resolve ticket ─────────────────────────────────────────────────
 
-    @PutMapping("/api/admin/tickets/{id}/resolve")
+    @PutMapping("/api/v1/admin/tickets/{id}/resolve")
     public ResponseEntity<?> resolveTicket(@PathVariable Long id, @RequestBody Map<String, String> body) {
         try {
             ticketService.resolve(id, body.get("note"));
@@ -65,7 +65,7 @@ public class TicketController {
 
     // ── Admin: reply to user by email ─────────────────────────────────────────
 
-    @PostMapping("/api/admin/tickets/{id}/reply")
+    @PostMapping("/api/v1/admin/tickets/{id}/reply")
     public ResponseEntity<?> replyToTicket(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String replyBody = body.get("reply");
         if (replyBody == null || replyBody.isBlank())
@@ -83,7 +83,7 @@ public class TicketController {
 
     // ── Admin: delete ticket ──────────────────────────────────────────────────
 
-    @DeleteMapping("/api/admin/tickets/{id}")
+    @DeleteMapping("/api/v1/admin/tickets/{id}")
     public ResponseEntity<?> deleteTicket(@PathVariable Long id) {
         try {
             ticketService.delete(id);

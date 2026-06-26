@@ -185,14 +185,18 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
+                                // /me requires authentication; must come before the broad auth/** rule
+                                .requestMatchers("/api/v1/auth/me")
+                                .authenticated()
+
                                 .requestMatchers(
-                                        "/api/auth/**"
+                                        "/api/v1/auth/**"
                                 )
                                 .permitAll()
 
                                 // Setu calls this without JWT
                                 .requestMatchers(
-                                        "/api/bank/webhook"
+                                        "/api/v1/bank/webhook"
                                 )
                                 .permitAll()
 
@@ -201,19 +205,39 @@ public class SecurityConfig {
                                 .permitAll()
 
                                 // Public market proxy — fetches Yahoo Finance server-side, no user context needed
-                                .requestMatchers("/api/market/**")
+                                .requestMatchers("/api/v1/market/**")
                                 .permitAll()
 
                                 // Support tickets — users submit from login page (unauthenticated)
-                                .requestMatchers(HttpMethod.POST, "/api/tickets")
+                                .requestMatchers(HttpMethod.POST, "/api/v1/tickets")
+                                .permitAll()
+
+                                // OpenAPI docs — public in dev, disabled in prod via SWAGGER_ENABLED
+                                .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                                 .permitAll()
 
                                 // Admin API — requires JWT + ADMIN role
-                                .requestMatchers("/api/admin/**")
+                                .requestMatchers("/api/v1/admin/**")
                                 .hasRole("ADMIN")
 
                                 .anyRequest()
                                 .authenticated()
+                )
+
+                // Spring Security 6 defaults to Http403ForbiddenEntryPoint for anonymous users.
+                // Write responses directly (NOT sendError) — sendError triggers a Tomcat re-dispatch
+                // to /error which goes back through Spring Security as anonymous, turning 403 into 401.
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint((req, res, ex) -> {
+                                res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                res.setContentType("application/json");
+                                res.getWriter().write("{\"error\":\"Unauthorized\"}");
+                        })
+                        .accessDeniedHandler((req, res, ex) -> {
+                                res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                                res.setContentType("application/json");
+                                res.getWriter().write("{\"error\":\"Forbidden\"}");
+                        })
                 )
 
                 .addFilterBefore(

@@ -2,12 +2,14 @@ package com.fintwin.service;
 
 import com.fintwin.ai.AIProvider;
 import com.fintwin.audit.Audited;
+import com.fintwin.config.FinTwinMetrics;
 import com.fintwin.dto.FinancialSummaryDTO;
 import com.fintwin.model.ChatHistory;
 import com.fintwin.model.User;
 import com.fintwin.repository.ChatHistoryRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +47,9 @@ public class ChatService {
     @Autowired
     private AIProvider aiProvider;
 
+    @Autowired
+    private FinTwinMetrics metrics;
+
     // ── Chat ─────────────────────────────────────────────────────────────────────
 
     @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
@@ -53,16 +58,23 @@ public class ChatService {
         if (message == null || message.isBlank()) {
             return "Please enter a message.";
         }
-        try {
-            User user = resolveCurrentUser();
-            FinancialSummaryDTO summary = aggregator.aggregate(user);
-            String reply = aiProvider.chat(message, mode, summary);
-            persistExchange(user, message, reply);
-            return reply;
-        } catch (Exception e) {
-            log.error("AI chat failed: {}", e.getMessage());
-            return "FinTwin AI is temporarily unavailable.";
-        }
+        metrics.aiChatCalls.increment();
+        User user = resolveCurrentUser();
+        FinancialSummaryDTO summary = aggregator.aggregate(user);
+        String reply = callAiProvider(message, mode, summary);
+        persistExchange(user, message, reply);
+        return reply;
+    }
+
+    @CircuitBreaker(name = "ai-service", fallbackMethod = "chatFallback")
+    String callAiProvider(String message, String mode, FinancialSummaryDTO summary) {
+        return aiProvider.chat(message, mode, summary);
+    }
+
+    @SuppressWarnings("unused")
+    String chatFallback(String message, String mode, FinancialSummaryDTO summary, Exception ex) {
+        log.warn("AI chat circuit open ({}), returning fallback", ex.getMessage());
+        return "FinTwin AI is temporarily unavailable. Please try again in a moment.";
     }
 
     // ── History ───────────────────────────────────────────────────────────────────

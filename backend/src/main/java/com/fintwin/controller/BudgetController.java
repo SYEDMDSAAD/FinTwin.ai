@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 
-@RequestMapping("/api/budgets")
+@RequestMapping("/api/v1/budgets")
 
 
 public class BudgetController {

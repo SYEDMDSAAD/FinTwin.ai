@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/portfolio")
+@RequestMapping("/api/v1/portfolio")
 public class InvestmentController {
 
     private final InvestmentService service;

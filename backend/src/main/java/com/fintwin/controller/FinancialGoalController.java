@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/goals")
+@RequestMapping("/api/v1/goals")
 public class FinancialGoalController {
 
     @Autowired

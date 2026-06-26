@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping(
-        "/api/spending-coach"
+        "/api/v1/spending-coach"
 )
 public class SpendingCoachController {
 

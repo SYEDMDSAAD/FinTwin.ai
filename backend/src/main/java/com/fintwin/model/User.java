@@ -64,6 +64,22 @@ public class User {
     @Column(name = "email_verified")
     private Boolean emailVerified = false;
 
+    // Phone (AES-256-GCM encrypted, same as email)
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "phone", length = 512)
+    private String phone;
+
+    @Column(name = "phone_verified")
+    private Boolean phoneVerified = false;
+
+    // SHA-256 of phone OTP (raw OTP only ever sent via SMS)
+    @JsonIgnore
+    @Column(name = "phone_verification_otp", length = 64)
+    private String phoneVerificationOtp;
+
+    @Column(name = "phone_verification_expiry")
+    private LocalDateTime phoneVerificationExpiry;
+
     // SHA-256 hash of the OTP (raw OTP is only ever in the email)
     @JsonIgnore
     @Column(name = "email_verification_otp", length = 64)
@@ -214,6 +230,15 @@ public class User {
     public void setFailedLoginAttempts(Integer v) { this.failedLoginAttempts = v; }
     public LocalDateTime getLockedUntil() { return lockedUntil; }
     public void setLockedUntil(LocalDateTime v) { this.lockedUntil = v; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public Boolean getPhoneVerified() { return phoneVerified; }
+    public void setPhoneVerified(Boolean phoneVerified) { this.phoneVerified = phoneVerified; }
+    public String getPhoneVerificationOtp() { return phoneVerificationOtp; }
+    public void setPhoneVerificationOtp(String phoneVerificationOtp) { this.phoneVerificationOtp = phoneVerificationOtp; }
+    public LocalDateTime getPhoneVerificationExpiry() { return phoneVerificationExpiry; }
+    public void setPhoneVerificationExpiry(LocalDateTime phoneVerificationExpiry) { this.phoneVerificationExpiry = phoneVerificationExpiry; }
 
     // ── RBAC helpers ─────────────────────────────────────────────────
 

@@ -28,6 +28,11 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 /**
  * Rate limiting filter with two backends:
  * - Redis (distributed): used when REDIS_URL is configured. Correct across all replicas.
@@ -44,8 +49,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Autowired @Lazy
     private BlockedIPRepository blockedIPRepository;
 
+    @Value("${rate.limit.enabled:true}")
+    private boolean enabled;
+
     @Value("${redis.url:}")
     private String redisUrl;
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    // Lazy JWT key — extracted from the bearer token for per-user limiting
+    private volatile SecretKey jwtKey;
 
     // Redis backend (null when Redis is not configured)
     private RedisClient redisClient;
@@ -57,6 +71,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @PostConstruct
     void init() {
+        jwtKey = new SecretKeySpec(
+                jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
+
         if (redisUrl != null && !redisUrl.isBlank()) {
             try {
                 redisClient = RedisClient.create(redisUrl);
@@ -85,6 +102,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
+        if (!enabled) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         String ip   = getClientIp(request);
         String path = request.getRequestURI();
 
@@ -98,17 +120,33 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
         } catch (Exception ignored) {}
 
+        // ── IP-based limit (covers unauthenticated + shared NAT) ─────────────
         int limit = limitFor(path);
         boolean allowed = redis != null
                 ? checkRedis(ip, path, limit)
                 : checkLocal(ip, path, limit);
 
-        if (allowed) {
-            chain.doFilter(request, response);
-        } else {
+        if (!allowed) {
             reject(response, HttpStatus.TOO_MANY_REQUESTS,
                     "{\"error\":\"Rate limit exceeded. Try again shortly.\"}");
+            return;
         }
+
+        // ── Per-user limit (covers authenticated abuse across IPs) ────────────
+        String email = extractEmailFromBearer(request);
+        if (email != null) {
+            int userLimit = userLimitFor(path);
+            boolean userAllowed = redis != null
+                    ? checkRedis("u:" + email, path, userLimit)
+                    : checkLocal("u:" + email, path, userLimit);
+            if (!userAllowed) {
+                reject(response, HttpStatus.TOO_MANY_REQUESTS,
+                        "{\"error\":\"Per-user rate limit exceeded. Slow down.\"}");
+                return;
+            }
+        }
+
+        chain.doFilter(request, response);
     }
 
     // ── Redis fixed-window check ──────────────────────────────────────────────
@@ -149,10 +187,40 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return 100;
     }
 
+    // Per-user limits are tighter on AI endpoints to control compute cost
+    private int userLimitFor(String path) {
+        if (path.contains("/auth"))                                  return 5;
+        if (path.contains("/transactions/expense")
+                || path.contains("/transactions/income")
+                || path.contains("/forecast")
+                || path.contains("/chat")
+                || path.contains("/coach"))                          return 30;
+        return 200;
+    }
+
     private String bucketKey(String path) {
         if (path.contains("/auth"))   return "auth";
         if (path.contains("/chat"))   return "ai";
         return "api";
+    }
+
+    // ── JWT email extraction for per-user rate limiting ───────────────────────
+
+    private String extractEmailFromBearer(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) return null;
+        String token = header.substring(7).trim();
+        if (token.isEmpty()) return null;
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(jwtKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            return claims.getSubject();
+        } catch (Exception e) {
+            return null; // Invalid token — JWT filter will reject it properly
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

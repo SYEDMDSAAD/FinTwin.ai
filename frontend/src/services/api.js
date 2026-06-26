@@ -2,7 +2,7 @@ import axios from "axios";
 
 // ── Main backend — business data (transactions, dashboard, AI, etc.) ──────────
 const API = axios.create({
-    baseURL: "http://localhost:8080/api"
+    baseURL: "http://localhost:8080/api/v1"
 });
 
 // ── Identity service — auth, 2FA, tokens ─────────────────────────────────────

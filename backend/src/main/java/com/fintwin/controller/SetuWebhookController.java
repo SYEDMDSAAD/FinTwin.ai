@@ -28,7 +28,7 @@ import java.util.Map;
  *   SESSION_STATUS_UPDATE  — FI data is ready to fetch
  */
 @RestController
-@RequestMapping("/api/bank")
+@RequestMapping("/api/v1/bank")
 public class SetuWebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(SetuWebhookController.class);
