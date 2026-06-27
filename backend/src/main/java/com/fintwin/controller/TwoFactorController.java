@@ -56,15 +56,6 @@ public class TwoFactorController {
         }
     }
 
-    @GetMapping("/2fa/debug")
-    public ResponseEntity<?> debug(Principal principal) {
-        try {
-            return ResponseEntity.ok(twoFactorService.getDebugInfo(principal.getName()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
-        }
-    }
-
     @PostMapping("/auth/2fa/login")
     public ResponseEntity<?> twoFactorLogin(@RequestBody Map<String, String> body) {
         try {

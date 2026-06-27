@@ -10,6 +10,8 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +25,8 @@ import java.util.*;
 
 @Service
 public class GoalPlannerService {
+
+    private static final Logger log = LoggerFactory.getLogger(GoalPlannerService.class);
 
     @Autowired
     private FinancialGoalRepository goalRepository;
@@ -470,7 +474,7 @@ public class GoalPlannerService {
             return response.get("plan").toString();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("AI goal-plan generation failed, using fallback plan", e);
             return buildFallbackPlan(dto, monthlyTarget);
         }
     }

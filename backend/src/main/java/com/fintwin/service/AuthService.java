@@ -299,8 +299,12 @@ public class AuthService {
             throw new IllegalArgumentException("Email must not be empty");
 
         String normalized = email.toLowerCase().trim();
-        User user = userRepository.findByEmail(normalized)
-                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+        // Do NOT reveal whether the account exists — that enables email enumeration.
+        // Silently no-op for unknown emails; the controller returns a generic response.
+        User user = userRepository.findByEmail(normalized).orElse(null);
+        if (user == null) {
+            return null;
+        }
 
         String rawToken = UUID.randomUUID().toString();
         user.setPasswordResetToken(sha256(rawToken));

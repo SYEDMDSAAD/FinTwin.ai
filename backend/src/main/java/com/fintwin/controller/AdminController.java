@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -75,7 +77,13 @@ public class AdminController {
     }
 
     private boolean isValidAdminKey(String key) {
-        return adminKey != null && !adminKey.isBlank() && adminKey.equals(key);
+        if (adminKey == null || adminKey.isBlank() || key == null) {
+            return false;
+        }
+        // Constant-time comparison to avoid leaking the key via response timing.
+        return MessageDigest.isEqual(
+                adminKey.getBytes(StandardCharsets.UTF_8),
+                key.getBytes(StandardCharsets.UTF_8));
     }
 
     public static class PromoteRequest {
