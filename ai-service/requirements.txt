@@ -1,4 +1,4 @@
-python-dotenv>=1.0.0
+python-dotenv>=1.2.2
 requests>=2.31.0
 statsforecast>=1.7.0
 xgboost>=2.0.0
