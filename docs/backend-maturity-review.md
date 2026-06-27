@@ -13,6 +13,31 @@ Severity legend: 🔴 Critical · 🟠 High · 🟡 Medium · 🟢 Low/polish
 
 ---
 
+## Implementation status (updated 2026-06-28)
+
+All three phases have been implemented and the full test suite (48 tests) passes.
+
+| Phase | Items | Status |
+|-------|-------|--------|
+| 1 — Security hardening | C1, C3, H2, M4, M5, M3 | ✅ done (commit `204a128`) |
+| 2 — Auth correctness | C2, H1, M1, M2, M6 | ✅ done |
+| 3 — Architecture maturity | H5, H3, H4, L1 | ✅ done |
+
+**Deliberately deferred / partial:**
+- **H3** applied to pure-DB write methods only. Methods with trailing external
+  calls (`addExpenseByText` → SMS, `uploadScreenshot` → AI) were left untransacted
+  on purpose: `SmsService`/AI calls are blocking, and wrapping them would hold a DB
+  connection across the network call. Making those atomic needs a refactor that
+  splits the DB work from the side effect — tracked for a follow-up.
+- **H4** implemented for the transaction endpoints (`TransactionDTO`). Other
+  entity-returning endpoints can follow the same pattern incrementally.
+- **L2/L3/L4/L5/L6** (EAGER fetch, optimistic locking, flyway pwd default,
+  formatting, money-as-double) intentionally left — low value or high churn/risk.
+- The old string-matching ladder in `GlobalExceptionHandler` is retained as a
+  fallback for services not yet migrated to typed exceptions.
+
+---
+
 ## 🔴 CRITICAL
 
 ### C1. `/2fa/debug` endpoint leaks the TOTP secret and the live valid code

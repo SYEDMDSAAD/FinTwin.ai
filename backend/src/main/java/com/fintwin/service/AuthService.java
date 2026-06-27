@@ -11,6 +11,12 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.audit.Audited;
 import com.fintwin.security.PasswordValidator;
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.ConflictException;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.LockedException;
+import com.fintwin.exception.NotFoundException;
+import com.fintwin.exception.UnauthorizedException;
 
 import com.fintwin.config.FinTwinMetrics;
 import org.slf4j.Logger;
@@ -39,6 +45,10 @@ import java.util.UUID;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
+    // Account lockout: after this many consecutive failures, lock for LOCK_MINUTES.
+    private static final int MAX_FAILED_LOGINS = 5;
+    private static final int LOCK_MINUTES = 15;
 
     @Autowired
     private UserRepository userRepository;
@@ -97,15 +107,18 @@ public class AuthService {
             );
         }
 
-        if (userRepository.findByEmail(
-                request.getEmail().toLowerCase().trim()
-        ).isPresent()) {
-            throw new RuntimeException(
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
+            throw new ConflictException(
                     "An account with this email already exists"
             );
         }
 
-        String normalizedEmail = request.getEmail().toLowerCase().trim();
+        // Build the verification OTP up front so the new user is persisted in a
+        // single save (atomic) rather than two sequential saves.
+        String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+
         User user = new User();
         user.setFullName(request.getFullName().trim());
         user.setEmail(normalizedEmail);
@@ -114,15 +127,12 @@ public class AuthService {
         user.setOnboardingCompleted(false);
         user.setConsentGivenAt(LocalDateTime.now());
         user.setRole("USER");
+        user.setEmailVerificationOtp(sha256(rawOtp));
+        user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
 
         userRepository.save(user);
         metrics.registrations.increment();
 
-        // Send email verification OTP
-        String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
-        user.setEmailVerificationOtp(sha256(rawOtp));
-        user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
-        userRepository.save(user);
         emailService.sendVerificationOtp(normalizedEmail, request.getFullName().trim(), rawOtp);
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -165,20 +175,36 @@ public class AuthService {
         User user = userRepository
                 .findByEmail(normalizedEmail)
                 .orElseThrow(() ->
-                        new RuntimeException("Invalid credentials")
+                        new UnauthorizedException("Invalid credentials")
                 );
+
+        // Reject while a temporary lockout is active (brute-force protection).
+        if (user.getLockedUntil() != null
+                && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            metrics.loginFailure.increment();
+            throw new LockedException(
+                    "Account temporarily locked due to repeated failed logins. Try again later.");
+        }
 
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword()
         )) {
+            registerFailedLogin(user);
             metrics.loginFailure.increment();
-            throw new RuntimeException("Invalid credentials");
+            throw new UnauthorizedException("Invalid credentials");
         }
 
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             metrics.loginFailure.increment();
-            throw new RuntimeException("Account has been disabled");
+            throw new ForbiddenException("ACCOUNT_DISABLED");
+        }
+
+        // Successful credential check — clear any prior failure/lock state.
+        if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+            userRepository.save(user);
         }
 
         if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
@@ -220,7 +246,7 @@ public class AuthService {
     public AuthResponse googleLogin(String credential) {
 
         if (credential == null || credential.isBlank()) {
-            throw new RuntimeException(
+            throw new UnauthorizedException(
                     "Google credential must not be empty"
             );
         }
@@ -239,7 +265,7 @@ public class AuthService {
             GoogleIdToken idToken = verifier.verify(credential);
 
             if (idToken == null) {
-                throw new RuntimeException(
+                throw new UnauthorizedException(
                         "Google token verification failed"
                 );
             }
@@ -284,9 +310,9 @@ public class AuthService {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException(
-                    "Google authentication failed: " + e.getMessage()
-            );
+            // Don't leak the underlying provider error to the client.
+            log.warn("Google authentication failed", e);
+            throw new UnauthorizedException("Google authentication failed");
         }
     }
 
@@ -330,11 +356,11 @@ public class AuthService {
 
         String hashed = sha256(rawToken);
         User user = userRepository.findByPasswordResetToken(hashed)
-                .orElseThrow(() -> new RuntimeException("Invalid or expired reset link"));
+                .orElseThrow(() -> new BadRequestException("Invalid or expired reset link"));
 
         if (user.getPasswordResetExpiry() == null
                 || user.getPasswordResetExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Reset link has expired — please request a new one");
+            throw new BadRequestException("Reset link has expired — please request a new one");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -353,18 +379,18 @@ public class AuthService {
 
         String normalized = email.toLowerCase().trim();
         User user = userRepository.findByEmail(normalized)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) return; // already verified
 
         if (user.getEmailVerificationOtp() == null
                 || user.getEmailVerificationExpiry() == null
                 || user.getEmailVerificationExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP has expired — please request a new one");
+            throw new BadRequestException("OTP has expired — please request a new one");
         }
 
         if (!sha256(otp.trim()).equals(user.getEmailVerificationOtp()))
-            throw new RuntimeException("Incorrect OTP");
+            throw new BadRequestException("Incorrect OTP");
 
         user.setEmailVerified(true);
         user.setEmailVerificationOtp(null);
@@ -417,7 +443,7 @@ public class AuthService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         user.setPhone(phone.trim());
         String rawOtp = String.valueOf(100000 + new SecureRandom().nextInt(900000));
@@ -442,18 +468,18 @@ public class AuthService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (Boolean.TRUE.equals(user.getPhoneVerified())) return;
 
         if (user.getPhoneVerificationOtp() == null
                 || user.getPhoneVerificationExpiry() == null
                 || user.getPhoneVerificationExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP has expired — please request a new one");
+            throw new BadRequestException("OTP has expired — please request a new one");
         }
 
         if (!sha256(otp.trim()).equals(user.getPhoneVerificationOtp()))
-            throw new RuntimeException("Incorrect OTP");
+            throw new BadRequestException("Incorrect OTP");
 
         user.setPhoneVerified(true);
         user.setPhoneVerificationOtp(null);
@@ -464,6 +490,27 @@ public class AuthService {
     // =========================
     // PRIVATE HELPERS
     // =========================
+
+    // Records a failed login and locks the account once the threshold is crossed.
+    private void registerFailedLogin(User user) {
+        LocalDateTime now = LocalDateTime.now();
+
+        int attempts = user.getFailedLoginAttempts();
+        // If an earlier lock has already expired, start counting fresh.
+        if (user.getLockedUntil() != null && user.getLockedUntil().isBefore(now)) {
+            attempts = 0;
+            user.setLockedUntil(null);
+        }
+        attempts++;
+
+        if (attempts >= MAX_FAILED_LOGINS) {
+            user.setLockedUntil(now.plusMinutes(LOCK_MINUTES));
+            user.setFailedLoginAttempts(0); // reset counter; the lock window now governs
+        } else {
+            user.setFailedLoginAttempts(attempts);
+        }
+        userRepository.save(user);
+    }
 
     private String sha256(String input) {
         try {

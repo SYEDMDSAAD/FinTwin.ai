@@ -77,12 +77,18 @@ public class TransactionService {
     );
     private static final long MAX_CSV_BYTES = 5 * 1024 * 1024; // 5 MB
 
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic"
+    );
+    private static final long MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",
             resource = "transactions",
             description = "CSV transaction bulk import"
     )
+    @Transactional
     public void uploadCSV(MultipartFile file) {
         String declaredType = file.getContentType();
         if (declaredType == null || !ALLOWED_CSV_TYPES.contains(
@@ -253,6 +259,7 @@ public class TransactionService {
             resource = "transactions",
             description = "Income transaction created via text"
     )
+    @Transactional
     public Transaction addIncomeByText(String text) {
 
         if (text == null || text.isBlank()) {
@@ -286,6 +293,7 @@ public class TransactionService {
     // =========================
 
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
     public Transaction addManualTransaction(
             String date, String merchant, Double amount, String category) {
 
@@ -325,6 +333,7 @@ public class TransactionService {
             resource = "transactions",
             description = "Batch CSV transaction import"
     )
+    @Transactional
     public int importBatch(List<Map<String, Object>> rows) {
 
         String email = SecurityUtils.getCurrentUserEmail();
@@ -395,6 +404,16 @@ public class TransactionService {
             throw new IllegalArgumentException(
                     "Screenshot file must not be empty"
             );
+        }
+
+        String declaredType = file.getContentType();
+        if (declaredType == null || !ALLOWED_IMAGE_TYPES.contains(
+                declaredType.toLowerCase().split(";")[0].trim())) {
+            throw new IllegalArgumentException(
+                    "Invalid file type '" + declaredType + "'. Only image files are accepted.");
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException("File too large. Maximum image size is 10 MB.");
         }
 
         String email = SecurityUtils.getCurrentUserEmail();

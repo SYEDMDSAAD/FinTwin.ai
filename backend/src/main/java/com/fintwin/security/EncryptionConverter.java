@@ -31,6 +31,9 @@ public class EncryptionConverter implements AttributeConverter<String, String> {
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
 
+    // Thread-safe; reuse one instance instead of allocating per encrypt call.
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     // "fintwin-dev-key-32-byte-key-pad!" — 32 bytes, dev only
     private static final String DEV_KEY_B64 = "ZmludHdpbi1kZXYta2V5LTMyLWJ5dGUta2V5LXBhZCE=";
 
@@ -73,7 +76,7 @@ public class EncryptionConverter implements AttributeConverter<String, String> {
         if (plaintext == null) return null;
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
+            SECURE_RANDOM.nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, getKey(),

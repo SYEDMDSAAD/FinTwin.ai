@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,8 +16,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fintwin.model.User;
+
 import java.io.IOException;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -36,214 +36,91 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
-
     ) throws ServletException, IOException {
 
-        String path = request.getServletPath();
+        String authHeader = request.getHeader("Authorization");
 
-        if (
-
-                path.equals("/api/auth/login")
-
-                ||
-
-                path.equals("/api/auth/register")
-
-                ||
-
-                path.equals("/api/auth/google")
-
-        ) {
-
-        filterChain.doFilter(
-                request,
-                response
-        );
-
-        return;
+        // No bearer token — let the chain decide (public endpoints) or reject later.
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        String authHeader =
-                request.getHeader(
-                        "Authorization"
-                );
+        String token = authHeader.substring(7);
 
-        String token = null;
-
-        String email = null;
-
-        if (
-
-                authHeader != null
-
-                &&
-
-                authHeader.startsWith(
-                        "Bearer "
-                )
-
-        ) {
-
-            token =
-                    authHeader.substring(
-                            7
-                    );
-
-            try {
-
-                email =
-                        jwtUtil.extractEmail(
-                                token
-                        );
-
-                log.debug("JWT authenticated: {} {}", request.getMethod(), request.getRequestURI());
-
-            } catch (
-
-                    io.jsonwebtoken.ExpiredJwtException ex
-
-            ) {
-
-                response.setStatus(
-                        HttpServletResponse.SC_UNAUTHORIZED
-                );
-
-                response.getWriter().write(
-                        "JWT Token Expired"
-                );
-
-                return;
-
-            } catch (Exception ex) {
-
-                response.setStatus(
-                        HttpServletResponse.SC_UNAUTHORIZED
-                );
-
-                response.getWriter().write(
-                        "Invalid JWT Token"
-                );
-
-                return;
-            }
+        // Parse once: this validates the signature and expiry and yields the claims.
+        io.jsonwebtoken.Claims claims;
+        try {
+            claims = jwtUtil.extractClaims(token);
+        } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+            writeUnauthorized(response, "Token expired");
+            return;
+        } catch (Exception ex) {
+            writeUnauthorized(response, "Invalid token");
+            return;
         }
 
-        if (
+        String email = claims.getSubject();
 
-                email != null
-
-                &&
-
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication()
-
-                        == null
-
-        ) {
-
+        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
+                // Single DB lookup, reused for the force-logout check and authorities.
+                User dbUser = userDetailsService.loadUser(email);
+                if (dbUser == null) {
+                    writeUnauthorized(response, "Invalid token");
+                    return;
+                }
 
-                UserDetails userDetails =
+                // Reject tokens for accounts that have since been disabled.
+                if (!Boolean.TRUE.equals(dbUser.getEnabled())) {
+                    writeUnauthorized(response, "Account disabled");
+                    return;
+                }
 
-                        userDetailsService
-                                .loadUserByUsername(
-                                        email
-                                );
-
-                // Check force-logout: if token was issued before lastLogoutAt, reject it
-                io.jsonwebtoken.Claims claims = jwtUtil.extractClaims(token);
+                // Force-logout: reject tokens issued before the user's last logout.
                 Date issuedAt = claims.getIssuedAt();
-                com.fintwin.model.User dbUser = ((com.fintwin.security.CustomUserDetailsService) userDetailsService).loadUser(email);
-                if (dbUser != null && dbUser.getLastLogoutAt() != null && issuedAt != null) {
-                    LocalDateTime tokenIssuedAt = issuedAt.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+                if (dbUser.getLastLogoutAt() != null && issuedAt != null) {
+                    LocalDateTime tokenIssuedAt = issuedAt.toInstant()
+                            .atZone(ZoneId.systemDefault()).toLocalDateTime();
                     if (tokenIssuedAt.isBefore(dbUser.getLastLogoutAt())) {
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.getWriter().write("Session invalidated");
+                        writeUnauthorized(response, "Session invalidated");
                         return;
                     }
                 }
 
-                // Expose impersonation context so audit logs can attribute actions to the admin.
+                // Expose impersonation context so audit logs attribute to the admin.
                 String impBy = (String) claims.get("imp_by");
                 if (impBy != null) {
                     request.setAttribute("imp_by", impBy);
                 }
 
-                if (
+                UserDetails userDetails = userDetailsService.buildUserDetails(dbUser);
 
-                        jwtUtil.validateToken(
-                                token
-                        )
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request));
 
-                ) {
+                SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                    UsernamePasswordAuthenticationToken
-                            authToken =
-
-                            new UsernamePasswordAuthenticationToken(
-
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-
-                            );
-
-                    authToken.setDetails(
-
-                            new WebAuthenticationDetailsSource()
-
-                                    .buildDetails(
-                                            request
-                                    )
-                    );
-
-                    SecurityContextHolder
-
-                            .getContext()
-
-                            .setAuthentication(
-                                    authToken
-                            );
-                }
-
-            } catch (
-
-                    UsernameNotFoundException ex
-
-            ) {
-
-                response.setStatus(
-                        HttpServletResponse.SC_UNAUTHORIZED
-                );
-
-                response.getWriter().write(
-                        "User Not Found"
-                );
-
-                return;
+                log.debug("JWT authenticated: {} {}", request.getMethod(), request.getRequestURI());
 
             } catch (Exception ex) {
-
-                response.setStatus(
-                        HttpServletResponse.SC_UNAUTHORIZED
-                );
-
-                response.getWriter().write(
-                        "Authentication Failed"
-                );
-
+                writeUnauthorized(response, "Authentication failed");
                 return;
             }
         }
 
-        filterChain.doFilter(
-                request,
-                response
-        );
+        filterChain.doFilter(request, response);
+    }
+
+    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
     }
 }

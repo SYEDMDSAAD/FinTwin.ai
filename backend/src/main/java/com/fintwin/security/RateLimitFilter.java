@@ -58,6 +58,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    // Comma-separated list of proxy addresses/prefixes whose X-Forwarded-For header
+    // we trust. Empty (default) = trust nothing, always use the socket peer address.
+    // Entries ending in '.' are treated as prefixes (e.g. "10.0." matches 10.0.x.x).
+    @Value("${security.trusted-proxies:}")
+    private String trustedProxiesRaw;
+
+    private java.util.List<String> trustedProxies = java.util.List.of();
+
     // Lazy JWT key — extracted from the bearer token for per-user limiting
     private volatile SecretKey jwtKey;
 
@@ -73,6 +81,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
     void init() {
         jwtKey = new SecretKeySpec(
                 jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
+
+        if (trustedProxiesRaw != null && !trustedProxiesRaw.isBlank()) {
+            trustedProxies = java.util.Arrays.stream(trustedProxiesRaw.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            log.info("RateLimitFilter: trusting X-Forwarded-For from proxies {}", trustedProxies);
+        } else {
+            log.info("RateLimitFilter: no security.trusted-proxies set — "
+                    + "X-Forwarded-For is ignored, using socket peer address only");
+        }
 
         if (redisUrl != null && !redisUrl.isBlank()) {
             try {
@@ -234,6 +253,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String getClientIp(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
+        // Only honour the client-supplied X-Forwarded-For when the request actually
+        // came from a configured, trusted proxy. Otherwise the header is forgeable
+        // and would let a caller rotate their apparent IP to evade rate limits/blocks.
         if (isTrustedProxy(remoteAddr)) {
             String forwarded = request.getHeader("X-Forwarded-For");
             if (forwarded != null && !forwarded.isBlank())
@@ -244,10 +266,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private boolean isTrustedProxy(String addr) {
         if (addr == null) return false;
-        return addr.equals("127.0.0.1")
-                || addr.equals("::1")
-                || addr.startsWith("172.")
-                || addr.startsWith("10.")
-                || addr.startsWith("192.168.");
+        for (String entry : trustedProxies) {
+            if (entry.endsWith(".") ? addr.startsWith(entry) : addr.equals(entry)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -3,13 +3,24 @@ package com.fintwin.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // Typed application exceptions carry their own status — handled before the
+    // generic RuntimeException fallback below. New code should throw these.
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<?> handleApiException(ApiException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.status(ex.getStatus()).body(error);
+    }
 
     @ExceptionHandler(
         MethodArgumentNotValidException.class
@@ -37,6 +48,25 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(errors);
     }
+        @ExceptionHandler(HttpMessageNotReadableException.class)
+        public ResponseEntity<?> handleUnreadableBody(HttpMessageNotReadableException ex) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Malformed or missing request body");
+                return ResponseEntity.badRequest().body(error);
+        }
+
+        @ExceptionHandler(DataIntegrityViolationException.class)
+        public ResponseEntity<?> handleDataIntegrity(DataIntegrityViolationException ex) {
+                Map<String, String> error = new HashMap<>();
+                String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+                if (msg.contains("email")) {
+                        error.put("error", "An account with this email already exists");
+                        return ResponseEntity.status(409).body(error);
+                }
+                error.put("error", "A database constraint was violated");
+                return ResponseEntity.status(409).body(error);
+        }
+
         @ExceptionHandler(IllegalArgumentException.class)
         public ResponseEntity<?> handleIllegalArgument(
                 IllegalArgumentException ex
