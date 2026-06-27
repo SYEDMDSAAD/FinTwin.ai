@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.config.FinTwinMetrics;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Transaction;
 import com.fintwin.repository.TransactionRepository;
 import com.opencsv.CSVReader;
@@ -103,7 +104,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         try (CSVReader reader = new CSVReader(
@@ -177,7 +178,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         String cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1).toString();
@@ -213,7 +214,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         Transaction transaction = parserService.parseExpense(text);
@@ -273,7 +274,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         Transaction transaction = parserService.parseExpense(text);
@@ -301,7 +302,7 @@ public class TransactionService {
 
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Transaction t = new Transaction();
         t.setDate(date != null && !date.isBlank() ? date : LocalDate.now().toString());
@@ -340,7 +341,7 @@ public class TransactionService {
 
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Transaction> toSave = new ArrayList<>();
 
@@ -421,7 +422,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         try {

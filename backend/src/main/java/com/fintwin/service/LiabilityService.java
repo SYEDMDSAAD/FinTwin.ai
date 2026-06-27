@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Liability;
 import com.fintwin.model.User;
 import com.fintwin.repository.LiabilityRepository;
@@ -51,7 +52,7 @@ public class LiabilityService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Liability liability = liabilityRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Liability not found"));
+                .orElseThrow(() -> new NotFoundException("Liability not found"));
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {
@@ -74,7 +75,7 @@ public class LiabilityService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Liability liability = liabilityRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Liability not found"));
+                .orElseThrow(() -> new NotFoundException("Liability not found"));
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {

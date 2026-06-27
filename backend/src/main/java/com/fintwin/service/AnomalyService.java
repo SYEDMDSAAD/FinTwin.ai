@@ -2,6 +2,7 @@ package com.fintwin.service;
 
 import com.fintwin.dto.AnomalyDTO;
 import com.fintwin.dto.DismissAnomalyRequest;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.DismissedAnomalyPattern;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
@@ -51,7 +52,7 @@ public class AnomalyService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Set<String> dismissed = dismissedRepository.findByUser(user).stream()
                 .map(p -> p.getAnomalyType() + "|" + (p.getMerchant() != null ? p.getMerchant() : ""))

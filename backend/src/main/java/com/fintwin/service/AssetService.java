@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Asset;
 import com.fintwin.model.User;
 import com.fintwin.repository.AssetRepository;
@@ -50,7 +51,7 @@ public class AssetService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Asset asset = assetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
+                .orElseThrow(() -> new NotFoundException("Asset not found"));
 
         // FIXED: Long.equals boxing bug
         if (asset.getUser().getId().longValue()
@@ -74,7 +75,7 @@ public class AssetService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Asset asset = assetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
+                .orElseThrow(() -> new NotFoundException("Asset not found"));
 
         if (asset.getUser().getId().longValue()
         != user.getId().longValue()) {

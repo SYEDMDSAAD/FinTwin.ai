@@ -79,6 +79,6 @@ public class TicketService {
 
     private SupportTicket findOrThrow(Long id) {
         return ticketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ticket not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Ticket not found: " + id));
     }
 }

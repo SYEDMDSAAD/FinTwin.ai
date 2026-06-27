@@ -167,7 +167,7 @@ public class InvestmentService {
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding updated")
     public InvestmentDTO update(Long id, Investment updated) {
         User user = currentUser();
-        Investment inv = repo.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
         if (!inv.getUser().getId().equals(user.getId())) throw new org.springframework.security.access.AccessDeniedException("Access denied");
 
         if (updated.getName()           != null) inv.setName(updated.getName());
