@@ -30,7 +30,9 @@ public class AdminBootstrapController {
 
         if (adminKey == null || adminKey.isBlank())
             return ResponseEntity.status(503).body("Admin bootstrap is not configured");
-        if (!adminKey.equals(key))
+        if (key == null || !java.security.MessageDigest.isEqual(
+                adminKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                key.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
             return ResponseEntity.status(403).body("Invalid admin key");
 
         String result = adminService.promoteBootstrap(body.get("email"));

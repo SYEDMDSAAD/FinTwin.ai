@@ -43,12 +43,10 @@ public class JwtFilter extends OncePerRequestFilter {
                 email = jwtUtil.extractEmail(token);
                 log.debug("JWT authenticated: {} {}", request.getMethod(), request.getRequestURI());
             } catch (io.jsonwebtoken.ExpiredJwtException ex) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("JWT Token Expired");
+                writeUnauthorized(response, "Token expired");
                 return;
             } catch (Exception ex) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Invalid JWT Token");
+                writeUnauthorized(response, "Invalid token");
                 return;
             }
         }
@@ -58,14 +56,21 @@ public class JwtFilter extends OncePerRequestFilter {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
                 io.jsonwebtoken.Claims claims = jwtUtil.extractClaims(token);
+
+                // Reject 2FA-pending temp tokens — they may only be exchanged at
+                // /2fa/login, never used as access tokens (else 2FA is bypassable).
+                if ("2fa_pending".equals(claims.get("type"))) {
+                    writeUnauthorized(response, "Invalid token");
+                    return;
+                }
+
                 Date issuedAt = claims.getIssuedAt();
                 User dbUser = userDetailsService.loadUser(email);
 
                 if (dbUser != null && dbUser.getLastLogoutAt() != null && issuedAt != null) {
                     LocalDateTime tokenIssuedAt = issuedAt.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
                     if (tokenIssuedAt.isBefore(dbUser.getLastLogoutAt())) {
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.getWriter().write("Session invalidated");
+                        writeUnauthorized(response, "Session invalidated");
                         return;
                     }
                 }
@@ -83,16 +88,20 @@ public class JwtFilter extends OncePerRequestFilter {
                 }
 
             } catch (UsernameNotFoundException ex) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("User Not Found");
+                writeUnauthorized(response, "Invalid token");
                 return;
             } catch (Exception ex) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Authentication Failed");
+                writeUnauthorized(response, "Authentication failed");
                 return;
             }
         }
 
         chain.doFilter(request, response);
+    }
+
+    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
     }
 }
