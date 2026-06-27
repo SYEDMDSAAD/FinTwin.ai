@@ -1,0 +1,66 @@
+# Proactive dependency updates. Dependabot opens PRs when newer (or security-fixed)
+# versions are available, so CVE remediation doesn't depend on a manual review pass.
+version: 2
+updates:
+  # ── Java / Maven ─────────────────────────────────────────────────────────────
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-maven:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: maven
+    directory: /identity-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      identity-maven:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # ── Frontend / npm ───────────────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # ── AI service / pip ─────────────────────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: /ai-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # ── GitHub Actions ───────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # ── Docker base images ───────────────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /identity-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /ai-service
+    schedule:
+      interval: weekly
