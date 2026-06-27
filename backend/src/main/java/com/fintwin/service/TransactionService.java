@@ -33,6 +33,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import jakarta.annotation.PostConstruct;
 
 @Service
 public class TransactionService {
@@ -68,6 +71,17 @@ public class TransactionService {
     @Autowired
     @Qualifier("aiRestTemplate")
     private RestTemplate aiRestTemplate;
+
+    // Used to run multi-write DB work in a tight transaction so blocking external
+    // calls (SMS/AI) can happen AFTER commit rather than holding a DB connection.
+    @Autowired
+    private PlatformTransactionManager txManager;
+    private TransactionTemplate txTemplate;
+
+    @PostConstruct
+    void initTxTemplate() {
+        this.txTemplate = new TransactionTemplate(txManager);
+    }
 
     // =========================
     // UPLOAD CSV
@@ -232,9 +246,14 @@ public class TransactionService {
 
         transaction.setUser(user);
 
-        Transaction saved = repository.save(transaction);
+        // Persist transaction + score snapshot atomically; fire the SMS alert AFTER
+        // commit so the blocking network call never holds a DB connection open.
+        Transaction saved = txTemplate.execute(status -> {
+            Transaction s = repository.save(transaction);
+            profileService.saveScoreSnapshot(user);
+            return s;
+        });
         metrics.transactionsCreated.increment();
-        profileService.saveScoreSnapshot(user);
 
         if (user.getPhone() != null && Boolean.TRUE.equals(user.getPhoneVerified())) {
             smsService.sendTransactionAlert(user.getPhone(), saved.getAmount(),
@@ -483,10 +502,13 @@ public class TransactionService {
 
             transaction.setUser(user);
 
-            Transaction saved = repository.save(transaction);
-            profileService.saveScoreSnapshot(user);
-
-            return saved;
+            // OCR call already completed above (outside any tx). Persist the result
+            // + score snapshot atomically.
+            return txTemplate.execute(status -> {
+                Transaction s = repository.save(transaction);
+                profileService.saveScoreSnapshot(user);
+                return s;
+            });
 
         } catch (RuntimeException e) {
             throw e;

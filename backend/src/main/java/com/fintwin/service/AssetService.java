@@ -23,6 +23,10 @@ public class AssetService {
     @Audited(action = "WRITE", resource = "assets", description = "Asset created")
     public Asset createAsset(Asset asset) {
 
+        // Prevent mass-assignment: a client-supplied id would turn save() into a
+        // merge and could overwrite another user's row. Always create a fresh row.
+        asset.setId(null);
+
         if (asset.getName() == null || asset.getName().isBlank()) {
             throw new IllegalArgumentException("Asset name required");
         }

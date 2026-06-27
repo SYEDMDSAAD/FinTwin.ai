@@ -24,6 +24,10 @@ public class LiabilityService {
     @Audited(action = "WRITE", resource = "liabilities", description = "Liability created")
     public Liability createLiability(Liability liability) {
 
+        // Prevent mass-assignment: a client-supplied id would turn save() into a
+        // merge and could overwrite another user's row. Always create a fresh row.
+        liability.setId(null);
+
         if (liability.getName() == null || liability.getName().isBlank()) {
             throw new IllegalArgumentException("Liability name required");
         }

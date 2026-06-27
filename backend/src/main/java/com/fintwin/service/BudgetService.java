@@ -50,6 +50,9 @@ public class BudgetService {
     @Audited(action = "WRITE", resource = "budgets", description = "Budget category created")
     public Budget createBudget(Budget budget) {
 
+        // Prevent mass-assignment via a client-supplied id (would merge, not insert).
+        budget.setId(null);
+
         String email = SecurityUtils.getCurrentUserEmail();
 
         User user = userRepository

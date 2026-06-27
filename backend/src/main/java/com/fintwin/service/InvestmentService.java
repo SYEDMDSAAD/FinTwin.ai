@@ -159,6 +159,8 @@ public class InvestmentService {
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding added")
     public InvestmentDTO add(Investment investment) {
+        // Prevent mass-assignment via a client-supplied id (would merge, not insert).
+        investment.setId(null);
         investment.setUser(currentUser());
         return InvestmentDTO.from(repo.save(investment));
     }
