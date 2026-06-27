@@ -14,6 +14,10 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, identity-service]
 
     steps:
       - name: Checkout
@@ -34,11 +38,10 @@ jobs:
           restore-keys: owasp-nvd-
 
       - name: Run OWASP dependency check
-        working-directory: backend
+        working-directory: ${{ matrix.service }}
         run: |
           mvn org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=9 \
-            -DsuppressionFile=.owasp-suppressions.xml \
             -Dformats=HTML,SARIF \
             -q || true
 
@@ -46,15 +49,16 @@ jobs:
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: backend/target/dependency-check-report.sarif
+          sarif_file: ${{ matrix.service }}/target/dependency-check-report.sarif
+          category: owasp-${{ matrix.service }}
         continue-on-error: true
 
       - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: owasp-dependency-report
-          path: backend/target/dependency-check-report.html
+          name: owasp-dependency-report-${{ matrix.service }}
+          path: ${{ matrix.service }}/target/dependency-check-report.html
           retention-days: 30
 
   trivy-scan:
@@ -65,7 +69,7 @@ jobs:
       security-events: write
     strategy:
       matrix:
-        service: [backend, frontend, ai-service]
+        service: [backend, frontend, ai-service, identity-service]
 
     steps:
       - name: Checkout
