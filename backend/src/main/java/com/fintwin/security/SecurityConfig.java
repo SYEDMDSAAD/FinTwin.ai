@@ -185,8 +185,12 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
-                                // /me requires authentication; must come before the broad auth/** rule
+                                // /me and phone OTP require authentication; must come before the broad auth/** rule
                                 .requestMatchers("/api/v1/auth/me")
+                                .authenticated()
+
+                                // Phone OTP endpoints look up the current user — anonymous callers must be rejected here
+                                .requestMatchers("/api/v1/auth/phone/**")
                                 .authenticated()
 
                                 .requestMatchers(
