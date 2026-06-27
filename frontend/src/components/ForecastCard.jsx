@@ -315,7 +315,7 @@ function ForecastCard({
 
                         <LineChart
                             data={chartData}
-                            margin={{ top: 10, right: 20, left: 80, bottom: 0 }}
+                            margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
                         >
 
                             <XAxis
@@ -323,7 +323,7 @@ function ForecastCard({
                             />
 
                             <YAxis
-                                width={70}
+                                width={48}
                                 tickFormatter={(value) => {
                                     if (value >= 100000) return "₹" + (value / 100000).toFixed(1) + "L";
                                     if (value >= 1000) return "₹" + (value / 1000).toFixed(0) + "k";

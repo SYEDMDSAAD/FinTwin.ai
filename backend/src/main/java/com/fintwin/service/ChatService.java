@@ -2,6 +2,7 @@ package com.fintwin.service;
 
 import com.fintwin.ai.AIProvider;
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.config.FinTwinMetrics;
 import com.fintwin.dto.FinancialSummaryDTO;
 import com.fintwin.model.ChatHistory;
@@ -101,7 +102,7 @@ public class ChatService {
 
     private User resolveCurrentUser() {
         return userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private void persistExchange(User user, String message, String reply) {

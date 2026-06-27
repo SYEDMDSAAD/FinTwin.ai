@@ -32,9 +32,11 @@ function NetWorthSection({ netWorth, assets, liabilities }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
         .nw-section { font-family: 'DM Sans', system-ui, sans-serif; margin-bottom: 32px; }
-        .nw-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 22px; position: relative; overflow: hidden; transition: all 0.25s; }
+        .nw-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; transition: all 0.25s; }
         .nw-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
         .nw-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }
+        .nw-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        @media (max-width: 640px) { .nw-stats-grid { grid-template-columns: 1fr 1fr; } .nw-card { padding: 14px; } }
       `}</style>
 
       <div className="nw-section">
@@ -83,7 +85,7 @@ function NetWorthSection({ netWorth, assets, liabilities }) {
         </div>
 
         {/* 3 stat cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div className="nw-stats-grid">
           {[
             { label: "TOTAL ASSETS", value: totalAssets, color: "#4ade80", icon: <TrendingUp size={14} color="#4ade80" />, duration: 900 },
             { label: "SAVINGS", value: savings, color: "#22d3ee", icon: <Wallet size={14} color="#22d3ee" />, duration: 1050 },
@@ -95,7 +97,7 @@ function NetWorthSection({ netWorth, assets, liabilities }) {
                 <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>{s.label}</span>
                 <div style={{ width: 26, height: 26, borderRadius: 7, background: s.color + "18", border: `1px solid ${s.color}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ fontSize: "clamp(14px, 3.5vw, 22px)", fontWeight: 800, color: s.color, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
                 <AnimatedNumber value={s.value} duration={s.duration} />
               </div>
             </div>

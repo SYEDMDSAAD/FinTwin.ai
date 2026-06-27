@@ -42,12 +42,12 @@ function InvestmentsPage() {
             </div>
 
             {/* Tab bar */}
-            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/10 w-fit">
+            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/10 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                 {TABS.map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                             activeTab === tab
                                 ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                                 : "text-zinc-400 hover:text-zinc-200"

@@ -1,7 +1,7 @@
 package com.fintwin.controller;
 
 import com.fintwin.dto.GoalRequestDTO;
-import com.fintwin.model.FinancialGoal;
+import com.fintwin.dto.FinancialGoalDTO;
 import com.fintwin.service.GoalPlannerService;
 
 import jakarta.validation.Valid;
@@ -26,16 +26,14 @@ public class FinancialGoalController {
 
     @PostMapping
 
-    public FinancialGoal createGoal(
+    public FinancialGoalDTO createGoal(
 
         @Valid @RequestBody
         GoalRequestDTO dto
 
     ) {
 
-        return goalService.createGoal(
-            dto
-        );
+        return FinancialGoalDTO.from(goalService.createGoal(dto));
     }
 
     // =====================================
@@ -44,10 +42,12 @@ public class FinancialGoalController {
 
     @GetMapping
 
-    public List<FinancialGoal>
+    public List<FinancialGoalDTO>
     getGoals() {
 
-        return goalService.getGoals();
+        return goalService.getGoals().stream()
+                .map(FinancialGoalDTO::from)
+                .toList();
     }
 
     // =====================================
@@ -79,19 +79,17 @@ public class FinancialGoalController {
 
     @PostMapping("/{id}/regenerate")
 
-    public FinancialGoal regenerateGoal(
+    public FinancialGoalDTO regenerateGoal(
 
         @PathVariable Long id
 
     ) {
 
-        return goalService.regenerateGoal(
-            id
-        );
+        return FinancialGoalDTO.from(goalService.regenerateGoal(id));
     }
     @PutMapping("/{id}")
 
-    public FinancialGoal updateGoal(
+    public FinancialGoalDTO updateGoal(
 
             @PathVariable Long id,
 
@@ -99,9 +97,6 @@ public class FinancialGoalController {
 
     ) {
 
-        return goalService.updateGoal(
-                id,
-                dto
-        );
+        return FinancialGoalDTO.from(goalService.updateGoal(id, dto));
     }
 }

@@ -2,6 +2,7 @@ package com.fintwin.service;
 
 import com.fintwin.dto.BudgetStatusDTO;
 import com.fintwin.dto.FinancialScoreDTO;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.FinancialScoreDTO.FactorDTO;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
@@ -52,7 +53,7 @@ public class FinancialScoreService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Transaction> txns = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 

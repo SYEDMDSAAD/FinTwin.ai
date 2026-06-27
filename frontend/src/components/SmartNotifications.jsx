@@ -384,7 +384,7 @@ function SmartNotifications({
 
                                     </div>
 
-                                    <div>
+                                    <div className="pr-8">
 
                                         <p
                                             className="

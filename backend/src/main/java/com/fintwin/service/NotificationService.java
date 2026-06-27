@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.NotificationDTO;
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Budget;
 import com.fintwin.model.FinancialGoal;
 import com.fintwin.model.Transaction;
@@ -43,7 +45,7 @@ public class NotificationService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Transaction> transactions = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
         List<Budget> budgets = budgetRepository.findByUser(user);
@@ -200,12 +202,12 @@ public class NotificationService {
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void deleteNotification(int index) {
-        if (index < 0) throw new RuntimeException("Invalid notification index");
+        if (index < 0) throw new BadRequestException("Invalid notification index");
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void markAsRead(int index) {
-        if (index < 0) throw new RuntimeException("Invalid notification index");
+        if (index < 0) throw new BadRequestException("Invalid notification index");
     }
 
     private String fmt(long v)   { return String.format("%,d", v); }

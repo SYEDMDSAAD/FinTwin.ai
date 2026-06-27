@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Asset;
 import com.fintwin.model.User;
 import com.fintwin.repository.AssetRepository;
@@ -21,6 +22,10 @@ public class AssetService {
     @PreAuthorize("hasAuthority('WRITE_OWN_ASSETS')")
     @Audited(action = "WRITE", resource = "assets", description = "Asset created")
     public Asset createAsset(Asset asset) {
+
+        // Prevent mass-assignment: a client-supplied id would turn save() into a
+        // merge and could overwrite another user's row. Always create a fresh row.
+        asset.setId(null);
 
         if (asset.getName() == null || asset.getName().isBlank()) {
             throw new IllegalArgumentException("Asset name required");
@@ -50,7 +55,7 @@ public class AssetService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Asset asset = assetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
+                .orElseThrow(() -> new NotFoundException("Asset not found"));
 
         // FIXED: Long.equals boxing bug
         if (asset.getUser().getId().longValue()
@@ -74,7 +79,7 @@ public class AssetService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Asset asset = assetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
+                .orElseThrow(() -> new NotFoundException("Asset not found"));
 
         if (asset.getUser().getId().longValue()
         != user.getId().longValue()) {

@@ -1,11 +1,10 @@
 package com.fintwin.controller;
 
-import com.fintwin.model.Transaction;
 import com.fintwin.service.ChatService;
 import com.fintwin.service.TransactionService;
 import com.fintwin.dto.ExpenseRequest;
 import com.fintwin.dto.ChatRequestDTO;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fintwin.dto.TransactionDTO;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -38,31 +37,33 @@ public class TransactionController {
     }
 
     @GetMapping
-    public List<Transaction> getTransactions() {
-        return service.getAllTransactions();
+    public List<TransactionDTO> getTransactions() {
+        return service.getAllTransactions().stream()
+                .map(TransactionDTO::from)
+                .toList();
     }
 
     @PostMapping("/expense")
-        public Transaction addExpense(
+        public TransactionDTO addExpense(
                 @Valid
                 @RequestBody
                 ExpenseRequest request
         ) {
 
-        return service.addExpenseByText(
-                request.getText()
+        return TransactionDTO.from(
+                service.addExpenseByText(request.getText())
         );
     }
 
     @PostMapping("/income")
-        public Transaction addIncome(
+        public TransactionDTO addIncome(
                 @Valid
                 @RequestBody
                 ExpenseRequest request
         ) {
 
-        return service.addIncomeByText(
-                request.getText()
+        return TransactionDTO.from(
+                service.addIncomeByText(request.getText())
         );
     }
 
@@ -74,23 +75,23 @@ public class TransactionController {
     }
 
     @PostMapping("/manual")
-    public Transaction addManual(@RequestBody Map<String, Object> body) {
+    public TransactionDTO addManual(@RequestBody Map<String, Object> body) {
         String date     = (String) body.get("date");
         String merchant = (String) body.get("merchant");
         Double amount   = body.get("amount") instanceof Number
                 ? ((Number) body.get("amount")).doubleValue() : 0.0;
         String category = (String) body.get("category");
-        return service.addManualTransaction(date, merchant, amount, category);
+        return TransactionDTO.from(
+                service.addManualTransaction(date, merchant, amount, category));
     }
 
     @PostMapping("/upload-screenshot")
-
-    public Transaction uploadScreenshot(
+    public TransactionDTO uploadScreenshot(
             @RequestParam("file")
             MultipartFile file
     ) {
 
-        return service.uploadScreenshot(file);
+        return TransactionDTO.from(service.uploadScreenshot(file));
     }
 
     @PostMapping("/chat")

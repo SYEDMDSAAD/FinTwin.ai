@@ -4,7 +4,7 @@ import com.fintwin.dto.ProfileDTO;
 import com.fintwin.service.ProfileService;
 import com.fintwin.dto.ChangePasswordDTO;
 import com.fintwin.dto.UpdateProfileDTO;
-import com.fintwin.model.FinancialScoreHistory;
+import com.fintwin.dto.ScoreHistoryDTO;
 
 import java.util.List;
 import java.util.Map;
@@ -64,9 +64,11 @@ public class ProfileController {
         }
 
         @GetMapping("/score-history")
-        public List<FinancialScoreHistory> getHistory() {
+        public List<ScoreHistoryDTO> getHistory() {
 
-        return profileService.getScoreHistory();
+        return profileService.getScoreHistory().stream()
+                .map(ScoreHistoryDTO::from)
+                .toList();
         }
 
         // GDPR Article 20 — right to data portability

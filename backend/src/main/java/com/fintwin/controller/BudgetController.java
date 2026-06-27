@@ -1,6 +1,7 @@
 package com.fintwin.controller;
 
 import com.fintwin.dto.BudgetStatusDTO;
+import com.fintwin.dto.BudgetDTO;
 
 import com.fintwin.model.Budget;
 
@@ -35,14 +36,14 @@ public class BudgetController {
 
     @PostMapping
 
-    public Budget createBudget(
+    public BudgetDTO createBudget(
 
         @RequestBody Budget budget
 
     ) {
 
-        return budgetService
-            .createBudget(budget);
+        return BudgetDTO.from(
+            budgetService.createBudget(budget));
     }
 
     // =========================

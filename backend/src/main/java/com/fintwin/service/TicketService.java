@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.SupportTicket;
 import com.fintwin.repository.SupportTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,12 +73,12 @@ public class TicketService {
 
     public void delete(Long id) {
         if (!ticketRepository.existsById(id))
-            throw new RuntimeException("Ticket not found: " + id);
+            throw new NotFoundException("Ticket not found: " + id);
         ticketRepository.deleteById(id);
     }
 
     private SupportTicket findOrThrow(Long id) {
         return ticketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ticket not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Ticket not found: " + id));
     }
 }

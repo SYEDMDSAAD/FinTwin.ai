@@ -28,6 +28,15 @@ const CSS = `
   .fade-up-1 { animation: fadeUp 0.4s ease both; }
   .fade-up-2 { animation: fadeUp 0.4s 0.08s ease both; }
   .fade-up-3 { animation: fadeUp 0.4s 0.16s ease both; }
+  .nwp-stats { display: grid; gap: 12px; margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .nwp-stat-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  @media (max-width: 640px) {
+    .nwp-stats { grid-template-columns: repeat(2, 1fr); }
+    .nwp-stat-value { font-size: 15px; }
+    .nwp-card { padding: 16px; }
+    .nwp-row { flex-wrap: wrap; gap: 6px; }
+    .nwp-row > div:last-child { font-size: 12px; }
+  }
 `;
 
 function AnimatedNumber({ value = 0, duration = 1100 }) {
@@ -116,7 +125,7 @@ function NetWorthPage() {
         </div>
 
         {/* 5 summary cards */}
-        <div className="fade-up-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
+        <div className="nwp-stats fade-up-2">
           {[
             { label: "NET WORTH",   value: Math.abs(netWorth.netWorth), color: "#a78bfa", icon: <Wallet size={14} color="#a78bfa" />, dur: 1000 },
             { label: "TOTAL ASSETS",value: totalAssets,                  color: "#4ade80", icon: <TrendingUp size={14} color="#4ade80" />, dur: 900 },
@@ -135,7 +144,7 @@ function NetWorthPage() {
                 <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>{s.label}</span>
                 <div style={{ width: 26, height: 26, borderRadius: 7, background: s.color + "18", border: `1px solid ${s.color}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: s.color, fontVariantNumeric: "tabular-nums" }}>
+              <div className="nwp-stat-value" style={{ color: s.color }}>
                 <AnimatedNumber value={s.value} duration={s.dur} />
               </div>
               {s.label === "PORTFOLIO" && portfolioPnl !== 0 && (

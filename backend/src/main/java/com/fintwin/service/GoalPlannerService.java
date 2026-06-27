@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.GoalRequestDTO;
 import com.fintwin.model.FinancialGoal;
 import com.fintwin.model.Transaction;
@@ -10,6 +12,8 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +27,8 @@ import java.util.*;
 
 @Service
 public class GoalPlannerService {
+
+    private static final Logger log = LoggerFactory.getLogger(GoalPlannerService.class);
 
     @Autowired
     private FinancialGoalRepository goalRepository;
@@ -62,7 +68,7 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -130,7 +136,7 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         List<FinancialGoal> goals = goalRepository.findByUser(user);
@@ -175,18 +181,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -242,18 +248,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         goalRepository.delete(goal);
@@ -275,18 +281,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -470,7 +476,7 @@ public class GoalPlannerService {
             return response.get("plan").toString();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("AI goal-plan generation failed, using fallback plan", e);
             return buildFallbackPlan(dto, monthlyTarget);
         }
     }

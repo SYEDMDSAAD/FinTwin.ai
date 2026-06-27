@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.InvestmentDTO;
 import com.fintwin.dto.PortfolioSummaryDTO;
 import com.fintwin.model.Investment;
@@ -157,6 +159,8 @@ public class InvestmentService {
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding added")
     public InvestmentDTO add(Investment investment) {
+        // Prevent mass-assignment via a client-supplied id (would merge, not insert).
+        investment.setId(null);
         investment.setUser(currentUser());
         return InvestmentDTO.from(repo.save(investment));
     }
@@ -165,7 +169,7 @@ public class InvestmentService {
     @Audited(action = "WRITE", resource = "portfolio", description = "Investment holding updated")
     public InvestmentDTO update(Long id, Investment updated) {
         User user = currentUser();
-        Investment inv = repo.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
         if (!inv.getUser().getId().equals(user.getId())) throw new org.springframework.security.access.AccessDeniedException("Access denied");
 
         if (updated.getName()           != null) inv.setName(updated.getName());
@@ -241,8 +245,8 @@ public class InvestmentService {
     @Audited(action = "DELETE", resource = "portfolio", description = "Investment holding deleted")
     public void delete(Long id) {
         User user = currentUser();
-        Investment inv = repo.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
-        if (!inv.getUser().getId().equals(user.getId())) throw new RuntimeException("Unauthorized");
+        Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
+        if (!inv.getUser().getId().equals(user.getId())) throw new ForbiddenException("Unauthorized");
         repo.delete(inv);
     }
 

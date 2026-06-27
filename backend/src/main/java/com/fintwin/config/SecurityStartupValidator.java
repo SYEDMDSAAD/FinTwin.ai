@@ -4,7 +4,12 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class SecurityStartupValidator {
@@ -15,6 +20,8 @@ public class SecurityStartupValidator {
     private static final String DEV_JWT =
         "FinTwinSuperSecretJwtKeyForProduction2026SecureKey";
 
+    private final Environment environment;
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -24,24 +31,48 @@ public class SecurityStartupValidator {
     @Value("${ai.service.internal-key}")
     private String internalKey;
 
+    @Value("${admin.key:}")
+    private String adminKey;
+
+    // When true (or when the active profile is "prod"), missing/default secrets
+    // abort startup instead of merely warning. Defaults to false for local dev.
+    @Value("${app.require-secure-config:false}")
+    private boolean requireSecureConfig;
+
+    public SecurityStartupValidator(Environment environment) {
+        this.environment = environment;
+    }
+
     @PostConstruct
     public void validate() {
-        boolean hasWarnings = false;
+        List<String> problems = new ArrayList<>();
 
         if (DEV_JWT.equals(jwtSecret)) {
-            warn("JWT_SECRET is the dev default. Set a random 64-char secret in production.");
-            hasWarnings = true;
+            problems.add("JWT_SECRET is the dev default. Set a random 64-char secret in production.");
         }
         if (encryptionKey == null || encryptionKey.isBlank()) {
-            warn("FINTWIN_ENCRYPTION_KEY is not set. Dev fallback key is in use — ALL PII IS WEAKLY PROTECTED.");
-            hasWarnings = true;
+            problems.add("FINTWIN_ENCRYPTION_KEY is not set. Dev fallback key is in use — ALL PII IS WEAKLY PROTECTED.");
         }
         if (internalKey == null || internalKey.isBlank()) {
-            warn("AI_INTERNAL_KEY is not set. Generate with: openssl rand -hex 32");
-            hasWarnings = true;
+            problems.add("AI_INTERNAL_KEY is not set. Generate with: openssl rand -hex 32");
+        }
+        if (adminKey == null || adminKey.isBlank()) {
+            problems.add("ADMIN_KEY is not set. Admin bootstrap/migration endpoints are unusable until set.");
         }
 
-        if (hasWarnings) {
+        if (!problems.isEmpty()) {
+            problems.forEach(p -> log.warn("[SECURITY] {}", p));
+
+            if (isSecureConfigRequired()) {
+                log.error(BORDER);
+                log.error("  STARTUP ABORTED: insecure configuration in a production profile.");
+                log.error("  Set the missing env vars above before deploying.");
+                log.error(BORDER);
+                throw new IllegalStateException(
+                        "Refusing to start with dev/default security credentials in a production "
+                        + "environment. Offending settings: " + problems);
+            }
+
             log.warn(BORDER);
             log.warn("  SECURITY WARNING: dev credentials detected (see above).");
             log.warn("  Set the missing env vars before deploying to production.");
@@ -52,7 +83,9 @@ public class SecurityStartupValidator {
                  "If upgrading an existing DB, migrate DOUBLE columns to TEXT before starting.");
     }
 
-    private void warn(String msg) {
-        log.warn("[SECURITY] {}", msg);
+    private boolean isSecureConfigRequired() {
+        if (requireSecureConfig) return true;
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(p -> p.equalsIgnoreCase("prod") || p.equalsIgnoreCase("production"));
     }
 }

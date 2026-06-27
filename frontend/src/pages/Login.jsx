@@ -426,7 +426,7 @@ function Login() {
                   <input className="auth-input" style={{ color:inputClr }} type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-                  <button onClick={() => setShowPw(!showPw)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(148,163,184,0.5)", padding:0, display:"flex" }}>
+                  <button onClick={() => setShowPw(!showPw)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(148,163,184,0.5)", padding:0, display:"flex", alignItems:"center" }}>
                     {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                   </button>
                 </div>

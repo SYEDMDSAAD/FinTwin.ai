@@ -1,5 +1,6 @@
 package com.fintwin.controller;
 
+import com.fintwin.dto.AssetDTO;
 import com.fintwin.model.Asset;
 import com.fintwin.service.AssetService;
 
@@ -16,15 +17,17 @@ public class AssetController {
     private AssetService assetService;
 
     @PostMapping
-    public Asset createAsset(
+    public AssetDTO createAsset(
             @RequestBody Asset asset
     ) {
-        return assetService.createAsset(asset);
+        return AssetDTO.from(assetService.createAsset(asset));
     }
 
     @GetMapping
-    public List<Asset> getAssets() {
-        return assetService.getAssets();
+    public List<AssetDTO> getAssets() {
+        return assetService.getAssets().stream()
+                .map(AssetDTO::from)
+                .toList();
     }
 
     @DeleteMapping("/{id}")
@@ -35,7 +38,7 @@ public class AssetController {
     }
 
     @PutMapping("/{id}")
-    public Asset updateAsset(
+    public AssetDTO updateAsset(
 
             @PathVariable Long id,
 
@@ -43,9 +46,6 @@ public class AssetController {
 
     ) {
 
-        return assetService.updateAsset(
-                id,
-                asset
-        );
+        return AssetDTO.from(assetService.updateAsset(id, asset));
     }
 }

@@ -73,6 +73,8 @@ services:
       DDL_AUTO:     validate          # Never auto-alter schema in prod
       DB_POOL_MAX:  ${DB_POOL_MAX:-30}
       SHOW_SQL:     "false"
+      # Abort startup on missing/dev-default secrets (JWT, encryption, admin, AI).
+      APP_REQUIRE_SECURE_CONFIG: "true"
     deploy:
       resources:
         # JVM flag -XX:MaxRAMPercentage=75 → ~576Mi heap inside a 768M container

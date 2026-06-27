@@ -185,8 +185,12 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
-                                // /me requires authentication; must come before the broad auth/** rule
+                                // /me and phone OTP require authentication; must come before the broad auth/** rule
                                 .requestMatchers("/api/v1/auth/me")
+                                .authenticated()
+
+                                // Phone OTP endpoints look up the current user — anonymous callers must be rejected here
+                                .requestMatchers("/api/v1/auth/phone/**")
                                 .authenticated()
 
                                 .requestMatchers(
@@ -214,6 +218,11 @@ public class SecurityConfig {
 
                                 // OpenAPI docs — public in dev, disabled in prod via SWAGGER_ENABLED
                                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                                .permitAll()
+
+                                // Liveness/readiness probes (k8s) and Prometheus scrape must be
+                                // reachable without a JWT. Other actuator endpoints stay secured.
+                                .requestMatchers("/actuator/health/**", "/actuator/prometheus")
                                 .permitAll()
 
                                 // Admin API — requires JWT + ADMIN role

@@ -1,6 +1,9 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ConflictException;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.BudgetStatusDTO;
 import com.fintwin.model.Budget;
 import com.fintwin.model.Transaction;
@@ -47,12 +50,15 @@ public class BudgetService {
     @Audited(action = "WRITE", resource = "budgets", description = "Budget category created")
     public Budget createBudget(Budget budget) {
 
+        // Prevent mass-assignment via a client-supplied id (would merge, not insert).
+        budget.setId(null);
+
         String email = SecurityUtils.getCurrentUserEmail();
 
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         if (budget.getCategory() == null
@@ -78,7 +84,7 @@ public class BudgetService {
                 );
 
         if (alreadyExists) {
-            throw new RuntimeException(
+            throw new ConflictException(
                     "A budget for category '"
                     + budget.getCategory()
                     + "' already exists"
@@ -113,19 +119,19 @@ public class BudgetService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         Budget budget = budgetRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Budget not found")
+                        new NotFoundException("Budget not found")
                 );
 
         // FIXED: Long.equals can have boxing issues — use longValue()
         if (budget.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException(
+            throw new ForbiddenException(
                     "Unauthorized Budget Access"
             );
         }
@@ -152,7 +158,7 @@ public class BudgetService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         List<Budget> budgets = budgetRepository.findByUser(user);

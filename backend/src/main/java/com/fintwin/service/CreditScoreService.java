@@ -2,6 +2,7 @@ package com.fintwin.service;
 
 import com.fintwin.dto.CreditScoreDTO;
 import com.fintwin.dto.CreditScoreDTO.FactorDTO;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
@@ -41,7 +42,7 @@ public class CreditScoreService {
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Transaction> txns = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
         List<Liability>   liabilities = liabilityRepository.findByUser(user);

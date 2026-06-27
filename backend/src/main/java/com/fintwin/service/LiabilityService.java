@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Liability;
 import com.fintwin.model.User;
 import com.fintwin.repository.LiabilityRepository;
@@ -22,6 +23,10 @@ public class LiabilityService {
     @PreAuthorize("hasAuthority('WRITE_OWN_LIABILITIES')")
     @Audited(action = "WRITE", resource = "liabilities", description = "Liability created")
     public Liability createLiability(Liability liability) {
+
+        // Prevent mass-assignment: a client-supplied id would turn save() into a
+        // merge and could overwrite another user's row. Always create a fresh row.
+        liability.setId(null);
 
         if (liability.getName() == null || liability.getName().isBlank()) {
             throw new IllegalArgumentException("Liability name required");
@@ -51,7 +56,7 @@ public class LiabilityService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Liability liability = liabilityRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Liability not found"));
+                .orElseThrow(() -> new NotFoundException("Liability not found"));
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {
@@ -74,7 +79,7 @@ public class LiabilityService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         Liability liability = liabilityRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Liability not found"));
+                .orElseThrow(() -> new NotFoundException("Liability not found"));
 
         if (liability.getUser().getId().longValue()
         != user.getId().longValue()) {

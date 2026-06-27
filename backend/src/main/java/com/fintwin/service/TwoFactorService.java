@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.AuthResponse;
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.JwtUtil;
@@ -41,7 +43,7 @@ public class TwoFactorService {
 
     public Map<String, String> setup(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         GoogleAuthenticatorKey key = gAuth.createCredentials();
         String secret = key.getKey();
@@ -61,13 +63,13 @@ public class TwoFactorService {
 
     public void enable(String email, int code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (user.getTwoFactorSecret() == null) {
-            throw new RuntimeException("2FA not set up. Call setup first.");
+            throw new BadRequestException("2FA not set up. Call setup first.");
         }
         if (!verifyCode(user.getTwoFactorSecret(), code)) {
-            throw new RuntimeException("Invalid verification code");
+            throw new BadRequestException("Invalid verification code");
         }
         user.setTwoFactorEnabled(true);
         userRepository.save(user);
@@ -75,13 +77,13 @@ public class TwoFactorService {
 
     public void disable(String email, int code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (!Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
-            throw new RuntimeException("2FA is not enabled");
+            throw new BadRequestException("2FA is not enabled");
         }
         if (!verifyCode(user.getTwoFactorSecret(), code)) {
-            throw new RuntimeException("Invalid verification code");
+            throw new BadRequestException("Invalid verification code");
         }
         user.setTwoFactorEnabled(false);
         user.setTwoFactorSecret(null);
@@ -94,27 +96,6 @@ public class TwoFactorService {
                 .orElse(false);
     }
 
-    public Map<String, Object> getDebugInfo(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        String secret = user.getTwoFactorSecret();
-        if (secret == null) return Map.of("secret", "NOT SET", "enabled", false);
-        try {
-            byte[] key = base32Decode(secret);
-            long timeStep = System.currentTimeMillis() / 1000L / 30L;
-            int expected  = computeTotp(key, timeStep);
-            long secsLeft = 30 - (System.currentTimeMillis() / 1000L % 30);
-            return Map.of(
-                    "secret", secret,
-                    "expectedCode", String.format("%06d", expected),
-                    "secondsRemaining", secsLeft,
-                    "enabled", Boolean.TRUE.equals(user.getTwoFactorEnabled())
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Debug info failed: " + e.getMessage());
-        }
-    }
-
     public AuthResponse completeTwoFactorLogin(String tempToken, String codeStr) {
         Claims claims = jwtUtil.extractClaims(tempToken);
         if (!"2fa_pending".equals(claims.get("type")))
@@ -124,7 +105,7 @@ public class TwoFactorService {
         if (!verify(email, code))
             throw new SecurityException("Invalid verification code. Check your authenticator app.");
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
         String realToken = jwtUtil.generateToken(email, user.getRole());
@@ -133,7 +114,7 @@ public class TwoFactorService {
 
     public boolean verify(String email, int code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (user.getTwoFactorSecret() == null) return false;
         return verifyCode(user.getTwoFactorSecret(), code);

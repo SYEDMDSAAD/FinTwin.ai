@@ -80,18 +80,7 @@ export default function MarketTicker() {
         .ticker-track:hover { animation-play-state: paused; }
       `}</style>
 
-      {/* Delayed data badge */}
-      <div style={{
-        position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-        display: "flex", alignItems: "center", gap: 5, zIndex: 2,
-        background: "linear-gradient(90deg, var(--bg-base) 60%, transparent)",
-        paddingRight: 16, paddingLeft: 4,
-      }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", display: "inline-block" }} />
-        <span style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", letterSpacing: "0.1em" }}>~15 MIN DELAY</span>
-      </div>
-
-      <div style={{ paddingLeft: 70, overflow: "hidden", width: "100%" }}>
+      <div style={{ paddingLeft: 4, overflow: "hidden", width: "100%" }}>
         <div className="ticker-track" ref={trackRef}>
           {items.map((item, i) => (
             <TickerItem key={i} item={item} />

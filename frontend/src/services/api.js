@@ -2,12 +2,12 @@ import axios from "axios";
 
 // ── Main backend — business data (transactions, dashboard, AI, etc.) ──────────
 const API = axios.create({
-    baseURL: "http://localhost:8080/api/v1"
+    baseURL: "/api/v1"
 });
 
 // ── Identity service — auth, 2FA, tokens ─────────────────────────────────────
 export const identityApi = axios.create({
-    baseURL: "http://localhost:8090/api"
+    baseURL: "/api"
 });
 
 // ── Attach access token to every request ─────────────────────────────────────
@@ -71,7 +71,7 @@ identityApi.interceptors.response.use(
         }
 
         try {
-            const { data } = await axios.post("http://localhost:8090/api/auth/refresh", {
+            const { data } = await axios.post("/api/auth/refresh", {
                 refreshToken,
             });
             localStorage.setItem("token", data.accessToken);

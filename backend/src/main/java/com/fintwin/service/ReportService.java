@@ -45,6 +45,9 @@ import java.util.*;
 @Service
 public class ReportService {
 
+    private static final org.slf4j.Logger log =
+        org.slf4j.LoggerFactory.getLogger(ReportService.class);
+
     private final TransactionRepository
         transactionRepository;
 
@@ -391,7 +394,7 @@ public class ReportService {
 
         } catch (Exception e) {
 
-            e.printStackTrace();
+            log.warn("Weekly report generation failed, returning empty report", e);
 
             WeeklyReportDTO report =
                 new WeeklyReportDTO();
@@ -610,7 +613,7 @@ public class ReportService {
 
             } catch (Exception e) {
 
-                e.printStackTrace();
+                log.error("PDF report generation failed", e);
 
                 return ResponseEntity.internalServerError()
                     .build();

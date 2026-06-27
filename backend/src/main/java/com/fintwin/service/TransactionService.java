@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.config.FinTwinMetrics;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Transaction;
 import com.fintwin.repository.TransactionRepository;
 import com.opencsv.CSVReader;
@@ -32,6 +33,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import jakarta.annotation.PostConstruct;
 
 @Service
 public class TransactionService {
@@ -68,6 +72,17 @@ public class TransactionService {
     @Qualifier("aiRestTemplate")
     private RestTemplate aiRestTemplate;
 
+    // Used to run multi-write DB work in a tight transaction so blocking external
+    // calls (SMS/AI) can happen AFTER commit rather than holding a DB connection.
+    @Autowired
+    private PlatformTransactionManager txManager;
+    private TransactionTemplate txTemplate;
+
+    @PostConstruct
+    void initTxTemplate() {
+        this.txTemplate = new TransactionTemplate(txManager);
+    }
+
     // =========================
     // UPLOAD CSV
     // =========================
@@ -77,12 +92,18 @@ public class TransactionService {
     );
     private static final long MAX_CSV_BYTES = 5 * 1024 * 1024; // 5 MB
 
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic"
+    );
+    private static final long MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
     @Audited(
             action = "UPLOAD",
             resource = "transactions",
             description = "CSV transaction bulk import"
     )
+    @Transactional
     public void uploadCSV(MultipartFile file) {
         String declaredType = file.getContentType();
         if (declaredType == null || !ALLOWED_CSV_TYPES.contains(
@@ -97,7 +118,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         try (CSVReader reader = new CSVReader(
@@ -171,7 +192,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         String cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1).toString();
@@ -207,7 +228,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         Transaction transaction = parserService.parseExpense(text);
@@ -225,9 +246,14 @@ public class TransactionService {
 
         transaction.setUser(user);
 
-        Transaction saved = repository.save(transaction);
+        // Persist transaction + score snapshot atomically; fire the SMS alert AFTER
+        // commit so the blocking network call never holds a DB connection open.
+        Transaction saved = txTemplate.execute(status -> {
+            Transaction s = repository.save(transaction);
+            profileService.saveScoreSnapshot(user);
+            return s;
+        });
         metrics.transactionsCreated.increment();
-        profileService.saveScoreSnapshot(user);
 
         if (user.getPhone() != null && Boolean.TRUE.equals(user.getPhoneVerified())) {
             smsService.sendTransactionAlert(user.getPhone(), saved.getAmount(),
@@ -253,6 +279,7 @@ public class TransactionService {
             resource = "transactions",
             description = "Income transaction created via text"
     )
+    @Transactional
     public Transaction addIncomeByText(String text) {
 
         if (text == null || text.isBlank()) {
@@ -266,7 +293,7 @@ public class TransactionService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         Transaction transaction = parserService.parseExpense(text);
@@ -286,6 +313,7 @@ public class TransactionService {
     // =========================
 
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
     public Transaction addManualTransaction(
             String date, String merchant, Double amount, String category) {
 
@@ -293,7 +321,7 @@ public class TransactionService {
 
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Transaction t = new Transaction();
         t.setDate(date != null && !date.isBlank() ? date : LocalDate.now().toString());
@@ -325,13 +353,14 @@ public class TransactionService {
             resource = "transactions",
             description = "Batch CSV transaction import"
     )
+    @Transactional
     public int importBatch(List<Map<String, Object>> rows) {
 
         String email = SecurityUtils.getCurrentUserEmail();
 
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         List<Transaction> toSave = new ArrayList<>();
 
@@ -397,12 +426,22 @@ public class TransactionService {
             );
         }
 
+        String declaredType = file.getContentType();
+        if (declaredType == null || !ALLOWED_IMAGE_TYPES.contains(
+                declaredType.toLowerCase().split(";")[0].trim())) {
+            throw new IllegalArgumentException(
+                    "Invalid file type '" + declaredType + "'. Only image files are accepted.");
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException("File too large. Maximum image size is 10 MB.");
+        }
+
         String email = SecurityUtils.getCurrentUserEmail();
 
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         try {
@@ -463,10 +502,13 @@ public class TransactionService {
 
             transaction.setUser(user);
 
-            Transaction saved = repository.save(transaction);
-            profileService.saveScoreSnapshot(user);
-
-            return saved;
+            // OCR call already completed above (outside any tx). Persist the result
+            // + score snapshot atomically.
+            return txTemplate.execute(status -> {
+                Transaction s = repository.save(transaction);
+                profileService.saveScoreSnapshot(user);
+                return s;
+            });
 
         } catch (RuntimeException e) {
             throw e;

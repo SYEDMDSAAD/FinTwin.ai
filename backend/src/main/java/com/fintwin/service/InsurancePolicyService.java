@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.InsurancePolicyDTO;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.InsurancePolicy;
 import com.fintwin.model.User;
 import com.fintwin.repository.InsurancePolicyRepository;
@@ -43,7 +44,7 @@ public class InsurancePolicyService {
     public InsurancePolicyDTO update(Long id, InsurancePolicyDTO dto) {
         User user = currentUser();
         InsurancePolicy policy = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Policy not found"));
+                .orElseThrow(() -> new NotFoundException("Policy not found"));
         if (!policy.getUser().getId().equals(user.getId()))
             throw new AccessDeniedException("Access denied");
         applyFields(policy, dto);
@@ -54,7 +55,7 @@ public class InsurancePolicyService {
     public void delete(Long id) {
         User user = currentUser();
         InsurancePolicy policy = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Policy not found"));
+                .orElseThrow(() -> new NotFoundException("Policy not found"));
         if (!policy.getUser().getId().equals(user.getId()))
             throw new AccessDeniedException("Access denied");
         repository.delete(policy);
