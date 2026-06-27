@@ -20,8 +20,23 @@ All three phases have been implemented and the full test suite (48 tests) passes
 | Phase | Items | Status |
 |-------|-------|--------|
 | 1 — Security hardening | C1, C3, H2, M4, M5, M3 | ✅ done (commit `204a128`) |
-| 2 — Auth correctness | C2, H1, M1, M2, M6 | ✅ done |
-| 3 — Architecture maturity | H5, H3, H4, L1 | ✅ done |
+| 2 — Auth correctness | C2, H1, M1, M2, M6 | ✅ done (commit `73575d3`) |
+| 3 — Architecture maturity | H5, H3, H4, L1 | ✅ done (`73575d3` + follow-up) |
+| Follow-up | C3 gate wired, H4 all endpoints, H5 ladder removed | ✅ done |
+
+**Follow-up round (also done):**
+- **C3 gate wired** into `k8s/configmap.yaml` and `docker-compose.prod.yml`
+  (`APP_REQUIRE_SECURE_CONFIG=true`), so the fail-fast check is active in prod.
+- **H4 completed** for all entity-returning endpoints: added `AssetDTO`,
+  `LiabilityDTO`, `BudgetDTO`, `FinancialGoalDTO`, `ScoreHistoryDTO` (plus the
+  earlier `TransactionDTO`). `InvestmentController`/`RoleController` already
+  avoided serializing entities. JSON contracts unchanged.
+- **H5 completed**: all client-error throws across the services migrated to typed
+  exceptions (`Auth`, `Budget`, `Bank`, `Goal`, `Crypto`, `Investment`, `Profile`,
+  `TwoFactor`, `Notification`, `Ticket`, `RoleController`). The string-matching
+  ladder in `GlobalExceptionHandler` has been **removed** — only the typed handler
+  and a generic 500 fallback remain. Genuine upstream/internal failures (email,
+  Setu, exchange APIs, OCR, QR) intentionally stay as 500s.
 
 **Deliberately deferred / partial:**
 - **H3** applied to pure-DB write methods only. Methods with trailing external
@@ -29,12 +44,10 @@ All three phases have been implemented and the full test suite (48 tests) passes
   on purpose: `SmsService`/AI calls are blocking, and wrapping them would hold a DB
   connection across the network call. Making those atomic needs a refactor that
   splits the DB work from the side effect — tracked for a follow-up.
-- **H4** implemented for the transaction endpoints (`TransactionDTO`). Other
-  entity-returning endpoints can follow the same pattern incrementally.
+- Entity **request bodies** (e.g. `@RequestBody Asset`) still bind to JPA entities
+  on create/update — a separate mass-assignment concern beyond H4's response scope.
 - **L2/L3/L4/L5/L6** (EAGER fetch, optimistic locking, flyway pwd default,
   formatting, money-as-double) intentionally left — low value or high churn/risk.
-- The old string-matching ladder in `GlobalExceptionHandler` is retained as a
-  fallback for services not yet migrated to typed exceptions.
 
 ---
 

@@ -80,79 +80,16 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(error);
         }
+        // Fallback for any uncaught RuntimeException. Client-facing errors should be
+        // thrown as ApiException subclasses (handled above) which carry their own
+        // status; anything reaching here is treated as an unexpected server error.
+        // Internal details are never exposed to the client.
         @ExceptionHandler(RuntimeException.class)
-        public ResponseEntity<?> handleRuntime(
-                RuntimeException ex
-        ) {
-
-        Map<String, String> error = new HashMap<>();
-
-        String msg = ex.getMessage();
-
-        if ("Invalid credentials".equals(msg)) {
-                error.put("error", msg);
+        public ResponseEntity<?> handleRuntime(RuntimeException ex) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "An unexpected error occurred");
                 return ResponseEntity
-                        .status(401)
+                        .internalServerError()
                         .body(error);
-        }
-
-        if ("Account has been disabled".equals(msg)) {
-                error.put("error", "ACCOUNT_DISABLED");
-                return ResponseEntity
-                        .status(403)
-                        .body(error);
-        }
-
-        if ("An account with this email already exists".equals(msg)) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(409)
-                        .body(error);
-        }
-
-        if ("No account found with that email address".equals(msg)) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(404)
-                        .body(error);
-        }
-
-        if (msg != null && msg.startsWith("Invalid or expired reset link")) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(400)
-                        .body(error);
-        }
-
-        if ("OTP has expired — please request a new one".equals(msg)
-                || "Incorrect OTP".equals(msg)
-                || "Reset link has expired — please request a new one".equals(msg)) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(400)
-                        .body(error);
-        }
-
-        if ("Google token verification failed".equals(msg)
-                || "Google credential must not be empty".equals(msg)) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(401)
-                        .body(error);
-        }
-
-        if (msg != null && (msg.startsWith("You already have a connected bank account")
-                || msg.startsWith("A bank connection is already in progress"))) {
-                error.put("error", msg);
-                return ResponseEntity
-                        .status(409)
-                        .body(error);
-        }
-
-        // Never expose internal error details to clients
-        error.put("error", "An unexpected error occurred");
-        return ResponseEntity
-                .internalServerError()
-                .body(error);
         }
 }

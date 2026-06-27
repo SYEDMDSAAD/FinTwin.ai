@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.ProfileDTO;
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.ChangePasswordDTO;
 import com.fintwin.dto.UpdateProfileDTO;
 import com.fintwin.model.User;
@@ -68,7 +70,7 @@ public class ProfileService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         long transactionCount = transactionRepository.countByUser(user);
@@ -98,12 +100,12 @@ public class ProfileService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         if (!passwordEncoder.matches(
                 dto.getCurrentPassword(), user.getPassword())) {
-            throw new RuntimeException("Current password is incorrect");
+            throw new BadRequestException("Current password is incorrect");
         }
 
         user.setPassword(
@@ -129,7 +131,7 @@ public class ProfileService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         user.setFullName(dto.getFullName().trim());
@@ -148,7 +150,7 @@ public class ProfileService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         // explicit delete order to respect FK constraints
@@ -214,7 +216,7 @@ public class ProfileService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         return financialScoreHistoryRepository

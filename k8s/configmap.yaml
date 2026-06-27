@@ -30,6 +30,9 @@ data:
   MAIL_ENABLED:     "false"
   MAIL_HOST:        "smtp.gmail.com"
   MAIL_PORT:        "587"
+  # Abort startup if JWT/encryption/admin/AI secrets are missing or dev-defaults.
+  # Keep "true" in every production environment.
+  APP_REQUIRE_SECURE_CONFIG: "true"
 
   # ── Setu ─────────────────────────────────────────────────────────────────────
   SETU_BASE_URL:    "https://fiu-uat.setu.co"

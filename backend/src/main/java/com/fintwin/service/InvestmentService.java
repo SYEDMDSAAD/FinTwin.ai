@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.InvestmentDTO;
 import com.fintwin.dto.PortfolioSummaryDTO;
 import com.fintwin.model.Investment;
@@ -241,8 +243,8 @@ public class InvestmentService {
     @Audited(action = "DELETE", resource = "portfolio", description = "Investment holding deleted")
     public void delete(Long id) {
         User user = currentUser();
-        Investment inv = repo.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
-        if (!inv.getUser().getId().equals(user.getId())) throw new RuntimeException("Unauthorized");
+        Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
+        if (!inv.getUser().getId().equals(user.getId())) throw new ForbiddenException("Unauthorized");
         repo.delete(inv);
     }
 

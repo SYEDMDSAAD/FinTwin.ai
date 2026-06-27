@@ -1,6 +1,9 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.CryptoConnectionDTO;
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.CryptoConnection;
 import com.fintwin.model.Investment;
 import com.fintwin.model.User;
@@ -87,9 +90,9 @@ public class CryptoConnectionService {
     public CryptoConnectionDTO resync(Long connectionId) {
         User user = currentUser();
         CryptoConnection conn = connRepo.findById(connectionId)
-                .orElseThrow(() -> new RuntimeException("Connection not found"));
+                .orElseThrow(() -> new NotFoundException("Connection not found"));
         if (!conn.getUser().getId().equals(user.getId()))
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Unauthorized");
 
         syncConnection(conn);
         connRepo.save(conn);
@@ -102,9 +105,9 @@ public class CryptoConnectionService {
     public void disconnect(Long connectionId) {
         User user = currentUser();
         CryptoConnection conn = connRepo.findById(connectionId)
-                .orElseThrow(() -> new RuntimeException("Connection not found"));
+                .orElseThrow(() -> new NotFoundException("Connection not found"));
         if (!conn.getUser().getId().equals(user.getId()))
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Unauthorized");
         connRepo.delete(conn);
     }
 
@@ -119,7 +122,7 @@ public class CryptoConnectionService {
             balances = switch (exchange.toUpperCase()) {
                 case "BINANCE"  -> fetchBinanceBalances(conn);
                 case "WAZIRX"   -> fetchWazirXBalances(conn);
-                default         -> throw new RuntimeException("Unsupported exchange: " + exchange);
+                default         -> throw new BadRequestException("Unsupported exchange: " + exchange);
             };
         } catch (RuntimeException e) {
             conn.setSyncStatus("ERROR");

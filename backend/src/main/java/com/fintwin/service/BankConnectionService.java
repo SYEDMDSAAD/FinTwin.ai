@@ -1,6 +1,9 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ConflictException;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.BankConnection;
 import com.fintwin.model.Investment;
 import com.fintwin.model.Transaction;
@@ -67,12 +70,12 @@ public class BankConnectionService {
         activeConns.addAll(bankRepo.findByUserAndConsentStatus(user, "ACTIVE"));
         activeConns.addAll(bankRepo.findByUserAndConsentStatus(user, "FETCHING"));
         if (!activeConns.isEmpty()) {
-            throw new RuntimeException("You already have a connected bank account. Disconnect it first before adding another.");
+            throw new ConflictException("You already have a connected bank account. Disconnect it first before adding another.");
         }
         bankRepo.findTopByConsentStatusOrderByCreatedAtDesc("PENDING").ifPresent(existing -> {
             if (existing.getUser().getId().equals(user.getId())
                     && existing.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(30))) {
-                throw new RuntimeException("A bank connection is already in progress. Please complete it or wait a few minutes before trying again.");
+                throw new ConflictException("A bank connection is already in progress. Please complete it or wait a few minutes before trying again.");
             }
         });
 
@@ -397,10 +400,10 @@ public class BankConnectionService {
         User user    = userRepo.findByEmail(email).orElseThrow();
 
         BankConnection conn = bankRepo.findById(connectionId)
-                .orElseThrow(() -> new RuntimeException("Connection not found"));
+                .orElseThrow(() -> new NotFoundException("Connection not found"));
 
         if (!conn.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Unauthorized");
         }
         if (conn.getConsentId() == null) {
             return "Consent not yet approved. Please complete the bank consent flow first.";
@@ -523,7 +526,7 @@ public class BankConnectionService {
 
         bankRepo.findById(id).ifPresent(conn -> {
             if (!conn.getUser().getId().equals(user.getId())) {
-                throw new RuntimeException("Unauthorized");
+                throw new ForbiddenException("Unauthorized");
             }
             bankRepo.delete(conn);
         });

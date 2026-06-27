@@ -1,6 +1,7 @@
 package com.fintwin.controller;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.Role;
@@ -45,7 +46,7 @@ public class RoleController {
 
         String adminEmail = SecurityUtils.getCurrentUserEmail();
         User target = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (target.getEmail().equals(adminEmail)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot change your own role"));
@@ -73,7 +74,7 @@ public class RoleController {
 
         String adminEmail = SecurityUtils.getCurrentUserEmail();
         User target = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (target.getEmail().equals(adminEmail)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot revoke your own role"));
@@ -119,7 +120,7 @@ public class RoleController {
     @GetMapping("/users/{id}")
     public ResponseEntity<Map<String, Object>> getUserRole(@PathVariable Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         return ResponseEntity.ok(Map.of(
                 "id", user.getId(),
@@ -141,7 +142,7 @@ public class RoleController {
     public ResponseEntity<Map<String, String>> freezeAccount(@PathVariable Long userId) {
         String adminEmail = SecurityUtils.getCurrentUserEmail();
         User target = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (target.getEmail().equals(adminEmail)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot freeze your own account"));

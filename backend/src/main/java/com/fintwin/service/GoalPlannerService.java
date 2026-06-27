@@ -1,6 +1,8 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.GoalRequestDTO;
 import com.fintwin.model.FinancialGoal;
 import com.fintwin.model.Transaction;
@@ -66,7 +68,7 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -134,7 +136,7 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         List<FinancialGoal> goals = goalRepository.findByUser(user);
@@ -179,18 +181,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -246,18 +248,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         goalRepository.delete(goal);
@@ -279,18 +281,18 @@ public class GoalPlannerService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new NotFoundException("User not found")
                 );
 
         FinancialGoal goal = goalRepository
                 .findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Goal not found")
+                        new NotFoundException("Goal not found")
                 );
 
         if (goal.getUser().getId().longValue()
         != user.getId().longValue()) {
-            throw new RuntimeException("Unauthorized Goal Access");
+            throw new ForbiddenException("Unauthorized Goal Access");
         }
 
         FinancialContext ctx = buildFinancialContext(user);

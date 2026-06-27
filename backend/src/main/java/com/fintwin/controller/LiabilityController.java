@@ -1,5 +1,6 @@
 package com.fintwin.controller;
 
+import com.fintwin.dto.LiabilityDTO;
 import com.fintwin.model.Liability;
 import com.fintwin.service.LiabilityService;
 
@@ -16,15 +17,17 @@ public class LiabilityController {
     private LiabilityService liabilityService;
 
     @PostMapping
-    public Liability createLiability(
+    public LiabilityDTO createLiability(
             @RequestBody Liability liability
     ) {
-        return liabilityService.createLiability(liability);
+        return LiabilityDTO.from(liabilityService.createLiability(liability));
     }
 
     @GetMapping
-    public List<Liability> getLiabilities() {
-        return liabilityService.getLiabilities();
+    public List<LiabilityDTO> getLiabilities() {
+        return liabilityService.getLiabilities().stream()
+                .map(LiabilityDTO::from)
+                .toList();
     }
 
     @DeleteMapping("/{id}")
@@ -35,7 +38,7 @@ public class LiabilityController {
     }
 
     @PutMapping("/{id}")
-    public Liability updateLiability(
+    public LiabilityDTO updateLiability(
 
             @PathVariable Long id,
 
@@ -43,9 +46,6 @@ public class LiabilityController {
 
     ) {
 
-        return liabilityService.updateLiability(
-                id,
-                liability
-        );
+        return LiabilityDTO.from(liabilityService.updateLiability(id, liability));
     }
 }

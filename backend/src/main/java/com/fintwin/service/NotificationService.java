@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.NotificationDTO;
+import com.fintwin.exception.BadRequestException;
 import com.fintwin.model.Budget;
 import com.fintwin.model.FinancialGoal;
 import com.fintwin.model.Transaction;
@@ -200,12 +201,12 @@ public class NotificationService {
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void deleteNotification(int index) {
-        if (index < 0) throw new RuntimeException("Invalid notification index");
+        if (index < 0) throw new BadRequestException("Invalid notification index");
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void markAsRead(int index) {
-        if (index < 0) throw new RuntimeException("Invalid notification index");
+        if (index < 0) throw new BadRequestException("Invalid notification index");
     }
 
     private String fmt(long v)   { return String.format("%,d", v); }
