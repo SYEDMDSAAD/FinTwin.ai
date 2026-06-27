@@ -220,6 +220,11 @@ public class SecurityConfig {
                                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                                 .permitAll()
 
+                                // Liveness/readiness probes (k8s) and Prometheus scrape must be
+                                // reachable without a JWT. Other actuator endpoints stay secured.
+                                .requestMatchers("/actuator/health/**", "/actuator/prometheus")
+                                .permitAll()
+
                                 // Admin API — requires JWT + ADMIN role
                                 .requestMatchers("/api/v1/admin/**")
                                 .hasRole("ADMIN")

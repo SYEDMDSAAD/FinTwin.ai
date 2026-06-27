@@ -24,6 +24,24 @@ All three phases have been implemented and the full test suite (48 tests) passes
 | 3 — Architecture maturity | H5, H3, H4, L1 | ✅ done (`73575d3` + follow-up) |
 | Follow-up | C3 gate wired, H4 all endpoints, H5 ladder removed | ✅ done |
 
+**Smoke-test finding (fixed):**
+- 🔴 **Actuator health probes returned 401.** A standalone boot revealed that
+  `SecurityConfig` never permitted `/actuator/**`, so `anyRequest().authenticated()`
+  rejected `/actuator/health/liveness` and `/actuator/health/readiness` — the exact
+  paths the k8s `deployment.yaml` uses for probes. Every pod would have failed
+  readiness and never received traffic; Prometheus (`/actuator/prometheus`) was
+  also blocked. Fixed by permitting `/actuator/health/**` and `/actuator/prometheus`
+  while keeping other actuator endpoints secured. Verified: liveness/readiness/
+  prometheus → 200, metrics → 401.
+
+**H3 + mass-assignment (also done):**
+- **H3 completed** — `addExpenseByText`/`uploadScreenshot` now persist the
+  transaction + score snapshot inside a `TransactionTemplate`, with SMS/AI calls
+  moved outside the transaction (no DB connection held across the network).
+- **Create-time mass-assignment hardening** — `Asset`/`Liability`/`Budget`/
+  `Investment` create paths null any client-supplied `id` so `save()` always
+  inserts rather than merging over an arbitrary (possibly other-user) row.
+
 **Follow-up round (also done):**
 - **C3 gate wired** into `k8s/configmap.yaml` and `docker-compose.prod.yml`
   (`APP_REQUIRE_SECURE_CONFIG=true`), so the fail-fast check is active in prod.
