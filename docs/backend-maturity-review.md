@@ -297,3 +297,46 @@ H5 (typed exceptions), H3 (`@Transactional`), H4 (DTOs), then L-series polish.
 
 Each phase is independently shippable and testable. Recommend doing Phase 1 first as
 one commit, since those are the items that matter most for a production deploy.
+
+---
+
+## Round 2 — dependency scan + identity-service review (2026-06-28)
+
+Follow-up pass covering the two blind spots the first review didn't touch:
+third-party CVEs and the standalone `identity-service`. All items below are fixed
+and verified (backend 48/48 tests pass; both services compile; frontend `npm audit`
+clean + builds).
+
+### 🔴 2FA bypass via token-type confusion (BOTH services)
+`JwtFilter` authenticated **any** validly-signed JWT with a subject, without checking
+the `type` claim. The 5-minute `2fa_pending` temp token issued after the password
+step (before the TOTP code) is such a token — so anyone with the password could use
+it as a Bearer access token and skip the second factor entirely. The identity
+`/api/token/introspect` endpoint had the same gap.
+**Fixed:** both `JwtFilter`s and `introspect` now reject `type == "2fa_pending"`.
+
+### 🟠 Dependency CVEs — Spring Boot 3.3.0 → 3.3.13 (both services)
+The parent bump pulls patched transitives:
+- Tomcat 10.1.24 → **10.1.42** (CVE-2025-24813 partial-PUT RCE, CVE-2024-50379/56337, CVE-2024-38286)
+- spring-web 6.1.8 → **6.1.21** (CVE-2024-38816/38819 path traversal)
+- logback 1.5.6 → **1.5.18** (CVE-2024-12798/12801)
+- netty 4.1.110 → **4.1.122** (CVE-2024-47535, CVE-2025-24970)
+- commons-beanutils 1.9.4 → **1.11.0** via explicit override (CVE-2025-48734)
+
+### 🟠 Frontend `npm audit` — 0 vulnerabilities (was 3)
+`npm audit fix` resolved form-data (high, CRLF injection), vite (high), and
+dompurify (moderate, sanitizer bypass). Lockfile-only change; build still clean.
+
+### 🟡 identity-service hardening
+- `introspect` and `admin/promote` key checks → **constant-time** (`MessageDigest.isEqual`);
+  `introspect` now **fails closed** when `internal.key` is unset (was open).
+- `JwtFilter` error bodies → generic JSON; no longer leaks "User Not Found".
+
+### Still open / notes
+- Dependency findings were a **knowledge-based assessment** (model cutoff), not an
+  authoritative scanner. Recommend wiring OWASP Dependency-Check or Trivy into CI for
+  ongoing, authoritative results.
+- **`identity-service` has no test suite** — changes were verified by compile only.
+  Adding integration tests (mirroring the backend's Testcontainers setup) is the next
+  gap to close.
+- `ai-service` (FastAPI) and a git-history secret scan (gitleaks) remain unreviewed.

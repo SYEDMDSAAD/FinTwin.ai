@@ -63,6 +63,13 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Reject 2FA-pending temp tokens: they may only be exchanged at /2fa/login,
+        // never used as access tokens — otherwise the second factor is bypassable.
+        if ("2fa_pending".equals(claims.get("type"))) {
+            writeUnauthorized(response, "Invalid token");
+            return;
+        }
+
         String email = claims.getSubject();
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {

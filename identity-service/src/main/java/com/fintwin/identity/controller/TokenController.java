@@ -33,7 +33,12 @@ public class TokenController {
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
             @RequestBody java.util.Map<String, String> body) {
 
-        if (internalKey != null && !internalKey.isBlank() && !internalKey.equals(key)) {
+        // Fail closed: an unset internal key must NOT leave introspection open.
+        // Constant-time comparison avoids leaking the key via response timing.
+        if (internalKey == null || internalKey.isBlank() || key == null
+                || !java.security.MessageDigest.isEqual(
+                        internalKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        key.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             return ResponseEntity.status(403)
                     .body(TokenIntrospectResponse.invalid("Unauthorized"));
         }
@@ -44,6 +49,12 @@ public class TokenController {
 
         try {
             Claims claims = jwtUtil.extractClaims(token);
+
+            // A 2FA-pending temp token is not a valid access token for resource servers.
+            if ("2fa_pending".equals(claims.get("type"))) {
+                return ResponseEntity.ok(TokenIntrospectResponse.invalid("Invalid token"));
+            }
+
             String email = claims.getSubject();
 
             User user = userRepository.findByEmail(email).orElse(null);
