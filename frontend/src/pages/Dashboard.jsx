@@ -1,4 +1,6 @@
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useState, useTransition, useCallback, useRef } from "react";
+import { Brain } from "lucide-react";
+import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
 
@@ -197,6 +199,17 @@ function Dashboard() {
         setLoading] =
         useState(true);
 
+    // Splash screen — show once per browser session
+    const [showSplash, setShowSplash] = useState(
+        () => !sessionStorage.getItem("splashShown")
+    );
+    const [dataReady, setDataReady] = useState(false);
+    const criticalCount = useRef(0);
+    const markCriticalDone = useCallback(() => {
+        criticalCount.current += 1;
+        if (criticalCount.current >= 2) setDataReady(true);
+    }, []);
+
     const [goals, setGoals] =
         useState([]);
 
@@ -230,6 +243,13 @@ function Dashboard() {
             })
             .catch(() => {});
 
+        // Splash: mark session on first visit; skip gate if splash already shown
+        if (!sessionStorage.getItem("splashShown")) {
+            sessionStorage.setItem("splashShown", "true");
+        } else {
+            setDataReady(true);
+        }
+
         refreshDashboard();
 
         const interval = setInterval(() => {
@@ -260,8 +280,6 @@ function Dashboard() {
 
         } catch (error) {
 
-
-
             toast.error(
                 "Failed to fetch transactions."
             );
@@ -269,6 +287,7 @@ function Dashboard() {
         } finally {
 
             setLoading(false);
+            markCriticalDone();
         }
     };
 
@@ -399,11 +418,12 @@ function Dashboard() {
 
             } catch (error) {
 
-    
-
                 toast.error(
                     "Failed financial score."
                 );
+
+            } finally {
+                markCriticalDone();
             }
         };
 
@@ -1533,13 +1553,20 @@ function Dashboard() {
             className="
                 min-h-screen
                 w-full
-                overflow-x-hidden
                 bg-[#080A0F]
                 text-white
                 flex
             "
             style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}
         >
+
+            {/* Splash screen — fixed overlay, only on first session visit */}
+            {showSplash && (
+                <SplashScreen
+                    isDataReady={dataReady}
+                    onComplete={() => setShowSplash(false)}
+                />
+            )}
 
             {/* Sidebar */}
 
@@ -1565,10 +1592,12 @@ function Dashboard() {
                 "
             >
 
-                <Header
+                {activeSection === "Dashboard" && (
+                  <Header
                     notifications={notifications}
                     scoreData={scoreData}
-                />
+                  />
+                )}
 
                 
 
@@ -1859,6 +1888,22 @@ function Dashboard() {
                 "AI Intelligence" && (
 
                 <>
+
+                    {/* AI Suite header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+                        <div style={{
+                            width: 40, height: 40, borderRadius: 12,
+                            background: "linear-gradient(135deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))",
+                            border: "1px solid rgba(167,139,250,0.3)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                            <Brain size={18} color="#a78bfa" />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>AI SUITE</div>
+                            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>AI Intelligence</h1>
+                        </div>
+                    </div>
 
                     <FinancialScoreCard
                         scoreData={scoreData}

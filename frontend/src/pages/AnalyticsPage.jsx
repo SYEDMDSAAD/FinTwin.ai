@@ -391,7 +391,7 @@ const TABS = ["Incomes & Expenses Report", "Balance Trend", "Cash Flow"];
 
 export default function AnalyticsPage({ transactions = [], recurringExpenses = [], insights = [] }) {
   const [activeTab, setActiveTab] = useState(TABS[0]);
-  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(typeof window !== "undefined" && window.innerWidth > 768);
   const [period, setPeriod] = useState("This month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");

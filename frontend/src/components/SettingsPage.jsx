@@ -42,9 +42,9 @@ const CSS = `
   .sp-tab-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 14px; border-radius:12px; border:none; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; text-align:left; transition:all 0.15s; }
   .sp-tab-btn:hover { background:rgba(255,255,255,0.05); }
   .sp-tab-btn.active { background:rgba(167,139,250,0.12); color:#a78bfa; }
-  .sp-row { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; }
+  .sp-row { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; gap:10px; }
   .sp-row + .sp-row { border-top:1px solid rgba(255,255,255,0.06); }
-  .sp-action-btn { padding:8px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:rgba(148,163,184,0.8); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s; white-space:nowrap; }
+  .sp-action-btn { padding:8px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:rgba(148,163,184,0.8); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s; white-space:nowrap; flex-shrink:0; }
   .sp-action-btn:hover { background:rgba(255,255,255,0.08); color:#e2e8f0; }
   .sp-action-btn.danger { background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.2); color:#f87171; }
   .sp-action-btn.danger:hover { background:#f87171; color:#fff; border-color:#f87171; }
@@ -58,6 +58,20 @@ const CSS = `
   .sp-ai-card.selected { background:rgba(167,139,250,0.1); border-color:rgba(167,139,250,0.35); }
   .sp-ai-card:hover:not(.selected) { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); }
   .sp-conn-card { padding:16px 20px; border-radius:14px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:14px; }
+  @media (max-width: 640px) {
+    .sp-layout { flex-direction: column !important; }
+    .sp-sidebar {
+      width: 100% !important; flex-direction: row !important; overflow-x: auto;
+      gap: 4px !important; padding: 6px !important;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .sp-sidebar::-webkit-scrollbar { display: none; }
+    .sp-tab-btn { white-space: nowrap; width: auto !important; flex-shrink: 0; padding: 8px 12px !important; }
+    .sp-row { flex-wrap: wrap; }
+    .sp-row > div:first-child { flex: 1; min-width: 0; }
+    .sp-conn-card { flex-wrap: wrap; }
+    .sp-conn-card > button { width: 100%; justify-content: center; }
+  }
 `;
 
 function SectionLabel({ children }) {
@@ -371,10 +385,10 @@ export default function SettingsPage({ navigateTo }) {
         </div>
 
         {/* Two-column layout */}
-        <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+        <div className="sp-layout" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
 
           {/* Left sidebar nav */}
-          <div style={{
+          <div className="sp-sidebar" style={{
             width: 200, flexShrink: 0,
             background: "rgba(255,255,255,0.025)",
             border: "1px solid rgba(255,255,255,0.07)",

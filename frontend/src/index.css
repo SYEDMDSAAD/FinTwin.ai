@@ -638,6 +638,17 @@ body.sidebar-animating [class*="backdrop-blur"] {
   background: rgba(15,23,42,0.10) !important;
 }
 
+/* ── 17. Transaction table separators (defined in component <style>) ── */
+[data-theme="light"] .tx-row-desktop { border-bottom-color: rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .tx-mobile-card { border-bottom-color: rgba(15,23,42,0.07) !important; }
+[data-theme="light"] .tx-col-headers { border-bottom-color: rgba(15,23,42,0.09) !important; }
+
+/* Near-zero white bg (0.012) used for date group rows */
+[data-theme="light"] [style*="background: rgba(255, 255, 255, 0.012)"],
+[data-theme="light"] [style*="background:rgba(255,255,255,0.012)"] {
+  background: rgba(15,23,42,0.03) !important;
+}
+
 * {
     box-sizing: border-box;
 }

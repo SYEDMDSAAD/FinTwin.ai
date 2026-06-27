@@ -23,6 +23,12 @@ const CSS = `
   .stat-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:20px; position:relative; overflow:hidden; transition:all 0.25s; }
   .stat-card:hover { border-color:rgba(255,255,255,0.12); transform:translateY(-2px); }
   .stat-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }
+  .nwm-stat-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 640px) {
+    .nwm-stat-grid { grid-template-columns: 1fr 1fr; }
+    .nwm-row { flex-wrap: wrap; gap: 8px; }
+    .nwm-row > div:last-child { flex-shrink: 0; }
+  }
 `;
 
 // Asset types that belong in the Investment Portfolio page — not allowed here
@@ -157,7 +163,7 @@ function NetWorthManagement({
         </div>
 
         {/* Summary Strip */}
-        <div style={{ display:"grid", gridTemplateColumns:"1.3fr 1fr 1fr 1fr", gap:12, marginBottom:24 }}>
+        <div className="nwm-stat-grid">
           <div className="stat-card">
             <div style={{ position:"absolute", bottom:0, left:0, right:0, height:2, background:`linear-gradient(90deg,transparent,${isHealthy?"#4ade80":"#f87171"}50,transparent)` }}/>
             <div style={{ fontSize:10, fontWeight:700, color:"rgba(148,163,184,0.5)", letterSpacing:"0.12em", marginBottom:10 }}>NET WORTH</div>
@@ -274,7 +280,7 @@ function NetWorthManagement({
                 </span>
               </div>
 
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(140px,100%), 1fr))", gap:10, marginBottom:12 }}>
                 <input className="nwm-input" placeholder="Asset name (e.g. Home)" value={assetName} onChange={(e)=>setAssetName(e.target.value)}/>
                 <input className="nwm-input" type="number" placeholder="Amount (₹)" value={assetAmount} onChange={(e)=>setAssetAmount(e.target.value)}/>
                 <select className="nwm-select" value={assetType} onChange={(e)=>setAssetType(e.target.value)}>
@@ -308,7 +314,7 @@ function NetWorthManagement({
             <div key={asset.id}>
               {editingAssetId === asset.id ? (
                 <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:12, padding:14, marginBottom:8 }}>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(140px,100%), 1fr))", gap:10, marginBottom:10 }}>
                     <input className="nwm-input" value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="Name"/>
                     <input className="nwm-input" type="number" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} placeholder="Amount"/>
                     <select className="nwm-select" value={editType} onChange={(e)=>setEditType(e.target.value)}>
@@ -400,7 +406,7 @@ function NetWorthManagement({
           {addingLiability && (
             <div style={{ background:"rgba(248,113,113,0.05)", border:"1px solid rgba(248,113,113,0.15)", borderRadius:14, padding:16, marginBottom:16 }}>
               <div style={{ fontSize:10, fontWeight:700, color:"rgba(248,113,113,0.6)", letterSpacing:"0.08em", marginBottom:12 }}>NEW LIABILITY</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(140px,100%), 1fr))", gap:10, marginBottom:12 }}>
                 <input className="nwm-input" placeholder="Liability name (e.g. Home Loan)" value={liabilityName} onChange={(e)=>setLiabilityName(e.target.value)}/>
                 <input className="nwm-input" type="number" placeholder="Amount (₹)" value={liabilityAmount} onChange={(e)=>setLiabilityAmount(e.target.value)}/>
                 <select className="nwm-select" value={liabilityType} onChange={(e)=>setLiabilityType(e.target.value)}>
@@ -433,7 +439,7 @@ function NetWorthManagement({
             <div key={liability.id}>
               {editingLiabilityId === liability.id ? (
                 <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:12, padding:14, marginBottom:8 }}>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(140px,100%), 1fr))", gap:10, marginBottom:10 }}>
                     <input className="nwm-input" value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="Name"/>
                     <input className="nwm-input" type="number" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} placeholder="Amount"/>
                     <select className="nwm-select" value={editType} onChange={(e)=>setEditType(e.target.value)}>

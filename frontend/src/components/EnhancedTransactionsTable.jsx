@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, memo, Fragment } from "react";
 import { Download, SlidersHorizontal, X, Search, ChevronDown } from "lucide-react";
 
 const CATEGORIES = [
@@ -34,6 +34,13 @@ function exportCSV(transactions) {
   const a = document.createElement("a");
   a.href = url; a.download = "fintwin_transactions.csv"; a.click();
   URL.revokeObjectURL(url);
+}
+
+function cleanMerchant(name) {
+  if (!name) return "—";
+  const parts = name.split("/");
+  if (parts.length >= 4) return parts[3];
+  return name;
 }
 
 function groupByDate(transactions) {
@@ -119,6 +126,22 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
 
   return (
     <div style={CARD}>
+      <style>{`
+        .tx-row-grid { display: grid; gap: 0; }
+        .tx-col-headers { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; padding: 8px 24px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .tx-row-desktop { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; align-items: center; padding: 12px 24px; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .tx-row-desktop.balance { grid-template-columns: 3fr 2fr 2fr 1.5fr 1.5fr; }
+        .tx-mobile-card { display: none; padding: 10px 16px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
+        .tx-filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        @media (max-width: 640px) {
+          .tx-row-desktop { display: none !important; }
+          .tx-col-headers { display: none !important; }
+          .tx-mobile-card { display: flex; flex-direction: column; gap: 6px; }
+          .tx-filter-grid { grid-template-columns: 1fr 1fr; }
+          .tx-header-wrap { flex-wrap: wrap; gap: 8px; }
+          .tx-export-btn { display: none; }
+        }
+      `}</style>
       <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.2),transparent)", borderRadius: 18 }} />
 
       {/* Header */}
@@ -127,7 +150,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.12em", marginBottom: 2 }}>RECORDS</div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary, #fff)", margin: 0 }}>Transactions</h2>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="tx-header-wrap" style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* Summary chips */}
           <span style={{ fontSize: 11, fontWeight: 600, color: "#4ade80", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 8, padding: "4px 10px" }}>
             +₹{totalIncome.toLocaleString("en-IN", {maximumFractionDigits: 0})}
@@ -165,6 +188,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
           )}
           <button
             onClick={() => exportCSV(filtered)}
+            className="tx-export-btn"
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "7px 12px", borderRadius: 10, cursor: "pointer",
@@ -180,7 +204,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
       {/* Filter panel */}
       {filtersOpen && (
         <div style={{ margin: "16px 24px 0", padding: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div className="tx-filter-grid">
             <div>
               <label style={lbl}>Search</label>
               <div style={{ position: "relative" }}>
@@ -246,7 +270,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
       )}
 
       {/* Column headers */}
-      <div style={{ display: "grid", gridTemplateColumns: showBalance ? "3fr 2fr 2fr 1.5fr 1.5fr" : "3fr 2fr 2fr 1.5fr", gap: 0, padding: "14px 24px 8px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+      <div className="tx-col-headers" style={{ gap: 0, padding: "14px 24px 8px", gridTemplateColumns: showBalance ? "3fr 2fr 2fr 1.5fr 1.5fr" : "3fr 2fr 2fr 1.5fr" }}>
         {["Merchant","Category","Date","Amount", showBalance && "Balance"].filter(Boolean).map(h => (
           <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", textAlign: h === "Amount" || h === "Balance" ? "right" : h === "Category" ? "center" : "left" }}>{h}</span>
         ))}
@@ -283,15 +307,10 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
                 const pos = t.amount > 0;
                 const bal = withBalance[t.id];
                 return (
+                  <Fragment key={t.id}>
                   <div
-                    key={t.id}
+                    className={`tx-row-desktop${showBalance ? " balance" : ""}`}
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: showBalance ? "3fr 2fr 2fr 1.5fr 1.5fr" : "3fr 2fr 2fr 1.5fr",
-                      alignItems: "center",
-                      padding: "12px 24px",
-                      borderBottom: "1px solid rgba(255,255,255,0.025)",
-                      transition: "background 0.15s",
                       cursor: "default",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
@@ -338,6 +357,26 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
                       </span>
                     )}
                   </div>
+
+                  {/* Mobile card layout */}
+                  <div className="tx-mobile-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: pos ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", border: `1px solid ${pos ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pos ? "#4ade80" : "#f87171" }}>
+                          {pos ? "↓" : "↑"}
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>{cleanMerchant(t.merchant)}</span>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: pos ? "#4ade80" : "#f87171", flexShrink: 0, marginLeft: 8 }}>
+                        {pos ? "+" : "-"}₹{Math.abs(t.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 36 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 6, padding: "2px 8px" }}>{t.category}</span>
+                      <span style={{ fontSize: 11, color: "var(--text-label)" }}>{t.date}</span>
+                    </div>
+                  </div>
+                  </Fragment>
                 );
               })}
             </div>

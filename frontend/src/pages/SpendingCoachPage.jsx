@@ -202,14 +202,8 @@ function SpendingCoachPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {coach.tips.map((tip, i) => (
                 <div key={i} className="coach-tip">
-                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 7, background: "rgba(167,139,250,0.2)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 10, fontWeight: 800, color: "#a78bfa", flexShrink: 0, marginTop: 1,
-                    }}>
-                      {i + 1}
-                    </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span style={{ color: "#a78bfa", flexShrink: 0, marginTop: 2, fontSize: 14, lineHeight: 1 }}>•</span>
                     <p style={{ fontSize: 12, color: "#d1d5db", margin: 0, lineHeight: 1.6 }}>
                       {cleanText(tip)}
                     </p>
