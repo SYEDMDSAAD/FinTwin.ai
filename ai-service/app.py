@@ -1,3 +1,4 @@
+import hmac
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -32,12 +33,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# This is an internal, server-to-server API (called by the Spring backend with
+# X-Internal-Key) — browsers never call it directly. CORS is therefore minimal:
+# no credentials, and only the methods/headers actually used.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Internal-Key"],
 )
 
 
@@ -48,7 +52,8 @@ async def verify_internal_key(request: Request, call_next):
     if request.url.path in _PUBLIC_PATHS:
         return await call_next(request)
     key = request.headers.get("x-internal-key", "")
-    if key != _INTERNAL_KEY:
+    # Constant-time comparison to avoid leaking the key via response timing.
+    if not hmac.compare_digest(key, _INTERNAL_KEY):
         return Response("Forbidden: missing or invalid internal key", status_code=403)
     return await call_next(request)
 

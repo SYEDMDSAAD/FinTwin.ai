@@ -340,3 +340,38 @@ dompurify (moderate, sanitizer bypass). Lockfile-only change; build still clean.
   Adding integration tests (mirroring the backend's Testcontainers setup) is the next
   gap to close.
 - `ai-service` (FastAPI) and a git-history secret scan (gitleaks) remain unreviewed.
+
+---
+
+## Round 3 — ai-service (FastAPI) review (2026-06-28)
+
+Reviewed the AI service for security, logic, and maturity. **No critical/high
+security holes** — the service is fundamentally sound (internal-key middleware on
+all routes, fail-fast on missing key, hardened OCR upload, no RCE primitives,
+operator-set OLLAMA_URL so no user-driven SSRF, secrets gitignored). All findings
+below are fixed; the HTTP layer now has an 8-test suite (passing).
+
+- **Constant-time internal-key compare** — middleware used `key != _INTERNAL_KEY`;
+  now `hmac.compare_digest`.
+- **CORS tightened** — it's a server-to-server API, so `allow_credentials` is now
+  False and methods/headers are restricted (were `*`).
+- **Dead code removed** — `internal_auth.py` (`require_internal_key`) was never
+  imported; the middleware does the enforcement.
+- **requirements.txt reproducibility** — pandas was pinned `==3.0.3` while the
+  tested env runs `2.3.3` (untested major); repinned to installed versions and the
+  four `>=` entries are now `==`.
+- **Input validation** — `spending_coach` had no Pydantic model (raw `dict[...]` →
+  KeyError/500); added a model + error handling. Chat `message` now length-bounded
+  (1–4000) to limit prompt-stuffing.
+- **Prompt-injection mitigation** — user question is wrapped in `<user_question>`
+  delimiters with an explicit "treat as data, not instructions" rule. (Impact was
+  already low — output is self-targeted text advice, no actions executed.)
+- **report_routes** — removed leftover debug `print`, switched deprecated `.dict()`
+  → `model_dump()`, added try/except.
+- **Tests + CI** — added `ai-service/tests/` (auth guard + validation, 8 tests) and
+  a `requirements-dev.txt`; the AI-service CI workflow now runs pytest (and was
+  aligned to Python 3.12 to match the Docker runtime).
+
+**Still open:** `ai-service` Python deps aren't yet covered by an authoritative
+CVE scanner in the manual review (Trivy/Dependabot in CI do cover them); a
+git-history secret scan (gitleaks) beyond the CI TruffleHog job remains optional.
