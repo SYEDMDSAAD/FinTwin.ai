@@ -40,7 +40,7 @@ public class ChatHistory {
 
     private LocalDateTime timestamp;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;

@@ -64,8 +64,9 @@ All three phases have been implemented and the full test suite (48 tests) passes
   splits the DB work from the side effect — tracked for a follow-up.
 - Entity **request bodies** (e.g. `@RequestBody Asset`) still bind to JPA entities
   on create/update — a separate mass-assignment concern beyond H4's response scope.
-- **L2/L3/L4/L5/L6** (EAGER fetch, optimistic locking, flyway pwd default,
-  formatting, money-as-double) intentionally left — low value or high churn/risk.
+- **L2/L3/L4** (EAGER fetch, optimistic locking, flyway pwd default) — **now done
+  in Round 5** (see below). **L5/L6** (formatting, money-as-double) intentionally
+  left — low value or high churn/risk.
 
 ---
 
@@ -375,3 +376,82 @@ below are fixed; the HTTP layer now has an 8-test suite (passing).
 **Still open:** `ai-service` Python deps aren't yet covered by an authoritative
 CVE scanner in the manual review (Trivy/Dependabot in CI do cover them); a
 git-history secret scan (gitleaks) beyond the CI TruffleHog job remains optional.
+
+---
+
+## Round 4 — outbound HTTP robustness (2026-06-28)
+
+A focused pass over the backend's outbound HTTP clients surfaced a robustness gap
+the earlier rounds missed (they covered the AI path but not the other third-party
+integrations). Items below are fixed and verified (backend compiles).
+
+### 🟠 R4.1 External `RestTemplate`s have no connect/read timeouts
+**File:** `service/SetuAAService.java:41`, `service/CryptoConnectionService.java:42`,
+`service/SmsService.java:49`
+
+All three create a bare `new RestTemplate()`. Spring's default
+`SimpleClientHttpRequestFactory` has **infinite** connect *and* read timeouts, so a
+slow or hung third party — Setu Account Aggregator, a crypto exchange API, or the
+MSG91 SMS gateway — blocks the calling Tomcat worker thread **indefinitely**. Enough
+stuck calls exhaust the request thread pool and the whole backend stops serving,
+including health probes. This is the exact failure the AI path already guards against:
+`AiServiceConfig.aiRestTemplate` sets connect 3 s / read 20 s and relies on the
+circuit breaker to release threads quickly.
+
+**Fix:** Route all outbound third-party calls through a shared timed factory
+(`config/HttpClients.externalApi()` — connect 5 s, read 15 s). Longer-term these
+could be promoted to injected `@Bean`s like `aiRestTemplate`, but a shared helper
+closes the availability gap now with minimal churn (the three services use
+field-initialised templates, not constructor injection).
+
+### 🟢 R4.2 `InterruptedException` swallowed without restoring the interrupt flag
+**File:** `service/SetuAAService.java:135` (`createFISessionAndWait` poll loop)
+
+`catch (InterruptedException ignored) {}` drops the interrupt, so a shutdown/cancel
+signal during the 30 s poll is lost and the loop keeps running. Restore the flag with
+`Thread.currentThread().interrupt()` (and stop polling) so cancellation propagates.
+
+### Still open / notes
+- **Money as `Double`** (L6) remains the largest deferred maturity item — amounts are
+  AES-encrypted TEXT via `EncryptedDoubleConverter`, so a `BigDecimal` migration is a
+  data-format change, not just a type change. Revisit if rounding bugs surface.
+- The unbounded `findAll()` in `EmailMigrationService` / `EncryptionMigrationService`
+  is acceptable: these are one-off admin-triggered migrations, not request-path code.
+
+---
+
+## Round 5 — L2/L3/L4 maturity polish (2026-06-28)
+
+The previously-deferred low-risk maturity items, now implemented and verified
+(backend **48/48 tests pass**; schema validates; no `LazyInitializationException`).
+
+### 🟢 L4 — Flyway password default inconsistency
+`spring.flyway.password` defaulted to empty while `spring.datasource.password`
+defaulted to `postgres`. Aligned both to `${DB_PASSWORD:postgres}` so a fresh local
+checkout migrates against the same credentials it connects with.
+
+### 🟢 L3 — Optimistic locking on write-heavy entities
+Added `@Version private Long version;` to `User`, `Transaction`, `Asset`,
+`Liability`, `Budget`, `FinancialGoal`, `Investment` — the entities with realistic
+concurrent writers (e.g. the hourly `ScheduledPriceRefreshService` updating an
+`Investment.currentValue` while the user edits it; multi-flow `User` updates).
+- New migration `V9__optimistic_locking.sql` adds `version BIGINT NOT NULL DEFAULT 0`
+  to the seven tables (idempotent `ADD COLUMN IF NOT EXISTS`; existing rows start at 0).
+- `GlobalExceptionHandler` now maps `ObjectOptimisticLockingFailureException` → **409**
+  with a "refresh and retry" message instead of a generic 500.
+
+### 🟢 L2 — `EAGER` → `LAZY` on `@ManyToOne user`
+Switched the 9 remaining default-`EAGER` associations (`Transaction`, `Asset`,
+`Liability`, `Budget`, `FinancialGoal`, `FinancialScoreHistory`, `BankConnection`,
+`Notification`, `ChatHistory`) to `FetchType.LAZY`, so loading a row no longer forces
+a join to `users` every time. Safe under `open-in-view=false` because every access to
+the association is either `getUser().getId()` (served from the FK without initializing
+the proxy) or passing the proxy as a `findByUser(...)` query parameter — verified by
+grep (no non-id proxy access) and by the full integration-test suite.
+
+### Deliberately still deferred
+- **L5** (whitespace/formatting) — cosmetic; would bloat the diff and obscure real
+  history. Skip until a file is being edited for other reasons.
+- **L6** (money `Double` → `BigDecimal`) — explicitly out of scope for this pass; it
+  is a financial-correctness migration across ~20 services + the encrypted converter
+  and warrants its own dedicated, well-tested effort.
