@@ -27,6 +27,7 @@ def _usd_inr() -> float:
         return _fx_cache["rate"]
     try:
         r = requests.get(FX_API, timeout=8)
+        r.raise_for_status()
         rate = r.json()["rates"]["INR"]
         _fx_cache.update({"rate": rate, "day": today})
         return rate
@@ -50,6 +51,7 @@ def _gold_inr_per_gram() -> float:
 def _mf_nav(scheme_code: str) -> Optional[float]:
     try:
         r = requests.get(f"{MFAPI_BASE}/{scheme_code}", timeout=10)
+        r.raise_for_status()
         return float(r.json()["data"][0]["nav"])
     except Exception:
         return None

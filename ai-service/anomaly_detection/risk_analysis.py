@@ -120,7 +120,7 @@ def analyse_financial_risk(
                     area=f"Budget: {category}",
                     severity="medium",
                     observation=f"{category} budget at {round(usage_pct)}% — will likely exceed limit.",
-                    suggestion=f"Limit {category} to ₹ remaining in budget this month.",
+                    suggestion=f"Slow down {category} spending — you're at {round(usage_pct)}% of budget before month-end.",
                 ))
                 penalty += 5
 

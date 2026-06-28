@@ -113,13 +113,22 @@ Return ONLY valid JSON, no markdown:
         if start == -1 or end == -1:
             raise ValueError("No JSON object found in LLM response")
         result = json.loads(text[start:end + 1])
-        if "recommendations" not in result:
-            raise ValueError("Missing recommendations key")
+        recs = result.get("recommendations")
+        if not isinstance(recs, list) or not recs:
+            raise ValueError("Missing or invalid recommendations")
         result.setdefault("expectedReturn", "8-12%")
         result.setdefault("investmentHorizon", "5+ Years")
-        result.setdefault("portfolioScore", 75)
-        for item in result["recommendations"]:
-            item["amount"] = round(monthly_savings * item.get("allocation", 0) / 100, 2)
+        # Bound the LLM-supplied score to a sane 0-100.
+        try:
+            result["portfolioScore"] = max(0, min(100, int(result.get("portfolioScore", 75))))
+        except (TypeError, ValueError):
+            result["portfolioScore"] = 75
+        for item in recs:
+            try:
+                allocation = float(item.get("allocation", 0) or 0)
+            except (TypeError, ValueError):
+                allocation = 0.0
+            item["amount"] = round(monthly_savings * allocation / 100, 2)
     except Exception as e:
         logger.warning("Ollama portfolio generation failed, using fallback: %s", e)
         result = _build_result(

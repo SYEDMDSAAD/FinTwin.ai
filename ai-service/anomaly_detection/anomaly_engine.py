@@ -89,7 +89,6 @@ def detect_anomalies(transactions: list[dict]) -> list[AnomalyResult]:
             seen_ids.add(tx_id)
 
     # ── 2. Category monthly surge ─────────────────────────────────────────
-    from collections import defaultdict as dd
     monthly_cat: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for t in expenses:
         date = t.get("date", "")
