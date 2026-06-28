@@ -48,7 +48,7 @@ function SpendingCoachPage() {
       saveCoach(response.data);
       setSavedAt(new Date().toISOString());
     } catch (error) {
-      console.log(error);
+      console.error("Spending coach load failed:", error);
     } finally {
       setLoading(false);
     }

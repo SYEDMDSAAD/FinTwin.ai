@@ -72,7 +72,7 @@ function WeeklyReport() {
 
         } catch (error) {
 
-            console.log(error);
+            console.error("Weekly report load failed:", error);
 
         } finally {
 
@@ -119,7 +119,7 @@ function WeeklyReport() {
 
         } catch (error) {
 
-            console.log(error);
+            console.error("Report PDF export failed:", error);
         } finally {
 
             setExporting(false);
