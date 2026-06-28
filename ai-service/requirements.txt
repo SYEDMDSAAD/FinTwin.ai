@@ -1,28 +1,40 @@
-# Pinned to the versions the service is tested against (the running venv), so
-# `pip install -r requirements.txt` reproduces a known-good environment rather
-# than silently pulling newer (possibly breaking) majors.
+# Pinned for reproducible installs. Versions chosen to resolve cleanly together
+# (the previously hand-built venv had scipy 1.17.1, which violates statsforecast's
+# scipy<1.16 requirement, and was missing the OCR deps entirely).
 python-dotenv==1.2.2
 requests==2.34.2
-statsforecast==2.0.3
-xgboost==3.2.0
-annotated-doc==0.0.4
-annotated-types==0.7.0
-anyio==4.13.0
-click==8.4.1
+
+# ── Web framework ────────────────────────────────────────────────────────────
 fastapi==0.136.3
-h11==0.16.0
-idna==3.16
-joblib==1.5.3
-numpy==2.4.6
-pandas==2.3.3
+starlette==1.1.0
 pydantic==2.13.4
 pydantic_core==2.46.4
-python-dateutil==2.9.0.post0
+uvicorn==0.48.0
+anyio==4.13.0
+h11==0.16.0
+idna==3.16
+click==8.4.1
+
+# ── Data / ML ────────────────────────────────────────────────────────────────
+numpy==2.4.6
+pandas==2.3.3
+scipy==1.15.3            # <1.16 to satisfy statsforecast
 scikit-learn==1.8.0
-scipy==1.17.1
-six==1.17.0
-starlette==1.1.0
+statsforecast==2.0.3
+xgboost==3.2.0
+numba==0.65.1
+llvmlite==0.47.0
+joblib==1.5.3
 threadpoolctl==3.6.0
+
+# ── OCR (were missing — required by ocr/ocr_engine.py) ───────────────────────
+pillow==12.2.0
+pytesseract==0.3.13
+
+# ── Shared transitives ───────────────────────────────────────────────────────
+python-dateutil==2.9.0.post0
+six==1.17.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
-uvicorn==0.48.0
+annotated-doc==0.0.4
+annotated-types==0.7.0
