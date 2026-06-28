@@ -1,9 +1,19 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Use the automatic JSX runtime for esbuild's transform too, so Vitest can
+  // compile the app's React-import-free .jsx files (matches plugin-react).
+  esbuild: { jsx: 'automatic' },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+    css: false,
+  },
   build: {
     // CSS minification stays OFF intentionally. This is rolldown-vite, whose only
     // bundled CSS minifier is lightningcss, and lightningcss can't parse the
