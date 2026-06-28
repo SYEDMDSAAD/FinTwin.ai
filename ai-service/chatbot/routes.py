@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from chatbot.advisor import generate_financial_advice
 
@@ -11,8 +11,9 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    message: str
-    mode: str
+    # Bounded length to limit prompt-stuffing / resource abuse.
+    message: str = Field(..., min_length=1, max_length=4000)
+    mode: str = Field(..., max_length=64)
     financialData: Optional[Dict[str, Any]] = None
 
 

@@ -1,7 +1,10 @@
-python-dotenv>=1.0.0
-requests>=2.31.0
-statsforecast>=1.7.0
-xgboost>=2.0.0
+# Pinned to the versions the service is tested against (the running venv), so
+# `pip install -r requirements.txt` reproduces a known-good environment rather
+# than silently pulling newer (possibly breaking) majors.
+python-dotenv==1.2.2
+requests==2.34.2
+statsforecast==2.0.3
+xgboost==3.2.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
@@ -11,7 +14,7 @@ h11==0.16.0
 idna==3.16
 joblib==1.5.3
 numpy==2.4.6
-pandas==3.0.3
+pandas==2.3.3
 pydantic==2.13.4
 pydantic_core==2.46.4
 python-dateutil==2.9.0.post0

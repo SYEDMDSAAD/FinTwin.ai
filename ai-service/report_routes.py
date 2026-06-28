@@ -1,11 +1,12 @@
-from fastapi import APIRouter
+import logging
+from typing import Dict, List
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, List, Optional
 
 from chatbot.report_generator import generate_weekly_report
 
-print("REPORT ROUTES LOADED")
-
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Reports"])
 
 
@@ -27,4 +28,8 @@ class WeeklyReportRequest(BaseModel):
 
 @router.post("/weekly-report")
 def weekly_report(data: WeeklyReportRequest):
-    return generate_weekly_report(data.dict())
+    try:
+        return generate_weekly_report(data.model_dump())
+    except Exception as e:
+        logger.exception("Weekly report error: %s", e)
+        raise HTTPException(status_code=500, detail="Report generation failed. Please retry.")
