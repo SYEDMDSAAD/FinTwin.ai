@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.config.FinTwinMetrics;
+import com.fintwin.config.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,7 @@ public class SmsService {
     @Autowired
     private FinTwinMetrics metrics;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = HttpClients.externalApi();
 
     public boolean isConfigured() {
         return smsEnabled && apiKey != null && !apiKey.isBlank();

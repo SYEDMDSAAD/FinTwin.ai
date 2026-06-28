@@ -16,6 +16,9 @@ public class FinancialGoal {
     )
     private Long id;
 
+    @Version
+    private Long version;
+
     @Convert(converter = EncryptionConverter.class)
     @Column(length = 400)
     private String title;
@@ -63,7 +66,7 @@ public class FinancialGoal {
 
     private java.time.LocalDate createdAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;

@@ -12,6 +12,9 @@ public class Asset {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Convert(converter = EncryptionConverter.class)
     @Column(length = 400)
     private String name;
@@ -22,7 +25,7 @@ public class Asset {
 
     private String type;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;

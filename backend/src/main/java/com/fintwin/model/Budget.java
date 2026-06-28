@@ -15,13 +15,16 @@ public class Budget {
 
     private Long id;
 
+    @Version
+    private Long version;
+
     private String category;
 
     @Convert(converter = EncryptedDoubleConverter.class)
     @Column(name = "limit_amount", columnDefinition = "TEXT")
     private Double limitAmount;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;

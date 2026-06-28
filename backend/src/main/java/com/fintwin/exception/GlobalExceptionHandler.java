@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -53,6 +54,15 @@ public class GlobalExceptionHandler {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Malformed or missing request body");
                 return ResponseEntity.badRequest().body(error);
+        }
+
+        // Optimistic-locking conflict (@Version): two writers raced on the same row.
+        // The client's copy is stale — tell them to refetch and retry.
+        @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+        public ResponseEntity<?> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "This record was modified by another request. Please refresh and try again.");
+                return ResponseEntity.status(409).body(error);
         }
 
         @ExceptionHandler(DataIntegrityViolationException.class)

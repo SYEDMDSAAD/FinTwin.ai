@@ -21,6 +21,9 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     private String date;
 
     @Convert(converter = EncryptionConverter.class)
@@ -42,7 +45,7 @@ public class Transaction {
     @Column(name = "external_id")
     private String externalId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;

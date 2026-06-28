@@ -16,6 +16,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @Convert(converter = EncryptionConverter.class)
     @Column(length = 512)
     private String fullName;

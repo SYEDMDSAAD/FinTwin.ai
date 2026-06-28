@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.config.HttpClients;
 import com.fintwin.dto.CryptoConnectionDTO;
 import com.fintwin.exception.BadRequestException;
 import com.fintwin.exception.ForbiddenException;
@@ -39,7 +40,7 @@ public class CryptoConnectionService {
     private final CryptoConnectionRepository connRepo;
     private final InvestmentRepository       investmentRepo;
     private final UserRepository             userRepo;
-    private final RestTemplate               restTemplate = new RestTemplate();
+    private final RestTemplate               restTemplate = HttpClients.externalApi();
 
     public CryptoConnectionService(CryptoConnectionRepository connRepo,
                                    InvestmentRepository investmentRepo,
