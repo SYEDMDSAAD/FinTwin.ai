@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import API, { identityApi } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
@@ -52,11 +52,16 @@ const PERKS = [
 
 function Register() {
   const navigate   = useNavigate();
+  const location   = useLocation();
   const { isDark } = useTheme();
 
-  const [step,     setStep]     = useState("register"); // "register" | "otp"
+  // When redirected here from Login because the email isn't verified yet,
+  // jump straight to the OTP step with the email prefilled.
+  const verifyEmail = location.state?.verifyEmail;
+
+  const [step,     setStep]     = useState(verifyEmail ? "otp" : "register"); // "register" | "otp"
   const [fullName, setFullName] = useState("");
-  const [email,    setEmail]    = useState("");
+  const [email,    setEmail]    = useState(verifyEmail || "");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [consent,  setConsent]  = useState(false);

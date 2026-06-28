@@ -181,8 +181,16 @@ function Login() {
       const me = await identityApi.get("/auth/me");
       navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {
-      if (err.response?.status === 403 && err.response?.data?.error === "ACCOUNT_DISABLED") {
+      const code = err.response?.data?.error;
+      if (err.response?.status === 403 && code === "ACCOUNT_DISABLED") {
         setAccountBlocked(true); setTicketDefaultEmail(email);
+      } else if (code === "EMAIL_NOT_VERIFIED") {
+        try {
+          const r = await identityApi.post("/auth/resend-verification", { email });
+          if (r.data?.devOtp) toast.success(`Dev mode: your OTP is ${r.data.devOtp}`, { duration: 15000 });
+        } catch { /* ignore — user can resend from the verify screen */ }
+        toast("Please verify your email to continue. We've sent you a new code.");
+        navigate("/register", { state: { verifyEmail: email } });
       } else { setAccountBlocked(false); toast.error("Invalid Credentials"); }
     } finally { setLoading(false); }
   };

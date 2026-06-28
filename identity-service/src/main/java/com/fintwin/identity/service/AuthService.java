@@ -109,6 +109,11 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials");
         }
 
+        // Email must be verified before login can proceed. Checked only after the
+        // password matches so it doesn't leak which emails are registered.
+        if (!Boolean.TRUE.equals(user.getEmailVerified()))
+            throw new RuntimeException("EMAIL_NOT_VERIFIED");
+
         // Successful login — reset lockout counters
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
