@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.config.HttpClients;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,7 @@ public class SetuAAService {
     @Value("${setu.aa.product-instance-id}")
     private String productInstanceId;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = HttpClients.externalApi();
 
     // ── Auth headers (Setu v2 uses direct header auth, no OAuth2) ─────────────
 
@@ -132,7 +133,12 @@ public class SetuAAService {
 
         // Poll up to 10 times with 3s delay (~30s total)
         for (int i = 0; i < 10; i++) {
-            try { TimeUnit.SECONDS.sleep(3); } catch (InterruptedException ignored) {}
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // preserve cancellation, stop polling
+                return null;
+            }
             try {
                 ResponseEntity<Map> res = restTemplate.exchange(
                         baseUrl + "/v2/sessions/" + sessionId,
