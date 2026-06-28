@@ -2,9 +2,11 @@ package com.fintwin.model;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fintwin.security.EncryptedBigDecimalConverter;
 import com.fintwin.security.EncryptedDoubleConverter;
 import com.fintwin.security.EncryptionConverter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -23,19 +25,19 @@ public class FinancialGoal {
     @Column(length = 400)
     private String title;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "target_amount", columnDefinition = "TEXT")
-    private Double targetAmount;
+    private BigDecimal targetAmount;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "current_saved", columnDefinition = "TEXT")
-    private Double currentSaved;
+    private BigDecimal currentSaved;
 
     private Integer durationMonths;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "monthly_target", columnDefinition = "TEXT")
-    private Double monthlyTarget;
+    private BigDecimal monthlyTarget;
 
     @Convert(converter = EncryptedDoubleConverter.class)
     @Column(name = "success_probability", columnDefinition = "TEXT")
@@ -50,17 +52,17 @@ public class FinancialGoal {
     // NEW GOAL TRACKING FIELDS
     // =========================
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "expected_saved", columnDefinition = "TEXT")
-    private Double expectedSaved;
+    private BigDecimal expectedSaved;
 
     @Convert(converter = EncryptedDoubleConverter.class)
     @Column(name = "progress_percent", columnDefinition = "TEXT")
     private Double progressPercent;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "available_savings", columnDefinition = "TEXT")
-    private Double availableSavings;
+    private BigDecimal availableSavings;
 
     private String goalHealth;
 
@@ -93,25 +95,32 @@ public class FinancialGoal {
         this.title = title;
     }
 
+    // Double compatibility view (estimate/display code + JSON); exact value below.
     public Double getTargetAmount() {
-        return targetAmount;
+        return targetAmount == null ? null : targetAmount.doubleValue();
     }
 
     public void setTargetAmount(
         Double targetAmount
     ) {
-        this.targetAmount = targetAmount;
+        this.targetAmount = targetAmount == null ? null : BigDecimal.valueOf(targetAmount);
     }
 
+    public BigDecimal getTargetAmountExact() { return targetAmount; }
+    public void setTargetAmountExact(BigDecimal targetAmount) { this.targetAmount = targetAmount; }
+
     public Double getCurrentSaved() {
-        return currentSaved;
+        return currentSaved == null ? null : currentSaved.doubleValue();
     }
 
     public void setCurrentSaved(
         Double currentSaved
     ) {
-        this.currentSaved = currentSaved;
+        this.currentSaved = currentSaved == null ? null : BigDecimal.valueOf(currentSaved);
     }
+
+    public BigDecimal getCurrentSavedExact() { return currentSaved; }
+    public void setCurrentSavedExact(BigDecimal currentSaved) { this.currentSaved = currentSaved; }
 
     public Integer getDurationMonths() {
         return durationMonths;
@@ -124,14 +133,17 @@ public class FinancialGoal {
     }
 
     public Double getMonthlyTarget() {
-        return monthlyTarget;
+        return monthlyTarget == null ? null : monthlyTarget.doubleValue();
     }
 
     public void setMonthlyTarget(
         Double monthlyTarget
     ) {
-        this.monthlyTarget = monthlyTarget;
+        this.monthlyTarget = monthlyTarget == null ? null : BigDecimal.valueOf(monthlyTarget);
     }
+
+    public BigDecimal getMonthlyTargetExact() { return monthlyTarget; }
+    public void setMonthlyTargetExact(BigDecimal monthlyTarget) { this.monthlyTarget = monthlyTarget; }
 
     public Double getSuccessProbability() {
         return successProbability;
@@ -154,14 +166,17 @@ public class FinancialGoal {
     }
 
     public Double getExpectedSaved() {
-        return expectedSaved;
+        return expectedSaved == null ? null : expectedSaved.doubleValue();
     }
 
     public void setExpectedSaved(
         Double expectedSaved
     ) {
-        this.expectedSaved = expectedSaved;
+        this.expectedSaved = expectedSaved == null ? null : BigDecimal.valueOf(expectedSaved);
     }
+
+    public BigDecimal getExpectedSavedExact() { return expectedSaved; }
+    public void setExpectedSavedExact(BigDecimal expectedSaved) { this.expectedSaved = expectedSaved; }
 
     public Double getProgressPercent() {
         return progressPercent;
@@ -174,14 +189,17 @@ public class FinancialGoal {
     }
 
     public Double getAvailableSavings() {
-        return availableSavings;
+        return availableSavings == null ? null : availableSavings.doubleValue();
     }
 
     public void setAvailableSavings(
         Double availableSavings
     ) {
-        this.availableSavings = availableSavings;
+        this.availableSavings = availableSavings == null ? null : BigDecimal.valueOf(availableSavings);
     }
+
+    public BigDecimal getAvailableSavingsExact() { return availableSavings; }
+    public void setAvailableSavingsExact(BigDecimal availableSavings) { this.availableSavings = availableSavings; }
 
     public String getGoalHealth() {
         return goalHealth;

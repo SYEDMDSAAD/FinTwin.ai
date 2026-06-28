@@ -24,6 +24,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -60,22 +62,25 @@ public class InvestmentService {
                 .map(InvestmentDTO::from)
                 .collect(Collectors.toList());
 
-        double totalInvested = all.stream()
-                .mapToDouble(i -> i.getInvestedAmount() != null ? i.getInvestedAmount() : 0)
-                .sum();
+        // Exact BigDecimal sums for the authoritative portfolio totals.
+        BigDecimal totalInvested = all.stream()
+                .map(i -> nz(i.getInvestedAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double currentValue = all.stream()
-                .mapToDouble(i -> i.getCurrentValue() != null ? i.getCurrentValue()
-                        : (i.getInvestedAmount() != null ? i.getInvestedAmount() : 0))
-                .sum();
+        BigDecimal currentValue = all.stream()
+                .map(i -> i.getCurrentValueExact() != null ? i.getCurrentValueExact()
+                        : nz(i.getInvestedAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double totalPnl    = Math.round((currentValue - totalInvested) * 100.0) / 100.0;
-        double totalPnlPct = totalInvested > 0
-                ? Math.round(((currentValue - totalInvested) / totalInvested) * 10000.0) / 100.0
+        BigDecimal totalPnl = currentValue.subtract(totalInvested);
+        // P&L % is a ratio — double is fine.
+        double totalPnlPct = totalInvested.signum() > 0
+                ? Math.round((totalPnl.doubleValue() / totalInvested.doubleValue()) * 10000.0) / 100.0
                 : 0.0;
 
         Map<String, Double> allocation = new LinkedHashMap<>();
-        if (currentValue > 0) {
+        double currentValueD = currentValue.doubleValue();
+        if (currentValue.signum() > 0) {
             all.stream()
                .collect(Collectors.groupingBy(
                    i -> i.getType() != null ? i.getType() : "Other",
@@ -83,18 +88,27 @@ public class InvestmentService {
                            : (i.getInvestedAmount() != null ? i.getInvestedAmount() : 0))
                ))
                .forEach((type, val) ->
-                   allocation.put(type, Math.round((val / currentValue) * 10000.0) / 100.0)
+                   allocation.put(type, Math.round((val / currentValueD) * 10000.0) / 100.0)
                );
         }
 
         PortfolioSummaryDTO summary = new PortfolioSummaryDTO();
         summary.setHoldings(holdings);
-        summary.setTotalInvested(Math.round(totalInvested * 100.0) / 100.0);
-        summary.setCurrentValue(Math.round(currentValue * 100.0) / 100.0);
-        summary.setTotalPnl(totalPnl);
+        summary.setTotalInvested(money(totalInvested));
+        summary.setCurrentValue(money(currentValue));
+        summary.setTotalPnl(money(totalPnl));
         summary.setTotalPnlPercent(totalPnlPct);
         summary.setAllocationByType(allocation);
         return summary;
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    // Money to the JSON edge: round to 2dp (half-up) and hand the frontend a double.
+    private static double money(BigDecimal v) {
+        return v.setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
     // ── Auto-detect investments from bank transactions ────────────────────────

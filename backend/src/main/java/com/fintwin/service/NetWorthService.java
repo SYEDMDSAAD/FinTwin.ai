@@ -13,7 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -49,74 +52,87 @@ public class NetWorthService {
         List<Liability> liabilitiesList = liabilityRepository.findByUser(user);
 
         // Manual savings entered at onboarding (tagged as ManualSavings type)
-        double manualSavings = assetsList.stream()
+        // Exact BigDecimal sums — money totals must not accumulate float error.
+        BigDecimal manualSavings = assetsList.stream()
                 .filter(a -> "ManualSavings".equalsIgnoreCase(a.getType()))
-                .mapToDouble(Asset::getAmount)
-                .sum();
+                .map(a -> nz(a.getAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Transactional savings = net cash flow from last 3 months of transactions
         // For manual users this is seeded data; replaced by real bank data after connection
         List<Transaction> transactions =
                 transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 
-        double txIncome = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount)
-                .sum();
+        BigDecimal txIncome = transactions.stream()
+                .map(Transaction::getAmountExact)
+                .filter(Objects::nonNull)
+                .filter(a -> a.signum() > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double txExpenses = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
+        BigDecimal txExpenses = transactions.stream()
+                .map(Transaction::getAmountExact)
+                .filter(Objects::nonNull)
+                .filter(a -> a.signum() < 0)
+                .map(BigDecimal::abs)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double transactionalSavings = txIncome - txExpenses;
+        BigDecimal transactionalSavings = txIncome.subtract(txExpenses);
 
         // Manual savings is the user's stated current balance — authoritative when present.
         // For bank users (manualSavings = 0), derive savings from real transaction cash flow.
-        double totalSavings = manualSavings > 0 ? manualSavings : transactionalSavings;
+        BigDecimal totalSavings = manualSavings.signum() > 0 ? manualSavings : transactionalSavings;
 
         // Total assets excludes ManualSavings (shown separately in savings card)
         // AND excludes investment-type assets (those belong in the Investment Portfolio page)
-        double totalAssets = assetsList.stream()
+        BigDecimal totalAssets = assetsList.stream()
                 .filter(a -> !"ManualSavings".equalsIgnoreCase(a.getType()))
                 .filter(a -> !INVESTMENT_TYPES.contains(
                         a.getType() != null ? a.getType().toLowerCase().trim() : ""))
-                .mapToDouble(Asset::getAmount)
-                .sum();
+                .map(a -> nz(a.getAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double totalLiabilities = liabilitiesList.stream()
-                .mapToDouble(Liability::getAmount)
-                .sum();
+        BigDecimal totalLiabilities = liabilitiesList.stream()
+                .map(l -> nz(l.getAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Investment portfolio (Investment Portfolio page)
         List<Investment> investments = investmentRepository.findByUser(user);
 
-        double portfolioCurrentValue = investments.stream()
-                .mapToDouble(i -> i.getCurrentValue() != null ? i.getCurrentValue()
-                        : (i.getInvestedAmount() != null ? i.getInvestedAmount() : 0))
-                .sum();
+        BigDecimal portfolioCurrentValue = investments.stream()
+                .map(i -> i.getCurrentValueExact() != null ? i.getCurrentValueExact()
+                        : nz(i.getInvestedAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double portfolioInvested = investments.stream()
-                .mapToDouble(i -> i.getInvestedAmount() != null ? i.getInvestedAmount() : 0)
-                .sum();
+        BigDecimal portfolioInvested = investments.stream()
+                .map(i -> nz(i.getInvestedAmountExact()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        double portfolioPnl = Math.round((portfolioCurrentValue - portfolioInvested) * 100.0) / 100.0;
+        BigDecimal portfolioPnl = portfolioCurrentValue.subtract(portfolioInvested);
 
         // Net Worth = assets + savings + portfolio current value - liabilities
-        double netWorth = totalAssets + totalSavings + portfolioCurrentValue - totalLiabilities;
+        BigDecimal netWorth = totalAssets.add(totalSavings).add(portfolioCurrentValue).subtract(totalLiabilities);
 
         NetWorthResponseDTO dto = new NetWorthResponseDTO();
         dto.setAssets(assetsList);
         dto.setLiabilities(liabilitiesList);
-        dto.setSavings(totalSavings);
-        dto.setTotalAssets(totalAssets);
-        dto.setTotalLiabilities(totalLiabilities);
-        dto.setNetWorth(netWorth);
-        dto.setPortfolioCurrentValue(Math.round(portfolioCurrentValue * 100.0) / 100.0);
-        dto.setPortfolioInvested(Math.round(portfolioInvested * 100.0) / 100.0);
-        dto.setPortfolioPnl(portfolioPnl);
+        dto.setSavings(money(totalSavings));
+        dto.setTotalAssets(money(totalAssets));
+        dto.setTotalLiabilities(money(totalLiabilities));
+        dto.setNetWorth(money(netWorth));
+        dto.setPortfolioCurrentValue(money(portfolioCurrentValue));
+        dto.setPortfolioInvested(money(portfolioInvested));
+        dto.setPortfolioPnl(money(portfolioPnl));
         dto.setPortfolioCount(investments.size());
 
         return dto;
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    // Money to the JSON edge: round to 2dp (half-up) and hand the frontend a double.
+    private static double money(BigDecimal v) {
+        return v.setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 }

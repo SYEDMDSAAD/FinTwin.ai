@@ -2,9 +2,11 @@ package com.fintwin.model;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fintwin.security.EncryptedBigDecimalConverter;
 import com.fintwin.security.EncryptedDoubleConverter;
 import com.fintwin.security.EncryptionConverter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -30,13 +32,13 @@ public class Investment {
     // Stocks | Mutual Fund | Fixed Deposit | Gold | PPF | NPS | Bonds | Crypto | Real Estate | Other
     private String type;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "invested_amount", columnDefinition = "TEXT")
-    private Double investedAmount;
+    private BigDecimal investedAmount;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "current_value", columnDefinition = "TEXT")
-    private Double currentValue;
+    private BigDecimal currentValue;
 
     private LocalDate purchaseDate;
 
@@ -75,11 +77,16 @@ public class Investment {
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
 
-    public Double getInvestedAmount() { return investedAmount; }
-    public void setInvestedAmount(Double investedAmount) { this.investedAmount = investedAmount; }
+    // Double compatibility view (estimate/display code + JSON); exact value below.
+    public Double getInvestedAmount() { return investedAmount == null ? null : investedAmount.doubleValue(); }
+    public void setInvestedAmount(Double investedAmount) { this.investedAmount = investedAmount == null ? null : BigDecimal.valueOf(investedAmount); }
+    public BigDecimal getInvestedAmountExact() { return investedAmount; }
+    public void setInvestedAmountExact(BigDecimal investedAmount) { this.investedAmount = investedAmount; }
 
-    public Double getCurrentValue() { return currentValue; }
-    public void setCurrentValue(Double currentValue) { this.currentValue = currentValue; }
+    public Double getCurrentValue() { return currentValue == null ? null : currentValue.doubleValue(); }
+    public void setCurrentValue(Double currentValue) { this.currentValue = currentValue == null ? null : BigDecimal.valueOf(currentValue); }
+    public BigDecimal getCurrentValueExact() { return currentValue; }
+    public void setCurrentValueExact(BigDecimal currentValue) { this.currentValue = currentValue; }
 
     public LocalDate getPurchaseDate() { return purchaseDate; }
     public void setPurchaseDate(LocalDate purchaseDate) { this.purchaseDate = purchaseDate; }
