@@ -16,6 +16,8 @@ import com.fintwin.security.SecurityUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -173,32 +175,30 @@ public class BudgetService {
 
         for (Budget budget : budgets) {
 
-            // Case-insensitive category matching
-            double spent = transactions.stream()
+            // Case-insensitive category matching. Exact BigDecimal sum so
+            // "spent" and "remaining" are correct to the cent.
+            BigDecimal limit = nz(budget.getLimitAmountExact());
+            BigDecimal spent = transactions.stream()
                     .filter(t ->
-                            t.getAmount() < 0
+                            t.getAmountExact() != null
+                            && t.getAmountExact().signum() < 0
                             && t.getCategory() != null
                             && t.getCategory().equalsIgnoreCase(
                                     budget.getCategory()
                                )
                     )
-                    .mapToDouble(t -> Math.abs(t.getAmount()))
-                    .sum();
+                    .map(t -> t.getAmountExact().abs())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            double remaining = budget.getLimitAmount() - spent;
-            boolean exceeded = spent > budget.getLimitAmount();
-
-            // IMPROVEMENT: include percentage for frontend
-            double percentage = budget.getLimitAmount() > 0
-                    ? Math.min((spent / budget.getLimitAmount()) * 100, 100)
-                    : 0;
+            BigDecimal remaining = limit.subtract(spent);
+            boolean exceeded = spent.compareTo(limit) > 0;
 
             result.add(new BudgetStatusDTO(
                     budget.getId(),
                     budget.getCategory(),
-                    budget.getLimitAmount(),
-                    spent,
-                    remaining,
+                    money(limit),
+                    money(spent),
+                    money(remaining),
                     exceeded
             ));
         }
@@ -214,5 +214,14 @@ public class BudgetService {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0))
                 + s.substring(1).toLowerCase();
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    // Money to the JSON edge: round to 2dp (half-up) and hand the frontend a double.
+    private static double money(BigDecimal v) {
+        return v.setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 }

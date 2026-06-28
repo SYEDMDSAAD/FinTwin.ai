@@ -3,7 +3,9 @@ package com.fintwin.model;
 import jakarta.persistence.*;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fintwin.security.EncryptedDoubleConverter;
+import com.fintwin.security.EncryptedBigDecimalConverter;
+
+import java.math.BigDecimal;
 
 @Entity
 
@@ -17,9 +19,9 @@ public class Budget {
 
     private String category;
 
-    @Convert(converter = EncryptedDoubleConverter.class)
+    @Convert(converter = EncryptedBigDecimalConverter.class)
     @Column(name = "limit_amount", columnDefinition = "TEXT")
-    private Double limitAmount;
+    private BigDecimal limitAmount;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -46,11 +48,20 @@ public class Budget {
         this.category = category;
     }
 
+    // Double compatibility view (estimate/display code + JSON); exact value below.
     public Double getLimitAmount() {
-        return limitAmount;
+        return limitAmount == null ? null : limitAmount.doubleValue();
     }
 
     public void setLimitAmount(Double limitAmount) {
+        this.limitAmount = limitAmount == null ? null : BigDecimal.valueOf(limitAmount);
+    }
+
+    public BigDecimal getLimitAmountExact() {
+        return limitAmount;
+    }
+
+    public void setLimitAmountExact(BigDecimal limitAmount) {
         this.limitAmount = limitAmount;
     }
 
