@@ -51,7 +51,7 @@ data: GoalPlanRequest
 ):
 
     plan = generate_goal_plan(
-        data.dict()
+        data.model_dump()
     )
 
     return {

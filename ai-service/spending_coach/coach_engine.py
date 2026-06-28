@@ -1,7 +1,18 @@
 import json
+import logging
 import re
 import pandas as pd
 from utils.ollama_client import ask
+
+logger = logging.getLogger(__name__)
+
+
+def _amount(t: dict) -> float:
+    """Coerce a transaction amount to float, tolerating missing/garbage values."""
+    try:
+        return float(t.get("amount", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _parse_llm_json(text):
@@ -71,7 +82,19 @@ def _compute_leakage(category_totals: dict) -> float:
 
 
 def generate_spending_coach(transactions):
-    expenses = [t for t in transactions if t["amount"] < 0]
+    # Normalise defensively: tolerate missing/garbage "amount" and missing
+    # "category" rather than raising KeyError/ValueError on malformed input.
+    expenses = []
+    income = 0.0
+    for t in transactions:
+        amt = _amount(t)
+        if amt < 0:
+            row = dict(t)
+            row["amount"] = amt
+            row["category"] = (t.get("category") or "Uncategorised")
+            expenses.append(row)
+        elif amt > 0:
+            income += amt
 
     if not expenses:
         return {
@@ -85,7 +108,6 @@ def generate_spending_coach(transactions):
     df["amount"] = df["amount"].abs()
 
     total_expenses = float(df["amount"].sum())
-    income = float(sum(t["amount"] for t in transactions if t["amount"] > 0))
     savings = income - total_expenses
     savings_rate = round((savings / income * 100), 1) if income > 0 else 0
     tx_count = len(expenses)
@@ -162,7 +184,7 @@ Return ONLY this JSON (no markdown, no extra text):
         raise ValueError("Parse failed")
 
     except Exception as e:
-        print("Coach Error:", str(e))
+        logger.warning("Spending coach LLM/parse failed, using fallback: %s", e)
         top_cat = list(category_totals.keys())[0] if category_totals else "discretionary"
         top_amt = round(list(category_totals.values())[0] / 3) if category_totals else 0
         monthly_exp = round(total_expenses / 3)

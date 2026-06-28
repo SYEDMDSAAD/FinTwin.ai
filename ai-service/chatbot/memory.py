@@ -109,6 +109,7 @@ def _local_get(user_id: str) -> list[Turn]:
 
 
 def _local_append(user_id: str, message: str, reply: str) -> None:
+    _evict_stale()  # bound the in-process store; called outside the (non-reentrant) lock
     with _lock:
         if user_id not in _store:
             _store[user_id] = {"history": deque(maxlen=_MAX_HISTORY), "last_access": time.time()}
