@@ -223,8 +223,10 @@ public class AuthService {
             throw new IllegalArgumentException("Email must not be empty");
 
         String normalized = email.toLowerCase().trim();
-        User user = userRepository.findByEmail(normalized)
-                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+        // Do not reveal whether an account exists — return silently for unknown
+        // emails so the response is indistinguishable from the success case.
+        User user = userRepository.findByEmail(normalized).orElse(null);
+        if (user == null) return null;
 
         String rawToken = UUID.randomUUID().toString();
         user.setPasswordResetToken(sha256(rawToken));

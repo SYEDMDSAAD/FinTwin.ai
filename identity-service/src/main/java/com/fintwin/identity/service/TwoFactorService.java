@@ -86,27 +86,6 @@ public class TwoFactorService {
                 .orElse(false);
     }
 
-    public Map<String, Object> getDebugInfo(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        String secret = user.getTwoFactorSecret();
-        if (secret == null) return Map.of("secret", "NOT SET", "enabled", false);
-        try {
-            byte[] key   = base32Decode(secret);
-            long timeStep = System.currentTimeMillis() / 1000L / 30L;
-            int expected  = computeTotp(key, timeStep);
-            long secsLeft = 30 - (System.currentTimeMillis() / 1000L % 30);
-            return Map.of(
-                "secret", secret,
-                "expectedCode", String.format("%06d", expected),
-                "secondsRemaining", secsLeft,
-                "enabled", Boolean.TRUE.equals(user.getTwoFactorEnabled())
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Debug info failed: " + e.getMessage());
-        }
-    }
-
     @Transactional
     public AuthResponse completeTwoFactorLogin(String tempToken, String codeStr) {
         Claims claims = jwtUtil.extractClaims(tempToken);
@@ -120,6 +99,10 @@ public class TwoFactorService {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        // A user disabled during the 5-min temp-token window must not be able to
+        // complete login — mirror the enabled check from the password login path.
+        if (!Boolean.TRUE.equals(user.getEnabled()))
+            throw new SecurityException("Account has been disabled");
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 

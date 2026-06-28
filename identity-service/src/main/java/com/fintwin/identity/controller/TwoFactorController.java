@@ -41,10 +41,4 @@ public class TwoFactorController {
         twoFactorService.disable(email, code);
         return ResponseEntity.ok(Map.of("message", "Two-factor authentication disabled."));
     }
-
-    @GetMapping("/debug")
-    public ResponseEntity<?> debug() {
-        String email = SecurityUtils.getCurrentUserEmail();
-        return ResponseEntity.ok(twoFactorService.getDebugInfo(email));
-    }
 }
