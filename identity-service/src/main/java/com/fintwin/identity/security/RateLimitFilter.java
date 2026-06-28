@@ -32,6 +32,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${redis.url:}")
     private String redisUrl;
 
+    // Operational kill-switch; also lets test suites avoid limit exhaustion.
+    @Value("${rate.limit.enabled:true}")
+    private boolean rateLimitEnabled;
+
     private RedisClient redisClient;
     private StatefulRedisConnection<String, String> redisConn;
     private RedisCommands<String, String> redis;
@@ -66,6 +70,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
+        if (!rateLimitEnabled) {
+            chain.doFilter(request, response);
+            return;
+        }
         String ip   = getClientIp(request);
         String path = request.getRequestURI();
         int limit = limitFor(path);
