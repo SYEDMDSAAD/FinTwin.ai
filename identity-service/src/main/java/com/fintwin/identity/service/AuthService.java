@@ -28,14 +28,12 @@ import java.util.*;
 @Service
 public class AuthService {
 
-    private static final int MAX_FAILED_ATTEMPTS = 5;
-    private static final int LOCKOUT_MINUTES     = 15;
-
     @Autowired private UserRepository userRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private TokenService tokenService;
     @Autowired private EmailService emailService;
+    @Autowired private LoginAttemptRecorder loginAttemptRecorder;
 
     @Value("${google.client.id:}")
     private String googleClientId;
@@ -85,7 +83,9 @@ public class AuthService {
 
     // ── Login ─────────────────────────────────────────────────────────────────
 
-    @Transactional
+    // NOT @Transactional: a single ambient transaction would roll back the
+    // failed-attempt increment when this method throws "Invalid credentials",
+    // permanently disengaging account lockout. Each save autocommits instead.
     public AuthResponse login(LoginRequest req) {
         if (req.getEmail() == null || req.getEmail().isBlank()
                 || req.getPassword() == null || req.getPassword().isBlank())
@@ -105,7 +105,9 @@ public class AuthService {
             throw new RuntimeException("Account has been disabled");
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            recordFailedAttempt(user);
+            // Record in a separate transaction — this method throws below, which
+            // would otherwise roll back the failed-attempt increment.
+            loginAttemptRecorder.recordFailure(user.getId());
             throw new RuntimeException("Invalid credentials");
         }
 
@@ -327,15 +329,6 @@ public class AuthService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void recordFailedAttempt(User user) {
-        int attempts = user.getFailedLoginAttempts() + 1;
-        user.setFailedLoginAttempts(attempts);
-        if (attempts >= MAX_FAILED_ATTEMPTS) {
-            user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
-        }
-        userRepository.save(user);
-    }
 
     private String sha256(String input) {
         try {
