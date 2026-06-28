@@ -56,7 +56,8 @@ function NetWorthPage() {
   const [netWorth, setNetWorth] = useState(null);
 
   useEffect(() => {
-    API.get("/net-worth").then((r) => setNetWorth(r.data)).catch(console.log);
+    API.get("/net-worth").then((r) => setNetWorth(r.data))
+      .catch((e) => console.error("Net worth load failed:", e));
   }, []);
 
   if (!netWorth) {

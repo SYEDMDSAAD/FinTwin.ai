@@ -159,7 +159,9 @@ function Profile() {
     try {
       const r = await API.get("/profile/score-history");
       setScoreHistory(r.data);
-    } catch { console.log("Score history not available"); }
+    } catch (e) {
+      console.error("Score history unavailable:", e);
+    }
   };
 
   const initial = profile?.fullName?.charAt(0).toUpperCase() || "U";

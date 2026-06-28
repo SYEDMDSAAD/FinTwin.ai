@@ -3,6 +3,16 @@ import { identityApi } from "../services/api";
 
 const AuthContext = createContext();
 
+// Tolerate corrupt/legacy values in localStorage — a bad JSON blob must never
+// crash the whole app at startup (white screen).
+const safeParse = (raw) => {
+    try {
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+
 export const AuthProvider = ({ children }) => {
 
     // Support admin impersonation: _imp_token is set by AdminPage, consumed once
@@ -21,9 +31,9 @@ export const AuthProvider = ({ children }) => {
         if (imp) {
             localStorage.setItem("user", imp);
             localStorage.removeItem("_imp_user");
-            return JSON.parse(imp);
+            return safeParse(imp);
         }
-        return JSON.parse(localStorage.getItem("user"));
+        return safeParse(localStorage.getItem("user"));
     };
 
     const [token, setToken] = useState(resolveToken);
