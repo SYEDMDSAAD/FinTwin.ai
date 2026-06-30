@@ -2,6 +2,9 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
+# gcc needed to compile native extensions (statsforecast, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first — cached unless requirements.txt changes
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
