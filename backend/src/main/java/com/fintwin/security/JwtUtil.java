@@ -2,7 +2,6 @@ package com.fintwin.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 
 import jakarta.annotation.PostConstruct;
@@ -44,15 +43,15 @@ public class JwtUtil {
 
         return Jwts.builder()
 
-                .setSubject(email)
+                .subject(email)
 
                 .claim("role", role != null ? role : "USER")
 
-                .setIssuedAt(
+                .issuedAt(
                         new Date()
                 )
 
-                .setExpiration(
+                .expiration(
 
                         new Date(
 
@@ -61,12 +60,7 @@ public class JwtUtil {
                         )
                 )
 
-                .signWith(
-
-                        SECRET_KEY,
-
-                        SignatureAlgorithm.HS256
-                )
+                .signWith(SECRET_KEY)
 
                 .compact();
     }
@@ -89,19 +83,19 @@ public class JwtUtil {
 
         Claims claims =
 
-                Jwts.parserBuilder()
+                Jwts.parser()
 
-                        .setSigningKey(
+                        .verifyWith(
                                 SECRET_KEY
                         )
 
                         .build()
 
-                        .parseClaimsJws(
+                        .parseSignedClaims(
                                 token
                         )
 
-                        .getBody();
+                        .getPayload();
 
         return claims.getSubject();
     }
@@ -112,11 +106,11 @@ public class JwtUtil {
 
     public String generateTempToken(String email) {
         return Jwts.builder()
-                .setSubject(email)
+                .subject(email)
                 .claim("type", "2fa_pending")
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 5 * 60 * 1000))
-                .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 5 * 60 * 1000))
+                .signWith(SECRET_KEY)
                 .compact();
     }
 
@@ -127,11 +121,11 @@ public class JwtUtil {
     // Carries imp_by claim so audit logs during the session are traceable to the admin.
     public String generateImpersonationToken(String targetEmail, String adminEmail) {
         return Jwts.builder()
-                .setSubject(targetEmail)
+                .subject(targetEmail)
                 .claim("imp_by", adminEmail)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .signWith(SECRET_KEY)
                 .compact();
     }
 
@@ -140,11 +134,11 @@ public class JwtUtil {
     // =====================================
 
     public Claims extractClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+        return Jwts.parser()
+                .verifyWith(SECRET_KEY)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     // =====================================
@@ -159,15 +153,15 @@ public class JwtUtil {
 
         try {
 
-            Jwts.parserBuilder()
+            Jwts.parser()
 
-                    .setSigningKey(
+                    .verifyWith(
                             SECRET_KEY
                     )
 
                     .build()
 
-                    .parseClaimsJws(
+                    .parseSignedClaims(
                             token
                     );
 
