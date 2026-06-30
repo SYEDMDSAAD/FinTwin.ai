@@ -231,11 +231,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String token = header.substring(7).trim();
         if (token.isEmpty()) return null;
         try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(jwtKey)
+            Claims claims = Jwts.parser()
+                    .verifyWith(jwtKey)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
             return claims.getSubject();
         } catch (Exception e) {
             return null; // Invalid token — JWT filter will reject it properly
