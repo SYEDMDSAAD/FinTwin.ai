@@ -20,6 +20,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <testcontainers.version>1.20.6</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -149,6 +150,31 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Apache HttpClient 5 — TestRestTemplate's default JDK factory throws
+             HttpRetryException on 401/403 POST responses in JDK 17+. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers — real PostgreSQL for integration tests -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
 
