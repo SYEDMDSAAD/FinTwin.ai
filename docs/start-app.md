@@ -168,3 +168,58 @@ Open: [http://localhost:5173](http://localhost:5173)
 `Ctrl+C` in each terminal. Supabase stays up in the cloud — nothing to stop there.
 
 To stop Ollama: `Ctrl+C` in its terminal or `pkill ollama`.
+
+---
+
+## Running Tests
+
+### Backend (48 integration tests — needs Docker)
+
+```bash
+cd backend
+set -a && source .env && set +a
+mvn test
+```
+
+> Testcontainers spins up a real PostgreSQL container. Docker must be running.
+
+### Identity Service (15 integration tests — needs Docker)
+
+```bash
+cd identity-service
+set -a && source ../backend/.env && set +a
+mvn test
+```
+
+### AI Service (129 unit tests — no Docker, no Ollama)
+
+```bash
+cd ai-service
+source venv/bin/activate
+python -m pytest tests/ -v
+```
+
+> Fast (~0.5s). All Ollama calls are mocked.
+
+### Frontend (17 unit tests)
+
+```bash
+cd frontend
+npm test
+```
+
+### Run all at once (from repo root)
+
+```bash
+# AI service
+(cd ai-service && source venv/bin/activate && python -m pytest tests/ -q)
+
+# Frontend
+(cd frontend && npm test)
+
+# Backend (needs Docker)
+(cd backend && set -a && source .env && set +a && mvn test -q)
+
+# Identity service (needs Docker)
+(cd identity-service && set -a && source ../backend/.env && set +a && mvn test -q)
+```
