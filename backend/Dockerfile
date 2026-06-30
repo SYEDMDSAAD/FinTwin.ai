@@ -7,10 +7,10 @@ WORKDIR /app
 
 # Resolve dependencies first — this layer is cached unless pom.xml changes.
 COPY pom.xml .
-RUN mvn dependency:go-offline -q
+RUN mvn dependency:go-offline -B -q
 
 COPY src ./src
-RUN mvn package -DskipTests -q
+RUN mvn package -DskipTests -B -q
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
