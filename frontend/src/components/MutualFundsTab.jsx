@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Star, TrendingUp, RefreshCw, Bookmark } from "lucide-react";
+import { Search, Star, RefreshCw, Bookmark } from "lucide-react";
 
 const CAT_COLORS = {
   "Large Cap": "#22d3ee", "Mid Cap": "#a78bfa", "Small Cap": "#fbbf24",
@@ -178,9 +178,8 @@ export default function MutualFundsTab() {
                 <button
                   onClick={() => toggleWatch(fund)}
                   style={{
-                    width: 34, height: 34, borderRadius: 9, border: "none", cursor: "pointer",
+                    width: 34, height: 34, borderRadius: 9, cursor: "pointer",
                     background: watched ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.04)",
-                    border2: "1px solid",
                     color: watched ? "#fbbf24" : "var(--text-dim)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "all 0.2s", flexShrink: 0,

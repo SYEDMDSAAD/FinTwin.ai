@@ -19,8 +19,8 @@ const MODAL_CSS = `
 
 // ─── DeleteAccountModal.jsx ───────────────────────────────────────────────────
 import { Trash2, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
-import { User, Mail, X } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import API from "../services/api";
 import InvestmentRecommendationSection from "../components/InvestmentRecommendationSection";
 import PortfolioTab from "../components/PortfolioTab";

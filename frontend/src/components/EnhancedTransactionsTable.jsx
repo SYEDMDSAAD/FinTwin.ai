@@ -1,5 +1,5 @@
 import { useState, useMemo, memo, Fragment } from "react";
-import { Download, SlidersHorizontal, X, Search, ChevronDown } from "lucide-react";
+import { Download, SlidersHorizontal, X, Search } from "lucide-react";
 
 const CATEGORIES = [
   "Food & Drinks","Shopping","Housing","Transportation","Vehicle",

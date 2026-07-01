@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import API, { identityApi } from "../services/api";
+import { identityApi } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { Lock, Eye, EyeOff } from "lucide-react";
 
@@ -35,7 +35,7 @@ function ResetPasswordPage() {
     if (newPassword.length >= 8) s++;
     if (/[A-Z]/.test(newPassword)) s++;
     if (/[0-9]/.test(newPassword)) s++;
-    if (/[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(newPassword)) s++;
+    if (/[!@#$%^&*()_+\-=[\]{}|;':",./<>?]/.test(newPassword)) s++;
     return s;
   })();
   const strengthColor = ["rgba(255,255,255,0.08)","#f87171","#fbbf24","#34d399","#34d399"][pwStrength];
@@ -132,7 +132,7 @@ function ResetPasswordPage() {
                     [/^.{8,}$/, "8+ characters"],
                     [/[A-Z]/, "uppercase letter"],
                     [/[0-9]/, "digit"],
-                    [/[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/, "special character"],
+                    [/[!@#$%^&*()_+\-=[\]{}|;':",./<>?]/, "special character"],
                   ].map(([re, label]) => (
                     <span key={label} style={{ fontSize:10, color: re.test(newPassword) ? reqMet : reqUnmet }}>
                       {re.test(newPassword) ? "✓" : "○"} {label}

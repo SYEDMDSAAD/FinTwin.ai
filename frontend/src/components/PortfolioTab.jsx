@@ -329,7 +329,7 @@ export default function PortfolioTab() {
                                     innerRadius={50}
                                     outerRadius={90}
                                     labelLine={false}
-                                    label={({ name, value }) => `${value}%`}
+                                    label={({ value }) => `${value}%`}
                                 >
                                     {pieData.map((entry) => (
                                         <Cell key={entry.name} fill={TYPE_COLORS[entry.name] || "#94a3b8"} />

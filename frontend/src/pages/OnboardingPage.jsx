@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import API, { identityApi } from "../services/api";
 import toast from "react-hot-toast";
 import {
-  CheckCircle, Sparkles, ChevronRight, Building2, Plus, RefreshCw,
-  Shield, Brain, Bell, Wallet, TrendingUp, ShoppingCart,
-  BarChart3, PiggyBank, Edit2, Lock
+  CheckCircle, Sparkles, ChevronRight, Building2, RefreshCw,
+  Shield, Bell, Edit2, Lock
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -201,7 +200,6 @@ function BankPanel({ data }) {
 
   // Pull depository vs investment from the assets list if available
   const assetList   = data?.assets   || [];
-  const liabList    = data?.liabilities || [];
 
   const depository  = assetList.filter(a => a.type === "BANK" || a.type === "SAVINGS").reduce((s, a) => s + (a.value || 0), 0);
   const investments = assetList.filter(a => a.type === "INVESTMENT" || a.type === "MUTUAL_FUND" || a.type === "STOCK").reduce((s, a) => s + (a.value || 0), 0);

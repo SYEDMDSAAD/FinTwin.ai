@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, X, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { Plus, X, TrendingUp, TrendingDown } from "lucide-react";
 
 const INDICES = [
   { label: "S&P 500",   symbol: "^GSPC", color: "#4ade80" },

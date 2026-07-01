@@ -389,7 +389,7 @@ function EmptyState({ msg }) {
 // ─── Main AnalyticsPage ───────────────────────────────────────────────────────
 const TABS = ["Incomes & Expenses Report", "Balance Trend", "Cash Flow"];
 
-export default function AnalyticsPage({ transactions = [], recurringExpenses = [], insights = [] }) {
+export default function AnalyticsPage({ transactions = [], recurringExpenses = [] }) {
   const [activeTab, setActiveTab] = useState(TABS[0]);
   const [filterOpen, setFilterOpen] = useState(typeof window !== "undefined" && window.innerWidth > 768);
   const [period, setPeriod] = useState("This month");
@@ -402,7 +402,6 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
   });
 
   const now = new Date();
-  const prevPeriod = period === "This month" ? "Last month" : period === "Last month" ? "2 months ago" : "Previous period";
 
   const currentTxns = useMemo(() => filterTransactions(transactions, filters, period, customStart, customEnd), [transactions, filters, period, customStart, customEnd]);
   const previousTxns = useMemo(() => prevPeriodTransactions(transactions, period), [transactions, period]);

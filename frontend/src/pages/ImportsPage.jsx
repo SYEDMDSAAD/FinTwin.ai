@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileText, ArrowRight, Check, X, Download } from "lucide-react";
+import { Upload, FileText, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
 
@@ -8,7 +8,7 @@ const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 function normalizeDate(str) {
   if (!str) return new Date().toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
   const d = new Date(str);
   return isNaN(d) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);

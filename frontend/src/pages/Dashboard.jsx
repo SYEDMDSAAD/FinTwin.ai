@@ -6,7 +6,7 @@ import API from "../services/api";
 
 import { useTheme } from "../context/ThemeContext";
 
-import { useCurrency, CURRENCIES } from "../context/CurrencyContext";
+import { useCurrency } from "../context/CurrencyContext";
 
 import toast from "react-hot-toast";
 
@@ -24,15 +24,11 @@ import Header from "../components/Header";
 import AnalyticsCards from "../components/AnalyticsCards";
 
 
-import ChartsInsightsSection from "../components/ChartsInsightsSection";
-
 import OCRSection from "../components/OCRSection";
 
 import CopilotSection from "../components/CopilotSection";
 
 import AffordabilitySection from "../components/AffordabilitySection";
-
-import TransactionsTable from "../components/TransactionsTable";
 
 import BankConnectionSection from "../components/BankConnectionSection";
 
@@ -42,13 +38,7 @@ import TransactionSkeleton from "../components/TransactionSkeleton";
 
 import QuickEntryDropdown from "../components/QuickEntryDropdown";
 
-import TrendChart from "../components/TrendChart";
-
-import SpendingHeatmap from "../components/SpendingHeatmap";
-
 import MonthlySummaryCard from "../components/MonthlySummaryCard";
-
-import RecurringExpenses from "../components/RecurringExpenses";
 
 import BudgetSection from "../components/BudgetSection";
 
@@ -97,8 +87,8 @@ import AnalyticsPage from "./AnalyticsPage";
 
 function Dashboard() {
 
-    const { theme, toggleTheme, isDark } = useTheme();
-    const { currency, setCurrency } = useCurrency();
+    useTheme();
+    useCurrency();
 
     // =========================
     // State
@@ -172,10 +162,6 @@ function Dashboard() {
 
     const [chatMessage,
         setChatMessage] =
-        useState("");
-
-    const [chatReply,
-        setChatReply] =
         useState("");
 
     const [messages, setMessages] =
@@ -278,7 +264,7 @@ function Dashboard() {
 
             setTransactions(response.data);
 
-        } catch (error) {
+        } catch {
 
             toast.error(
                 "Failed to fetch transactions."
@@ -304,7 +290,7 @@ function Dashboard() {
 
             setInsights(response.data);
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -332,7 +318,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -360,7 +346,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -388,7 +374,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -416,7 +402,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
                 toast.error(
                     "Failed financial score."
@@ -445,7 +431,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -472,7 +458,7 @@ function Dashboard() {
                 response.data
             );
 
-        } catch (error) {
+        } catch {
 
 
         }
@@ -496,7 +482,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -524,7 +510,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
             }
@@ -548,7 +534,7 @@ function Dashboard() {
                     response.data
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -575,7 +561,7 @@ function Dashboard() {
                 response.data
             );
 
-        } catch (error) {
+        } catch {
 
 
         }
@@ -594,7 +580,7 @@ function Dashboard() {
                 response.data
             );
 
-        } catch (error) {
+        } catch {
 
 
         }
@@ -613,7 +599,7 @@ function Dashboard() {
                 response.data
             );
 
-        } catch (error) {
+        } catch {
 
 
         }
@@ -644,7 +630,7 @@ function Dashboard() {
 
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -679,7 +665,7 @@ function Dashboard() {
 
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -709,7 +695,7 @@ function Dashboard() {
             fetchAssets();
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -738,7 +724,7 @@ function Dashboard() {
             fetchAssets();
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -768,7 +754,7 @@ function Dashboard() {
             fetchLiabilities();
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -797,7 +783,7 @@ function Dashboard() {
             fetchLiabilities();
             fetchNetWorth();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -833,7 +819,7 @@ function Dashboard() {
                     "Budget created!"
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -921,7 +907,7 @@ function Dashboard() {
 
                                 fetchFinancialScore();
 
-                            } catch (error) {
+                            } catch {
 
                                 toast.error(
                                     "Delete failed"
@@ -1017,7 +1003,7 @@ function Dashboard() {
 
             refreshDashboard();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1059,7 +1045,7 @@ function Dashboard() {
 
             refreshDashboard();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1107,7 +1093,7 @@ function Dashboard() {
 
             refreshDashboard();
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1170,49 +1156,6 @@ function Dashboard() {
 
         try {
 
-            const financialData = {
-
-                income: income,
-
-                expenses: Math.abs(expenses),
-
-                savings: savings,
-
-                financialScore:
-                    scoreData?.score ?? 0,
-
-                budgetAlerts:
-                    budgets
-                        ?.filter(
-                            (b) => b.status === "EXCEEDED"
-                        )
-                        .map(
-                            (b) =>
-                                `${b.category} exceeded by ${b.percentage}%`
-                        ) || [],
-
-                subscriptions:
-                    recurringExpenses?.map(
-                        (r) => r.merchant
-                    ) || [],
-
-                anomalies:
-                    anomalies?.map(
-                        (a) =>
-                            `${a.merchant} spending unusually high`
-                    ) || [],
-
-                notifications:
-                    notifications?.map(
-                        (n) => n.message
-                    ) || [],
-
-                forecast: {
-                    predictedExpense:
-                        forecast?.predictedExpenses || 0
-                }
-            };
-
             const response =
                 await API.post(
 
@@ -1259,7 +1202,7 @@ function Dashboard() {
                 "AI generated response!"
             );
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1317,7 +1260,7 @@ function Dashboard() {
                     "Affordability analyzed!"
                 );
 
-            } catch (error) {
+            } catch {
 
     
 
@@ -1366,7 +1309,7 @@ function Dashboard() {
 
             setGoals(response.data);
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1477,7 +1420,7 @@ function Dashboard() {
                 "Goal deleted!"
             );
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1516,7 +1459,7 @@ function Dashboard() {
                 "AI regenerated!"
             );
 
-        } catch (error) {
+        } catch {
 
 
 
@@ -1525,23 +1468,6 @@ function Dashboard() {
             );
         }
     };
-
-    // =========================
-    // Chart Data
-    // =========================
-
-    const chartData = [
-
-        {
-            name: "Income",
-            value: income
-        },
-
-        {
-            name: "Expenses",
-            value: Math.abs(expenses)
-        }
-    ];
 
     // =========================
     // UI

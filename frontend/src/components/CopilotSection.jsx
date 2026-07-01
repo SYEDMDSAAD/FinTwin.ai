@@ -1,7 +1,6 @@
 import {
     useEffect,
-    useRef,
-    useState
+    useRef
 } from "react";
 
 import toast from "react-hot-toast";

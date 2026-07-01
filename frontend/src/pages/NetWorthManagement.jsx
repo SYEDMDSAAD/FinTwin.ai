@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Wallet, CreditCard, Plus, Edit2, Trash2, Check, X, PieChart, ArrowRight, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, CreditCard, Plus, Edit2, Trash2, Check, X, ArrowRight, Info } from "lucide-react";
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');

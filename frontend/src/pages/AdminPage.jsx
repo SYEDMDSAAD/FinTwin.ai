@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, FileText, Activity, LogOut,
   Crown, UserX, UserCheck, UserMinus, RefreshCw, Search,
-  Shield, TrendingUp, Mail, Eye, Trash2, Key, User as UserIcon,
+  Shield, TrendingUp, Mail, Eye, Trash2, Key,
   ChevronRight, X, AlertTriangle, CheckCircle, XCircle,
   ArrowUpRight, Clock, Cpu, Database,
   ShieldAlert, MessageSquare, Ban, Send, AlertOctagon,
@@ -15,7 +15,7 @@ import {
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, BarChart, Bar
+  LineChart, Line
 } from "recharts";
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -711,7 +711,7 @@ function SecuritySection() {
     finally { setActId(null); }
   };
 
-  const SectionHead = ({ title, count, color = "#a78bfa" }) => (
+  const SectionHead = ({ title, count }) => (
     <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
       <span style={{ fontSize:14, fontWeight:700, color:"#fff" }}>{title}</span>
       {count > 0 && <span className="badge" style={{ background:`${riskBg.HIGH}`, color:"#f87171", border:"1px solid rgba(239,68,68,0.2)" }}>{count}</span>}

@@ -22,20 +22,6 @@ function BudgetCard({
         100
     );
 
-    // =========================
-    // Progress Color
-    // =========================
-
-    const progressColor =
-
-        percentage >= 90
-            ? "bg-red-500"
-
-        : percentage >= 70
-            ? "bg-yellow-500"
-
-        : "bg-green-500";
-
     return (
 
         <GlassCard

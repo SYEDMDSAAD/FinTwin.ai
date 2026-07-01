@@ -1,4 +1,4 @@
-import { User, Mail, Calendar, Wallet, Target, Shield, Crown, Sparkles, Edit2, Lock, Trash2, ArrowLeft } from "lucide-react";
+import { User, Mail, Calendar, Wallet, Target, Shield, Sparkles, Edit2, Lock, Trash2, ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";

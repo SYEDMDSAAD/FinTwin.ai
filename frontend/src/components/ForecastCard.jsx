@@ -1,10 +1,7 @@
 import GlassCard from "./GlassCard";
 
 import {
-    TrendingUp,
-    TrendingDown,
-    Sparkles,
-    ShieldCheck
+    Sparkles
 } from "lucide-react";
 
 import {

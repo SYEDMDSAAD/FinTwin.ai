@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Wallet, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
 
 function AnimatedNumber({ value = 0, prefix = "₹", duration = 1200 }) {
   const [display, setDisplay] = useState(0);
@@ -16,7 +16,7 @@ function AnimatedNumber({ value = 0, prefix = "₹", duration = 1200 }) {
   return <span>{prefix}{Math.round(display).toLocaleString("en-IN")}</span>;
 }
 
-function NetWorthSection({ netWorth, assets, liabilities }) {
+function NetWorthSection({ netWorth }) {
   if (!netWorth) return null;
 
   const isHealthy = netWorth.netWorth >= 0;

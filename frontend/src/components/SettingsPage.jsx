@@ -93,7 +93,7 @@ function Toggle({ on, onChange }) {
 // ── Inline 2FA modal ──────────────────────────────────────────────────────────
 
 function TwoFAModal({ enabled, onClose, onSuccess }) {
-  const [phase,      setPhase]      = useState(enabled ? "disable" : "setup");
+  const [phase]      = useState(enabled ? "disable" : "setup");
   const [qrData,     setQrData]     = useState(null);  // { qrCodeBase64, secret }
   const [qrLoading,  setQrLoading]  = useState(false);
   const [otpCode,    setOtpCode]    = useState(["", "", "", "", "", ""]);

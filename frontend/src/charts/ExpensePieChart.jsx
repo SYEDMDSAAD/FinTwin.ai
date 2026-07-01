@@ -3,8 +3,7 @@ import {
     Pie,
     Cell,
     Tooltip,
-    ResponsiveContainer,
-    Legend
+    ResponsiveContainer
 } from "recharts";
 
 const COLORS = [

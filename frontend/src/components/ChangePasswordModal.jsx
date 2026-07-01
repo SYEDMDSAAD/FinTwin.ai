@@ -20,9 +20,9 @@ const MODAL_CSS = `
 // ─── ChangePasswordModal.jsx ──────────────────────────────────────────────────
 import { Shield, Lock, Eye, EyeOff } from "lucide-react";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-import { User, Mail, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import API from "../services/api";
 import toast from "react-hot-toast";

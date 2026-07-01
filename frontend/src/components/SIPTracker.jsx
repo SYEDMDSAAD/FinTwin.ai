@@ -87,7 +87,7 @@ export default function SIPTracker() {
         </div>
         <button
           onClick={() => setShowAdd(o => !o)}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 12, border: "none", background: "rgba(167,139,250,0.12)", border2: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid rgba(167,139,250,0.25)" }}
+          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 12, background: "rgba(167,139,250,0.12)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid rgba(167,139,250,0.25)" }}
         >
           <Plus size={14} /> Add SIP
         </button>

@@ -1,14 +1,5 @@
 import GlassCard from "./GlassCard";
 
-import {
-    PieChart,
-    Pie,
-    Cell,
-    Tooltip,
-    ResponsiveContainer,
-    Legend
-} from "recharts";
-
 import { Sparkles } from "lucide-react";
 
 function CategoryForecastCard({

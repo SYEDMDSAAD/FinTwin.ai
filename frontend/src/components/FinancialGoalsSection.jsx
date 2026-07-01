@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { Target, Zap, Edit2, Trash2, RefreshCw, Link, RefreshCcw } from "lucide-react";
+import { Target, Zap, Edit2, Trash2, RefreshCw, Link } from "lucide-react";
 import GlassCard from "./GlassCard";
 
 const SIP_LINKS_KEY = "fintwin-goal-sip-links";
