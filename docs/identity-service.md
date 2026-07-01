@@ -202,7 +202,6 @@ identity-service/
 | `POST` | `/api/2fa/setup` | Generate TOTP secret + QR code |
 | `POST` | `/api/2fa/enable` | Enable 2FA (verify first code) |
 | `POST` | `/api/2fa/disable` | Disable 2FA (verify code) |
-| `GET` | `/api/2fa/debug` | Dev helper: expected code + seconds remaining |
 
 ### Admin (JWT + ADMIN role)
 
