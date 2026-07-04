@@ -33,7 +33,7 @@ pillow==12.2.0
 pytesseract==0.3.13
 
 # ── Market data (were missing — required by investments/price_service.py) ────
-yfinance==1.4.1
+yfinance==1.5.1
 
 # ── Shared transitives ───────────────────────────────────────────────────────
 python-dateutil==2.9.0.post0
