@@ -35,7 +35,7 @@ jobs:
         run: echo "week=$(date +%Y-W%U)" >> "$GITHUB_OUTPUT"
 
       - name: Cache OWASP NVD database
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository/org/owasp
           # Keyed by week (not run_id, which is unique every run and could never
