@@ -10,6 +10,9 @@ const SCORE_BANDS = [
   { label: "Excellent", min: 800, max: 900, color: "#a78bfa" },
 ];
 
+// Fallback only — the backend sends authoritative `band` and `bandColor`
+// with the score; the local table exists for gauge geometry and for older
+// responses that lack them.
 function getBand(score) {
   return SCORE_BANDS.find(b => score >= b.min && score <= b.max) || SCORE_BANDS[0];
 }
@@ -92,7 +95,12 @@ export default function CreditScoreCard() {
   useEffect(() => { fetchScore(); }, []);
 
   const score = data?.score ?? 0;
-  const band  = getBand(score);
+  const fallback = getBand(score);
+  // Backend band/color are authoritative — the local thresholds can drift.
+  const band = {
+    label: data?.band ?? fallback.label,
+    color: data?.bandColor ?? fallback.color,
+  };
 
   return (
     <div style={{
@@ -143,7 +151,7 @@ export default function CreditScoreCard() {
                 border: `1px solid ${band.color}30`, borderRadius: 8, padding: "4px 12px",
                 marginBottom: 10,
               }}>
-                {data?.band ?? band.label}
+                {band.label}
               </div>
               <ScoreGauge score={score} />
             </div>

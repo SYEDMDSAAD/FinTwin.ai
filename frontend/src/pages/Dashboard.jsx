@@ -221,6 +221,34 @@ function Dashboard() {
     // Initial Load
     // =========================
 
+    // ── Aggregated load-error reporting ──────────────────────────────────
+    // refreshDashboard fires ~15 fetches in parallel; when the backend is
+    // unreachable, each used to raise its own toast — a 15-toast storm.
+    // Failures within a short window are collected: many failures produce
+    // one summary toast, isolated failures keep their specific message.
+    // Stable toast ids also stop the 30s notification poll from stacking
+    // an endless column of identical toasts during an outage.
+    const loadErrors = useRef(new Set());
+    const loadErrorTimer = useRef(null);
+    const reportLoadError = (section) => {
+        loadErrors.current.add(section);
+        clearTimeout(loadErrorTimer.current);
+        loadErrorTimer.current = setTimeout(() => {
+            const failed = [...loadErrors.current];
+            loadErrors.current = new Set();
+            if (failed.length >= 3) {
+                toast.error(
+                    `Couldn't load ${failed.length} dashboard sections. Check your connection and refresh.`,
+                    { id: "dashboard-load-errors" }
+                );
+            } else {
+                failed.forEach((name) =>
+                    toast.error(`Failed to load ${name}.`, { id: `load-${name}` })
+                );
+            }
+        }, 800);
+    };
+
     useEffect(() => {
 
         API.get("/transactions/chat/history")
@@ -266,9 +294,7 @@ function Dashboard() {
 
         } catch {
 
-            toast.error(
-                "Failed to fetch transactions."
-            );
+            reportLoadError("transactions");
 
         } finally {
 
@@ -294,9 +320,7 @@ function Dashboard() {
 
 
 
-            toast.error(
-                "Failed to fetch insights."
-            );
+            reportLoadError("insights");
         }
     };
 
@@ -322,9 +346,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed monthly summary."
-                );
+                reportLoadError("monthly summary");
             }
         };
 
@@ -350,9 +372,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed recurring expenses."
-                );
+                reportLoadError("recurring expenses");
             }
         };
 
@@ -378,9 +398,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed to fetch budgets."
-                );
+                reportLoadError("budgets");
             }
         };
 
@@ -404,9 +422,7 @@ function Dashboard() {
 
             } catch {
 
-                toast.error(
-                    "Failed financial score."
-                );
+                reportLoadError("financial score");
 
             } finally {
                 markCriticalDone();
@@ -435,9 +451,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed anomalies."
-                );
+                reportLoadError("anomalies");
             }
         };
 
@@ -486,9 +500,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed forecast."
-                );
+                reportLoadError("forecast");
             }
         };
 
@@ -538,9 +550,7 @@ function Dashboard() {
 
     
 
-                toast.error(
-                    "Failed category forecast."
-                );
+                reportLoadError("category forecast");
             }
         };
         
@@ -1313,9 +1323,7 @@ function Dashboard() {
 
 
 
-            toast.error(
-                "Failed to fetch goals."
-            );
+            reportLoadError("goals");
         }
     };
     
