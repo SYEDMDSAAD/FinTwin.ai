@@ -8,6 +8,8 @@ Sources:
   FD / PPF / NPS / Bonds → compound interest calculation
 """
 
+import os
+
 import yfinance as yf
 import requests
 from datetime import date
@@ -15,6 +17,11 @@ from typing import List, Dict, Optional
 
 MFAPI_BASE = "https://api.mfapi.in/mf"
 FX_API     = "https://open.er-api.com/v6/latest/USD"
+
+# Last-resort fallbacks when the live APIs are unreachable. Env-configurable
+# because hardcoded market constants silently go stale.
+_FALLBACK_USD_INR       = float(os.environ.get("FALLBACK_USD_INR", "84.0"))
+_FALLBACK_GOLD_INR_GRAM = float(os.environ.get("FALLBACK_GOLD_INR_PER_GRAM", "7500.0"))
 
 # Simple in-process cache (reset on each AI service restart)
 _fx_cache   = {"rate": None, "day": None}
@@ -32,7 +39,7 @@ def _usd_inr() -> float:
         _fx_cache.update({"rate": rate, "day": today})
         return rate
     except Exception:
-        return 84.0  # fallback
+        return _FALLBACK_USD_INR
 
 
 def _gold_inr_per_gram() -> float:
@@ -45,7 +52,7 @@ def _gold_inr_per_gram() -> float:
         _gold_cache.update({"price": price, "day": today})
         return price
     except Exception:
-        return 7500.0  # fallback ~₹7,500/gram
+        return _FALLBACK_GOLD_INR_GRAM
 
 
 def _mf_nav(scheme_code: str) -> Optional[float]:
@@ -82,6 +89,16 @@ def _crypto_price_inr(ticker: str) -> Optional[float]:
 
 
 def _compound(principal: float, rate_pct: float, purchase_date_str: Optional[str]) -> float:
+    """Annual compounding of the full principal from the purchase date.
+
+    Two documented approximations:
+    - The stored investedAmount may be a SUM of contributions (e.g. detected
+      SIPs), all compounded from the earliest date — this OVERSTATES value,
+      since later contributions earn interest they never had time for.
+    - Indian FDs typically compound quarterly; annual compounding slightly
+      UNDERSTATES. The two errors partially offset, but treat the result as
+      an estimate, not an accrual.
+    """
     if not purchase_date_str:
         return principal
     try:

@@ -48,9 +48,9 @@ def generate_weekly_report(data: dict) -> dict:
     )
 
     summary = _ask_section(
-        f"You are FinTwin AI. Write a 2-sentence executive summary for this user's weekly financial report. Use real numbers.\n"
+        f"You are FinTwin AI. Write a 2-sentence executive summary of this user's current financial health. Use real numbers.\n"
         f"{profile}\n"
-        f"Sentence 1: Overall financial health this week.\n"
+        f"Sentence 1: Overall financial health right now.\n"
         f"Sentence 2: The single most important thing to focus on.\n"
         f"Only the 2 sentences, no headers.",
         max_tokens=120,
