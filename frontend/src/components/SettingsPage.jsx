@@ -434,7 +434,10 @@ export default function SettingsPage({ navigateTo }) {
                 <div className="sp-card">
                   <SectionLabel>CURRENCY</SectionLabel>
                   <div style={{ padding: "16px 20px" }}>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 12px" }}>Choose the currency symbol displayed throughout the app.</p>
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 12px" }}>
+                      All amounts are denominated in Indian Rupees. Additional display
+                      currencies will be available once live exchange-rate conversion is supported.
+                    </p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {CURRENCIES.map(c => (
                         <button
