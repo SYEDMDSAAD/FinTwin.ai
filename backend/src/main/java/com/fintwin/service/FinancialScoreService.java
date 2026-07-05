@@ -33,17 +33,14 @@ public class FinancialScoreService {
     private final TransactionRepository transactionRepository;
     private final UserRepository        userRepository;
     private final BudgetService         budgetService;
-    private final AnalyticsService      analyticsService;
 
     public FinancialScoreService(
             TransactionRepository transactionRepository,
             UserRepository        userRepository,
-            BudgetService         budgetService,
-            AnalyticsService      analyticsService) {
+            BudgetService         budgetService) {
         this.transactionRepository = transactionRepository;
         this.userRepository        = userRepository;
         this.budgetService         = budgetService;
-        this.analyticsService      = analyticsService;
     }
 
     @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
@@ -54,6 +51,17 @@ public class FinancialScoreService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
+
+        return calculateScoreFor(user);
+    }
+
+    /**
+     * User-parameterized, annotation-free scoring — the single source of
+     * truth for the financial score. ProfileService (profile display and
+     * score-history snapshots) and InvestmentRecommendationService delegate
+     * here so every surface shows the same number.
+     */
+    public FinancialScoreDTO calculateScoreFor(User user) {
 
         List<Transaction> txns = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 
@@ -108,7 +116,7 @@ public class FinancialScoreService {
         }
 
         // ── 3. Budget Discipline (max 20 pts) ─────────────────────────────
-        List<BudgetStatusDTO> budgets = budgetService.getBudgetStatus();
+        List<BudgetStatusDTO> budgets = budgetService.getBudgetStatusFor(user);
         long exceeded = budgets.stream().filter(BudgetStatusDTO::getExceeded).count();
         int total     = budgets.size();
         int budgetPts;
@@ -192,7 +200,20 @@ public class FinancialScoreService {
         else if (score >= 50) rating = "Average";
         else                  rating = "Poor";
 
-        int recurringCount = analyticsService.getRecurringExpenses().size();
+        // Recurring merchants: expenses at the same merchant in 3+ distinct
+        // months of the window (computed inline from the already-loaded
+        // window, with a null-merchant guard).
+        int recurringCount = (int) txns.stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0
+                        && t.getMerchant() != null && t.getDate() != null)
+                .collect(Collectors.groupingBy(
+                        Transaction::getMerchant,
+                        Collectors.mapping(
+                                t -> t.getDate().toString().substring(0, 7),
+                                Collectors.toSet())))
+                .values().stream()
+                .filter(monthsSeen -> monthsSeen.size() >= 3)
+                .count();
 
         List<FactorDTO> factors = List.of(
             new FactorDTO("Savings Rate",          "High",   savingsPts,     30, savingsStatus,     savingsDesc),

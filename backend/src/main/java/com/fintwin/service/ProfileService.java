@@ -32,6 +32,11 @@ public class ProfileService {
     @Autowired private AssetRepository assetRepository;
     @Autowired private LiabilityRepository liabilityRepository;
 
+    // @Lazy breaks the instantiation cycle:
+    // ProfileService ← BudgetService ← FinancialScoreService ← (this field)
+    @Autowired @org.springframework.context.annotation.Lazy
+    private FinancialScoreService financialScoreService;
+
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
     private final FinancialGoalRepository goalRepository;
@@ -252,42 +257,10 @@ public class ProfileService {
         financialScoreHistoryRepository.save(history);
     }
 
-    // FIXED: now uses same formula as FinancialScoreService
-    // to avoid score inconsistency across the app
+    // Delegates to the single source of truth (5-factor FinTwin Score) —
+    // previously this had its own base-40 formula, so the profile page and
+    // score history disagreed with the score page for the same user.
     private int calculateFinancialScore(User user) {
-
-        List<Transaction> transactions =
-                transactionRepository
-                        .findLatestThreeMonthsTransactions(user.getId());
-
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
-
-        double savings = income - expenses;
-        double ratio = income > 0 ? (savings / income) * 100 : 0;
-
-        int score = 40;
-        if (ratio >= 40)      score += 30;
-        else if (ratio >= 30) score += 22;
-        else if (ratio >= 20) score += 15;
-        else if (ratio >= 10) score +=  8;
-
-        if (income > 0) {
-            double expenseRatio = expenses / income;
-            if (expenseRatio > 0.90)      score -= 15;
-            else if (expenseRatio > 0.80) score -= 10;
-            else if (expenseRatio > 0.70) score -=  5;
-        }
-
-        if (income == 0) score -= 20;
-
-        return Math.max(0, Math.min(100, score));
+        return financialScoreService.calculateScoreFor(user).getScore();
     }
 }

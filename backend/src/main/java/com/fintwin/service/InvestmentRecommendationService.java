@@ -30,6 +30,9 @@ public class InvestmentRecommendationService {
     private NetWorthService netWorthService;
 
     @Autowired
+    private FinancialScoreService financialScoreService;
+
+    @Autowired
     private FinancialGoalRepository goalRepository;
 
     @Autowired
@@ -66,7 +69,7 @@ public class InvestmentRecommendationService {
 
         double netWorth = netWorthService.getNetWorth().getNetWorth();
 
-        int financialScore = computeFinancialScore(income, expenses, savings);
+        int financialScore = financialScoreService.calculateScoreFor(user).getScore();
 
         String goalHealth = computeWorstGoalHealth(user);
 
@@ -83,28 +86,6 @@ public class InvestmentRecommendationService {
                 body,
                 Map.class
         );
-    }
-
-    // Same formula as ProfileService.calculateFinancialScore
-    private int computeFinancialScore(double income, double expenses, double savings) {
-        double ratio = income > 0 ? (savings / income) * 100 : 0;
-
-        int score = 40;
-        if      (ratio >= 40) score += 30;
-        else if (ratio >= 30) score += 22;
-        else if (ratio >= 20) score += 15;
-        else if (ratio >= 10) score +=  8;
-
-        if (income > 0) {
-            double expenseRatio = expenses / income;
-            if      (expenseRatio > 0.90) score -= 15;
-            else if (expenseRatio > 0.80) score -= 10;
-            else if (expenseRatio > 0.70) score -=  5;
-        }
-
-        if (income == 0) score -= 20;
-
-        return Math.max(0, Math.min(100, score));
     }
 
     // Returns the worst health status across all user goals

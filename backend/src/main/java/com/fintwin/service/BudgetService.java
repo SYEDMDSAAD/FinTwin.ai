@@ -163,6 +163,14 @@ public class BudgetService {
                         new NotFoundException("User not found")
                 );
 
+        return getBudgetStatusFor(user);
+    }
+
+    // Internal, user-parameterized variant — used by FinancialScoreService so
+    // score snapshots can be computed for a known user without going through
+    // the request-scoped security context.
+    public List<BudgetStatusDTO> getBudgetStatusFor(User user) {
+
         List<Budget> budgets = budgetRepository.findByUser(user);
 
         java.time.YearMonth currentMonth = java.time.YearMonth.now();
