@@ -66,16 +66,16 @@ public class JwtUtil {
     }
 
     public Claims extractClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+        return Jwts.parser()
+                .verifyWith(SECRET_KEY)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(SECRET_KEY).build().parseClaimsJws(token);
+            Jwts.parser().verifyWith(SECRET_KEY).build().parseSignedClaims(token);
             return true;
         } catch (Exception e) {
             return false;

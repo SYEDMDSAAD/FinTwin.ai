@@ -9,7 +9,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.13</version>
+        <version>3.5.3</version>
         <relativePath/>
     </parent>
 
@@ -25,6 +25,9 @@
              Docker 29.x requires minimum API 1.40; Testcontainers 1.20+ uses
              docker-java 3.4.x which targets API 1.41 by default. -->
         <testcontainers.version>1.20.6</testcontainers.version>
+        <!-- Spring Boot 3.5.3 manages 10.1.42, which has several CVSS >= 9 CVEs.
+             Override to the latest 10.1.x patch to clear them without a major bump. -->
+        <tomcat.version>10.1.55</tomcat.version>
     </properties>
 
     <dependencies>
