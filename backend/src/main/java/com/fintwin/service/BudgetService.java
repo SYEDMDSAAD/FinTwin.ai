@@ -144,11 +144,11 @@ public class BudgetService {
 
     // =========================
     // BUDGET STATUS
-    // FIXED: was fetching all 3-month transactions then
-    // re-filtering by 3-month cutoff — redundant double
-    // filter. Removed duplicate filter.
-    // IMPROVEMENT: added percentage field to DTO for
-    // frontend progress bars without client-side math.
+    // Budget limits are monthly (the universal convention), so spend is
+    // measured against the current calendar month only. Previously the
+    // full 3-month window was summed against the limit, which made every
+    // monthly budget read as ~3x spent and permanently "exceeded" — also
+    // wrongly dragging down the Budget Discipline score factor.
     // =========================
 
     @PreAuthorize("hasAuthority('READ_OWN_BUDGETS')")
@@ -165,11 +165,14 @@ public class BudgetService {
 
         List<Budget> budgets = budgetRepository.findByUser(user);
 
-        // FIXED: removed the duplicate cutoff filter that was
-        // reapplied after findLatestThreeMonthsTransactions
+        java.time.YearMonth currentMonth = java.time.YearMonth.now();
         List<Transaction> transactions =
                 transactionRepository
-                        .findLatestThreeMonthsTransactions(user.getId());
+                        .findLatestThreeMonthsTransactions(user.getId())
+                        .stream()
+                        .filter(t -> t.getDate() != null
+                                && java.time.YearMonth.from(t.getDate()).equals(currentMonth))
+                        .toList();
 
         List<BudgetStatusDTO> result = new ArrayList<>();
 

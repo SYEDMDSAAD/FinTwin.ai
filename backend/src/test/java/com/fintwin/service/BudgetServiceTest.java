@@ -245,6 +245,27 @@ class BudgetServiceTest {
         assertThat(result.get(0).getSpent()).isEqualTo(500.0);
     }
 
+    @Test
+    void getBudgetStatus_priorMonthSpendNotCounted() {
+        Budget food = budget("Food", 5000.0);
+        food.setId(1L);
+        food.setUser(user);
+        when(budgetRepository.findByUser(user)).thenReturn(List.of(food));
+
+        Transaction lastMonth = txn("Food", -900.0);
+        lastMonth.setDate(java.time.LocalDate.now().minusMonths(1));
+
+        when(transactionRepository.findLatestThreeMonthsTransactions(1L))
+                .thenReturn(List.of(
+                        txn("Food", -500.0),  // this month — counts
+                        lastMonth             // prior month — must not count
+                ));
+
+        List<BudgetStatusDTO> result = service.getBudgetStatus();
+
+        assertThat(result.get(0).getSpent()).isEqualTo(500.0);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private Budget budget(String category, double limit) {
@@ -258,6 +279,8 @@ class BudgetServiceTest {
         Transaction t = new Transaction();
         t.setCategory(category);
         t.setAmount(amount);
+        // Budget status only counts current-month spend
+        t.setDate(java.time.LocalDate.now());
         return t;
     }
 }
