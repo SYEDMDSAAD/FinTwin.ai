@@ -137,7 +137,7 @@ public class InvestmentService {
 
             String name = extractName(raw, n, type);
             double amount = Math.abs(t.getAmount());
-            LocalDate date = parseDate(t.getDate());
+            LocalDate date = t.getDate();
 
             DetectedEntry entry = grouped.computeIfAbsent(name, k -> new DetectedEntry(type, date));
             entry.totalAmount += amount;
@@ -349,15 +349,6 @@ public class InvestmentService {
         }
         String name = sb.toString().trim();
         return name.isEmpty() ? type + " Investment" : name;
-    }
-
-    private LocalDate parseDate(String dateStr) {
-        if (dateStr == null) return null;
-        try {
-            return LocalDate.parse(dateStr.substring(0, 10));
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private User currentUser() {

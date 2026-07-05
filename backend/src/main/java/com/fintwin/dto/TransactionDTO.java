@@ -20,7 +20,7 @@ public record TransactionDTO(
     public static TransactionDTO from(Transaction t) {
         return new TransactionDTO(
                 t.getId(),
-                t.getDate(),
+                t.getDate() != null ? t.getDate().toString() : null,
                 t.getMerchant(),
                 t.getAmount(),
                 t.getCategory(),

@@ -159,7 +159,7 @@ public class OnboardingService {
             // Oldest month first: (total-1) months ago → 0 months ago
             LocalDate month = today.minusMonths(total - 1 - i);
 
-            batch.add(buildTransaction(user, month.withDayOfMonth(1).toString(), "Employer", mIncome, "Income"));
+            batch.add(buildTransaction(user, month.withDayOfMonth(1), "Employer", mIncome, "Income"));
 
             for (Object[] row : EXPENSE_TEMPLATE) {
                 int    day      = (int)    row[0];
@@ -169,7 +169,7 @@ public class OnboardingService {
 
                 LocalDate txDate = month.withDayOfMonth(day);
                 if (!txDate.isAfter(today)) {
-                    batch.add(buildTransaction(user, txDate.toString(), merchant, -(mExpenses * fraction), category));
+                    batch.add(buildTransaction(user, txDate, merchant, -(mExpenses * fraction), category));
                 }
             }
         }
@@ -223,7 +223,7 @@ public class OnboardingService {
         return g;
     }
 
-    private Transaction buildTransaction(User user, String date, String merchant, double amount, String category) {
+    private Transaction buildTransaction(User user, LocalDate date, String merchant, double amount, String category) {
         Transaction t = new Transaction();
         t.setUser(user);
         t.setDate(date);

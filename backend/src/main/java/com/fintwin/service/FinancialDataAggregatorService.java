@@ -31,7 +31,7 @@ public class FinancialDataAggregatorService {
     private ChatHistoryRepository chatHistoryRepository;
 
     public FinancialSummaryDTO aggregate(User user) {
-        String cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1).toString();
+        LocalDate cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1);
         List<Transaction> transactions =
                 transactionRepository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
 

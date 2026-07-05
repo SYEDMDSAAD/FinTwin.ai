@@ -87,7 +87,8 @@ public class AnomalyService {
 
             double avg = mtxns.stream().mapToDouble(t -> Math.abs(t.getAmount())).average().orElse(0);
             Transaction latest = mtxns.stream()
-                    .max(Comparator.comparing(t -> LocalDate.parse(t.getDate())))
+                    .max(Comparator.comparing(Transaction::getDate,
+                            Comparator.nullsFirst(Comparator.naturalOrder())))
                     .orElse(mtxns.get(mtxns.size() - 1));
 
             double latestAmt = Math.abs(latest.getAmount());
@@ -110,12 +111,12 @@ public class AnomalyService {
         // ── 2. Category monthly spike: this month vs prior 2-month average ─
         String thisMonth = LocalDate.now().toString().substring(0, 7);
         Map<String, Double> thisMonthCat = expenses.stream()
-                .filter(t -> t.getDate() != null && t.getDate().startsWith(thisMonth) && t.getCategory() != null)
+                .filter(t -> t.getDate() != null && t.getDate().toString().startsWith(thisMonth) && t.getCategory() != null)
                 .collect(Collectors.groupingBy(Transaction::getCategory,
                         Collectors.summingDouble(t -> Math.abs(t.getAmount()))));
 
         Map<String, Double> priorCat = expenses.stream()
-                .filter(t -> t.getDate() != null && !t.getDate().startsWith(thisMonth) && t.getCategory() != null)
+                .filter(t -> t.getDate() != null && !t.getDate().toString().startsWith(thisMonth) && t.getCategory() != null)
                 .collect(Collectors.groupingBy(Transaction::getCategory,
                         Collectors.summingDouble(t -> Math.abs(t.getAmount()))));
 
@@ -169,7 +170,7 @@ public class AnomalyService {
         }
 
         // ── 4. Spending burst: 5+ transactions on a single day ───────────
-        Map<String, Long> txPerDay = expenses.stream()
+        Map<LocalDate, Long> txPerDay = expenses.stream()
                 .filter(t -> t.getDate() != null)
                 .collect(Collectors.groupingBy(Transaction::getDate, Collectors.counting()));
 

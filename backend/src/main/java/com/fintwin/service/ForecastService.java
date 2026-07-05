@@ -91,7 +91,7 @@ public class ForecastService {
                 income += t.getAmount();
             }
             Map<String, Object> tx = new HashMap<>();
-            tx.put("date", t.getDate());
+            tx.put("date", t.getDate() != null ? t.getDate().toString() : null);
             tx.put("amount", t.getAmount());
             tx.put("category",
                     t.getCategory() != null ? t.getCategory() : "Other"
@@ -165,8 +165,8 @@ public class ForecastService {
         Map<String, Double> byMonth = new LinkedHashMap<>();
         for (Transaction t : all) {
             if (t.getAmount() == null || t.getAmount() >= 0) continue;
-            if (t.getDate() == null || t.getDate().length() < 7) continue;
-            String month = t.getDate().substring(0, 7);
+            if (t.getDate() == null) continue;
+            String month = t.getDate().toString().substring(0, 7);
             byMonth.merge(month, Math.abs(t.getAmount()), Double::sum);
         }
 

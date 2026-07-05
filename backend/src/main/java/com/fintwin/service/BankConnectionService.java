@@ -577,9 +577,8 @@ public class BankConnectionService {
 
         String narration = safeStr(raw, "narration");
         String timestamp = safeStr(raw, "transactionTimestamp");
-        String date      = timestamp != null && timestamp.length() >= 10
-                           ? timestamp.substring(0, 10)
-                           : LocalDateTime.now().toString().substring(0, 10);
+        LocalDate parsedDate = com.fintwin.util.DateNormalizer.parseFlexible(timestamp);
+        LocalDate date       = parsedDate != null ? parsedDate : LocalDate.now();
 
         // Populate masked account number on the connection object (once)
         if (conn.getMaskedAccountNumber() == null) {

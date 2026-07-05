@@ -63,7 +63,7 @@ public class SpendingCoachService {
             map.put("amount", t.getAmount());
             map.put("category", t.getCategory());
             map.put("merchant", t.getMerchant());
-            map.put("date", t.getDate());
+            map.put("date", t.getDate() != null ? t.getDate().toString() : null);
 
             payloadTransactions.add(map);
         }

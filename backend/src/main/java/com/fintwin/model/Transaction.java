@@ -7,6 +7,7 @@ import com.fintwin.security.EncryptedBigDecimalConverter;
 import com.fintwin.security.EncryptionConverter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Entity
 @Table(indexes = {
@@ -26,7 +27,9 @@ public class Transaction {
     @Version
     private Long version;
 
-    private String date;
+    // Proper DATE column — ingest points normalize external strings via
+    // DateNormalizer so regional formats can never reach the database.
+    private LocalDate date;
 
     @Convert(converter = EncryptionConverter.class)
     @Column(length = 400)

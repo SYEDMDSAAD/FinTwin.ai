@@ -87,7 +87,7 @@ public class ExpenseParserService {
         Transaction transaction = new Transaction();
         transaction.setMerchant(merchant);
         transaction.setAmount(-amount);
-        transaction.setDate(java.time.LocalDate.now().toString());
+        transaction.setDate(java.time.LocalDate.now());
         return transaction;
     }
 

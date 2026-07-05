@@ -29,10 +29,10 @@ public interface TransactionRepository
     List<Transaction> findSeededByUser(@Param("user") User user);
 
     @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.date >= :cutoff ORDER BY t.date ASC")
-    List<Transaction> findLatestThreeMonthsTransactions(@Param("userId") Long userId, @Param("cutoff") String cutoff);
+    List<Transaction> findLatestThreeMonthsTransactions(@Param("userId") Long userId, @Param("cutoff") java.time.LocalDate cutoff);
 
     default List<Transaction> findLatestThreeMonthsTransactions(Long userId) {
-        String cutoff = java.time.LocalDate.now().minusMonths(2).withDayOfMonth(1).toString();
+        java.time.LocalDate cutoff = java.time.LocalDate.now().minusMonths(2).withDayOfMonth(1);
         return findLatestThreeMonthsTransactions(userId, cutoff);
     }
 }

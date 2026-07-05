@@ -15,7 +15,6 @@ import com.fintwin.security.SecurityUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -51,7 +50,7 @@ public class AnalyticsService {
 
         transactions = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return d != null && !d.isBefore(cutoffDate);
                 })
                 .toList();
@@ -76,7 +75,7 @@ public class AnalyticsService {
 
         double currentIncome = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return t.getAmount() != null && t.getAmount() > 0
                             && d != null && !d.isBefore(currentMonthStart);
                 })
@@ -85,7 +84,7 @@ public class AnalyticsService {
 
         double currentExpenses = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return t.getAmount() != null && t.getAmount() < 0
                             && d != null && !d.isBefore(currentMonthStart);
                 })
@@ -96,7 +95,7 @@ public class AnalyticsService {
 
         double previousIncome = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return t.getAmount() != null && t.getAmount() > 0
                             && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
                 })
@@ -105,7 +104,7 @@ public class AnalyticsService {
 
         double previousExpenses = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return t.getAmount() != null && t.getAmount() < 0
                             && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
                 })
@@ -204,7 +203,7 @@ public class AnalyticsService {
 
         transactions = transactions.stream()
                 .filter(t -> {
-                    LocalDate d = parseDateSafe(t.getDate());
+                    LocalDate d = t.getDate();
                     return d != null && !d.isBefore(cutoffDate);
                 })
                 .toList();
@@ -269,20 +268,7 @@ public class AnalyticsService {
         return result;
     }
 
-    // Handles YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY; returns null for unparseable
-    private static final DateTimeFormatter DMY_SLASH = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter DMY_DASH  = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-
-    private static LocalDate parseDateSafe(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return LocalDate.parse(s); } catch (Exception ignored) {}
-        try { return LocalDate.parse(s, DMY_SLASH); } catch (Exception ignored) {}
-        try { return LocalDate.parse(s, DMY_DASH); } catch (Exception ignored) {}
-        return null;
-    }
-
-    private static String toYearMonth(String s) {
-        LocalDate d = parseDateSafe(s);
+    private static String toYearMonth(LocalDate d) {
         return d != null ? d.toString().substring(0, 7) : "unknown";
     }
 

@@ -8,6 +8,7 @@ import com.opencsv.CSVReader;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
+import com.fintwin.util.DateNormalizer;
 import com.fintwin.audit.Audited;
 
 import java.time.LocalDate;
@@ -137,8 +138,14 @@ public class TransactionService {
                 try {
                     if (row.length < 3) continue;
 
+                    LocalDate txDate = DateNormalizer.parseFlexible(row[0]);
+                    if (txDate == null) {
+                        log.warn("Skipping CSV row {} — unparseable date '{}'", i, row[0]);
+                        continue;
+                    }
+
                     Transaction transaction = new Transaction();
-                    transaction.setDate(row[0].trim());
+                    transaction.setDate(txDate);
                     transaction.setMerchant(row[1].trim());
                     transaction.setAmount(
                             Double.parseDouble(row[2].trim())
@@ -195,7 +202,7 @@ public class TransactionService {
                         new NotFoundException("User not found")
                 );
 
-        String cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1).toString();
+        LocalDate cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1);
         return repository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
     }
 
@@ -323,8 +330,10 @@ public class TransactionService {
                 .findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
+        LocalDate txDate = DateNormalizer.parseFlexible(date);
+
         Transaction t = new Transaction();
-        t.setDate(date != null && !date.isBlank() ? date : LocalDate.now().toString());
+        t.setDate(txDate != null ? txDate : LocalDate.now());
         t.setMerchant(merchant != null ? merchant : "Unknown");
         t.setAmount(amount != null ? amount : 0.0);
         t.setCategory(category != null && !category.isBlank() ? category : "Others");
@@ -366,9 +375,13 @@ public class TransactionService {
 
         for (Map<String, Object> row : rows) {
             try {
-                String date = row.get("date") != null
-                        ? row.get("date").toString()
-                        : LocalDate.now().toString();
+                LocalDate date = row.get("date") != null
+                        ? DateNormalizer.parseFlexible(row.get("date").toString())
+                        : LocalDate.now();
+                if (date == null) {
+                    log.warn("Skipping import row — unparseable date '{}'", row.get("date"));
+                    continue;
+                }
 
                 String merchant = row.get("merchant") != null
                         ? row.get("merchant").toString()
@@ -493,7 +506,7 @@ public class TransactionService {
             Transaction transaction = new Transaction();
             transaction.setMerchant(merchant);
             transaction.setAmount(-amount);
-            transaction.setDate(java.time.LocalDate.now().toString());
+            transaction.setDate(java.time.LocalDate.now());
 
             String category = categoryService.categorize(merchant);
             transaction.setCategory(
