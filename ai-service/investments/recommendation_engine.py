@@ -14,6 +14,10 @@ def generate_investment_recommendation(data: dict) -> dict:
     savings = float(data.get("savings") or 0)
     financial_score = int(data.get("financialScore") or 0)
     net_worth = float(data.get("netWorth") or 0)
+    # Liquid savings (stated balance / transactional flow). Falls back to net
+    # worth for older callers — but net worth includes illiquid assets, so a
+    # homeowner with no cash could previously skip the emergency-fund branch.
+    liquid_savings = float(data.get("liquidSavings") or net_worth)
     goal_health = data.get("goalHealth") or "N/A"
 
     monthly_savings = round(savings, 2)
@@ -32,7 +36,7 @@ def generate_investment_recommendation(data: dict) -> dict:
 
     # 6 months of (monthly) expenses
     emergency_fund_needed = expenses * 6
-    emergency_fund_ratio = (net_worth / emergency_fund_needed) if emergency_fund_needed > 0 else 1.0
+    emergency_fund_ratio = (liquid_savings / emergency_fund_needed) if emergency_fund_needed > 0 else 1.0
 
     if emergency_fund_ratio < 0.1:
         result = _build_result(
@@ -126,11 +130,20 @@ Return ONLY valid JSON, no markdown:
             result["portfolioScore"] = max(0, min(100, int(result.get("portfolioScore", 75))))
         except (TypeError, ValueError):
             result["portfolioScore"] = 75
+        # Normalize allocations: the prompt asks for a sum of exactly 100, but
+        # nothing guarantees the model complies — un-normalized allocations
+        # would over- or under-commit the user's monthly savings.
+        parsed_allocations = []
         for item in recs:
             try:
-                allocation = float(item.get("allocation", 0) or 0)
+                parsed_allocations.append(max(0.0, float(item.get("allocation", 0) or 0)))
             except (TypeError, ValueError):
-                allocation = 0.0
+                parsed_allocations.append(0.0)
+        total_allocation = sum(parsed_allocations)
+        for item, allocation in zip(recs, parsed_allocations):
+            if total_allocation > 0:
+                allocation = allocation / total_allocation * 100
+            item["allocation"] = round(allocation, 1)
             item["amount"] = round(monthly_savings * allocation / 100, 2)
     except Exception as e:
         logger.warning("Ollama portfolio generation failed, using fallback: %s", e)

@@ -178,6 +178,30 @@ def test_healthy_path_falls_back_when_recommendations_missing(mock_ask):
     assert result["portfolioScore"] == 70
 
 
+@patch("investments.recommendation_engine.ask")
+def test_llm_allocations_normalized_to_100(mock_ask):
+    # Model ignores the "sum to exactly 100" rule — allocations total 130.
+    portfolio_json = json.dumps({
+        "riskProfile": "Moderate",
+        "recommendations": [
+            {"asset": "Index Funds", "allocation": 90, "reason": "Growth"},
+            {"asset": "Debt Funds", "allocation": 40, "reason": "Stability"},
+        ],
+    })
+    mock_ask.side_effect = [portfolio_json, "Summary."]
+
+    data = _base_data(expenses=10000, savings=13000, financialScore=80, goalHealth="Healthy")
+    result = generate_investment_recommendation(data)
+
+    allocations = [r["allocation"] for r in result["recommendations"]]
+    amounts = [r["amount"] for r in result["recommendations"]]
+    assert round(sum(allocations)) == 100
+    # Amounts must not overcommit monthly savings
+    assert sum(amounts) <= 13000 + 0.01
+    # Proportions preserved: 90:40 → ~69.2 : ~30.8
+    assert allocations[0] == round(90 / 130 * 100, 1)
+
+
 # ── monthlyInvestableAmount always present ────────────────────────────────────
 
 @patch("investments.recommendation_engine.ask")

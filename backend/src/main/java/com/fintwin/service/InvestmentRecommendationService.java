@@ -68,7 +68,12 @@ public class InvestmentRecommendationService {
 
         double savings = income - expenses;
 
-        double netWorth = netWorthService.getNetWorth().getNetWorth();
+        var netWorthDto = netWorthService.getNetWorth();
+        double netWorth = netWorthDto.getNetWorth();
+        // The user's stated balance (or transactional flow for bank users) —
+        // the emergency-fund check must use liquid savings, not net worth,
+        // which includes illiquid assets minus liabilities.
+        double liquidSavings = netWorthDto.getSavings();
 
         int financialScore = financialScoreService.calculateScoreFor(user).getScore();
 
@@ -80,6 +85,7 @@ public class InvestmentRecommendationService {
         body.put("savings",        savings);
         body.put("financialScore", financialScore);
         body.put("netWorth",       netWorth);
+        body.put("liquidSavings",  liquidSavings);
         body.put("goalHealth",     goalHealth);
 
         try {
