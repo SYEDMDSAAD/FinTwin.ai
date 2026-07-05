@@ -64,6 +64,9 @@ public class ReportService {
         spendingCoachService;
 
     @Autowired
+    private FinancialScoreService financialScoreService;
+
+    @Autowired
     @Qualifier("aiRestTemplate")
     private RestTemplate aiRestTemplate;
 
@@ -141,38 +144,12 @@ public class ReportService {
         // ANALYTICS
         // =================================
 
-        double income = transactions
-
-            .stream()
-
-            .filter(t ->
-                t.getAmount() != null && t.getAmount() > 0
-            )
-
-            .mapToDouble(
-                Transaction::getAmount
-            )
-
-            .sum();
-
-        double expenses = transactions
-
-            .stream()
-
-            .filter(t ->
-                t.getAmount() != null && t.getAmount() < 0
-            )
-
-            .mapToDouble(t ->
-                Math.abs(
-                    t.getAmount()
-                )
-            )
-
-            .sum();
-
-        double savings =
-            income - expenses;
+        // Monthly averages (transfer-excluded) over months actually present —
+        // the report generator labels these as monthly figures.
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double income   = com.fintwin.util.TransactionMath.income(transactions) / months;
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions) / months;
+        double savings  = income - expenses;
 
         // =================================
         // CATEGORY SPENDING
@@ -215,45 +192,11 @@ public class ReportService {
 
         // =================================
         // FINANCIAL SCORE
+        // Single source of truth — this was a fifth inline formula.
         // =================================
 
-        double savingsRatio =
-
-            income > 0
-
-                ?
-
-                (savings / income) * 100
-
-                :
-
-                0;
-
-        int financialScore = 50;
-
-        if (savingsRatio >= 40) {
-
-            financialScore += 30;
-
-        } else if (savingsRatio >= 20) {
-
-            financialScore += 15;
-        }
-
-        if (expenses > income * 0.8) {
-
-            financialScore -= 15;
-        }
-
-        financialScore =
-
-            Math.max(
-                0,
-                Math.min(
-                    100,
-                    financialScore
-                )
-            );
+        int financialScore =
+            financialScoreService.calculateScoreFor(user).getScore();
 
         NetWorthResponseDTO
             netWorth =

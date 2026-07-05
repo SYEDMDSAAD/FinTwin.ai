@@ -1,11 +1,9 @@
 package com.fintwin.service;
 
 import com.fintwin.dto.FinancialSummaryDTO;
-import com.fintwin.model.Budget;
 import com.fintwin.model.ChatHistory;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
-import com.fintwin.repository.BudgetRepository;
 import com.fintwin.repository.ChatHistoryRepository;
 import com.fintwin.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +23,10 @@ public class FinancialDataAggregatorService {
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private BudgetRepository budgetRepository;
+    private BudgetService budgetService;
+
+    @Autowired
+    private FinancialScoreService financialScoreService;
 
     @Autowired
     private ChatHistoryRepository chatHistoryRepository;
@@ -35,8 +36,13 @@ public class FinancialDataAggregatorService {
         List<Transaction> transactions =
                 transactionRepository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
 
-        double income   = com.fintwin.util.TransactionMath.income(transactions);
-        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
+        // Monthly averages over the months actually present — the ai-service
+        // labels these "Monthly Income/Expenses/Savings" in its prompts, so
+        // sending window totals had every chat answer reasoning from numbers
+        // up to 3x too high.
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double income   = com.fintwin.util.TransactionMath.income(transactions) / months;
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions) / months;
 
         double savings = income - expenses;
 
@@ -58,7 +64,9 @@ public class FinancialDataAggregatorService {
                 .orElse("Unknown");
 
         double savingsRatio = income > 0 ? (savings / income) * 100 : 0;
-        int    financialScore = computeScore(savingsRatio, expenses, income);
+        // Single source of truth — this had its own base-50 formula, so the
+        // chatbot quoted a different score than the score page.
+        int    financialScore = financialScoreService.calculateScoreFor(user).getScore();
 
         List<String> subscriptions = merchantSpending.entrySet().stream()
                 .filter(e -> transactions.stream()
@@ -78,19 +86,21 @@ public class FinancialDataAggregatorService {
                 .topCategory(topCategory)
                 .categorySpending(categorySpending)
                 .merchantSpending(merchantSpending)
-                .budgetAlerts(computeBudgetAlerts(user, categorySpending))
+                .budgetAlerts(computeBudgetAlerts(user))
                 .subscriptions(subscriptions)
                 .conversationHistory(recentHistory(user))
                 .build();
     }
 
-    public List<String> computeBudgetAlerts(User user, Map<String, Double> categorySpending) {
+    // Budget alerts come from BudgetService's current-month status — the
+    // previous version compared the 3-month category totals against the
+    // (monthly) limit, so chat routinely reported budgets "exceeded by 200%".
+    public List<String> computeBudgetAlerts(User user) {
         List<String> alerts = new ArrayList<>();
-        for (Budget b : budgetRepository.findByUser(user)) {
-            double spent = categorySpending.getOrDefault(b.getCategory(), 0.0);
-            if (b.getLimitAmount() != null && spent > b.getLimitAmount()) {
-                long pct = Math.round((spent / b.getLimitAmount()) * 100) - 100;
-                alerts.add(b.getCategory() + " exceeded by " + pct + "%");
+        for (com.fintwin.dto.BudgetStatusDTO status : budgetService.getBudgetStatusFor(user)) {
+            if (status.getExceeded() && status.getLimit() > 0) {
+                long pct = Math.round((status.getSpent() / status.getLimit()) * 100) - 100;
+                alerts.add(status.getCategory() + " exceeded by " + pct + "%");
             }
         }
         return alerts;
@@ -110,11 +120,4 @@ public class FinancialDataAggregatorService {
         return result;
     }
 
-    private int computeScore(double savingsRatio, double expenses, double income) {
-        int score = 50;
-        if (savingsRatio >= 40) score += 30;
-        else if (savingsRatio >= 20) score += 15;
-        if (expenses > income * 0.8) score -= 15;
-        return Math.max(0, Math.min(100, score));
-    }
 }

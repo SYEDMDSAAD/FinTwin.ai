@@ -91,25 +91,25 @@ def test_normalize_tips_mixed_list():
 def test_compute_leakage_known_categories():
     totals = {"Food": 3000, "Entertainment": 1000}
     # food: 3000*0.25=750, entertainment: 1000*0.40=400 -> sum=1150 / 3 = 383.33
-    leakage = _compute_leakage(totals)
+    leakage = _compute_leakage(totals, months=3)
     assert leakage == round((3000 * 0.25 + 1000 * 0.40) / 3, 2)
 
 
 def test_compute_leakage_unknown_category_uses_default_rate():
     totals = {"Miscellaneous Stuff": 900}
-    leakage = _compute_leakage(totals)
+    leakage = _compute_leakage(totals, months=3)
     assert leakage == round(900 * 0.10 / 3, 2)
 
 
 def test_compute_leakage_case_insensitive_match():
     totals = {"FOOD & DINING": 1500}
-    leakage = _compute_leakage(totals)
+    leakage = _compute_leakage(totals, months=3)
     # "food" matches first in the dict (insertion order), rate 0.25
     assert leakage == round(1500 * 0.25 / 3, 2)
 
 
 def test_compute_leakage_empty_dict():
-    assert _compute_leakage({}) == 0.0
+    assert _compute_leakage({}, months=3) == 0.0
 
 
 # ── generate_spending_coach ───────────────────────────────────────────────────

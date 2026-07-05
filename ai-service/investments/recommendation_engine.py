@@ -7,6 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 def generate_investment_recommendation(data: dict) -> dict:
+    # income/expenses/savings arrive as MONTHLY figures (the backend divides
+    # its window totals by the months actually present before sending).
     income = float(data.get("income") or 0)
     expenses = float(data.get("expenses") or 0)
     savings = float(data.get("savings") or 0)
@@ -14,7 +16,7 @@ def generate_investment_recommendation(data: dict) -> dict:
     net_worth = float(data.get("netWorth") or 0)
     goal_health = data.get("goalHealth") or "N/A"
 
-    monthly_savings = round(savings / 3, 2)
+    monthly_savings = round(savings, 2)
 
     if savings <= 0:
         result = _build_result(
@@ -28,7 +30,8 @@ def generate_investment_recommendation(data: dict) -> dict:
         result["summary"] = _generate_summary(income, expenses, savings, net_worth, financial_score, goal_health, result)
         return result
 
-    emergency_fund_needed = expenses * 2
+    # 6 months of (monthly) expenses
+    emergency_fund_needed = expenses * 6
     emergency_fund_ratio = (net_worth / emergency_fund_needed) if emergency_fund_needed > 0 else 1.0
 
     if emergency_fund_ratio < 0.1:
@@ -40,7 +43,7 @@ def generate_investment_recommendation(data: dict) -> dict:
             monthly_savings=monthly_savings,
             recs=[
                 {"asset": "Emergency Fund", "allocation": 60, "amount": round(monthly_savings * 0.60, 2),
-                 "reason": f"₹{round(monthly_savings * 0.60)}/month to build your 6-month reserve of ₹{round(emergency_fund_needed / 6)}."},
+                 "reason": f"₹{round(monthly_savings * 0.60)}/month to build your 6-month reserve of ₹{round(emergency_fund_needed)}."},
                 {"asset": "Fixed Deposit", "allocation": 25, "amount": round(monthly_savings * 0.25, 2),
                  "reason": f"₹{round(monthly_savings * 0.25)}/month in FD earns 6-7% safely while your emergency buffer grows."},
                 {"asset": "Liquid Fund", "allocation": 15, "amount": round(monthly_savings * 0.15, 2),
@@ -87,8 +90,8 @@ def generate_investment_recommendation(data: dict) -> dict:
         return result
 
     savings_rate = round((savings / income) * 100, 1) if income > 0 else 0
-    monthly_income = round(income / 3, 0)
-    monthly_expenses = round(expenses / 3, 0)
+    monthly_income = round(income, 0)
+    monthly_expenses = round(expenses, 0)
 
     portfolio_prompt = f"""You are a certified financial advisor in India. Return a JSON investment portfolio for this user.
 
@@ -190,7 +193,7 @@ def _generate_summary(
     prompt = (
         f"You are a financial advisor. Write exactly 2 short sentences analyzing this investor. "
         f"No headers, no bullet points, no extra text.\n\n"
-        f"{risk_profile} investor | Score: {financial_score}/100 | Savings: ₹{round(savings)} ({savings_rate}%) | "
+        f"{risk_profile} investor | Score: {financial_score}/100 | Monthly savings: ₹{round(savings)} ({savings_rate}%) | "
         f"Net worth: ₹{round(net_worth)} | Portfolio: {assets} | Return: {expected_return}\n\n"
         f"Sentence 1: Why this risk profile fits their numbers.\n"
         f"Sentence 2: One concrete action with a specific rupee amount."
@@ -204,5 +207,5 @@ def _generate_summary(
         return (
             f"A {risk_profile.lower()} portfolio suits your {savings_rate}% savings rate and score of {financial_score}/100, "
             f"targeting {expected_return} over {horizon}. "
-            f"Start by investing ₹{round(savings * 0.4)} into {first_asset} this month."
+            f"Start by investing ₹{round(savings * 0.4)} of your monthly savings into {first_asset} this month."
         )

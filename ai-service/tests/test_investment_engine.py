@@ -119,7 +119,8 @@ def test_healthy_path_uses_ollama_portfolio(mock_ask):
     assert result["riskProfile"] == "Moderate"
     assert result["portfolioScore"] == 82
     assert len(result["recommendations"]) == 2
-    assert result["recommendations"][0]["amount"] == round(round(20000 / 3, 2) * 60 / 100, 2)
+    # savings arrives as a monthly figure now — no /3
+    assert result["recommendations"][0]["amount"] == round(20000 * 60 / 100, 2)
     assert result["summary"] == "Sentence one. Sentence two."
     assert mock_ask.call_count == 2
 
@@ -183,4 +184,4 @@ def test_healthy_path_falls_back_when_recommendations_missing(mock_ask):
 def test_monthly_investable_amount_present_on_all_paths(mock_ask):
     data = _base_data(savings=0)
     result = generate_investment_recommendation(data)
-    assert result["monthlyInvestableAmount"] == round(0 / 3, 2)
+    assert result["monthlyInvestableAmount"] == 0.0

@@ -68,7 +68,7 @@ _LEAKAGE_RATES = {
     "transport": 0.15,
 }
 
-def _compute_leakage(category_totals: dict) -> float:
+def _compute_leakage(category_totals: dict, months: int) -> float:
     leakage = 0.0
     for cat, total in category_totals.items():
         key = cat.lower()
@@ -78,7 +78,18 @@ def _compute_leakage(category_totals: dict) -> float:
                 break
         else:
             leakage += total * 0.10  # default 10% for unknown categories
-    return round(leakage / 3, 2)  # monthly average (data is 3 months)
+    return round(leakage / months, 2)  # monthly average
+
+
+def _months_present(transactions: list) -> int:
+    """Distinct calendar months in the data; never below 1. A hardcoded /3
+    understated monthly figures up to 3x for users with less history."""
+    months = set()
+    for t in transactions:
+        date = str(t.get("date") or "")
+        if len(date) >= 7:
+            months.add(date[:7])
+    return max(1, len(months))
 
 
 def generate_spending_coach(transactions):
@@ -103,6 +114,8 @@ def generate_spending_coach(transactions):
             "tips": [],
             "coachMessage": "No spending data available.",
         }
+
+    months = _months_present(transactions)
 
     df = pd.DataFrame(expenses)
     df["amount"] = df["amount"].abs()
@@ -130,7 +143,7 @@ def generate_spending_coach(transactions):
         )
 
     # Compute leakage deterministically — never changes on regenerate
-    monthly_leakage = _compute_leakage(category_totals)
+    monthly_leakage = _compute_leakage(category_totals, months)
 
     # Determine health from savings rate
     if savings_rate >= 30:
@@ -144,21 +157,21 @@ def generate_spending_coach(transactions):
 
     top_category = list(category_totals.keys())[0] if category_totals else "discretionary"
     top_category_amount = round(list(category_totals.values())[0]) if category_totals else 0
-    monthly_expense = round(total_expenses / 3)
-    monthly_income = round(income / 3) if income > 0 else 0
+    monthly_expense = round(total_expenses / months)
+    monthly_income = round(income / months) if income > 0 else 0
 
     prompt = f"""You are a senior personal finance advisor with 15 years of experience helping Indians build wealth. Speak directly to the user — confident, warm, and precise. Never be vague or generic. Every sentence must reference the user's actual numbers.
 
-USER'S FINANCIAL SNAPSHOT (last 3 months):
+USER'S FINANCIAL SNAPSHOT (recent months):
 - Monthly Income: ₹{monthly_income:,}
 - Monthly Expenses: ₹{monthly_expense:,}
 - Savings Rate: {savings_rate}%
 - Total Transactions: {tx_count}
 
-CATEGORY BREAKDOWN (3-month total, ₹):
+CATEGORY BREAKDOWN (window total, ₹):
 {json.dumps(category_totals, indent=2)}
 
-TOP MERCHANTS (3-month total, ₹):
+TOP MERCHANTS (window total, ₹):
 {json.dumps(merchant_totals, indent=2)}
 
 Write a coachMessage (2-3 sentences, max 90 words): Start with a direct assessment of their financial health using their savings rate. Identify the single biggest pattern you see in their spending. End with one concrete next step they can take this week — mention an actual number or category.
@@ -179,21 +192,21 @@ Return ONLY this JSON (no markdown, no extra text):
                 "spendingHealth": health,
                 "monthlyLeakage": monthly_leakage,
                 "coachMessage": parsed.get("coachMessage", ""),
-                "tips": tips if tips else _fallback_tips(category_totals, merchant_totals, savings_rate),
+                "tips": tips if tips else _fallback_tips(category_totals, merchant_totals, savings_rate, months),
             }
         raise ValueError("Parse failed")
 
     except Exception as e:
         logger.warning("Spending coach LLM/parse failed, using fallback: %s", e)
         top_cat = list(category_totals.keys())[0] if category_totals else "discretionary"
-        top_amt = round(list(category_totals.values())[0] / 3) if category_totals else 0
-        monthly_exp = round(total_expenses / 3)
-        monthly_inc = round(income / 3) if income > 0 else 0
-        gap = max(0, round(monthly_inc * 0.20) - round(income * savings_rate / 100 / 3))
+        top_amt = round(list(category_totals.values())[0] / months) if category_totals else 0
+        monthly_exp = round(total_expenses / months)
+        monthly_inc = round(income / months) if income > 0 else 0
+        gap = max(0, round(monthly_inc * 0.20) - round(income * savings_rate / 100 / months))
         return {
             "spendingHealth": health,
             "monthlyLeakage": monthly_leakage,
-            "tips": _fallback_tips(category_totals, merchant_totals, savings_rate),
+            "tips": _fallback_tips(category_totals, merchant_totals, savings_rate, months),
             "coachMessage": (
                 f"Your savings rate stands at {savings_rate}% — "
                 f"{'well above' if savings_rate >= 30 else 'below' if savings_rate < 20 else 'close to'} the recommended 20% benchmark. "
@@ -203,7 +216,7 @@ Return ONLY this JSON (no markdown, no extra text):
         }
 
 
-def _fallback_tips(category_totals, merchant_totals, savings_rate):
+def _fallback_tips(category_totals, merchant_totals, savings_rate, months=3):
     tips = []
     cats = list(category_totals.keys())
     amounts = list(category_totals.values())
@@ -211,23 +224,25 @@ def _fallback_tips(category_totals, merchant_totals, savings_rate):
     m_amounts = list(merchant_totals.values())
 
     if cats:
-        cap = round(amounts[0] / 3 * 0.80)
+        cap = round(amounts[0] / months * 0.80)
         tips.append(
-            f"{cats[0]} is your top spending category at ₹{round(amounts[0]/3):,}/month on average. "
+            f"{cats[0]} is your top spending category at ₹{round(amounts[0]/months):,}/month on average. "
             f"Set a hard monthly cap of ₹{cap:,} — that's a 20% reduction that compounds over time."
         )
     if len(cats) > 1:
         tips.append(
-            f"Your {cats[1]} spend of ₹{round(amounts[1]/3):,}/month is your second-largest category. "
+            f"Your {cats[1]} spend of ₹{round(amounts[1]/months):,}/month is your second-largest category. "
             f"Review this category's transactions and identify 2-3 recurring charges you can eliminate or downgrade."
         )
     if merchants:
         tips.append(
-            f"You've spent ₹{round(m_amounts[0]):,} at {merchants[0]} over the last 3 months — roughly ₹{round(m_amounts[0]/3):,}/month. "
+            f"You've spent ₹{round(m_amounts[0]):,} at {merchants[0]} over the recent months — roughly ₹{round(m_amounts[0]/months):,}/month. "
             f"Set a monthly limit for this merchant and stop when you hit it."
         )
     if savings_rate < 20:
-        shortfall = round((20 - savings_rate) / 100 * (sum(amounts) / 3 + sum(amounts) / 3 * savings_rate / 100))
+        monthly_exp = sum(amounts) / months
+        est_income = monthly_exp / (1 - savings_rate / 100) if savings_rate < 100 else monthly_exp
+        shortfall = round((20 - savings_rate) / 100 * est_income)
         tips.append(
             f"At {savings_rate}% savings rate, you're ₹{shortfall:,}/month short of the 20% benchmark. "
             f"Set up an automatic transfer to a separate savings account the day your salary arrives — before you spend."

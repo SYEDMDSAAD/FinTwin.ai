@@ -91,8 +91,8 @@ public class GoalPlannerService {
                 goalRepository.findByUser(user);
 
         String aiPlan = generateAIPlan(
-                dto, ctx.income, ctx.expenses,
-                ctx.savings, monthlyTarget,
+                dto, ctx.monthlyIncome, ctx.monthlyExpenses,
+                ctx.monthlySavings, monthlyTarget,
                 probability, categorySpending, existingGoals
         );
 
@@ -213,8 +213,8 @@ public class GoalPlannerService {
         }
 
         String aiPlan = generateAIPlan(
-                dto, ctx.income, ctx.expenses,
-                ctx.savings, monthlyTarget,
+                dto, ctx.monthlyIncome, ctx.monthlyExpenses,
+                ctx.monthlySavings, monthlyTarget,
                 probability, categorySpending, otherGoals
         );
 
@@ -314,8 +314,8 @@ public class GoalPlannerService {
         }
 
         String newPlan = generateAIPlan(
-                dto, ctx.income, ctx.expenses,
-                ctx.savings, goal.getMonthlyTarget(),
+                dto, ctx.monthlyIncome, ctx.monthlyExpenses,
+                ctx.monthlySavings, goal.getMonthlyTarget(),
                 probability, categorySpending, otherGoals
         );
 
@@ -493,9 +493,12 @@ public class GoalPlannerService {
         final double income;
         final double expenses;
         final double savings;
-        // Per-month savings over the months actually present in the window.
-        // Goal targets are monthly, so every comparison against them must use
-        // this — comparing the multi-month total overstated capacity ~3x.
+        // Per-month figures over the months actually present in the window.
+        // Goal targets are monthly, and the ai-service labels these values
+        // "Monthly income/expenses/savings" in its prompts — multi-month
+        // totals overstated everything ~3x.
+        final double monthlyIncome;
+        final double monthlyExpenses;
         final double monthlySavings;
 
         FinancialContext(List<Transaction> tx, double inc, double exp) {
@@ -503,8 +506,10 @@ public class GoalPlannerService {
             this.income = inc;
             this.expenses = exp;
             this.savings = inc - exp;
-            this.monthlySavings = this.savings
-                    / com.fintwin.util.TransactionMath.monthsPresent(tx);
+            int months = com.fintwin.util.TransactionMath.monthsPresent(tx);
+            this.monthlyIncome   = inc / months;
+            this.monthlyExpenses = exp / months;
+            this.monthlySavings  = this.savings / months;
         }
     }
 }

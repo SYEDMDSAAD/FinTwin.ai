@@ -60,8 +60,11 @@ public class InvestmentRecommendationService {
                 transactionRepository
                         .findLatestThreeMonthsTransactions(user.getId());
 
-        double income   = com.fintwin.util.TransactionMath.income(transactions);
-        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
+        // Monthly figures — the ai-service recommendation engine previously
+        // received window totals and divided by a hardcoded 3.
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double income   = com.fintwin.util.TransactionMath.income(transactions) / months;
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions) / months;
 
         double savings = income - expenses;
 
@@ -98,8 +101,7 @@ public class InvestmentRecommendationService {
     private Map<String, Object> buildFallbackRecommendation(
             List<Transaction> transactions, double savings) {
 
-        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
-        double monthlySavings = Math.round(savings / months * 100.0) / 100.0;
+        double monthlySavings = Math.round(savings * 100.0) / 100.0;
 
         List<Map<String, Object>> recs = new ArrayList<>();
         if (monthlySavings > 0) {
