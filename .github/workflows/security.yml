@@ -30,11 +30,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Compute cache week
+        id: date
+        run: echo "week=$(date +%Y-W%U)" >> "$GITHUB_OUTPUT"
+
       - name: Cache OWASP NVD database
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/owasp
-          key: owasp-nvd-${{ github.run_id }}
+          # Keyed by week (not run_id, which is unique every run and could never
+          # be reused) so the NVD DB persists across runs — a cold sync without
+          # an API key is rate-limited to 5 req/30s and reliably hits 429.
+          key: owasp-nvd-${{ steps.date.outputs.week }}
           restore-keys: owasp-nvd-
 
       - name: Run OWASP dependency check
@@ -76,11 +83,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Runner disk is tight once an image is built here plus Trivy's ~1GB
+      # combined vuln+Java DB download; a mid-scan ENOSPC surfaces as a bare
+      # "exit code 1" with no error text, which looked like a false CVE
+      # failure until reproduced locally. Reclaim preinstalled toolchains we
+      # don't use before the build/scan.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af
+
       - name: Build image for scanning
         run: docker build -t fintwin-${{ matrix.service }}:scan ./${{ matrix.service }}
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: fintwin-${{ matrix.service }}:scan
           format: sarif
