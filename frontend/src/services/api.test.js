@@ -73,7 +73,23 @@ describe('api interceptors', () => {
     expect(window.location.href).toBe(''); // no forced redirect on the auth path
   });
 
-  it('logs the user out on a 401 from the main backend API', async () => {
+  it('refreshes and retries on a 401 from the main backend API', async () => {
+    localStorage.setItem('token', 'old');
+    localStorage.setItem('refreshToken', 'r1');
+
+    apiMock.onGet('/dashboard').replyOnce(401);
+    axiosMock.onPost('/api/auth/refresh').reply(200, { accessToken: 'new', refreshToken: 'r2' });
+    apiMock.onGet('/dashboard').reply(200, { ok: true });
+
+    const res = await API.get('/dashboard');
+
+    expect(res.data).toEqual({ ok: true });
+    expect(localStorage.getItem('token')).toBe('new');
+    // Session survives — no forced redirect
+    expect(window.location.href).toBe('');
+  });
+
+  it('logs the user out on a backend 401 when no refresh token exists', async () => {
     apiMock.onGet('/dashboard').reply(401);
     await expect(API.get('/dashboard')).rejects.toBeTruthy();
     expect(window.location.href).toBe('/login');
