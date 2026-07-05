@@ -14,6 +14,9 @@ FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
+# Patch Alpine base packages (e.g. p11-kit CVE-2026-2100) ahead of the upstream image refresh.
+RUN apk upgrade --no-cache
+
 RUN addgroup -S fintwin && adduser -S fintwin -G fintwin
 USER fintwin
 
