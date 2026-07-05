@@ -35,6 +35,10 @@ public class User {
     @Column(name = "two_factor_secret", length = 512)
     private String twoFactorSecret;
 
+    // Last accepted TOTP time-step — rejects replayed codes (RFC 6238 §5.2)
+    @Column(name = "two_factor_last_used_step")
+    private Long twoFactorLastUsedStep;
+
     @Column(name = "two_factor_enabled")
     private Boolean twoFactorEnabled = false;
 
@@ -122,4 +126,7 @@ public class User {
     public void setFailedLoginAttempts(Integer v) { this.failedLoginAttempts = v; }
     public LocalDateTime getLockedUntil() { return lockedUntil; }
     public void setLockedUntil(LocalDateTime v) { this.lockedUntil = v; }
+
+    public Long getTwoFactorLastUsedStep() { return twoFactorLastUsedStep; }
+    public void setTwoFactorLastUsedStep(Long twoFactorLastUsedStep) { this.twoFactorLastUsedStep = twoFactorLastUsedStep; }
 }

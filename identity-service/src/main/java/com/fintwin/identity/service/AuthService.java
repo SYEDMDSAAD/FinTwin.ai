@@ -314,13 +314,21 @@ public class AuthService {
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) return;
 
+        // OTP guesses feed the same lockout as password failures — a 6-digit
+        // code with a 10-minute lifetime is brute-forceable when the only cap
+        // is the per-IP rate limit.
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now()))
+            throw new RuntimeException("Too many attempts. Try again later.");
+
         if (user.getEmailVerificationOtp() == null
                 || user.getEmailVerificationExpiry() == null
                 || user.getEmailVerificationExpiry().isBefore(LocalDateTime.now()))
             throw new RuntimeException("OTP has expired — please request a new one");
 
-        if (!sha256(otp.trim()).equals(user.getEmailVerificationOtp()))
+        if (!sha256(otp.trim()).equals(user.getEmailVerificationOtp())) {
+            loginAttemptRecorder.recordFailure(user.getId());
             throw new RuntimeException("Incorrect OTP");
+        }
 
         user.setEmailVerified(true);
         user.setEmailVerificationOtp(null);

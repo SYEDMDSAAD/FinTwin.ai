@@ -3,6 +3,8 @@ package com.fintwin.identity.service;
 import com.fintwin.identity.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -21,6 +23,10 @@ public class LoginAttemptRecorder {
 
     @Autowired private UserRepository userRepository;
 
+    // REQUIRES_NEW: callers inside @Transactional methods (2FA login, email
+    // OTP verify) throw right after recording — an ambient transaction would
+    // roll the increment back, exactly the bug this class exists to prevent.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(Long userId) {
         userRepository.registerFailedLogin(
                 userId, MAX_FAILED_ATTEMPTS, LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));

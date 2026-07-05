@@ -31,6 +31,7 @@ public class TwoFactorService {
     @Autowired private UserRepository userRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private TokenService tokenService;
+    @Autowired private LoginAttemptRecorder loginAttemptRecorder;
 
     private final GoogleAuthenticator gAuth = new GoogleAuthenticator();
     private static final String BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -102,16 +103,38 @@ public class TwoFactorService {
             throw new IllegalArgumentException("Invalid token type");
 
         String email = claims.getSubject();
-        int code = Integer.parseInt(codeStr.replaceAll("\\s", ""));
-        if (!verify(email, code))
-            throw new SecurityException("Invalid verification code. Check your authenticator app.");
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Brute-force cap: TOTP failures feed the same lockout as password
+        // failures. Without this, the 5-minute temp-token window allowed
+        // unlimited guessing bounded only by the IP rate limit.
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now()))
+            throw new SecurityException("Account locked due to too many failed attempts. Try again later.");
+
         // A user disabled during the 5-min temp-token window must not be able to
         // complete login — mirror the enabled check from the password login path.
         if (!Boolean.TRUE.equals(user.getEnabled()))
             throw new SecurityException("Account has been disabled");
+
+        int code = Integer.parseInt(codeStr.replaceAll("\\s", ""));
+        long matchedStep = user.getTwoFactorSecret() == null ? -1
+                : matchTotpStep(user.getTwoFactorSecret(), code);
+        if (matchedStep < 0) {
+            loginAttemptRecorder.recordFailure(user.getId());
+            throw new SecurityException("Invalid verification code. Check your authenticator app.");
+        }
+
+        // Replay guard (RFC 6238): an accepted code stays valid up to 90s in
+        // the ±1-step window — a sniffed code must not work a second time.
+        if (user.getTwoFactorLastUsedStep() != null && matchedStep <= user.getTwoFactorLastUsedStep()) {
+            loginAttemptRecorder.recordFailure(user.getId());
+            throw new SecurityException("Invalid verification code. Check your authenticator app.");
+        }
+
+        user.setTwoFactorLastUsedStep(matchedStep);
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
@@ -128,15 +151,20 @@ public class TwoFactorService {
     }
 
     private boolean verifyCode(String secret, int code) {
+        return matchTotpStep(secret, code) >= 0;
+    }
+
+    /** Returns the matched time-step, or -1 when the code is invalid. */
+    private long matchTotpStep(String secret, int code) {
         try {
             byte[] keyBytes = base32Decode(secret);
             long timeStep = System.currentTimeMillis() / 1000L / 30L;
             for (long delta = -1; delta <= 1; delta++) {
-                if (computeTotp(keyBytes, timeStep + delta) == code) return true;
+                if (computeTotp(keyBytes, timeStep + delta) == code) return timeStep + delta;
             }
-            return false;
+            return -1;
         } catch (Exception e) {
-            return false;
+            return -1;
         }
     }
 
