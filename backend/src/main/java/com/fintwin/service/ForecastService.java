@@ -182,24 +182,11 @@ public class ForecastService {
 
     // =========================
     // CATEGORY FORECAST
-    // FIXED: used a switch-case on category name for growth
-    // rates — fragile if category names change (case-sensitive).
-    // Changed to case-insensitive map lookup with a default.
-    // IMPROVEMENT: total is divided by 3 months to get a
-    // true monthly average before applying growth rate,
-    // preventing inflated 3-month totals being projected
-    // as a single month forecast.
+    // Predicts next month per category as a recency-weighted average of the
+    // user's own monthly totals. Previously applied invented per-category
+    // growth multipliers (Food ×1.15/month ≈ 435%/year annualized) with no
+    // basis in the user's data.
     // =========================
-
-    private static final Map<String, Double> CATEGORY_GROWTH = Map.of(
-            "food",          1.15,
-            "shopping",      1.20,
-            "travel",        1.10,
-            "bills",         1.05,
-            "entertainment", 1.08,
-            "healthcare",    1.06,
-            "housing",       1.03
-    );
 
     @PreAuthorize("hasAuthority('USE_AI_FORECAST')")
     public List<CategoryForecastDTO> getCategoryForecast() {
@@ -216,32 +203,48 @@ public class ForecastService {
                 transactionRepository
                         .findLatestThreeMonthsTransactions(user.getId());
 
-        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
-        Map<String, Double> categoryTotals = new HashMap<>();
-
+        // category → (month → total spent)
+        Map<String, Map<java.time.YearMonth, Double>> byCategoryMonth = new HashMap<>();
         for (Transaction t : transactions) {
-            if (t.getAmount() != null && t.getAmount() < 0) {
-                String cat = t.getCategory() != null
-                        ? t.getCategory() : "Other";
-                categoryTotals.merge(
-                        cat, Math.abs(t.getAmount()), Double::sum
-                );
-            }
+            if (t.getAmount() == null || t.getAmount() >= 0 || t.getDate() == null) continue;
+            String cat = t.getCategory() != null ? t.getCategory() : "Other";
+            byCategoryMonth
+                    .computeIfAbsent(cat, k -> new HashMap<>())
+                    .merge(java.time.YearMonth.from(t.getDate()),
+                           Math.abs(t.getAmount()), Double::sum);
         }
+
+        // Exclude the current, still-incomplete month from the baseline when
+        // complete months exist — a half-elapsed month would drag the
+        // prediction down.
+        java.time.YearMonth currentMonth = java.time.YearMonth.now();
 
         List<CategoryForecastDTO> result = new ArrayList<>();
 
-        categoryTotals.forEach((category, total) -> {
+        byCategoryMonth.forEach((category, perMonth) -> {
+            List<java.time.YearMonth> completeMonths = perMonth.keySet().stream()
+                    .filter(m -> !m.equals(currentMonth))
+                    .sorted()
+                    .toList();
 
-            double monthlyAvg = total / months;
-
-            double growth = CATEGORY_GROWTH.getOrDefault(
-                    category.toLowerCase(), 1.08
-            );
+            double predicted;
+            if (completeMonths.isEmpty()) {
+                // Only the current partial month has data — best available
+                predicted = perMonth.getOrDefault(currentMonth, 0.0);
+            } else {
+                // Recency-weighted average: weights 1..n oldest→newest
+                double weightedSum = 0, weightTotal = 0;
+                for (int i = 0; i < completeMonths.size(); i++) {
+                    double w = i + 1;
+                    weightedSum += perMonth.get(completeMonths.get(i)) * w;
+                    weightTotal += w;
+                }
+                predicted = weightedSum / weightTotal;
+            }
 
             result.add(new CategoryForecastDTO(
                     category,
-                    (double) Math.round(monthlyAvg * growth)
+                    (double) Math.round(predicted)
             ));
         });
 
