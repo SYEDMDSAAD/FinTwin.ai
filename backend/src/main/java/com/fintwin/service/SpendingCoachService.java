@@ -116,12 +116,8 @@ public class SpendingCoachService {
 
         int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
 
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount).sum();
-        double expenses = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .mapToDouble(t -> Math.abs(t.getAmount())).sum();
+        double income   = com.fintwin.util.TransactionMath.income(transactions);
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
 
         // "Leakage": monthly average of small discretionary debits (< ₹500) —
         // the spend that tends to go unnoticed.

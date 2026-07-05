@@ -64,12 +64,14 @@ public class NetWorthService {
                 transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 
         BigDecimal txIncome = transactions.stream()
+                .filter(t -> !com.fintwin.util.TransactionMath.isSelfTransfer(t))
                 .map(Transaction::getAmountExact)
                 .filter(Objects::nonNull)
                 .filter(a -> a.signum() > 0)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal txExpenses = transactions.stream()
+                .filter(t -> !com.fintwin.util.TransactionMath.isSelfTransfer(t))
                 .map(Transaction::getAmountExact)
                 .filter(Objects::nonNull)
                 .filter(a -> a.signum() < 0)

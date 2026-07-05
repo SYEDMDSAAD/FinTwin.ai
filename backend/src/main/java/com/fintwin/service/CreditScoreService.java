@@ -53,10 +53,8 @@ public class CreditScoreService {
         List<Transaction> txns = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
         List<Liability>   liabilities = liabilityRepository.findByUser(user);
 
-        double income   = txns.stream().filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                              .mapToDouble(Transaction::getAmount).sum();
-        double expenses = txns.stream().filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                              .mapToDouble(t -> Math.abs(t.getAmount())).sum();
+        double income   = com.fintwin.util.TransactionMath.income(txns);
+        double expenses = com.fintwin.util.TransactionMath.expenses(txns);
         double totalDebt = liabilities.stream()
                 .map(Liability::getAmount)
                 .filter(a -> a != null)

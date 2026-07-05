@@ -65,10 +65,8 @@ public class FinancialScoreService {
 
         List<Transaction> txns = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 
-        double income   = txns.stream().filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                              .mapToDouble(Transaction::getAmount).sum();
-        double expenses = txns.stream().filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                              .mapToDouble(t -> Math.abs(t.getAmount())).sum();
+        double income   = com.fintwin.util.TransactionMath.income(txns);
+        double expenses = com.fintwin.util.TransactionMath.expenses(txns);
         double savingsRate = income > 0 ? (income - expenses) / income * 100 : 0;
 
         // ── 1. Savings Rate (max 30 pts) ──────────────────────────────────

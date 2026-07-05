@@ -57,15 +57,8 @@ public class AnalyticsService {
 
         MonthlySummaryDTO dto = new MonthlySummaryDTO();
 
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        double expenses = Math.abs(transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .mapToDouble(Transaction::getAmount)
-                .sum());
+        double income   = com.fintwin.util.TransactionMath.income(transactions);
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
 
         double savings = income - expenses;
 
@@ -76,7 +69,8 @@ public class AnalyticsService {
         double currentIncome = transactions.stream()
                 .filter(t -> {
                     LocalDate d = t.getDate();
-                    return t.getAmount() != null && t.getAmount() > 0
+                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
+                            && t.getAmount() != null && t.getAmount() > 0
                             && d != null && !d.isBefore(currentMonthStart);
                 })
                 .mapToDouble(Transaction::getAmount)
@@ -85,7 +79,8 @@ public class AnalyticsService {
         double currentExpenses = transactions.stream()
                 .filter(t -> {
                     LocalDate d = t.getDate();
-                    return t.getAmount() != null && t.getAmount() < 0
+                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
+                            && t.getAmount() != null && t.getAmount() < 0
                             && d != null && !d.isBefore(currentMonthStart);
                 })
                 .mapToDouble(t -> Math.abs(t.getAmount()))
@@ -96,7 +91,8 @@ public class AnalyticsService {
         double previousIncome = transactions.stream()
                 .filter(t -> {
                     LocalDate d = t.getDate();
-                    return t.getAmount() != null && t.getAmount() > 0
+                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
+                            && t.getAmount() != null && t.getAmount() > 0
                             && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
                 })
                 .mapToDouble(Transaction::getAmount)
@@ -105,7 +101,8 @@ public class AnalyticsService {
         double previousExpenses = transactions.stream()
                 .filter(t -> {
                     LocalDate d = t.getDate();
-                    return t.getAmount() != null && t.getAmount() < 0
+                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
+                            && t.getAmount() != null && t.getAmount() < 0
                             && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
                 })
                 .mapToDouble(t -> Math.abs(t.getAmount()))

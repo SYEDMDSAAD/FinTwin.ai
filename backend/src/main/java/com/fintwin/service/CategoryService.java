@@ -33,7 +33,14 @@ private static final Map<String, String> RULES = Map.ofEntries(
 
         Map.entry("salary", "Income"),
         Map.entry("bonus", "Income"),
-        Map.entry("freelance", "Income")
+        Map.entry("freelance", "Income"),
+
+        // Money moving between the user's own accounts — excluded from
+        // income/expense aggregates (see TransactionMath.isSelfTransfer)
+        Map.entry("self transfer", "Transfer"),
+        Map.entry("self-transfer", "Transfer"),
+        Map.entry("own account", "Transfer"),
+        Map.entry("transfer to self", "Transfer")
 );
 
 public String categorize(String merchant) {

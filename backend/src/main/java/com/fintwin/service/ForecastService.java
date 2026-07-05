@@ -87,6 +87,9 @@ public class ForecastService {
         double income = 0;
 
         for (Transaction t : transactions) {
+            // Self-transfers are neither income nor spending — keep them out
+            // of both the income figure and the series sent to the AI.
+            if (com.fintwin.util.TransactionMath.isSelfTransfer(t)) continue;
             if (t.getAmount() != null && t.getAmount() > 0) {
                 income += t.getAmount();
             }
@@ -131,9 +134,7 @@ public class ForecastService {
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
         List<Transaction> transactions = transactionRepository.findLatestThreeMonthsTransactions(user.getId());
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount).sum();
+        double income = com.fintwin.util.TransactionMath.income(transactions);
         return buildFallbackForecast(transactions, income);
     }
 
@@ -273,10 +274,7 @@ public class ForecastService {
     private ForecastDTO buildFallbackForecast(
             List<Transaction> transactions, double income) {
 
-        double expenses = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
 
         // Average over the months actually present in the window
         int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);

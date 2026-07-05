@@ -60,15 +60,8 @@ public class InvestmentRecommendationService {
                 transactionRepository
                         .findLatestThreeMonthsTransactions(user.getId());
 
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        double expenses = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
+        double income   = com.fintwin.util.TransactionMath.income(transactions);
+        double expenses = com.fintwin.util.TransactionMath.expenses(transactions);
 
         double savings = income - expenses;
 
