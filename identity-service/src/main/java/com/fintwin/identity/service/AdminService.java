@@ -111,11 +111,22 @@ public class AdminService {
         user.setLastLogoutAt(LocalDateTime.now());
         userRepository.save(user);
         emailService.sendTemporaryPassword(user.getEmail(), user.getFullName(), tempPassword);
-        return Map.of("message", "Password reset successfully", "temporaryPassword", tempPassword);
+        // The temp password goes to the USER's email — returning it to the
+        // admin as well would let any admin quietly take over the account.
+        // Only exposed when email delivery isn't configured (dev), which the
+        // admin UI already handles.
+        if (!emailService.isConfigured()) {
+            return Map.of("message", "Password reset successfully", "temporaryPassword", tempPassword);
+        }
+        return Map.of("message", "Password reset — temporary password sent to the user's email");
     }
 
     public Map<String, Object> impersonate(Long targetId, String adminEmail) {
         User target = userRepository.findById(targetId).orElseThrow();
+        // Impersonating another admin would let any admin act with a peer's
+        // identity (and covers self-impersonation confusion too).
+        if ("ADMIN".equals(target.getRole()))
+            throw new IllegalArgumentException("Admin accounts cannot be impersonated");
         String token = jwtUtil.generateImpersonationToken(target.getEmail(), adminEmail);
         return Map.of(
             "accessToken", token,

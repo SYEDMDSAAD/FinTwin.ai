@@ -29,6 +29,16 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private CustomUserDetailsService userDetailsService;
 
+    // Mirrors SecurityConfig's permitAll list. On these paths a bad Bearer
+    // header must NOT produce a 401 — clients that attach whatever token is
+    // in storage (the frontend does) would otherwise be unable to log in or
+    // refresh once their stored token expires.
+    private static boolean isPublicPath(String uri) {
+        return uri.startsWith("/api/auth/")
+                || uri.startsWith("/admin/")
+                || uri.equals("/api/token/introspect");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
@@ -43,9 +53,17 @@ public class JwtFilter extends OncePerRequestFilter {
                 email = jwtUtil.extractEmail(token);
                 log.debug("JWT authenticated: {} {}", request.getMethod(), request.getRequestURI());
             } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+                if (isPublicPath(request.getRequestURI())) {
+                    chain.doFilter(request, response);
+                    return;
+                }
                 writeUnauthorized(response, "Token expired");
                 return;
             } catch (Exception ex) {
+                if (isPublicPath(request.getRequestURI())) {
+                    chain.doFilter(request, response);
+                    return;
+                }
                 writeUnauthorized(response, "Invalid token");
                 return;
             }
