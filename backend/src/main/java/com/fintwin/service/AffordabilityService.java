@@ -18,12 +18,7 @@ public class AffordabilityService {
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ForecastService forecastService;
-
-    // FIXED: was re-filtering 3-month transactions by a cutoff
-    // date — redundant double filter. Removed.
-    // FIXED: suggestedEMI was always 12 months — now adapted
-    // based on risk level (high risk → smaller EMI, longer term).
-    // IMPROVEMENT: added canAffordOutright and monthsToSave fields.
+    @Autowired private NetWorthService netWorthService;
 
     @PreAuthorize("hasAuthority('USE_AI_BASIC')")
     public Map<String, Object> analyzePurchase(Double price) {
@@ -47,53 +42,56 @@ public class AffordabilityService {
                         .findLatestThreeMonthsTransactions(user.getId());
 
         double income = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
-        double savings = income - expenses;
+        // Monthly averages over the months actually present — a hardcoded /3
+        // understated new users' monthly savings by up to 3x.
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double monthlySavings = (income - expenses) / months;
 
-        // Monthly averages from the 3-month window
-        double monthlySavings = savings / 3.0;
-        double monthlyIncome  = income  / 3.0;
+        // Affordability must be judged against what the user actually has,
+        // not recent cash flow: a user with a healthy balance but a flat
+        // 3-month flow can still afford the purchase. NetWorthService's
+        // savings figure is the user's stated balance when present, falling
+        // back to transactional flow for bank-connected users.
+        double availableFunds = netWorthService.getNetWorth().getSavings();
 
-        ForecastDTO forecast;
         double predictedExpense;
-
         try {
-            forecast = forecastService.generateForecast();
+            ForecastDTO forecast = forecastService.generateForecast();
             predictedExpense = forecast.getPredictedExpenses();
         } catch (Exception e) {
-            // IMPROVEMENT: fallback if prediction service is down
-            predictedExpense = expenses / 3.0;
+            // Fallback if prediction service is down
+            predictedExpense = expenses / months;
         }
 
-        double remainingSavings = savings - price;
+        double remainingSavings = availableFunds - price;
 
-        // FIXED: risk was only based on remainingSavings vs predictedExpense
-        // Now uses monthlySavings for a more accurate risk model
+        // Emergency-fund ladder: how many months of predicted expenses would
+        // remain after the purchase. < 2 months buffer is high risk, 2–4
+        // months is medium, above that is low.
         String risk;
-        if (price > savings) {
+        if (price > availableFunds) {
             risk = "High"; // can't afford outright even with full savings
         } else if (remainingSavings < predictedExpense * 2) {
-            risk = "High"; // would leave < 2 months buffer
-        } else if (remainingSavings < savings * 0.4) {
+            risk = "High";
+        } else if (remainingSavings < predictedExpense * 4) {
             risk = "Medium";
         } else {
             risk = "Low";
         }
 
-        // FIXED: EMI now adapts to risk and price
         int emiMonths = risk.equals("High") ? 24
                       : risk.equals("Medium") ? 18 : 12;
         double suggestedEMI = price / emiMonths;
 
-        // IMPROVEMENT: months needed to save for this purchase
         long monthsToSave = monthlySavings > 0
                 ? (long) Math.ceil(price / monthlySavings)
                 : Long.MAX_VALUE;
@@ -103,7 +101,7 @@ public class AffordabilityService {
         response.put("remainingSavings", Math.round(remainingSavings));
         response.put("suggestedEMI", Math.round(suggestedEMI));
         response.put("emiMonths", emiMonths);
-        response.put("canAffordOutright", price <= savings);
+        response.put("canAffordOutright", price <= availableFunds);
         response.put("monthsToSave",
                 monthsToSave == Long.MAX_VALUE ? -1 : monthsToSave
         );

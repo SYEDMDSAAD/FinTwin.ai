@@ -65,11 +65,6 @@ public class AnomalyService {
 
         if (expenses.isEmpty()) return List.of();
 
-        double income = transactions.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
-                .mapToDouble(Transaction::getAmount).sum();
-        double monthlyIncome = income / 3.0;
-
         double globalAvg = expenses.stream()
                 .mapToDouble(t -> Math.abs(t.getAmount())).average().orElse(0);
 

@@ -78,7 +78,8 @@ public class CreditScoreService {
         }
 
         // ── 2. Debt-to-Income Ratio (max 180 pts) ─────────────────────────
-        double annualIncome = income / 3.0 * 12;
+        int months = com.fintwin.util.TransactionMath.monthsPresent(txns);
+        double annualIncome = income / months * 12;
         double dti = annualIncome > 0 ? (totalDebt / annualIncome) * 100 : (totalDebt > 0 ? 100 : 0);
         int debtPts;
         String debtStatus, debtDesc;

@@ -216,6 +216,7 @@ public class ForecastService {
                 transactionRepository
                         .findLatestThreeMonthsTransactions(user.getId());
 
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
         Map<String, Double> categoryTotals = new HashMap<>();
 
         for (Transaction t : transactions) {
@@ -232,8 +233,7 @@ public class ForecastService {
 
         categoryTotals.forEach((category, total) -> {
 
-            // FIXED: was projecting 3-month sum — divide by 3 for monthly avg
-            double monthlyAvg = total / 3.0;
+            double monthlyAvg = total / months;
 
             double growth = CATEGORY_GROWTH.getOrDefault(
                     category.toLowerCase(), 1.08
@@ -275,9 +275,10 @@ public class ForecastService {
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
-        // Simple 3-month average as fallback
-        double avgMonthlyExpense = expenses / 3.0;
-        double avgMonthlySavings = (income / 3.0) - avgMonthlyExpense;
+        // Average over the months actually present in the window
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double avgMonthlyExpense = expenses / months;
+        double avgMonthlySavings = (income / months) - avgMonthlyExpense;
 
         return new ForecastDTO(
                 Math.round(avgMonthlyExpense * 100.0) / 100.0,

@@ -49,10 +49,11 @@ public class InsightService {
                 .sum();
 
         double savings = income - expenses;
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
         double savingsRatio = income > 0 ? (savings / income) * 100 : 0;
 
         // Savings insight
-        long savingsRounded = Math.round(savings / 3);
+        long savingsRounded = Math.round(savings / months);
         if (savingsRatio >= 40) {
             insights.add("💰 You're saving " + Math.round(savingsRatio) + "% of your income — well above the 20% benchmark. Make sure this surplus is actively invested, not sitting idle in a savings account.");
         } else if (savingsRatio >= 20) {
@@ -73,26 +74,26 @@ public class InsightService {
             }
         }
 
-        double monthlyIncome = income / 3.0;
+        double monthlyIncome = income / (double) months;
 
         // FIXED: now income-relative thresholds
-        double foodTotal = categoryTotals.getOrDefault("Food", 0.0) / 3.0;
+        double foodTotal = categoryTotals.getOrDefault("Food", 0.0) / months;
         if (monthlyIncome > 0 && foodTotal / monthlyIncome > 0.20) {
             insights.add("🍔 Food is consuming " + Math.round(foodTotal / monthlyIncome * 100) + "% of your monthly income (₹" + String.format("%,d", Math.round(foodTotal)) + "/month). Meal prepping 3 days a week can realistically cut this by 20-25%.");
         }
 
-        double travelTotal = categoryTotals.getOrDefault("Travel", 0.0) / 3.0;
+        double travelTotal = categoryTotals.getOrDefault("Travel", 0.0) / months;
         if (monthlyIncome > 0 && travelTotal / monthlyIncome > 0.15) {
             insights.add("🚕 Travel is taking up " + Math.round(travelTotal / monthlyIncome * 100) + "% of your income (₹" + String.format("%,d", Math.round(travelTotal)) + "/month). Consider switching high-frequency routes to public transport or a monthly pass.");
         }
 
-        double shoppingTotal = categoryTotals.getOrDefault("Shopping", 0.0) / 3.0;
+        double shoppingTotal = categoryTotals.getOrDefault("Shopping", 0.0) / months;
         if (monthlyIncome > 0 && shoppingTotal / monthlyIncome > 0.15) {
             insights.add("🛍️ Shopping accounts for " + Math.round(shoppingTotal / monthlyIncome * 100) + "% of your income this period. A 48-hour rule before non-essential purchases eliminates most impulse spending.");
         }
 
         // Entertainment
-        double entertainmentTotal = categoryTotals.getOrDefault("Entertainment", 0.0) / 3.0;
+        double entertainmentTotal = categoryTotals.getOrDefault("Entertainment", 0.0) / months;
         if (monthlyIncome > 0 && entertainmentTotal / monthlyIncome > 0.10) {
             insights.add("🎬 Entertainment spending is at " + Math.round(entertainmentTotal / monthlyIncome * 100) + "% of income. Audit your active subscriptions — most people pay for 2-3 they rarely use.");
         }

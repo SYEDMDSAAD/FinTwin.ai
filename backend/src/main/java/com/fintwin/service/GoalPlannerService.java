@@ -77,11 +77,11 @@ public class GoalPlannerService {
                 / dto.getDurationMonths());
 
         double probability = computeProbability(
-                ctx.savings, monthlyTarget
+                ctx.monthlySavings, monthlyTarget
         );
 
         String goalHealth = computeGoalHealth(
-                ctx.savings, monthlyTarget
+                ctx.monthlySavings, monthlyTarget
         );
 
         Map<String, Double> categorySpending =
@@ -105,7 +105,7 @@ public class GoalPlannerService {
         goal.setSuccessProbability(round1(probability));
         goal.setAiPlan(aiPlan);
         goal.setUser(user);
-        goal.setAvailableSavings(ctx.savings);
+        goal.setAvailableSavings(ctx.monthlySavings);
         goal.setGoalHealth(goalHealth);
         goal.setCreatedAt(LocalDate.now());
         goal.setExpectedSaved(0.0);
@@ -151,9 +151,9 @@ public class GoalPlannerService {
                 goalRepository.save(goal);
             }
 
-            goal.setAvailableSavings(ctx.savings);
+            goal.setAvailableSavings(ctx.monthlySavings);
             goal.setGoalHealth(
-                    computeGoalHealth(ctx.savings, goal.getMonthlyTarget())
+                    computeGoalHealth(ctx.monthlySavings, goal.getMonthlyTarget())
             );
 
             updateProgress(goal);
@@ -201,7 +201,7 @@ public class GoalPlannerService {
                 / dto.getDurationMonths());
 
         double probability = computeProbability(
-                ctx.savings, monthlyTarget
+                ctx.monthlySavings, monthlyTarget
         );
 
         Map<String, Double> categorySpending =
@@ -224,8 +224,8 @@ public class GoalPlannerService {
         goal.setMonthlyTarget(monthlyTarget);
         goal.setSuccessProbability(round1(probability));
         goal.setAiPlan(aiPlan);
-        goal.setAvailableSavings(ctx.savings);
-        goal.setGoalHealth(computeGoalHealth(ctx.savings, monthlyTarget));
+        goal.setAvailableSavings(ctx.monthlySavings);
+        goal.setGoalHealth(computeGoalHealth(ctx.monthlySavings, monthlyTarget));
 
         updateProgress(goal);
 
@@ -320,9 +320,9 @@ public class GoalPlannerService {
         );
 
         goal.setAiPlan(newPlan);
-        goal.setAvailableSavings(ctx.savings);
+        goal.setAvailableSavings(ctx.monthlySavings);
         goal.setGoalHealth(
-                computeGoalHealth(ctx.savings, goal.getMonthlyTarget())
+                computeGoalHealth(ctx.monthlySavings, goal.getMonthlyTarget())
         );
 
         updateProgress(goal);
@@ -509,12 +509,18 @@ public class GoalPlannerService {
         final double income;
         final double expenses;
         final double savings;
+        // Per-month savings over the months actually present in the window.
+        // Goal targets are monthly, so every comparison against them must use
+        // this — comparing the multi-month total overstated capacity ~3x.
+        final double monthlySavings;
 
         FinancialContext(List<Transaction> tx, double inc, double exp) {
             this.transactions = tx;
             this.income = inc;
             this.expenses = exp;
             this.savings = inc - exp;
+            this.monthlySavings = this.savings
+                    / com.fintwin.util.TransactionMath.monthsPresent(tx);
         }
     }
 }
