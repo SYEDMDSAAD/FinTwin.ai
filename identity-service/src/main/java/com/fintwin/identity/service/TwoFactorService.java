@@ -40,6 +40,15 @@ public class TwoFactorService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // A stolen access token must not be able to silently replace the
+        // authenticator secret while 2FA is active: the response hands the new
+        // secret to the caller, which would lock the real user out of 2FA and
+        // let a password-holding attacker pass it. Require an explicit
+        // disable (which demands a current TOTP code) first.
+        if (Boolean.TRUE.equals(user.getTwoFactorEnabled()))
+            throw new IllegalArgumentException(
+                    "2FA is already enabled. Disable it with a current code before re-running setup.");
+
         GoogleAuthenticatorKey key = gAuth.createCredentials();
         String secret = key.getKey();
         user.setTwoFactorSecret(secret);

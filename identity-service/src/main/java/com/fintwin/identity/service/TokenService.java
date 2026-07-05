@@ -25,6 +25,7 @@ public class TokenService {
 
     @Autowired private JwtUtil jwtUtil;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private TokenReuseGuard tokenReuseGuard;
 
     public String issueAccessToken(String email) {
         return jwtUtil.generateAccessToken(email);
@@ -50,8 +51,16 @@ public class TokenService {
         RefreshToken stored = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new SecurityException("Invalid refresh token"));
 
-        if (stored.isRevoked())
+        if (stored.isRevoked()) {
+            // Reuse of a rotated-out token is the theft signal rotation exists
+            // to catch: if an attacker used the stolen token first, the
+            // legitimate client replays the old one here. Revoke the entire
+            // family and invalidate outstanding access tokens so the
+            // attacker's descendant session dies too. Runs in its own
+            // transaction — the throw below would roll it back otherwise.
+            tokenReuseGuard.onReuse(stored.getUser().getId());
             throw new SecurityException("Refresh token has been revoked");
+        }
 
         if (stored.getExpiresAt().isBefore(LocalDateTime.now()))
             throw new SecurityException("Refresh token has expired");
