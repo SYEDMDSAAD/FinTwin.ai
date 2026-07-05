@@ -46,10 +46,13 @@ jobs:
 
       - name: Run OWASP dependency check
         working-directory: ${{ matrix.service }}
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mvn org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=9 \
             -Dformats=HTML,SARIF \
+            -Dnvd.api.key="$NVD_API_KEY" \
             -q
 
       - name: Upload SARIF report
