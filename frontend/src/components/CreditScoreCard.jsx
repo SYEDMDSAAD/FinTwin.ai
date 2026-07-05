@@ -72,14 +72,17 @@ export default function CreditScoreCard() {
   const [data,     setData]     = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [checking, setChecking] = useState(false);
+  const [error,    setError]    = useState(false);
 
   const fetchScore = async () => {
     setChecking(true);
+    setError(false);
     try {
       const res = await API.get("/credit-score");
       setData(res.data);
     } catch (err) {
       console.error("Credit score fetch failed", err);
+      setError(true);
     } finally {
       setLoading(false);
       setChecking(false);
@@ -119,6 +122,10 @@ export default function CreditScoreCard() {
         <div style={{ textAlign: "center", padding: "32px 0", color: "rgba(148,163,184,0.4)", fontSize: 13 }}>
           Calculating your score...
         </div>
+      ) : error || !data ? (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "rgba(148,163,184,0.6)", fontSize: 13 }}>
+          Couldn't load your score right now. Use Recalculate to try again.
+        </div>
       ) : (
         <>
           {/* Score + Gauge */}
@@ -152,6 +159,13 @@ export default function CreditScoreCard() {
             </div>
           )}
         </>
+      )}
+
+      {/* Disclaimer — required: this is an internal estimate, not a bureau score */}
+      {data?.disclaimer && (
+        <p style={{ fontSize: 10.5, color: "rgba(148,163,184,0.55)", lineHeight: 1.5, margin: "0 0 12px", fontStyle: "italic" }}>
+          {data.disclaimer}
+        </p>
       )}
 
       {/* Footer */}

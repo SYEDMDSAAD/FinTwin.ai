@@ -197,41 +197,79 @@ function ForecastCard({
                 "
             >
 
-                <div
-                    className="
-                        rounded-2xl
-                        border
-                        border-green-500/15
-                        bg-green-500/[0.05]
-                        p-4
-                    "
-                >
-
+                {/* Negative predicted savings = projected overspend — the most
+                    important warning a forecast can give. Style it as one
+                    instead of showing "₹-7,000" in green. */}
+                {forecast.predictedSavings < 0 ? (
                     <div
                         className="
-                            text-[10px]
-                            tracking-widest
-                            text-green-400
-                            mb-2
+                            rounded-2xl
+                            border
+                            border-red-500/20
+                            bg-red-500/[0.06]
+                            p-4
                         "
                     >
-                        PREDICTED SAVINGS
+                        <div
+                            className="
+                                text-[10px]
+                                tracking-widest
+                                text-red-400
+                                mb-2
+                            "
+                        >
+                            PROJECTED OVERSPEND
+                        </div>
+                        <h3
+                            className="
+                                text-xl
+                                font-bold
+                                text-red-400
+                            "
+                        >
+                            ₹{
+                                Math.abs(forecast.predictedSavings)
+                                    .toLocaleString("en-IN")
+                            }
+                        </h3>
+                        <p className="text-[11px] text-red-300/70 mt-1">
+                            Spending is on track to exceed income next month.
+                        </p>
                     </div>
-
-                    <h3
+                ) : (
+                    <div
                         className="
-                            text-xl
-                            font-bold
-                            text-green-400
+                            rounded-2xl
+                            border
+                            border-green-500/15
+                            bg-green-500/[0.05]
+                            p-4
                         "
                     >
-                        ₹{
-                            forecast.predictedSavings
-                                ?.toLocaleString("en-IN")
-                        }
-                    </h3>
-
-                </div>
+                        <div
+                            className="
+                                text-[10px]
+                                tracking-widest
+                                text-green-400
+                                mb-2
+                            "
+                        >
+                            PREDICTED SAVINGS
+                        </div>
+                        <h3
+                            className="
+                                text-xl
+                                font-bold
+                                text-green-400
+                            "
+                        >
+                            ₹{
+                                forecast.predictedSavings
+                                    ?.toLocaleString("en-IN")
+                            }
+                        </h3>
+                    </div>
+                )}
 
                 <div
                     className="

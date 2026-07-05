@@ -94,6 +94,11 @@ function NetWorthManagement({
   const [liabilityName,   setLiabilityName]   = useState("");
   const [liabilityAmount, setLiabilityAmount] = useState("");
   const [liabilityType,   setLiabilityType]   = useState(LIABILITY_TYPES[0]);
+  // Optional loan details — providing an EMI activates the payment-based
+  // debt-to-income assessment in the credit score.
+  const [liabilityEmi,    setLiabilityEmi]    = useState("");
+  const [liabilityRate,   setLiabilityRate]   = useState("");
+  const [liabilityTerm,   setLiabilityTerm]   = useState("");
   const [editingAssetId,     setEditingAssetId]     = useState(null);
   const [editingLiabilityId, setEditingLiabilityId] = useState(null);
   const [editName,   setEditName]   = useState("");
@@ -412,13 +417,28 @@ function NetWorthManagement({
                 <select className="nwm-select" value={liabilityType} onChange={(e)=>setLiabilityType(e.target.value)}>
                   {LIABILITY_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
+                <input className="nwm-input" type="number" placeholder="Monthly EMI (₹, optional)" value={liabilityEmi} onChange={(e)=>setLiabilityEmi(e.target.value)}/>
+                <input className="nwm-input" type="number" placeholder="Interest rate (% p.a., optional)" value={liabilityRate} onChange={(e)=>setLiabilityRate(e.target.value)}/>
+                <input className="nwm-input" type="number" placeholder="Months remaining (optional)" value={liabilityTerm} onChange={(e)=>setLiabilityTerm(e.target.value)}/>
               </div>
+              <p style={{ fontSize:11, color:"rgba(148,163,184,0.5)", margin:"0 0 12px" }}>
+                Adding the EMI lets FinTwin assess your debt the way lenders do — monthly payments against monthly income.
+              </p>
               <div style={{ display:"flex", gap:8 }}>
                 <button className="nwm-btn" style={{ background:"rgba(248,113,113,0.18)", color:"#f87171" }}
                   onClick={async()=>{
                     if(!liabilityName.trim()||!liabilityAmount) return;
-                    await createLiability({ name:liabilityName, amount:Number(liabilityAmount), type:liabilityType });
-                    setLiabilityName(""); setLiabilityAmount(""); setLiabilityType(LIABILITY_TYPES[0]); setAddingLiability(false);
+                    await createLiability({
+                      name: liabilityName,
+                      amount: Number(liabilityAmount),
+                      type: liabilityType,
+                      emi: liabilityEmi ? Number(liabilityEmi) : null,
+                      interestRate: liabilityRate ? Number(liabilityRate) : null,
+                      termMonths: liabilityTerm ? Number(liabilityTerm) : null,
+                    });
+                    setLiabilityName(""); setLiabilityAmount(""); setLiabilityType(LIABILITY_TYPES[0]);
+                    setLiabilityEmi(""); setLiabilityRate(""); setLiabilityTerm("");
+                    setAddingLiability(false);
                   }}>
                   <Check size={13}/> Save Liability
                 </button>

@@ -127,7 +127,7 @@ function BudgetModal({
 
                 <input
                     type="number"
-                    placeholder="Budget Amount"
+                    placeholder="Monthly limit (₹)"
                     value={limitAmount}
                     onChange={(e) =>
                         setLimitAmount(

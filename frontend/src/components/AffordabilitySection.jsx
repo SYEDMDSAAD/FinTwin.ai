@@ -201,7 +201,7 @@ function AffordabilitySection({
 
                             ₹{
                                 affordability.remainingSavings
-                                    .toLocaleString()
+                                    .toLocaleString("en-IN")
                             }
 
                         </p>
@@ -231,14 +231,33 @@ function AffordabilitySection({
 
                             ₹{
                                 affordability.suggestedEMI
-                                    .toLocaleString()
+                                    .toLocaleString("en-IN")
                             } / mo
 
                         </p>
 
+                        {affordability.emiMonths && (
+                            <p className="text-[11px] text-zinc-500 mt-1">
+                                {affordability.emiMonths} months
+                                {affordability.emiAnnualInterestRate
+                                    ? ` at an assumed ${affordability.emiAnnualInterestRate}% p.a.`
+                                    : ""}
+                            </p>
+                        )}
+
                     </div>
 
                 </div>
+            )}
+
+            {affordability && (
+                <p className="text-xs text-zinc-500 mt-3">
+                    {affordability.canAffordOutright
+                        ? "You can afford this outright from your savings."
+                        : affordability.monthsToSave > 0
+                        ? `At your current savings rate, you could save up for this in about ${affordability.monthsToSave} month${affordability.monthsToSave > 1 ? "s" : ""}.`
+                        : "Your current savings rate doesn't cover this purchase — review the EMI option or build savings first."}
+                </p>
             )}
 
         </GlassCard>

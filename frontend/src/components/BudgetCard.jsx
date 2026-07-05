@@ -146,16 +146,20 @@ function BudgetCard({
 
                     ₹{
                         (budget.spent || 0)
-                            .toLocaleString()
+                            .toLocaleString("en-IN")
                     }
 
                     {" / "}
 
                     ₹{
                         (budget.limit || 0)
-                            .toLocaleString()
+                            .toLocaleString("en-IN")
                     }
 
+                </p>
+
+                <p className="text-[11px] text-zinc-500 mt-1">
+                    spent this month
                 </p>
 
             </div>
