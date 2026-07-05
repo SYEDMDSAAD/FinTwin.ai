@@ -159,7 +159,7 @@ function RecurringExpenses({ recurringExpenses }) {
                                 ">
                                     ₹{
                                         expense.amount
-                                            .toLocaleString()
+                                            .toLocaleString("en-IN")
                                     }
                                 </p>
 

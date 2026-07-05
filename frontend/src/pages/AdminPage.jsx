@@ -524,7 +524,7 @@ function AuditSection() {
             {a||"All"}
           </button>
         ))}
-        <div style={{ marginLeft:"auto", fontSize:12, color:"rgba(148,163,184,0.4)" }}>{total.toLocaleString()} events</div>
+        <div style={{ marginLeft:"auto", fontSize:12, color:"rgba(148,163,184,0.4)" }}>{total.toLocaleString("en-IN")} events</div>
       </div>
 
       <div className="card" style={{ overflow:"hidden" }}>
@@ -606,7 +606,7 @@ function PlatformSection() {
               <span style={{ fontSize:10, fontWeight:700, color:"rgba(148,163,184,0.4)", letterSpacing:"0.08em" }}>{m.label.toUpperCase()}</span>
               <span style={{ color:m.color, opacity:0.7 }}>{m.icon}</span>
             </div>
-            <div style={{ fontSize:28, fontWeight:800, color:"#fff" }}>{loading?"—":m.value?.toLocaleString()}</div>
+            <div style={{ fontSize:28, fontWeight:800, color:"#fff" }}>{loading?"—":m.value?.toLocaleString("en-IN")}</div>
           </div>
         ))}
       </div>
@@ -1321,10 +1321,10 @@ function MonitoringSection() {
       {/* Auth + Activity */}
       <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>AUTH & ACTIVITY</div>
       <div className="grid4" style={{ marginBottom:24 }}>
-        <StatCard label="Login Success"        value={data?.loginSuccess?.toLocaleString()}        sub="today"     color="#34d399" icon={<CheckCircle size={15}/>}/>
-        <StatCard label="Login Failures"       value={data?.loginFailure?.toLocaleString()}        sub="today"     color="#f87171" icon={<XCircle size={15}/>}/>
-        <StatCard label="Total Users"          value={data?.registrations?.toLocaleString()}       sub="all-time"  color="#a78bfa" icon={<Users size={15}/>}/>
-        <StatCard label="Total Transactions"   value={data?.transactionsCreated?.toLocaleString()} sub="all-time"  color="#22d3ee" icon={<TrendingUp size={15}/>}/>
+        <StatCard label="Login Success"        value={data?.loginSuccess?.toLocaleString("en-IN")}        sub="today"     color="#34d399" icon={<CheckCircle size={15}/>}/>
+        <StatCard label="Login Failures"       value={data?.loginFailure?.toLocaleString("en-IN")}        sub="today"     color="#f87171" icon={<XCircle size={15}/>}/>
+        <StatCard label="Total Users"          value={data?.registrations?.toLocaleString("en-IN")}       sub="all-time"  color="#a78bfa" icon={<Users size={15}/>}/>
+        <StatCard label="Total Transactions"   value={data?.transactionsCreated?.toLocaleString("en-IN")} sub="all-time"  color="#22d3ee" icon={<TrendingUp size={15}/>}/>
       </div>
 
       {/* Login trend chart */}
@@ -1347,9 +1347,9 @@ function MonitoringSection() {
       {/* AI Service */}
       <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>AI SERVICE</div>
       <div className="grid4" style={{ marginBottom:16 }}>
-        <StatCard label="Forecast Calls"    value={data?.aiForecastCalls?.toLocaleString()}    color="#a78bfa" icon={<Cpu size={15}/>}/>
-        <StatCard label="Forecast Fallbacks" value={data?.aiForecastFallbacks?.toLocaleString()} color="#f87171" sub="AI was down — used stats" icon={<AlertTriangle size={15}/>}/>
-        <StatCard label="Chat Calls"        value={data?.aiChatCalls?.toLocaleString()}         color="#22d3ee" icon={<MessageCircle size={15}/>}/>
+        <StatCard label="Forecast Calls"    value={data?.aiForecastCalls?.toLocaleString("en-IN")}    color="#a78bfa" icon={<Cpu size={15}/>}/>
+        <StatCard label="Forecast Fallbacks" value={data?.aiForecastFallbacks?.toLocaleString("en-IN")} color="#f87171" sub="AI was down — used stats" icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="Chat Calls"        value={data?.aiChatCalls?.toLocaleString("en-IN")}         color="#22d3ee" icon={<MessageCircle size={15}/>}/>
         <StatCard label="Forecast P99"      value={data?.aiForecastP99Ms ? `${data.aiForecastP99Ms.toFixed(0)}ms` : "—"} color="#fbbf24" sub="tail latency" icon={<Clock size={15}/>}/>
       </div>
 
@@ -1419,8 +1419,8 @@ function MonitoringSection() {
       {/* HTTP */}
       <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>HTTP REQUESTS</div>
       <div className="grid4" style={{ marginBottom:24 }}>
-        <StatCard label="Total Requests" value={data?.httpTotal?.toLocaleString()}  color="#22d3ee" icon={<Wifi size={15}/>}/>
-        <StatCard label="5xx Errors"     value={data?.httpErrors?.toLocaleString()} color={data?.httpErrors > 0 ? "#f87171" : "#34d399"} sub={data?.httpTotal ? `${((data.httpErrors/data.httpTotal)*100).toFixed(2)}% error rate` : ""} icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="Total Requests" value={data?.httpTotal?.toLocaleString("en-IN")}  color="#22d3ee" icon={<Wifi size={15}/>}/>
+        <StatCard label="5xx Errors"     value={data?.httpErrors?.toLocaleString("en-IN")} color={data?.httpErrors > 0 ? "#f87171" : "#34d399"} sub={data?.httpTotal ? `${((data.httpErrors/data.httpTotal)*100).toFixed(2)}% error rate` : ""} icon={<AlertTriangle size={15}/>}/>
         <StatCard label="P99 Latency"    value={data?.httpP99Ms ? `${data.httpP99Ms.toFixed(0)}ms` : "—"} color={data?.httpP99Ms > 1000 ? "#f87171" : "#34d399"} sub="tail latency" icon={<Clock size={15}/>}/>
         <StatCard label="Error Rate"     value={data?.httpTotal ? `${((data?.httpErrors||0)/data.httpTotal*100).toFixed(1)}%` : "—"}
           color={((data?.httpErrors||0)/(data?.httpTotal||1)) > 0.05 ? "#f87171" : "#34d399"} icon={<Shield size={15}/>}/>
@@ -1429,8 +1429,8 @@ function MonitoringSection() {
       {/* SMS */}
       <div style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.35)", letterSpacing:"0.1em", marginBottom:12 }}>SMS DELIVERY</div>
       <div className="grid4" style={{ marginBottom:8 }}>
-        <StatCard label="OTP Sent"   value={data?.smsOtpSent?.toLocaleString()} color="#34d399" icon={<Send size={15}/>}/>
-        <StatCard label="SMS Failed" value={data?.smsFailed?.toLocaleString()}  color={data?.smsFailed > 0 ? "#f87171" : "#34d399"} icon={<AlertTriangle size={15}/>}/>
+        <StatCard label="OTP Sent"   value={data?.smsOtpSent?.toLocaleString("en-IN")} color="#34d399" icon={<Send size={15}/>}/>
+        <StatCard label="SMS Failed" value={data?.smsFailed?.toLocaleString("en-IN")}  color={data?.smsFailed > 0 ? "#f87171" : "#34d399"} icon={<AlertTriangle size={15}/>}/>
         <StatCard label="Success Rate"
           value={data?.smsOtpSent != null ? `${Math.round(((data.smsOtpSent)/Math.max(1,data.smsOtpSent+data.smsFailed))*100)}%` : "—"}
           color="#22d3ee" icon={<CheckCircle size={15}/>}/>

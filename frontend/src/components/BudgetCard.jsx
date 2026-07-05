@@ -239,11 +239,11 @@ function BudgetCard({
 
                         budget.remaining >= 0
 
-                        ? `₹${budget.remaining.toLocaleString()} left`
+                        ? `₹${budget.remaining.toLocaleString("en-IN")} left`
 
                         : `₹${Math.abs(
                             budget.remaining
-                        ).toLocaleString()} over`
+                        ).toLocaleString("en-IN")} over`
 
                     }
 
@@ -298,7 +298,7 @@ function BudgetCard({
                                     ₹{
                                         Math.abs(
                                             budget.remaining
-                                        ).toLocaleString()
+                                        ).toLocaleString("en-IN")
                                     }
 
                                     {" "}

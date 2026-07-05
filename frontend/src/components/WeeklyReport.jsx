@@ -488,7 +488,7 @@ function WeeklyReport() {
                     ">
                         ₹{
                             report?.netWorth
-                            ?.toLocaleString()
+                            ?.toLocaleString("en-IN")
                         }
                     </h3>
 
@@ -550,7 +550,7 @@ function WeeklyReport() {
                     ">
                         ₹{
                             report?.monthlyLeakage
-                            ?.toLocaleString()
+                            ?.toLocaleString("en-IN")
                         }
                     </h3>
 

@@ -412,7 +412,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                       </p>
 
                       <p className="text-purple-400 font-bold">
-                          ₹{goal.availableSavings?.toLocaleString()}
+                          ₹{goal.availableSavings?.toLocaleString("en-IN")}
                       </p>
                   </div>
 

@@ -328,7 +328,7 @@ function InvestmentRecommendationSection({
                     ₹{
                         recommendation
                         .monthlyInvestableAmount
-                        ?.toLocaleString()
+                        ?.toLocaleString("en-IN")
                     }
                 </h1>
 
@@ -497,7 +497,7 @@ function InvestmentRecommendationSection({
                                         mb-1
                                     "
                                 >
-                                    ₹{item.amount?.toLocaleString()}
+                                    ₹{item.amount?.toLocaleString("en-IN")}
                                 </p>
 
                                 <p

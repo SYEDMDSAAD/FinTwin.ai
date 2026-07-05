@@ -212,7 +212,7 @@ function SpendingHeatmap({ transactions }) {
 
                                     ₹{
                                         total
-                                            .toLocaleString()
+                                            .toLocaleString("en-IN")
                                     }
 
                                 </p>

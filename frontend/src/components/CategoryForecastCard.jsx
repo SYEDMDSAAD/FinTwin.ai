@@ -208,7 +208,7 @@ function CategoryForecastCard({
                                                 text-white
                                             "
                                         >
-                                            ₹{item.predictedAmount.toLocaleString()}
+                                            ₹{item.predictedAmount.toLocaleString("en-IN")}
                                         </span>
 
                                     </div>
