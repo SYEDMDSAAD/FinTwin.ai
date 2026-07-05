@@ -18,6 +18,18 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+def _drop_partial_current_month(monthly: pd.DataFrame) -> pd.DataFrame:
+    """Exclude the still-incomplete current month from the training series —
+    a half-elapsed month reads as a spending drop and drags the forecast
+    down. Kept only when it's the sole data point."""
+    if len(monthly) < 2:
+        return monthly
+    current_period = pd.Timestamp.today().to_period("M")
+    mask = monthly["ds"].dt.to_period("M") != current_period
+    filtered = monthly[mask].reset_index(drop=True)
+    return filtered if not filtered.empty else monthly
+
 _MIN_TRANSACTIONS = 5
 _MIN_MONTHLY_POINTS = 2
 
@@ -42,6 +54,7 @@ def forecast_expenses(transactions: list[dict]) -> dict:
             .reset_index()
         )
         monthly = monthly[monthly["y"] > 0].reset_index(drop=True)
+        monthly = _drop_partial_current_month(monthly)
 
         historical_average = float(monthly["y"].mean()) if not monthly.empty else 0.0
 
@@ -56,7 +69,12 @@ def forecast_expenses(transactions: list[dict]) -> dict:
         predicted_expenses = max(predicted_expenses, 0.0)
 
         avg_income = _monthly_avg_income(incomes)
-        predicted_savings = round(max(avg_income - predicted_expenses, 0), 2)
+        # Negative savings = on track to overspend — the most important signal
+        # a forecast can give; flooring at 0 hid it. Zero only when there's no
+        # income data to subtract from.
+        predicted_savings = (
+            round(avg_income - predicted_expenses, 2) if avg_income > 0 else 0.0
+        )
 
         expense_growth = (
             round(((predicted_expenses - historical_average) / historical_average) * 100, 2)
@@ -109,6 +127,10 @@ def _monthly_avg_income(incomes: list[dict]) -> float:
         if inc_df.empty:
             return 0.0
         monthly = inc_df.groupby(pd.Grouper(key="ds", freq="ME"))["amount"].sum().reset_index()
+        monthly = monthly[monthly["amount"] > 0].reset_index(drop=True)
+        monthly = _drop_partial_current_month(monthly)
+        if monthly.empty:
+            return 0.0
         return float(monthly["amount"].mean())
     except Exception:
         return 0.0
