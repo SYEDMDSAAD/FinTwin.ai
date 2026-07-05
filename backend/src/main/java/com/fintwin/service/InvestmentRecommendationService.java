@@ -8,6 +8,8 @@ import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,9 @@ import java.util.*;
 
 @Service
 public class InvestmentRecommendationService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(InvestmentRecommendationService.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -81,11 +86,59 @@ public class InvestmentRecommendationService {
         body.put("netWorth",       netWorth);
         body.put("goalHealth",     goalHealth);
 
-        return aiRestTemplate.postForObject(
-                aiServiceUrl + "/investment-recommendation",
-                body,
-                Map.class
-        );
+        try {
+            Map response = aiRestTemplate.postForObject(
+                    aiServiceUrl + "/investment-recommendation",
+                    body,
+                    Map.class
+            );
+            if (response != null) return response;
+        } catch (Exception e) {
+            log.warn("AI investment recommendation unavailable, using conservative fallback: {}",
+                    e.getMessage());
+        }
+        return buildFallbackRecommendation(transactions, savings);
+    }
+
+    // Conservative rule-based fallback with the same response shape the
+    // ai-service produces, so the frontend renders it identically.
+    private Map<String, Object> buildFallbackRecommendation(
+            List<Transaction> transactions, double savings) {
+
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
+        double monthlySavings = Math.round(savings / months * 100.0) / 100.0;
+
+        List<Map<String, Object>> recs = new ArrayList<>();
+        if (monthlySavings > 0) {
+            recs.add(rec("Fixed Deposit", 50, monthlySavings * 0.50,
+                    "Guaranteed 6-7% returns while detailed analysis is unavailable."));
+            recs.add(rec("Index Fund SIP", 30, monthlySavings * 0.30,
+                    "Low-cost diversified equity exposure for long-term growth."));
+            recs.add(rec("Emergency Fund", 20, monthlySavings * 0.20,
+                    "Keep building an accessible safety buffer."));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("riskProfile",             monthlySavings > 0 ? "Conservative" : "None");
+        result.put("expectedReturn",          monthlySavings > 0 ? "6-9%" : "0%");
+        result.put("investmentHorizon",       monthlySavings > 0 ? "3-5 Years" : "Not Applicable");
+        result.put("portfolioScore",          50);
+        result.put("monthlyInvestableAmount", Math.max(0, monthlySavings));
+        result.put("recommendations",         recs);
+        result.put("summary",
+                "The AI advisor is temporarily unavailable — this is a conservative "
+                + "default allocation based on your average monthly savings. "
+                + "Check back later for a personalised recommendation.");
+        return result;
+    }
+
+    private Map<String, Object> rec(String asset, int allocation, double amount, String reason) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("asset",      asset);
+        m.put("allocation", allocation);
+        m.put("amount",     Math.round(amount * 100.0) / 100.0);
+        m.put("reason",     reason);
+        return m;
     }
 
     // Returns the worst health status across all user goals

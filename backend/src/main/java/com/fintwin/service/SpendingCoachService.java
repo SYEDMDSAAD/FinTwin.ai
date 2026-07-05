@@ -7,6 +7,8 @@ import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +23,9 @@ import java.util.*;
 
 @Service
 public class SpendingCoachService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(SpendingCoachService.class);
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -90,21 +95,57 @@ public class SpendingCoachService {
                         headers
                 );
 
-        ResponseEntity<SpendingCoachResponseDTO>
-                response =
+        try {
+            ResponseEntity<SpendingCoachResponseDTO> response =
+                    aiRestTemplate.exchange(
+                            aiServiceUrl + "/spending-coach",
+                            HttpMethod.POST,
+                            request,
+                            SpendingCoachResponseDTO.class
+                    );
+            if (response.getBody() != null) return response.getBody();
+        } catch (Exception e) {
+            log.warn("AI spending coach unavailable, using statistical fallback: {}",
+                    e.getMessage());
+        }
+        return buildFallback(transactions);
+    }
 
-                aiRestTemplate.exchange(
+    // Statistical fallback when the AI coach is down — same DTO shape.
+    private SpendingCoachResponseDTO buildFallback(List<Transaction> transactions) {
 
-                        aiServiceUrl
-                                + "/spending-coach",
+        int months = com.fintwin.util.TransactionMath.monthsPresent(transactions);
 
-                        HttpMethod.POST,
+        double income = transactions.stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
+                .mapToDouble(Transaction::getAmount).sum();
+        double expenses = transactions.stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
+                .mapToDouble(t -> Math.abs(t.getAmount())).sum();
 
-                        request,
+        // "Leakage": monthly average of small discretionary debits (< ₹500) —
+        // the spend that tends to go unnoticed.
+        double leakage = transactions.stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0
+                        && Math.abs(t.getAmount()) < 500)
+                .mapToDouble(t -> Math.abs(t.getAmount())).sum() / months;
 
-                        SpendingCoachResponseDTO.class
-                );
+        double ratio = income > 0 ? expenses / income : 1.0;
+        String health = ratio < 0.60 ? "Good"
+                      : ratio < 0.85 ? "Fair"
+                      : "Needs Attention";
 
-        return response.getBody();
+        SpendingCoachResponseDTO dto = new SpendingCoachResponseDTO();
+        dto.setSpendingHealth(health);
+        dto.setMonthlyLeakage(Math.round(leakage * 100.0) / 100.0);
+        dto.setTips(List.of(
+                "Review small recurring charges — subscriptions under ₹500 add up fastest.",
+                "Set category budgets for your top three spending categories.",
+                "Automate a fixed transfer to savings on salary day, before discretionary spending."
+        ));
+        dto.setCoachMessage(
+                "The AI coach is temporarily unavailable — these figures are computed "
+                + "from your recent transactions. Check back later for personalised advice.");
+        return dto;
     }
 }
