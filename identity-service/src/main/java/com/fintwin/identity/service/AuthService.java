@@ -41,6 +41,17 @@ public class AuthService {
     @Value("${app.base-url:http://localhost:5173}")
     private String appBaseUrl;
 
+    // Bcrypt hash of a random throwaway value, computed once at startup.
+    // Burned on login attempts for unknown emails so the response time is
+    // indistinguishable from a real bcrypt comparison — without it, unknown
+    // emails returned ~100ms faster, a reliable enumeration oracle.
+    private String timingDummyHash;
+
+    @jakarta.annotation.PostConstruct
+    void initTimingDummy() {
+        timingDummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
+    }
+
     // ── Register ──────────────────────────────────────────────────────────────
 
     @Transactional
@@ -92,8 +103,12 @@ public class AuthService {
             throw new IllegalArgumentException("Email and password are required");
 
         String normalized = req.getEmail().toLowerCase().trim();
-        User user = userRepository.findByEmail(normalized)
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+        User user = userRepository.findByEmail(normalized).orElse(null);
+        if (user == null) {
+            // Equalize timing with the known-email path (see initTimingDummy)
+            passwordEncoder.matches(req.getPassword(), timingDummyHash);
+            throw new RuntimeException("Invalid credentials");
+        }
 
         // Check account lockout
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
@@ -151,6 +166,13 @@ public class AuthService {
                 throw new RuntimeException("Google token verification failed");
 
             GoogleIdToken.Payload payload = idToken.getPayload();
+
+            // Google issues tokens for unverified emails too (workspace/legacy
+            // accounts). Without this check, controlling an unverified Google
+            // address is enough to log in as that email here.
+            if (!Boolean.TRUE.equals(payload.getEmailVerified()))
+                throw new RuntimeException("Google account email is not verified");
+
             String email    = payload.getEmail().toLowerCase().trim();
             String fullName = (String) payload.get("name");
             if (fullName == null || fullName.isBlank()) fullName = email.split("@")[0];
@@ -164,6 +186,16 @@ public class AuthService {
                 user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
                 user.setOnboardingCompleted(false);
                 user.setEmailVerified(true);
+                userRepository.save(user);
+            } else if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+                // Pre-registration takeover defence: this local account was
+                // created (password chosen) by someone who never proved they
+                // own the email. Google login just proved ownership — rotate
+                // the password so any attacker-set credential dies, then mark
+                // the email verified.
+                user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                user.setEmailVerified(true);
+                tokenService.revokeAllForUser(user.getId());
                 userRepository.save(user);
             }
 

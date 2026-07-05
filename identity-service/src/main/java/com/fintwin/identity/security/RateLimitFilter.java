@@ -126,16 +126,41 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String addr = request.getRemoteAddr();
         if (isTrustedProxy(addr)) {
             String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank())
-                return forwarded.split(",")[0].trim();
+            if (forwarded != null && !forwarded.isBlank()) {
+                // Walk from the RIGHT and take the first untrusted hop. The
+                // leftmost entry is client-supplied — keying the limiter on it
+                // let an attacker rotate fake XFF values and get a fresh
+                // bucket per request, defeating login/2FA brute-force limits.
+                String[] hops = forwarded.split(",");
+                for (int i = hops.length - 1; i >= 0; i--) {
+                    String hop = hops[i].trim();
+                    if (!hop.isEmpty() && !isTrustedProxy(hop)) return hop;
+                }
+                // Every hop was a trusted proxy — fall through to remoteAddr
+            }
         }
         return addr;
     }
 
     private boolean isTrustedProxy(String addr) {
         if (addr == null) return false;
-        return addr.equals("127.0.0.1") || addr.equals("::1")
-                || addr.startsWith("172.") || addr.startsWith("10.")
-                || addr.startsWith("192.168.");
+        if (addr.equals("127.0.0.1") || addr.equals("::1")
+                || addr.startsWith("10.") || addr.startsWith("192.168.")) {
+            return true;
+        }
+        // RFC 1918: only 172.16.0.0/12 is private — a bare startsWith("172.")
+        // trusted 172.32+ PUBLIC addresses, letting internet hosts spoof XFF.
+        if (addr.startsWith("172.")) {
+            String[] parts = addr.split("\\.");
+            if (parts.length >= 2) {
+                try {
+                    int second = Integer.parseInt(parts[1]);
+                    return second >= 16 && second <= 31;
+                } catch (NumberFormatException ignored) {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 }
