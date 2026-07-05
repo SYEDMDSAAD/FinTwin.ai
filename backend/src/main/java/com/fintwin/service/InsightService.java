@@ -39,12 +39,12 @@ public class InsightService {
         List<String> insights = new ArrayList<>();
 
         double income = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
@@ -65,7 +65,7 @@ public class InsightService {
         // FIXED: category filtering with null guard
         Map<String, Double> categoryTotals = new HashMap<>();
         for (Transaction t : transactions) {
-            if (t.getAmount() < 0 && t.getCategory() != null) {
+            if (t.getAmount() != null && t.getAmount() < 0 && t.getCategory() != null) {
                 categoryTotals.merge(
                         t.getCategory(),
                         Math.abs(t.getAmount()),

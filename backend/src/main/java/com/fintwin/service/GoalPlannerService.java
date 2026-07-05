@@ -362,12 +362,12 @@ public class GoalPlannerService {
                         .findLatestThreeMonthsTransactions(user.getId());
 
         double income = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
@@ -378,7 +378,7 @@ public class GoalPlannerService {
             List<Transaction> transactions) {
         Map<String, Double> map = new HashMap<>();
         for (Transaction t : transactions) {
-            if (t.getAmount() < 0) {
+            if (t.getAmount() != null && t.getAmount() < 0) {
                 String cat = t.getCategory() != null
                         ? t.getCategory() : "Other";
                 map.merge(cat, Math.abs(t.getAmount()), Double::sum);

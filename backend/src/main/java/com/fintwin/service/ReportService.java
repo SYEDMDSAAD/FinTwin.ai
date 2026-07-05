@@ -146,7 +146,7 @@ public class ReportService {
             .stream()
 
             .filter(t ->
-                t.getAmount() > 0
+                t.getAmount() != null && t.getAmount() > 0
             )
 
             .mapToDouble(
@@ -160,7 +160,7 @@ public class ReportService {
             .stream()
 
             .filter(t ->
-                t.getAmount() < 0
+                t.getAmount() != null && t.getAmount() < 0
             )
 
             .mapToDouble(t ->
@@ -186,7 +186,7 @@ public class ReportService {
 
             if (
 
-                t.getAmount() < 0
+                t.getAmount() != null && t.getAmount() < 0
 
                 &&
 

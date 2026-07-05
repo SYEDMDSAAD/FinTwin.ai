@@ -36,12 +36,12 @@ public class FinancialDataAggregatorService {
                 transactionRepository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
 
         double income   = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
@@ -51,7 +51,7 @@ public class FinancialDataAggregatorService {
         Map<String, Double> merchantSpending = new HashMap<>();
 
         for (Transaction t : transactions) {
-            if (t.getAmount() < 0) {
+            if (t.getAmount() != null && t.getAmount() < 0) {
                 String cat   = t.getCategory() != null ? t.getCategory() : "Other";
                 String merch = t.getMerchant() != null ? t.getMerchant() : "Unknown";
                 categorySpending.merge(cat,   Math.abs(t.getAmount()), Double::sum);
@@ -69,7 +69,7 @@ public class FinancialDataAggregatorService {
 
         List<String> subscriptions = merchantSpending.entrySet().stream()
                 .filter(e -> transactions.stream()
-                        .filter(t -> t.getAmount() < 0
+                        .filter(t -> t.getAmount() != null && t.getAmount() < 0
                                 && e.getKey().equals(t.getMerchant() != null ? t.getMerchant() : "Unknown"))
                         .count() >= 2)
                 .map(Map.Entry::getKey)

@@ -127,7 +127,7 @@ public class InvestmentService {
         Map<String, DetectedEntry> grouped = new LinkedHashMap<>();
 
         for (Transaction t : txns) {
-            if (t.getAmount() >= 0) continue; // only outgoing payments
+            if (t.getAmount() == null || t.getAmount() >= 0) continue; // only outgoing payments
 
             String raw = t.getMerchant() != null ? t.getMerchant() : "";
             String n   = raw.toLowerCase();

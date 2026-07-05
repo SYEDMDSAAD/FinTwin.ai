@@ -240,7 +240,7 @@ public class TransactionService {
 
         Transaction transaction = parserService.parseExpense(text);
 
-        if (transaction.getAmount() > 0) {
+        if (transaction.getAmount() != null && transaction.getAmount() > 0) {
             transaction.setAmount(-transaction.getAmount());
         }
 
@@ -336,7 +336,7 @@ public class TransactionService {
         t.setDate(txDate != null ? txDate : LocalDate.now());
         t.setMerchant(merchant != null ? merchant : "Unknown");
         t.setAmount(amount != null ? amount : 0.0);
-        t.setCategory(category != null && !category.isBlank() ? category : "Others");
+        t.setCategory(category != null && !category.isBlank() ? category : "Other");
         t.setSource("MANUAL");
         t.setUser(user);
 
@@ -397,7 +397,7 @@ public class TransactionService {
                         ? row.get("category").toString()
                         : categoryService.categorize(merchant) != null
                                 ? categoryService.categorize(merchant)
-                                : "Others";
+                                : "Other";
 
                 Transaction t = new Transaction();
                 t.setDate(date);

@@ -220,7 +220,7 @@ public class ForecastService {
         Map<String, Double> categoryTotals = new HashMap<>();
 
         for (Transaction t : transactions) {
-            if (t.getAmount() < 0) {
+            if (t.getAmount() != null && t.getAmount() < 0) {
                 String cat = t.getCategory() != null
                         ? t.getCategory() : "Other";
                 categoryTotals.merge(

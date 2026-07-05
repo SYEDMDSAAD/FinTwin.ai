@@ -210,6 +210,7 @@ public class AnalyticsService {
 
         Map<String, List<Transaction>> grouped = transactions.stream()
                 .filter(t -> t.getAmount() != null && t.getAmount() < 0)
+                .filter(t -> t.getMerchant() != null)  // groupingBy throws on null keys
                 .collect(Collectors.groupingBy(Transaction::getMerchant));
 
         List<RecurringExpenseDTO> result =

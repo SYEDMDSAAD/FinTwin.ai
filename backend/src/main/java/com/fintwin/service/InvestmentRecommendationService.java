@@ -56,12 +56,12 @@ public class InvestmentRecommendationService {
                         .findLatestThreeMonthsTransactions(user.getId());
 
         double income = transactions.stream()
-                .filter(t -> t.getAmount() > 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() > 0)
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double expenses = transactions.stream()
-                .filter(t -> t.getAmount() < 0)
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .mapToDouble(t -> Math.abs(t.getAmount()))
                 .sum();
 
