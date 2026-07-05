@@ -7,6 +7,7 @@ import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.dto.ForecastDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,11 @@ public class AffordabilityService {
     @Autowired private UserRepository userRepository;
     @Autowired private ForecastService forecastService;
     @Autowired private NetWorthService netWorthService;
+
+    // Assumed annual rate for the suggested-EMI estimate. Indian consumer
+    // durable / personal-loan rates typically run 11-16% p.a.
+    @Value("${fintwin.affordability.annual-interest-rate:14.0}")
+    private double annualInterestRatePct;
 
     @PreAuthorize("hasAuthority('USE_AI_BASIC')")
     public Map<String, Object> analyzePurchase(Double price) {
@@ -90,7 +96,7 @@ public class AffordabilityService {
 
         int emiMonths = risk.equals("High") ? 24
                       : risk.equals("Medium") ? 18 : 12;
-        double suggestedEMI = price / emiMonths;
+        double suggestedEMI = computeEmi(price, annualInterestRatePct, emiMonths);
 
         long monthsToSave = monthlySavings > 0
                 ? (long) Math.ceil(price / monthlySavings)
@@ -106,7 +112,21 @@ public class AffordabilityService {
                 monthsToSave == Long.MAX_VALUE ? -1 : monthsToSave
         );
         response.put("monthlySavingsAvg", Math.round(monthlySavings));
+        response.put("emiAnnualInterestRate", annualInterestRatePct);
 
         return response;
+    }
+
+    /**
+     * Standard amortized EMI: P·r·(1+r)^n / ((1+r)^n − 1), where r is the
+     * monthly rate. Flat price/n division (the previous behaviour) understates
+     * the real payment — ~14% at 24 months is off by about 15%.
+     */
+    static double computeEmi(double principal, double annualRatePct, int months) {
+        if (months <= 0) return principal;
+        double r = annualRatePct / 100.0 / 12.0;
+        if (r <= 0) return principal / months;
+        double factor = Math.pow(1 + r, months);
+        return principal * r * factor / (factor - 1);
     }
 }
