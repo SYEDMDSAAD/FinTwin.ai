@@ -9,7 +9,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.3</version>
+        <version>3.5.14</version>
         <relativePath/>
     </parent>
 
@@ -28,6 +28,14 @@
         <!-- Spring Boot 3.5.3 manages 10.1.42, which has several CVSS >= 9 CVEs.
              Override to the latest 10.1.x patch to clear them without a major bump. -->
         <tomcat.version>10.1.55</tomcat.version>
+        <!-- Spring Boot 3.5.14 still manages jackson-bom 2.21.2 and netty 4.1.132.Final,
+             both short of the versions that fix CVE-2026-54512/54513 (jackson-databind)
+             and CVE-2026-42583/44249/45416/50010 (netty). Override to clear them. -->
+        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <netty.version>4.1.135.Final</netty.version>
+        <!-- Spring Boot 3.5.14 still manages postgresql 42.7.10, short of the version
+             that fixes CVE-2026-42198 (client-side DoS via SCRAM-SHA-256 auth). -->
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <dependencies>
@@ -254,6 +262,19 @@
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
             <version>9.0</version>
+        </dependency>
+
+        <!-- logstash-logback-encoder pulls Jackson 3.x (tools.jackson), which Spring Boot's
+             BOM doesn't manage. Override to clear CVE-2026-54512/54513 and GHSA-2m67-wjpj-xhg9. -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>3.1.4</version>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>3.1.1</version>
         </dependency>
 
         <!-- ── Resilience ─────────────────────────────────────────────── -->
