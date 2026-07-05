@@ -18,11 +18,17 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Calculates a CIBIL-style credit score (300–900) from the user's
- * transaction history and liabilities.
+ * FinTwin's internal Debt &amp; Discipline Score (300–900), computed from the
+ * user's transaction history and liabilities.
  *
- * Weights mirror real bureau logic:
- *   Payment / Savings Discipline  35% → max 210 pts
+ * This is NOT a credit-bureau score. Bureaus (CIBIL/Experian/Equifax) score
+ * payment history, credit utilization, account age, credit mix, and hard
+ * inquiries — none of which are visible to this app. The 300–900 range is
+ * kept only because it's the scale Indian users know how to read; the DTO
+ * carries a disclaimer the frontend must display.
+ *
+ * Factors and weights:
+ *   Savings Discipline            35% → max 210 pts
  *   Debt-to-Income Ratio          30% → max 180 pts
  *   Spending Consistency          15% → max  90 pts
  *   Income Regularity             10% → max  60 pts
@@ -51,7 +57,10 @@ public class CreditScoreService {
                               .mapToDouble(Transaction::getAmount).sum();
         double expenses = txns.stream().filter(t -> t.getAmount() != null && t.getAmount() < 0)
                               .mapToDouble(t -> Math.abs(t.getAmount())).sum();
-        double totalDebt = liabilities.stream().mapToDouble(Liability::getAmount).sum();
+        double totalDebt = liabilities.stream()
+                .map(Liability::getAmount)
+                .filter(a -> a != null)
+                .mapToDouble(Double::doubleValue).sum();
 
         // ── 1. Savings Discipline (max 210 pts) ───────────────────────────
         double savingsRate = income > 0 ? (income - expenses) / income * 100 : 0;
@@ -78,29 +87,63 @@ public class CreditScoreService {
         }
 
         // ── 2. Debt-to-Income Ratio (max 180 pts) ─────────────────────────
+        // Real DTI is monthly debt *payments* / monthly income — that's what
+        // lenders underwrite against. When liabilities carry an EMI we use it;
+        // otherwise fall back to a balance/annual-income leverage ratio with
+        // thresholds calibrated for balances (a normal car loan ≈ 40% of
+        // annual income and a mortgage 200-400% — neither should score zero,
+        // which the old payment-style thresholds did).
         int months = com.fintwin.util.TransactionMath.monthsPresent(txns);
-        double annualIncome = income / months * 12;
-        double dti = annualIncome > 0 ? (totalDebt / annualIncome) * 100 : (totalDebt > 0 ? 100 : 0);
+        double monthlyIncome = income / months;
+        double annualIncome  = monthlyIncome * 12;
+        double totalEmi = liabilities.stream()
+                .map(Liability::getEmi)
+                .filter(e -> e != null && e > 0)
+                .mapToDouble(Double::doubleValue).sum();
+
         int debtPts;
         String debtStatus, debtDesc;
         if (totalDebt == 0) {
             debtPts = 180; debtStatus = "good";
             debtDesc = "No outstanding liabilities. Excellent debt position.";
-        } else if (dti < 10) {
-            debtPts = 160; debtStatus = "good";
-            debtDesc = "Debt is " + fmt(dti) + "% of annual income — well within safe limits.";
-        } else if (dti < 20) {
-            debtPts = 130; debtStatus = "good";
-            debtDesc = "Debt-to-income ratio of " + fmt(dti) + "% is manageable. Stay on top of repayments.";
-        } else if (dti < 40) {
-            debtPts = 90; debtStatus = "warning";
-            debtDesc = "Debt-to-income ratio of " + fmt(dti) + "% is elevated. Focus on reducing principal.";
-        } else if (dti < 60) {
-            debtPts = 45; debtStatus = "warning";
-            debtDesc = "High DTI of " + fmt(dti) + "%. Lenders consider this a moderate risk signal.";
+        } else if (totalEmi > 0 && monthlyIncome > 0) {
+            // Payment-based DTI — standard lending thresholds
+            double dti = totalEmi / monthlyIncome * 100;
+            if (dti < 20) {
+                debtPts = 160; debtStatus = "good";
+                debtDesc = "Debt payments are " + fmt(dti) + "% of monthly income — comfortably within safe limits.";
+            } else if (dti < 36) {
+                debtPts = 130; debtStatus = "good";
+                debtDesc = "Payment-to-income ratio of " + fmt(dti) + "% is manageable. Lenders consider under 36% healthy.";
+            } else if (dti < 43) {
+                debtPts = 90; debtStatus = "warning";
+                debtDesc = "Payment-to-income ratio of " + fmt(dti) + "% is elevated — above 36%, lenders start seeing risk.";
+            } else if (dti < 50) {
+                debtPts = 45; debtStatus = "warning";
+                debtDesc = "High payment burden of " + fmt(dti) + "% of income. New credit will be hard to service.";
+            } else {
+                debtPts = 0; debtStatus = "poor";
+                debtDesc = "Debt payments consume " + fmt(dti) + "% of income — a critical level. Prioritise repayment.";
+            }
         } else {
-            debtPts = 0; debtStatus = "poor";
-            debtDesc = "Debt-to-income ratio of " + fmt(dti) + "% is critical. Prioritise debt reduction immediately.";
+            // No EMI data — leverage ratio (balance vs annual income)
+            double leverage = annualIncome > 0 ? (totalDebt / annualIncome) * 100 : 100;
+            if (leverage < 35) {
+                debtPts = 160; debtStatus = "good";
+                debtDesc = "Total debt is " + fmt(leverage) + "% of annual income — a light debt load.";
+            } else if (leverage < 100) {
+                debtPts = 130; debtStatus = "good";
+                debtDesc = "Total debt at " + fmt(leverage) + "% of annual income is normal for a financed vehicle or education loan.";
+            } else if (leverage < 250) {
+                debtPts = 90; debtStatus = "warning";
+                debtDesc = "Total debt is " + fmt(leverage) + "% of annual income — typical with a mortgage; add EMI details for a more accurate reading.";
+            } else if (leverage < 400) {
+                debtPts = 45; debtStatus = "warning";
+                debtDesc = "Debt of " + fmt(leverage) + "% of annual income is on the high side. Add EMI details to your liabilities for a payment-based assessment.";
+            } else {
+                debtPts = 0; debtStatus = "poor";
+                debtDesc = "Debt exceeds 4x annual income. Prioritise repayment planning.";
+            }
         }
 
         // ── 3. Spending Consistency (max 90 pts) ──────────────────────────
@@ -201,7 +244,11 @@ public class CreditScoreService {
             new FactorDTO("Category Health",      "Low",    categoryPts,     60, categoryStatus,    categoryDesc)
         );
 
-        return new CreditScoreDTO(total, band, bandColor, factors);
+        return new CreditScoreDTO(total, band, bandColor, factors,
+                "This is FinTwin's internal estimate based on your transactions and "
+                + "liabilities. It is not a credit bureau score — your actual "
+                + "CIBIL/Experian score depends on payment history, credit utilisation "
+                + "and other data this app cannot see.");
     }
 
     private String fmt(double v) {

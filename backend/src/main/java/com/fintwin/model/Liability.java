@@ -3,6 +3,7 @@ package com.fintwin.model;
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fintwin.security.EncryptedBigDecimalConverter;
+import com.fintwin.security.EncryptedDoubleConverter;
 import com.fintwin.security.EncryptionConverter;
 
 import java.math.BigDecimal;
@@ -26,6 +27,21 @@ public class Liability {
     private BigDecimal amount;
 
     private String type;
+
+    // Annual interest rate % on this debt (optional, user-supplied)
+    @Convert(converter = EncryptedDoubleConverter.class)
+    @Column(name = "interest_rate", columnDefinition = "TEXT")
+    private Double interestRate;
+
+    // Monthly payment (EMI). Enables real payment-based debt-to-income
+    // instead of a balance-vs-annual-income leverage proxy.
+    @Convert(converter = EncryptedDoubleConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private Double emi;
+
+    // Remaining term in months (optional)
+    @Column(name = "term_months")
+    private Integer termMonths;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
@@ -72,6 +88,15 @@ public class Liability {
     public void setType(String type) {
         this.type = type;
     }
+
+    public Double getInterestRate() { return interestRate; }
+    public void setInterestRate(Double interestRate) { this.interestRate = interestRate; }
+
+    public Double getEmi() { return emi; }
+    public void setEmi(Double emi) { this.emi = emi; }
+
+    public Integer getTermMonths() { return termMonths; }
+    public void setTermMonths(Integer termMonths) { this.termMonths = termMonths; }
 
     public User getUser() {
         return user;

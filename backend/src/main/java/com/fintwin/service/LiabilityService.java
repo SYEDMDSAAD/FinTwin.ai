@@ -89,6 +89,9 @@ public class LiabilityService {
         liability.setName(updated.getName().trim());
         liability.setAmount(updated.getAmount());
         liability.setType(updated.getType());
+        liability.setInterestRate(updated.getInterestRate());
+        liability.setEmi(updated.getEmi());
+        liability.setTermMonths(updated.getTermMonths());
 
         return liabilityRepository.save(liability);
     }

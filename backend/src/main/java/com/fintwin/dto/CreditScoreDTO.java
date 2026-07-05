@@ -8,6 +8,9 @@ public class CreditScoreDTO {
     private String band;
     private String bandColor;
     private List<FactorDTO> factors;
+    // Must be displayed wherever the score is shown — this is an internal
+    // estimate, not a bureau (CIBIL/Experian/Equifax) score.
+    private String disclaimer;
 
     public static class FactorDTO {
         private String label;
@@ -34,15 +37,17 @@ public class CreditScoreDTO {
         public String getDesc()      { return desc; }
     }
 
-    public CreditScoreDTO(int score, String band, String bandColor, List<FactorDTO> factors) {
-        this.score     = score;
-        this.band      = band;
-        this.bandColor = bandColor;
-        this.factors   = factors;
+    public CreditScoreDTO(int score, String band, String bandColor, List<FactorDTO> factors, String disclaimer) {
+        this.score      = score;
+        this.band       = band;
+        this.bandColor  = bandColor;
+        this.factors    = factors;
+        this.disclaimer = disclaimer;
     }
 
-    public int              getScore()     { return score; }
-    public String           getBand()      { return band; }
-    public String           getBandColor() { return bandColor; }
-    public List<FactorDTO>  getFactors()   { return factors; }
+    public int              getScore()      { return score; }
+    public String           getBand()       { return band; }
+    public String           getBandColor()  { return bandColor; }
+    public List<FactorDTO>  getFactors()    { return factors; }
+    public String           getDisclaimer() { return disclaimer; }
 }
