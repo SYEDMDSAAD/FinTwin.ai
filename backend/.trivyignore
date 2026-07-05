@@ -1,0 +1,3 @@
+# No suppressed CVEs for this service. File exists (empty) so the shared
+# --ignorefile flag in .github/workflows/security.yml works uniformly across
+# the trivy-scan matrix without a per-service conditional.

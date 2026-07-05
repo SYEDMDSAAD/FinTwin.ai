@@ -1,0 +1,24 @@
+# Debian base-image (python:3.12-slim) OS-package CVEs with no upstream fix
+# available as of 2026-07-05. All are in packages this headless FastAPI/ML
+# service never exercises (no shell scripts, no terminal UI, no ad-hoc
+# archive extraction) — perl/gzip/ncurses/acl ship as part of Debian's
+# minimal base system, not as app dependencies. Re-run a clean Trivy scan
+# periodically and drop entries once Debian ships real fixes.
+
+# gzip: buffer overflow in LZH decompression — not invoked by this service
+CVE-2026-41992
+
+# libacl1: symlink traversal privilege escalation via libacl functions — not used
+CVE-2026-54369
+
+# libncursesw6 / libtinfo6 / ncurses-base / ncurses-bin: buffer overflow —
+# no terminal UI in a headless service
+CVE-2025-69720
+
+# perl-base: path traversal / heap overflow / arbitrary file access / DoS via
+# perl-Archive-Tar and perl-IO-Compress — perl is not invoked by this service
+CVE-2026-42496
+CVE-2026-8376
+CVE-2026-42497
+CVE-2026-48962
+CVE-2026-9538
