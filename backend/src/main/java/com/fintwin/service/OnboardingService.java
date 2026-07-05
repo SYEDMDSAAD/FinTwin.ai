@@ -38,7 +38,7 @@ public class OnboardingService {
         { 19, "Amazon",        "Shopping",      0.10 },
         { 23, "Medical",       "Healthcare",    0.04 },
         { 26, "Fuel",          "Travel",        0.05 },
-        { 28, "Miscellaneous", "Others",        0.10 },
+        { 28, "Miscellaneous", "Other",         0.10 },
     };
 
     private final UserRepository            userRepository;
@@ -199,12 +199,8 @@ public class OnboardingService {
         int    nMonths    = req.getNumberOfMonths()       != null && req.getNumberOfMonths() >= 2
                             ? req.getNumberOfMonths() : 3;
         double monthlySavings = (income3m - expenses3m) / nMonths;
-        double probability    = monthlyTarget <= 0 ? 50.0
-                : Math.min(100.0, Math.max(0.0, (monthlySavings / monthlyTarget) * 100));
-        String health = probability >= 100 ? "Excellent"
-                : probability >= 70        ? "On Track"
-                : probability >= 40        ? "At Risk"
-                : "Critical";
+        double probability    = com.fintwin.util.GoalMath.successProbability(monthlySavings, monthlyTarget);
+        String health         = com.fintwin.util.GoalMath.health(monthlySavings, monthlyTarget);
 
         FinancialGoal g = new FinancialGoal();
         g.setTitle(title);

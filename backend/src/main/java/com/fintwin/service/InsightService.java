@@ -63,11 +63,13 @@ public class InsightService {
         }
 
         // FIXED: category filtering with null guard
+        // Keys normalized to lowercase so lookups don't silently miss when
+        // categorization casing shifts ("food" vs "Food").
         Map<String, Double> categoryTotals = new HashMap<>();
         for (Transaction t : transactions) {
             if (t.getAmount() != null && t.getAmount() < 0 && t.getCategory() != null) {
                 categoryTotals.merge(
-                        t.getCategory(),
+                        t.getCategory().toLowerCase(),
                         Math.abs(t.getAmount()),
                         Double::sum
                 );
@@ -77,23 +79,23 @@ public class InsightService {
         double monthlyIncome = income / (double) months;
 
         // FIXED: now income-relative thresholds
-        double foodTotal = categoryTotals.getOrDefault("Food", 0.0) / months;
+        double foodTotal = categoryTotals.getOrDefault("food", 0.0) / months;
         if (monthlyIncome > 0 && foodTotal / monthlyIncome > 0.20) {
             insights.add("🍔 Food is consuming " + Math.round(foodTotal / monthlyIncome * 100) + "% of your monthly income (₹" + String.format("%,d", Math.round(foodTotal)) + "/month). Meal prepping 3 days a week can realistically cut this by 20-25%.");
         }
 
-        double travelTotal = categoryTotals.getOrDefault("Travel", 0.0) / months;
+        double travelTotal = categoryTotals.getOrDefault("travel", 0.0) / months;
         if (monthlyIncome > 0 && travelTotal / monthlyIncome > 0.15) {
             insights.add("🚕 Travel is taking up " + Math.round(travelTotal / monthlyIncome * 100) + "% of your income (₹" + String.format("%,d", Math.round(travelTotal)) + "/month). Consider switching high-frequency routes to public transport or a monthly pass.");
         }
 
-        double shoppingTotal = categoryTotals.getOrDefault("Shopping", 0.0) / months;
+        double shoppingTotal = categoryTotals.getOrDefault("shopping", 0.0) / months;
         if (monthlyIncome > 0 && shoppingTotal / monthlyIncome > 0.15) {
             insights.add("🛍️ Shopping accounts for " + Math.round(shoppingTotal / monthlyIncome * 100) + "% of your income this period. A 48-hour rule before non-essential purchases eliminates most impulse spending.");
         }
 
         // Entertainment
-        double entertainmentTotal = categoryTotals.getOrDefault("Entertainment", 0.0) / months;
+        double entertainmentTotal = categoryTotals.getOrDefault("entertainment", 0.0) / months;
         if (monthlyIncome > 0 && entertainmentTotal / monthlyIncome > 0.10) {
             insights.add("🎬 Entertainment spending is at " + Math.round(entertainmentTotal / monthlyIncome * 100) + "% of income. Audit your active subscriptions — most people pay for 2-3 they rarely use.");
         }

@@ -110,15 +110,21 @@ public class AnomalyService {
                 .collect(Collectors.groupingBy(Transaction::getCategory,
                         Collectors.summingDouble(t -> Math.abs(t.getAmount()))));
 
-        Map<String, Double> priorCat = expenses.stream()
+        List<Transaction> priorExpenses = expenses.stream()
                 .filter(t -> t.getDate() != null && !t.getDate().toString().startsWith(thisMonth) && t.getCategory() != null)
+                .toList();
+        Map<String, Double> priorCat = priorExpenses.stream()
                 .collect(Collectors.groupingBy(Transaction::getCategory,
                         Collectors.summingDouble(t -> Math.abs(t.getAmount()))));
+        // Average over the prior months actually present — dividing by a fixed
+        // 2 halved the baseline when only 1 prior month existed, inflating
+        // spike ratios and causing false alarms for new users.
+        int priorMonths = com.fintwin.util.TransactionMath.monthsPresent(priorExpenses);
 
         for (Map.Entry<String, Double> entry : thisMonthCat.entrySet()) {
             String cat = entry.getKey();
             double thisAmt = entry.getValue();
-            double priorAvg = priorCat.getOrDefault(cat, 0.0) / 2.0;
+            double priorAvg = priorCat.getOrDefault(cat, 0.0) / priorMonths;
             if (priorAvg < 500) continue; // not enough history
             double ratio = thisAmt / priorAvg;
             if (ratio < 1.8) continue;

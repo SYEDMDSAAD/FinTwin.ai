@@ -387,21 +387,12 @@ public class GoalPlannerService {
         return map;
     }
 
-    private double computeProbability(double savings, double monthlyTarget) {
-        if (monthlyTarget <= 0) return 50.0;
-        // FIXED: was missing floor at 0
-        return Math.min(100.0, Math.max(0.0,
-                (savings / monthlyTarget) * 100
-        ));
+    private double computeProbability(double monthlySavings, double monthlyTarget) {
+        return com.fintwin.util.GoalMath.successProbability(monthlySavings, monthlyTarget);
     }
 
-    private String computeGoalHealth(double savings, double monthlyTarget) {
-        if (monthlyTarget <= 0) return "On Track";
-        double score = (savings / monthlyTarget) * 100;
-        if (score >= 150) return "Excellent";
-        if (score >= 100) return "On Track";
-        if (score >= 70)  return "At Risk";
-        return "Critical";
+    private String computeGoalHealth(double monthlySavings, double monthlyTarget) {
+        return com.fintwin.util.GoalMath.health(monthlySavings, monthlyTarget);
     }
 
     private void updateProgress(FinancialGoal goal) {

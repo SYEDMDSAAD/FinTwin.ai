@@ -245,14 +245,13 @@ public class AnalyticsService {
                     entry.getValue().size()
                 );
 
+                // Average of this merchant's charges — the first row was an
+                // arbitrary pick and misrepresented variable recurring bills.
                 dto.setAmount(
-
-                    Math.abs(
-
-                        entry.getValue()
-                            .get(0)
-                            .getAmount()
-                    )
+                    Math.round(txns.stream()
+                            .filter(t -> t.getAmount() != null)
+                            .mapToDouble(t -> Math.abs(t.getAmount()))
+                            .average().orElse(0) * 100.0) / 100.0
                 );
 
                 result.add(dto);
