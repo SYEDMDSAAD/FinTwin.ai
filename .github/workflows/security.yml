@@ -94,21 +94,26 @@ jobs:
       - name: Build image for scanning
         run: docker build -t fintwin-${{ matrix.service }}:scan ./${{ matrix.service }}
 
-      # trivy-action@v0.36.0 defaults to Trivy CLI v0.70.0, which crashes
-      # right after "Detecting vulnerabilities" (no error text, exit 1) when
-      # format: sarif is combined with exit-code — reproduced this ourselves
-      # even against a genuinely clean image. v0.72.0 doesn't have the bug;
-      # pin the underlying CLI explicitly rather than relying on the action's
-      # default, which floats to whatever aquasecurity ships next.
-      - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@v0.36.0
+      # trivy-action's composite wrapper crashes right after "Detecting
+      # vulnerabilities" with a bare exit code 1 and no error text — happens
+      # even on a genuinely clean image, and persists across both v0.70.0 and
+      # v0.72.0 of the underlying CLI, so it's the wrapper itself, not the
+      # scan. The identical `trivy image` invocation run directly (same flags,
+      # same image, same DB) completes fine outside the wrapper. Install the
+      # CLI and invoke it directly so a real failure is actually visible.
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
         with:
           version: v0.72.0
-          image-ref: fintwin-${{ matrix.service }}:scan
-          format: sarif
-          output: trivy-${{ matrix.service }}.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '1'
+
+      - name: Scan with Trivy
+        run: |
+          trivy image \
+            --format sarif \
+            --output trivy-${{ matrix.service }}.sarif \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            fintwin-${{ matrix.service }}:scan
 
       - name: Upload Trivy SARIF
         if: always()
