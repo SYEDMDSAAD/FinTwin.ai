@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!-- CVE-2026-41855 (CVSSv3 9.8, CRITICAL) — arbitrary class instantiation via
+         gadget deserialization in org.springframework.jms.support.converter.
+         MappingJackson2MessageConverter / JacksonJsonMessageConverter, exploitable
+         only in an untrusted JMS environment. No fix exists yet as of this writing
+         (affects every current Spring Framework line: 7.0.7, 6.2.18, 6.1.27, 5.3.48).
+         Flagged against spring-core because dependency-check maps any spring-core
+         jar in the affected range to every CVE tagged against the broad "Spring
+         Framework" CPE, regardless of which module is actually vulnerable. Neither
+         backend nor identity-service use Spring JMS or either message converter —
+         verified via `grep -r "spring-jms\|JmsTemplate\|MappingJackson2MessageConverter\|
+         JacksonJsonMessageConverter"` across both services' src trees, 2026-07-05.
+         Re-evaluate if JMS messaging is ever introduced. -->
+    <suppress>
+        <notes><![CDATA[
+        Unreachable: neither backend nor identity-service use Spring JMS or the
+        affected message converters. See comment above for verification details.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-core@.*$</packageUrl>
+        <cve>CVE-2026-41855</cve>
+    </suppress>
+
+</suppressions>

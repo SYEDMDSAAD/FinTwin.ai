@@ -53,6 +53,7 @@ jobs:
             -DfailBuildOnCVSS=9 \
             -Dformats=HTML,SARIF \
             -Dnvd.api.key="$NVD_API_KEY" \
+            -DsuppressionFiles=${{ github.workspace }}/.github/dependency-check-suppressions.xml \
             -q
 
       - name: Upload SARIF report
