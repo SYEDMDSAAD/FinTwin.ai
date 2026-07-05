@@ -20,12 +20,10 @@ python-multipart==0.0.30   # required by FastAPI for the OCR file upload (File/F
 numpy==2.4.6
 pandas==2.3.3
 scipy==1.15.3            # <1.16 to satisfy statsforecast
-scikit-learn==1.8.0
 statsforecast==2.0.3
-xgboost==3.2.0
+statsmodels==0.14.6      # statsforecast dependency
 numba==0.65.1
 llvmlite==0.47.0
-joblib==1.5.3
 threadpoolctl==3.6.0
 
 # ── OCR (were missing — required by ocr/ocr_engine.py) ───────────────────────
