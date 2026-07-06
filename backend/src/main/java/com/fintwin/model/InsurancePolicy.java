@@ -1,5 +1,6 @@
 package com.fintwin.model;
 
+import com.fintwin.security.EncryptionConverter;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,22 +20,28 @@ public class InsurancePolicy {
     @Column(name = "type", length = 50)
     private String type;
 
-    @Column(name = "provider", length = 512)
+    // Encrypted (AES-256/GCM). Ciphertext is larger than plaintext, so these
+    // use TEXT rather than a bounded VARCHAR to avoid overflow on save.
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "provider", columnDefinition = "TEXT")
     private String provider;
 
-    @Column(name = "premium")
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "premium", columnDefinition = "TEXT")
     private String premium;
 
     @Column(name = "frequency", length = 20)
     private String frequency;
 
-    @Column(name = "sum_assured")
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "sum_assured", columnDefinition = "TEXT")
     private String sumAssured;
 
     @Column(name = "renewal_date")
     private LocalDate renewalDate;
 
-    @Column(name = "notes", length = 1400)
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
     @Column(name = "created_at")

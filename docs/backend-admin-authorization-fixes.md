@@ -23,6 +23,7 @@ Severity legend: 🔴 Critical · 🟠 High · 🟡 Medium
 | 1 | 🔴 | Block impersonating ADMIN/SUPER_ADMIN targets (privilege escalation) | `8df413d` |
 | 2 | 🟠 | Add method-level `@PreAuthorize` to `resetPassword` + `impersonate` | `8df413d` |
 | 3 | 🟠 | Scope impersonation to SUPER_ADMIN only via dedicated `IMPERSONATE_USER` permission | `3430103` |
+| 4 | 🟠 | Encrypt `InsurancePolicy` (premium/sum-assured/provider/notes) + `SupportTicket.message` — were plaintext at rest | `2431c89` |
 
 ---
 
@@ -84,6 +85,42 @@ IMPERSONATE_USER,
 keeps it): a password reset notifies the user and is a normal support action,
 unlike silent impersonation.
 
+## 4. Encryption-at-rest coverage gap (🟠, `2431c89`)
+
+A field-by-field audit of every entity — prompted by re-checking the "all PII is
+encrypted" claim rather than trusting it — found that **`InsurancePolicy` was
+never brought into the AES-256/GCM field-encryption scheme**. Every other
+financial entity (`Transaction`, `Asset`, `Liability`, `Investment`,
+`FinancialGoal`, `Budget`, `BankConnection`, `CryptoConnection`) encrypts its
+amount and name columns; insurance did not. These sat as **cleartext** in the
+database:
+
+- `premium` — premium amount
+- `sumAssured` — coverage amount
+- `provider` — insurer name
+- `notes` — free text (up to 1400 chars)
+
+It was a missed annotation, not a design choice: the V4 migration comments
+already read `premium TEXT -- AES-GCM encrypted Double` and
+`notes ... -- AES-GCM encrypted`, but the entity had no `@Convert`, and
+`EncryptionMigrationService` never listed the repository. `SupportTicket.message`
+(free text a user may paste sensitive detail into) had the same gap.
+
+**Fix:**
+- `@Convert(converter = EncryptionConverter.class)` on `InsurancePolicy`'s four
+  fields and `SupportTicket.message`.
+- **V12 migration** widens `provider`, `notes`, and `message` from bounded
+  VARCHAR to `TEXT` — ciphertext is ~35% larger than plaintext and would
+  otherwise overflow.
+- Both repositories added to `EncryptionMigrationService` so existing plaintext
+  rows re-encrypt on `POST /admin/migrate-encryption` (and transparently on the
+  next save via the converter's legacy-plaintext fallback path).
+
+`SupportTicket.userEmail` was deliberately **left** plaintext: it's the reply-to
+routing key and must stay admin-readable. None of the encrypted fields are ever
+used in a `WHERE` clause (insurance is queried only by `user`; tickets by
+`status`), so encryption breaks no lookups.
+
 ### Impersonation now has three stacked controls
 1. Filter-level `hasRole('ADMIN')` on `/api/v1/admin/**`
 2. Method-level `@PreAuthorize("hasAuthority('IMPERSONATE_USER')")` — SUPER_ADMIN only
@@ -111,9 +148,18 @@ unlike silent impersonation.
   (no credentials).
 - **No error/stacktrace leakage.** `GlobalExceptionHandler` returns a generic
   message for any uncaught exception; internal details never reach the client.
-- **Field encryption** (AES-256/GCM) on PII, **passwords/secrets `@JsonIgnore`'d**
-  and never logged, **Setu webhook** verifies JWS signatures, **admin actions
+- **Field encryption** (AES-256/GCM) on financial columns across all entities —
+  now including `InsurancePolicy` and `SupportTicket.message` after fix #4;
+  applied via JPA `@Convert` with a transparent legacy-plaintext fallback and a
+  one-shot re-encryption endpoint. **Passwords/secrets `@JsonIgnore`'d** and
+  never logged, **Setu webhook** verifies JWS signatures, **admin actions
   audit-logged** with admin email + IP + user-agent.
+
+> **Scope of this claim:** encryption here is *application-level field
+> encryption* (specific DB columns are ciphertext). It does **not** by itself
+> cover TLS-in-transit (app↔DB, app↔ai-service) or full-disk/at-rest encryption
+> of the database volume — those are deployment-infra concerns verified
+> separately, not in application code.
 
 ## Known remaining considerations (accepted / noted)
 
@@ -122,6 +168,13 @@ unlike silent impersonation.
 - **`resetPassword` returns the temp password in the response body** only when
   email is unconfigured (dev), the same documented pattern as identity-service.
 - **Emails logged at INFO** in `EmailService` — low sensitivity.
+- **`SupportTicket.userEmail`, `FinancialScoreHistory`, `DismissedAnomalyPattern.merchant`,
+  `BlockedIP.*` remain plaintext** — intentional: email is the reply-to routing
+  key; the others are non-sensitive (a score integer, a merchant string,
+  security metadata).
+- **IDOR review was sampled, not exhaustive.** Ownership guards were verified on
+  every financial service and were consistent and correct; this is strong
+  evidence of the pattern but not a proof across all ~35 controllers.
 
 ---
 

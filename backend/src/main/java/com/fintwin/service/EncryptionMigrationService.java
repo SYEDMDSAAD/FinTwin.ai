@@ -30,6 +30,8 @@ public class EncryptionMigrationService {
     private final ChatHistoryRepository chatHistoryRepository;
     private final NotificationRepository notificationRepository;
     private final BudgetRepository budgetRepository;
+    private final InsurancePolicyRepository insurancePolicyRepository;
+    private final SupportTicketRepository supportTicketRepository;
 
     public EncryptionMigrationService(
             UserRepository userRepository,
@@ -42,7 +44,9 @@ public class EncryptionMigrationService {
             CryptoConnectionRepository cryptoConnectionRepository,
             ChatHistoryRepository chatHistoryRepository,
             NotificationRepository notificationRepository,
-            BudgetRepository budgetRepository) {
+            BudgetRepository budgetRepository,
+            InsurancePolicyRepository insurancePolicyRepository,
+            SupportTicketRepository supportTicketRepository) {
         this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
         this.assetRepository = assetRepository;
@@ -54,6 +58,8 @@ public class EncryptionMigrationService {
         this.chatHistoryRepository = chatHistoryRepository;
         this.notificationRepository = notificationRepository;
         this.budgetRepository = budgetRepository;
+        this.insurancePolicyRepository = insurancePolicyRepository;
+        this.supportTicketRepository = supportTicketRepository;
     }
 
     @Transactional
@@ -71,6 +77,8 @@ public class EncryptionMigrationService {
         total += migrate("chat_history",    chatHistoryRepository);
         total += migrate("notifications",   notificationRepository);
         total += migrate("budgets",         budgetRepository);
+        total += migrate("insurance_policy",insurancePolicyRepository);
+        total += migrate("support_tickets", supportTicketRepository);
 
         log.info("Encryption migration complete — {} rows re-encrypted.", total);
         return new MigrationResult(total, "Migration complete. All legacy rows are now encrypted.");

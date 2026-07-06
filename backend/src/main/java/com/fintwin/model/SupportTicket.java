@@ -1,5 +1,6 @@
 package com.fintwin.model;
 
+import com.fintwin.security.EncryptionConverter;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -21,7 +22,11 @@ public class SupportTicket {
     @Column(name = "category", length = 50)
     private String category;   // LOGIN_ISSUE, ACCOUNT_BLOCKED, BUG, BILLING, OTHER
 
-    @Column(name = "message", nullable = false, length = 2000)
+    // Encrypted (AES-256/GCM) — free text a user may type sensitive detail into.
+    // TEXT because ciphertext exceeds the old VARCHAR(2000) bound. userEmail stays
+    // plaintext: it's the reply-to routing key and must remain admin-readable.
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
 
     @Column(name = "status", length = 20)
