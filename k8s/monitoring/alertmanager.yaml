@@ -14,10 +14,11 @@ data:
   alertmanager.yml: |
     global:
       resolve_timeout: 5m
-      # ← change to your SMTP relay and sender identity
+      # Same Gmail relay/account the app uses for mail (MAIL_USERNAME). The app
+      # password lives in the alertmanager-secret Secret, not here.
       smtp_smarthost: 'smtp.gmail.com:587'
-      smtp_from: 'alerts@fintwin.ai'
-      smtp_auth_username: 'alerts@fintwin.ai'
+      smtp_from: 'FinTwin Alerts <mdsaadsyed29@gmail.com>'
+      smtp_auth_username: 'mdsaadsyed29@gmail.com'
       smtp_auth_password_file: '/etc/alertmanager/secrets/smtp-password'
       smtp_require_tls: true
 
@@ -38,7 +39,7 @@ data:
     receivers:
       - name: 'email-oncall'
         email_configs:
-          - to: 'oncall@fintwin.ai'   # ← change to your on-call inbox
+          - to: 'mdsaadsyed29@gmail.com'   # on-call / admin inbox
             send_resolved: true
         # ── Slack (optional) — uncomment and set the webhook to also post to Slack.
         # slack_configs:
