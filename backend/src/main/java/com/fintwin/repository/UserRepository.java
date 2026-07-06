@@ -27,6 +27,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role")
     long countByRole(@Param("role") String role);
 
+    // Enabled admins to notify on security alerts.
+    @Query("SELECT u FROM User u WHERE u.role IN :roles AND u.enabled = true")
+    List<User> findEnabledByRoleIn(@Param("roles") List<String> roles);
+
     // 1 round-trip to Supabase instead of 4 COUNT queries for admin stats
     @Query(value = "SELECT COUNT(*), COUNT(*) FILTER (WHERE enabled = true), COUNT(*) FILTER (WHERE created_at > :weekAgo), COUNT(*) FILTER (WHERE role = 'ADMIN') FROM users",
            nativeQuery = true)

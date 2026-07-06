@@ -100,6 +100,26 @@ public class EmailService {
         }
     }
 
+    /**
+     * Sends a pre-rendered security alert to one admin. Best-effort: logs and
+     * swallows failures so one bad recipient doesn't abort a broadcast.
+     */
+    public void sendSecurityAlert(String toEmail, String subject, String htmlBody) {
+        if (!isConfigured()) return;
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom(mailUsername, mailFrom);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(msg);
+            log.info("Security alert sent to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send security alert to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
     private String buildPasswordResetHtml(String userName, String tempPassword) {
         String name = (userName != null && !userName.isBlank()) ? userName : "there";
         return """
