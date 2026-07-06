@@ -22,7 +22,7 @@ pandas==2.3.3
 scipy==1.15.3            # <1.16 to satisfy statsforecast
 statsforecast==2.0.3
 statsmodels==0.14.6      # statsforecast dependency
-numba==0.65.1
+numba==0.66.0
 llvmlite==0.47.0
 threadpoolctl==3.6.0
 
