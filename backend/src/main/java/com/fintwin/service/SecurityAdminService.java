@@ -6,6 +6,7 @@ import com.fintwin.model.User;
 import com.fintwin.repository.BlockedIPRepository;
 import com.fintwin.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,19 @@ public class SecurityAdminService {
     @Autowired private BlockedIPRepository blockedIPRepository;
     @Autowired private UserRepository userRepository;
 
+    // Runtime configuration surfaced to the admin dashboard so misconfigurations
+    // (dev-default secrets, plaintext internal transport, unauthenticated Redis)
+    // are visible operationally, not just in startup logs.
+    private static final String DEV_JWT = "FinTwinSuperSecretJwtKeyForProduction2026SecureKey";
+    @Value("${jwt.secret:}")                private String jwtSecret;
+    @Value("${encryption.key:}")            private String encryptionKey;
+    @Value("${ai.service.internal-key:}")   private String aiInternalKey;
+    @Value("${admin.key:}")                 private String adminKey;
+    @Value("${ai.service.url:}")            private String aiServiceUrl;
+    @Value("${spring.datasource.url:}")     private String datasourceUrl;
+    @Value("${redis.url:}")                 private String redisUrl;
+    @Value("${cors.allowed-origins:}")      private String corsAllowedOrigins;
+
     // ── Security posture ──────────────────────────────────────────────────────
 
     public Map<String, Object> getPosture() {
@@ -39,7 +53,18 @@ public class SecurityAdminService {
                 LocalDateTime.now().withHour(0).withMinute(0).withSecond(0));
 
         long totalThreats = bruteForceIPs + targetedAccounts + suspiciousSessions + dataAnomalies;
-        String riskLevel  = totalThreats == 0 ? "LOW" : totalThreats < 3 ? "MEDIUM" : "HIGH";
+
+        // Configuration hardening — misconfigurations count toward the posture so a
+        // deployment running with dev defaults or plaintext transport can't read
+        // "LOW risk" just because no live attack is in progress.
+        List<Map<String, String>> configIssues = buildConfigIssues();
+        long criticalConfig = configIssues.stream()
+                .filter(i -> "CRITICAL".equals(i.get("severity"))).count();
+
+        String riskLevel;
+        if (criticalConfig > 0 || totalThreats >= 3)      riskLevel = "HIGH";
+        else if (totalThreats > 0 || !configIssues.isEmpty()) riskLevel = "MEDIUM";
+        else                                               riskLevel = "LOW";
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("riskLevel", riskLevel);
@@ -51,7 +76,50 @@ public class SecurityAdminService {
         r.put("blockedIPs", blockedIPs);
         r.put("usersWithout2FA", usersWithout2FA);
         r.put("failedLoginsToday", failedLoginsToday);
+        r.put("configIssues", configIssues);
+        r.put("configIssueCount", configIssues.size());
         return r;
+    }
+
+    /**
+     * Inspects security-sensitive runtime config and returns a list of issues,
+     * most severe first. Empty when the deployment is hardened. Surfaced under
+     * "configIssues" in the posture so the admin dashboard can flag it.
+     */
+    private List<Map<String, String>> buildConfigIssues() {
+        List<Map<String, String>> issues = new ArrayList<>();
+
+        if (jwtSecret == null || jwtSecret.isBlank() || DEV_JWT.equals(jwtSecret))
+            issues.add(issue("CRITICAL", "JWT secret", "Using the dev-default JWT signing key — tokens are forgeable. Set JWT_SECRET."));
+        if (encryptionKey == null || encryptionKey.isBlank())
+            issues.add(issue("CRITICAL", "Field encryption", "FINTWIN_ENCRYPTION_KEY unset — PII is protected only by the weak dev fallback key."));
+        if (aiInternalKey == null || aiInternalKey.isBlank())
+            issues.add(issue("CRITICAL", "AI service auth", "AI_INTERNAL_KEY unset — the AI service is callable without authentication."));
+        if (adminKey == null || adminKey.isBlank())
+            issues.add(issue("HIGH", "Admin bootstrap key", "ADMIN_KEY unset — admin bootstrap/migration endpoints are disabled or unprotected."));
+
+        // Transport: internal hops that carry credentials/financial data in the clear.
+        if (datasourceUrl != null && !datasourceUrl.isBlank()
+                && !datasourceUrl.contains("sslmode=require") && !datasourceUrl.contains("localhost"))
+            issues.add(issue("HIGH", "Database TLS", "DB connection has no sslmode=require — traffic to Postgres is unencrypted."));
+        if (aiServiceUrl != null && aiServiceUrl.startsWith("http://") && !aiServiceUrl.contains("localhost"))
+            issues.add(issue("HIGH", "AI service TLS", "AI_SERVICE_URL is plaintext http:// — the internal key and payloads cross the network unencrypted."));
+        if (redisUrl != null && !redisUrl.isBlank()
+                && !redisUrl.contains("@") && !redisUrl.contains("localhost"))
+            issues.add(issue("MEDIUM", "Redis auth", "REDIS_URL has no password — Redis is reachable unauthenticated on the network."));
+
+        if (corsAllowedOrigins != null && corsAllowedOrigins.contains("localhost"))
+            issues.add(issue("MEDIUM", "CORS origins", "CORS still allows localhost — tighten CORS_ALLOWED_ORIGINS for production."));
+
+        return issues;
+    }
+
+    private Map<String, String> issue(String severity, String area, String detail) {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("severity", severity);
+        m.put("area", area);
+        m.put("detail", detail);
+        return m;
     }
 
     // ── Brute force ───────────────────────────────────────────────────────────

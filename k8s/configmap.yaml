@@ -23,7 +23,8 @@ data:
 
   # ── Services ──────────────────────────────────────────────────────────────────
   AI_SERVICE_URL:   "http://ai-service:8000"
-  REDIS_URL:        "redis://redis-service:6379"
+  # REDIS_URL moved to the Secret — it now embeds the Redis password
+  # (redis://:<password>@redis-service:6379). See k8s/secret.yaml.template.
 
   # ── App ───────────────────────────────────────────────────────────────────────
   SERVER_PORT:      "8080"
