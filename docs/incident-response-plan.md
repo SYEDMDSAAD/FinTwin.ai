@@ -47,10 +47,14 @@ Incidents may be detected via:
   dashboard. Requires `MAIL_ENABLED=true`; when email is off it still logs the
   HIGH state at WARN. Tunables: `SECURITY_ALERTS_ENABLED`,
   `SECURITY_ALERTS_INTERVAL_MS`, `SECURITY_ALERTS_COOLDOWN_MIN`.
-- **Prometheus alert rules** — `k8s/monitoring/prometheus-configmap.yaml`
+- **Prometheus alert rules + Alertmanager** — `k8s/monitoring/prometheus-configmap.yaml`
   (`alert.rules.yml`) fires on backend/AI downtime, 5xx error-rate, p95 latency,
-  a 401/403 auth-failure spike, JVM heap, and DB-pool exhaustion. Route these to
-  email/Slack/PagerDuty via an Alertmanager.
+  a 401/403 auth-failure spike, JVM heap, and DB-pool exhaustion. Prometheus
+  forwards firing alerts to **Alertmanager** (`k8s/monitoring/alertmanager.yaml`),
+  which emails the on-call inbox (criticals notify in 10s and repeat hourly;
+  warnings group over 5m). Set the SMTP password in `alertmanager-secret.yaml`
+  and the relay/recipient in `alertmanager.yaml` before applying; a Slack
+  receiver is included commented-out.
 - **Admin Security Dashboard** (`/api/v1/admin/security`) — brute-force IPs,
   targeted accounts, suspicious sessions (one user, many IPs), data anomalies
   (bulk reads), blocked IPs, and a **Configuration & Hardening** panel flagging

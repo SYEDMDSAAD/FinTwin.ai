@@ -12,6 +12,11 @@ data:
     rule_files:
       - /etc/prometheus/alert.rules.yml
 
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager:9093']
+
     scrape_configs:
       # ── FinTwin backend (/actuator/prometheus) ───────────────────────────────
       # NOTE: regex matches the pod label set by k8s/backend/deployment.yaml

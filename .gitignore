@@ -3,6 +3,13 @@
 backend/.env
 ai-service/.env
 
+# Filled Kubernetes secrets — the *.template files are committed, the real
+# values (produced by copying a template) must never be. The negation keeps
+# templates tracked even though they match the *-secret.yaml glob logic.
+k8s/secret.yaml
+k8s/**/*-secret.yaml
+!k8s/**/*-secret.yaml.template
+
 # ── Java / Maven ──────────────────────────────────────────────────────────────
 target/
 *.class
