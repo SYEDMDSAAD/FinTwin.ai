@@ -668,6 +668,7 @@ function SecuritySection() {
 
   const riskColor = { LOW:"#34d399", MEDIUM:"#fbbf24", HIGH:"#f87171" };
   const riskBg    = { LOW:"rgba(52,211,153,0.08)", MEDIUM:"rgba(251,191,36,0.08)", HIGH:"rgba(239,68,68,0.08)" };
+  const sevColor  = { CRITICAL:"#f87171", HIGH:"#fb923c", MEDIUM:"#fbbf24" };
   const risk = posture?.riskLevel || "LOW";
 
   const doBlockIP = async () => {
@@ -753,6 +754,34 @@ function SecuritySection() {
               <div style={{ fontSize:22, fontWeight:800, color: val > 0 ? "#fbbf24" : "#34d399" }}>{val}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Configuration hardening — surfaced from posture.configIssues */}
+      {posture && (
+        <div className="card" style={{ padding:20, marginBottom:20 }}>
+          <SectionHead title="Configuration & Hardening" count={posture.configIssueCount || 0}/>
+          {(!posture.configIssues || posture.configIssues.length === 0) ? (
+            <div style={{ padding:"18px 14px", color:"rgba(148,163,184,0.35)", fontSize:12 }}>
+              No misconfiguration detected — secrets, transport, and CORS look hardened.
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {posture.configIssues.map((iss, i) => {
+                const sev = iss.severity || "MEDIUM";
+                const c = sevColor[sev] || sevColor.MEDIUM;
+                return (
+                  <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"12px 14px", borderRadius:10, background:`${c}12`, border:`1px solid ${c}30` }}>
+                    <span className="badge" style={{ background:`${c}1f`, color:c, border:`1px solid ${c}40`, flexShrink:0, marginTop:1 }}>{sev}</span>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#fff" }}>{iss.area}</div>
+                      <div style={{ fontSize:12, color:"rgba(203,213,225,0.75)", marginTop:2 }}>{iss.detail}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
