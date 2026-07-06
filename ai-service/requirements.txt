@@ -22,8 +22,8 @@ pandas==2.3.3
 scipy==1.15.3            # <1.16 to satisfy statsforecast
 statsforecast==2.0.3
 statsmodels==0.14.6      # statsforecast dependency
-numba==0.65.1
-llvmlite==0.47.0
+numba==0.66.0
+llvmlite==0.48.0   # must move in lockstep with numba (numba pins llvmlite's minor)
 threadpoolctl==3.6.0
 
 # ── OCR (were missing — required by ocr/ocr_engine.py) ───────────────────────
