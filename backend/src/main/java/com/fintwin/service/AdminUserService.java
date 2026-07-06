@@ -202,7 +202,7 @@ public class AdminUserService {
 
     // ── Impersonate ───────────────────────────────────────────────────────────
 
-    @PreAuthorize("hasAuthority('WRITE_ANY_USER_PROFILE')")
+    @PreAuthorize("hasAuthority('IMPERSONATE_USER')")
     public Map<String, Object> impersonate(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         if (user.getEmail().equals(adminEmail))

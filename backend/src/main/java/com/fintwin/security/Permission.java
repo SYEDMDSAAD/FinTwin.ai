@@ -53,6 +53,8 @@ public enum Permission {
     DELETE_ANY_USER,
     READ_ANY_USER_TRANSACTIONS,
     EXPORT_ALL_DATA,
+    // Full account takeover — deliberately NOT granted to ADMIN; SUPER_ADMIN only.
+    IMPERSONATE_USER,
 
     // ── Admin: Compliance & Risk ─────────────────────────────────────
     READ_AUDIT_LOGS,
