@@ -6,11 +6,12 @@
 **Companion docs:** [identity-service-security-fixes.md](identity-service-security-fixes.md) · [backend-financial-logic-fixes.md](backend-financial-logic-fixes.md) · [rbac.md](rbac.md) · [security-policy.md](security-policy.md)
 
 A full-application audit for data leakage, authorization gaps, admin-action
-abuse, and incident readiness. The codebase came out strong — every
-finding below was on the main backend's admin surface, and both were variants
-of bugs already fixed in the identity-service that had never been applied to
-the backend's separate admin path. All fixes are **implemented**, 56 backend
-tests passing.
+abuse, and incident readiness. The codebase came out strong. Findings #1–#3 are
+admin-surface authorization gaps — two of them variants of bugs already fixed in
+the identity-service that had never reached the backend's separate admin path.
+Finding #4 is an encryption-at-rest coverage gap surfaced by re-checking the
+"all PII is encrypted" claim field-by-field instead of trusting it. All fixes
+are **implemented**, 56 backend tests passing.
 
 Severity legend: 🔴 Critical · 🟠 High · 🟡 Medium
 
@@ -23,7 +24,7 @@ Severity legend: 🔴 Critical · 🟠 High · 🟡 Medium
 | 1 | 🔴 | Block impersonating ADMIN/SUPER_ADMIN targets (privilege escalation) | `8df413d` |
 | 2 | 🟠 | Add method-level `@PreAuthorize` to `resetPassword` + `impersonate` | `8df413d` |
 | 3 | 🟠 | Scope impersonation to SUPER_ADMIN only via dedicated `IMPERSONATE_USER` permission | `3430103` |
-| 4 | 🟠 | Encrypt `InsurancePolicy` (premium/sum-assured/provider/notes) + `SupportTicket.message` — were plaintext at rest | `2431c89` |
+| 4 | 🟠 | Encrypt `InsurancePolicy` (premium/sum-assured/provider/notes) + `SupportTicket.message` — were plaintext at rest | `b9fa95b` |
 
 ---
 
@@ -85,7 +86,7 @@ IMPERSONATE_USER,
 keeps it): a password reset notifies the user and is a normal support action,
 unlike silent impersonation.
 
-## 4. Encryption-at-rest coverage gap (🟠, `2431c89`)
+## 4. Encryption-at-rest coverage gap (🟠, `b9fa95b`)
 
 A field-by-field audit of every entity — prompted by re-checking the "all PII is
 encrypted" claim rather than trusting it — found that **`InsurancePolicy` was
