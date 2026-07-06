@@ -180,6 +180,7 @@ public class AdminUserService {
 
     // ── Reset password ────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_ANY_USER_PROFILE')")
     public Map<String, Object> resetPassword(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         String newPassword = generatePassword();
@@ -201,12 +202,19 @@ public class AdminUserService {
 
     // ── Impersonate ───────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAuthority('WRITE_ANY_USER_PROFILE')")
     public Map<String, Object> impersonate(Long id, String adminEmail, String ip, String ua, String method, String uri) {
         User user = findOrThrow(id);
         if (user.getEmail().equals(adminEmail))
             throw new IllegalArgumentException("Cannot impersonate your own account.");
         if (!Boolean.TRUE.equals(user.getEnabled()))
             throw new IllegalArgumentException("Cannot impersonate a disabled user.");
+        // Block impersonating other privileged accounts: the token is minted with
+        // the target's email as subject, so impersonating an ADMIN/SUPER_ADMIN would
+        // hand the caller that account's full authority — privilege escalation.
+        String targetRole = user.getRole() != null ? user.getRole().toUpperCase() : "USER";
+        if (targetRole.equals("ADMIN") || targetRole.equals("SUPER_ADMIN"))
+            throw new IllegalArgumentException("Cannot impersonate an administrator account.");
         String token = jwtUtil.generateImpersonationToken(user.getEmail(), adminEmail);
         audit(adminEmail, "WRITE", "admin/impersonate",
                 "Admin impersonated: " + user.getEmail() + " (id=" + id + ")", ip, ua, method, uri);
