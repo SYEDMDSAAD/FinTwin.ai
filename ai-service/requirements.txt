@@ -14,7 +14,7 @@ anyio==4.14.1
 h11==0.16.0
 idna==3.16
 click==8.4.2
-python-multipart==0.0.30   # required by FastAPI for the OCR file upload (File/Form)
+python-multipart==0.0.32   # required by FastAPI for the OCR file upload (File/Form)
 
 # ── Data / ML ────────────────────────────────────────────────────────────────
 numpy==2.4.6
