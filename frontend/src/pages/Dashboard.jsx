@@ -859,6 +859,40 @@ function Dashboard() {
         };
 
     // =========================
+    // UPDATE BUDGET (limit only)
+    // =========================
+
+    const updateBudget =
+        async (id, limitAmount) => {
+
+            try {
+
+                await API.put(
+                    `/budgets/${id}`,
+                    { limitAmount }
+                );
+
+                await fetchBudgets();
+
+                await fetchFinancialScore();
+
+                await fetchNotifications();
+
+                toast.success(
+                    "Budget limit updated!"
+                );
+
+            } catch {
+
+                toast.error(
+                    "Failed to update budget."
+                );
+
+                throw new Error("update failed");
+            }
+        };
+
+    // =========================
     // DELETE BUDGET
     // =========================
 
@@ -2019,6 +2053,9 @@ function Dashboard() {
                         }
                         deleteBudget={
                             deleteBudget
+                        }
+                        updateBudget={
+                            updateBudget
                         }
                     />
 

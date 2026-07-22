@@ -28,12 +28,7 @@ public class LiabilityService {
         // merge and could overwrite another user's row. Always create a fresh row.
         liability.setId(null);
 
-        if (liability.getName() == null || liability.getName().isBlank()) {
-            throw new IllegalArgumentException("Liability name required");
-        }
-        if (liability.getAmount() == null || liability.getAmount() < 0) {
-            throw new IllegalArgumentException("Liability amount must be >= 0");
-        }
+        validate(liability);
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
@@ -69,12 +64,7 @@ public class LiabilityService {
     @Audited(action = "WRITE", resource = "liabilities", description = "Liability updated")
     public Liability updateLiability(Long id, Liability updated) {
 
-        if (updated.getName() == null || updated.getName().isBlank()) {
-            throw new IllegalArgumentException("Liability name required");
-        }
-        if (updated.getAmount() == null || updated.getAmount() < 0) {
-            throw new IllegalArgumentException("Liability amount must be >= 0");
-        }
+        validate(updated);
 
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email).orElseThrow();
@@ -94,5 +84,25 @@ public class LiabilityService {
         liability.setTermMonths(updated.getTermMonths());
 
         return liabilityRepository.save(liability);
+    }
+
+    // The optional loan fields feed the DTI and credit-score math — a negative
+    // EMI or rate stored here would silently skew scores with no trace back.
+    private void validate(Liability l) {
+        if (l.getName() == null || l.getName().isBlank()) {
+            throw new IllegalArgumentException("Liability name required");
+        }
+        if (l.getAmount() == null || l.getAmount() < 0) {
+            throw new IllegalArgumentException("Liability amount must be >= 0");
+        }
+        if (l.getEmi() != null && l.getEmi() <= 0) {
+            throw new IllegalArgumentException("EMI must be greater than 0 when provided");
+        }
+        if (l.getInterestRate() != null && l.getInterestRate() < 0) {
+            throw new IllegalArgumentException("Interest rate cannot be negative");
+        }
+        if (l.getTermMonths() != null && l.getTermMonths() <= 0) {
+            throw new IllegalArgumentException("Repayment term must be at least 1 month when provided");
+        }
     }
 }

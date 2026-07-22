@@ -47,16 +47,55 @@ public class BudgetController {
     }
 
     // =========================
+    // Update Budget (limit only)
+    // =========================
+
+    @PutMapping("/{id}")
+
+    public BudgetDTO updateBudget(
+
+        @PathVariable
+        Long id,
+
+        @RequestBody Budget budget
+
+    ) {
+
+        return BudgetDTO.from(
+            budgetService.updateBudget(
+                id, budget.getLimitAmount()));
+    }
+
+    // =========================
     // Budget Status
+    // month is optional (yyyy-MM); omitted = current month. Past months are
+    // computed on demand from transactions against the current limits.
     // =========================
 
     @GetMapping("/status")
 
     public List<BudgetStatusDTO>
-    getBudgetStatus() {
+    getBudgetStatus(
+
+        @RequestParam(required = false)
+        String month
+
+    ) {
+
+        java.time.YearMonth parsed = null;
+
+        if (month != null && !month.isBlank()) {
+            try {
+                parsed = java.time.YearMonth.parse(month);
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                    "month must be in yyyy-MM format"
+                );
+            }
+        }
 
         return budgetService
-            .getBudgetStatus();
+            .getBudgetStatus(parsed);
     }
 
     @DeleteMapping("/{id}")

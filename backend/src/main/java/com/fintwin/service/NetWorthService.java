@@ -45,7 +45,7 @@ public class NetWorthService {
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new com.fintwin.exception.NotFoundException("User not found")
                 );
 
         List<Asset> assetsList = assetRepository.findByUser(user);

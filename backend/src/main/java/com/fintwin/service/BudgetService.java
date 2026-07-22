@@ -13,12 +13,15 @@ import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 
+import com.fintwin.util.TransactionMath;
+
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -98,6 +101,65 @@ public class BudgetService {
         );
         budget.setUser(user);
 
+        // The pre-check above races: two concurrent creates both pass it.
+        // The unique index (V15) is the real guard — translate its violation
+        // into the same 409 the pre-check produces.
+        Budget saved;
+        try {
+            saved = budgetRepository.save(budget);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException(
+                    "A budget for category '"
+                    + budget.getCategory()
+                    + "' already exists"
+            );
+        }
+        profileService.saveScoreSnapshot(user);
+
+        return saved;
+    }
+
+    // =========================
+    // UPDATE BUDGET (limit only)
+    // The category is the budget's identity — "changing" it is really a
+    // different budget, so that stays create+delete. The limit is the thing
+    // users actually adjust, and deleting to change it also destroyed the
+    // month's context.
+    // =========================
+
+    @PreAuthorize("hasAuthority('WRITE_OWN_BUDGETS')")
+    @Audited(action = "WRITE", resource = "budgets", description = "Budget limit updated")
+    public Budget updateBudget(Long id, Double limitAmount) {
+
+        if (limitAmount == null || limitAmount <= 0) {
+            throw new IllegalArgumentException(
+                    "Budget limit must be greater than 0"
+            );
+        }
+
+        String email = SecurityUtils.getCurrentUserEmail();
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new NotFoundException("User not found")
+                );
+
+        Budget budget = budgetRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new NotFoundException("Budget not found")
+                );
+
+        if (budget.getUser().getId().longValue()
+        != user.getId().longValue()) {
+            throw new ForbiddenException(
+                    "Unauthorized Budget Access"
+            );
+        }
+
+        budget.setLimitAmount(limitAmount);
+
         Budget saved = budgetRepository.save(budget);
         profileService.saveScoreSnapshot(user);
 
@@ -153,7 +215,7 @@ public class BudgetService {
 
     @PreAuthorize("hasAuthority('READ_OWN_BUDGETS')")
     @Audited(action = "READ", resource = "budgets", description = "Budget status retrieved")
-    public List<BudgetStatusDTO> getBudgetStatus() {
+    public List<BudgetStatusDTO> getBudgetStatus(YearMonth month) {
 
         String email = SecurityUtils.getCurrentUserEmail();
 
@@ -163,23 +225,39 @@ public class BudgetService {
                         new NotFoundException("User not found")
                 );
 
-        return getBudgetStatusFor(user);
+        if (month != null && month.isAfter(YearMonth.now())) {
+            throw new IllegalArgumentException(
+                    "Budget status is not available for future months"
+            );
+        }
+
+        return getBudgetStatusFor(user, month != null ? month : YearMonth.now());
     }
 
     // Internal, user-parameterized variant — used by FinancialScoreService so
     // score snapshots can be computed for a known user without going through
     // the request-scoped security context.
     public List<BudgetStatusDTO> getBudgetStatusFor(User user) {
+        return getBudgetStatusFor(user, YearMonth.now());
+    }
+
+    // Past months are computed from the same transactions on demand — nothing
+    // is snapshotted, so they reflect the *current* limit, not what the limit
+    // was back then. Limits rarely change, and this keeps history queryable
+    // (spending coach, score) without a history table.
+    public List<BudgetStatusDTO> getBudgetStatusFor(User user, YearMonth month) {
 
         List<Budget> budgets = budgetRepository.findByUser(user);
 
-        java.time.YearMonth currentMonth = java.time.YearMonth.now();
+        // Dates are plaintext (amounts are the encrypted part), so the month's
+        // lower bound can be pushed into SQL instead of fetching 3 months and
+        // discarding two of them here.
         List<Transaction> transactions =
                 transactionRepository
-                        .findLatestThreeMonthsTransactions(user.getId())
+                        .findLatestThreeMonthsTransactions(user.getId(), month.atDay(1))
                         .stream()
                         .filter(t -> t.getDate() != null
-                                && java.time.YearMonth.from(t.getDate()).equals(currentMonth))
+                                && YearMonth.from(t.getDate()).equals(month))
                         .toList();
 
         List<BudgetStatusDTO> result = new ArrayList<>();
@@ -187,7 +265,9 @@ public class BudgetService {
         for (Budget budget : budgets) {
 
             // Case-insensitive category matching. Exact BigDecimal sum so
-            // "spent" and "remaining" are correct to the cent.
+            // "spent" and "remaining" are correct to the cent. Self-transfers
+            // are excluded like everywhere else money is measured — moving
+            // money between own accounts is not spending.
             BigDecimal limit = nz(budget.getLimitAmountExact());
             BigDecimal spent = transactions.stream()
                     .filter(t ->
@@ -197,6 +277,7 @@ public class BudgetService {
                             && t.getCategory().equalsIgnoreCase(
                                     budget.getCategory()
                                )
+                            && !TransactionMath.isSelfTransfer(t)
                     )
                     .map(t -> t.getAmountExact().abs())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -221,10 +302,12 @@ public class BudgetService {
     // PRIVATE HELPER
     // =========================
 
+    // Only the first letter is touched — lowercasing the rest turned "EMI"
+    // into "Emi" and "Food & Dining" into "Food & dining". Matching is
+    // case-insensitive anyway; this is purely how the card renders.
     private String capitalizeFirstLetter(String s) {
         if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0))
-                + s.substring(1).toLowerCase();
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private static BigDecimal nz(BigDecimal v) {
