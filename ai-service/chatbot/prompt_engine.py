@@ -39,19 +39,40 @@ def build_financial_context(data: dict[str, Any]) -> str:
     budget_alerts = data.get("budgetAlerts", [])
     subscriptions = data.get("subscriptions", [])
 
-    return f"""User Financial Profile (last 3 months):
-Monthly Income:    ₹{data.get('income', 0):,}
-Monthly Expenses:  ₹{data.get('expenses', 0):,}
-Monthly Savings:   ₹{data.get('savings', 0):,}
+    # NOTE: income/expenses/savings are MONTHLY AVERAGES; the category and
+    # merchant figures are 3-MONTH TOTALS — labeled explicitly so the model
+    # never compares them against each other directly.
+    return f"""User Financial Profile:
+Monthly Income (avg):    ₹{data.get('income', 0):,}
+Monthly Expenses (avg):  ₹{data.get('expenses', 0):,}
+Monthly Savings (avg):   ₹{data.get('savings', 0):,}
 Savings Ratio:     {data.get('savingsRatio', 0)}%
 Financial Score:   {data.get('financialScore', 0)}/100
 Top Spend Category: {data.get('topCategory', 'Unknown')}
 
-Spending by Category:
+Spending by Category (3-month TOTALS, not monthly):
 {cat_lines}
 
-Top Merchants:
+Top Merchants (3-month TOTALS, not monthly):
 {merch_lines}
 
 Budget Alerts: {budget_alerts if budget_alerts else 'None'}
 Recurring Subscriptions: {subscriptions if subscriptions else 'None'}"""
+
+
+def build_base_context(data: dict[str, Any]) -> str:
+    """
+    Compact snapshot for the tool-calling copilot. Only headline figures —
+    details (transactions, budgets, goals, net worth) are fetched on demand
+    through tools, never pre-attached.
+    """
+    cat_lines = format_category_lines(data.get("categorySpending", {}))
+    return f"""User Financial Snapshot:
+Monthly Income (avg):   ₹{data.get('income', 0):,}
+Monthly Expenses (avg): ₹{data.get('expenses', 0):,}
+Monthly Savings (avg):  ₹{data.get('savings', 0):,}
+Savings Ratio:          {data.get('savingsRatio', 0)}%
+Financial Score:        {data.get('financialScore', 0)}/100
+
+Spending by Category (3-month TOTALS, not monthly):
+{cat_lines}"""

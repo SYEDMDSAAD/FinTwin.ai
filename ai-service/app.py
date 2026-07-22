@@ -45,11 +45,16 @@ app.add_middleware(
 )
 
 
-_PUBLIC_PATHS = {"/", "/health"}
+# /metrics is public the same way the Spring services' /actuator/prometheus
+# is: reachable only on the internal network, scraped by Prometheus, and
+# carrying operational counters rather than user data.
+_PUBLIC_PATHS = {"/", "/health", "/metrics"}
 
 @app.middleware("http")
 async def verify_internal_key(request: Request, call_next):
-    if request.url.path in _PUBLIC_PATHS:
+    # Trailing slash normalised: the mounted /metrics app redirects to
+    # "/metrics/", and the redirected request passes through here again.
+    if (request.url.path.rstrip("/") or "/") in _PUBLIC_PATHS:
         return await call_next(request)
     key = request.headers.get("x-internal-key", "")
     # Constant-time comparison to avoid leaking the key via response timing.
@@ -67,6 +72,9 @@ def root():
 def health():
     return {"status": "ok", "service": "FinTwin AI"}
 
+
+from prometheus_client import make_asgi_app  # noqa: E402
+app.mount("/metrics", make_asgi_app())
 
 app.include_router(chatbot_router, tags=["AI Chatbot"])
 app.include_router(goal_router, tags=["AI Goal Planner"])

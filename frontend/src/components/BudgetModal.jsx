@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { toast } from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 import GlassCard from "./GlassCard";
-import { Plus } from "lucide-react";
+import AnimatedDots from "./AnimatedDots";
+import { Plus, ChevronDown, Sparkles } from "lucide-react";
 
 function BudgetModal({
 
@@ -18,7 +20,11 @@ function BudgetModal({
 
     const [creatingBudget,
         setCreatingBudget] =
-        useState(false);    
+        useState(false);
+
+    const [open, setOpen] = useState(true);
+
+    const canCreate = category.trim() && limitAmount && Number(limitAmount) > 0;
 
     const handleCreateBudget = async () => {
 
@@ -55,7 +61,7 @@ function BudgetModal({
 
             setCreatingBudget(false);
         }
-    };    
+    };
 
     return (
 
@@ -63,7 +69,7 @@ function BudgetModal({
             className="
                 relative
                 overflow-hidden
-                p-6
+                p-5
                 mb-6
                 border
                 border-white/10
@@ -85,23 +91,30 @@ function BudgetModal({
                 "
             />
 
-            <div
-                className="
-                    text-[11px]
-                    font-bold
-                    tracking-[0.12em]
-                    text-zinc-500
-                    mb-4
-                "
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", background: "none", border: "none", padding: 0,
+                    cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                    marginBottom: open ? 12 : 0,
+                }}
             >
-                CREATE BUDGET
-            </div>
+                {open ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>CREATE BUDGET</span>
+                ) : (
+                    <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>Create Budget</span>
+                )}
+                <ChevronDown size={17} style={{ color: "var(--text-primary)", flexShrink: 0, transition: "transform 0.2s ease", transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+            </button>
 
+            {open && (
             <div className="
                 grid
                 grid-cols-1
                 md:grid-cols-3
-                gap-4
+                gap-3
             ">
 
                 {/* Category */}
@@ -115,12 +128,7 @@ function BudgetModal({
                             e.target.value
                         )
                     }
-                    className="
-                        bg-zinc-800
-                        p-4
-                        rounded-2xl
-                        outline-none
-                    "
+                    className="goal-input"
                 />
 
                 {/* Amount */}
@@ -134,54 +142,56 @@ function BudgetModal({
                             e.target.value
                         )
                     }
-                    className="
-                        no-spinner
-                        bg-zinc-800
-                        p-4
-                        rounded-2xl
-                        outline-none
-                    "
+                    className="goal-input"
                 />
 
                 {/* Button */}
 
                 <button
 
-                    disabled={creatingBudget}
+                    disabled={creatingBudget || !canCreate}
 
                     onClick={handleCreateBudget}
 
-                    className={`
-                        flex
-                        items-center
-                        justify-center
-                        gap-2
-                        rounded-xl
-                        font-semibold
-                        transition-all
-                        px-4
-
-                        ${
-                            creatingBudget
-
-                            ? "bg-zinc-700 cursor-not-allowed"
-
-                            : "bg-purple-600 hover:bg-purple-700"
-                        }
-                    `}
+                    style={{
+                        position: "relative", overflow: "hidden",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        borderRadius: 12, fontWeight: 600, fontSize: 13, padding: "12px 16px",
+                        border: "none", cursor: creatingBudget ? "not-allowed" : "pointer",
+                        background: canCreate && !creatingBudget ? "linear-gradient(135deg, #a78bfa, #7c3aed)" : "var(--bg-subtle)",
+                        color: canCreate && !creatingBudget ? "#fff" : "var(--text-dim)",
+                        transition: "opacity 0.2s",
+                    }}
                 >
 
-                    <Plus size={15} />
+                    <AnimatePresence mode="wait">
+                        {creatingBudget ? (
+                            <motion.span key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ display: "flex" }}>
+                                    <Sparkles size={14} />
+                                </motion.span>
+                                <span>Creating<AnimatedDots /></span>
+                            </motion.span>
+                        ) : (
+                            <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <Plus size={15} />
+                                Create Budget
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
 
-                    {
-                        creatingBudget
-                        ? "Creating..."
-                        : "Create Budget"
-                    }
+                    {creatingBudget && (
+                        <motion.span
+                            style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)" }}
+                            animate={{ x: ["-100%", "100%"] }}
+                            transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                        />
+                    )}
 
                 </button>
 
             </div>
+            )}
 
         </GlassCard>
     );

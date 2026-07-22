@@ -87,6 +87,21 @@ public class FinancialGoalController {
 
         return FinancialGoalDTO.from(goalService.regenerateGoal(id));
     }
+    // =====================================
+    // MARK GOAL COMPLETE
+    // =====================================
+
+    @PostMapping("/{id}/complete")
+
+    public FinancialGoalDTO completeGoal(
+
+        @PathVariable Long id
+
+    ) {
+
+        return FinancialGoalDTO.from(goalService.completeGoal(id));
+    }
+
     @PutMapping("/{id}")
 
     public FinancialGoalDTO updateGoal(

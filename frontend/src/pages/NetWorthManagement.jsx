@@ -26,8 +26,9 @@ const CSS = `
   .nwm-stat-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
   @media (max-width: 640px) {
     .nwm-stat-grid { grid-template-columns: 1fr 1fr; }
-    .nwm-row { flex-wrap: wrap; gap: 8px; }
-    .nwm-row > div:last-child { flex-shrink: 0; }
+    .nwm-row { flex-wrap: wrap; gap: 10px; }
+    .nwm-row > div:first-child { width: 100%; }
+    .nwm-row > div:last-child { width: 100%; flex-shrink: 1; justify-content: flex-start; gap: 10px; }
   }
 `;
 
@@ -83,6 +84,67 @@ const gotoSection = (name) => {
   window.dispatchEvent(new Event("dashboardNav"));
 };
 
+// Weighs a single liability against the user's savings and, when no
+// structured repayment plan (EMI + term) has been recorded, advises whether
+// it is small enough relative to savings to clear outright versus large
+// enough that it warrants a formal, tracked repayment schedule.
+const PAYOFF_THRESHOLD_PCT = 35;
+
+function getLiabilityInsight(liability, savings) {
+  const amount = liability?.amount || 0;
+  const hasEmi  = Boolean(liability?.emi);
+  const hasTerm = Boolean(liability?.termMonths);
+
+  if (!savings || savings <= 0) {
+    return {
+      tone: "neutral",
+      message:
+        "We can't yet weigh this liability against your savings because no savings balance is on record. Add your savings under Net Worth to unlock a personalised repayment recommendation.",
+    };
+  }
+
+  const pct = (amount / savings) * 100;
+  const pctLabel = pct < 1 ? "under 1%" : `${Math.round(pct)}%`;
+
+  if (hasEmi && hasTerm) {
+    return {
+      tone: "info",
+      pct,
+      message: `This liability equals ${pctLabel} of your total savings. You've already set up a monthly EMI of ₹${liability.emi.toLocaleString("en-IN")} over ${liability.termMonths} months, so continue following that repayment schedule — it's the most cost-effective way to retire this debt.`,
+    };
+  }
+
+  if (hasEmi && !hasTerm) {
+    return {
+      tone: "info",
+      pct,
+      message: `This liability equals ${pctLabel} of your total savings. You've set a monthly EMI of ₹${liability.emi.toLocaleString("en-IN")}, but no repayment term is on record. Add the remaining months so we can confirm your full payoff timeline and total interest outlay.`,
+    };
+  }
+
+  if (!hasEmi && hasTerm) {
+    return {
+      tone: "info",
+      pct,
+      message: `This liability equals ${pctLabel} of your total savings. You've recorded a repayment term of ${liability.termMonths} months, but no monthly EMI amount. Add the EMI so we can confirm this liability is on track to be fully repaid within that window.`,
+    };
+  }
+
+  if (pct < PAYOFF_THRESHOLD_PCT) {
+    return {
+      tone: "good",
+      pct,
+      message: `This liability equals only ${pctLabel} of your total savings — a manageable share. Since no EMI or repayment term is set, we recommend paying it off in full as early as you comfortably can. Clearing it now will save you from accumulating avoidable interest and will immediately strengthen your net worth.`,
+    };
+  }
+
+  return {
+    tone: "warning",
+    pct,
+    message: `This liability equals ${pctLabel} of your total savings — a substantial share that isn't advisable to clear in one go. Rather than draining your savings, set up a monthly EMI with a defined repayment term. A structured plan protects your emergency buffer while steadily reducing the debt.`,
+  };
+}
+
 function NetWorthManagement({
   netWorth, assets = [], liabilities = [],
   createAsset, updateAsset, deleteAsset,
@@ -104,12 +166,16 @@ function NetWorthManagement({
   const [editName,   setEditName]   = useState("");
   const [editAmount, setEditAmount] = useState("");
   const [editType,   setEditType]   = useState("");
+  const [editEmi,    setEditEmi]    = useState("");
+  const [editRate,   setEditRate]   = useState("");
+  const [editTerm,   setEditTerm]   = useState("");
   const [addingAsset,     setAddingAsset]     = useState(false);
   const [addingLiability, setAddingLiability] = useState(false);
 
   const isHealthy      = (netWorth?.netWorth || 0) >= 0;
   const totalAssets    = netWorth?.totalAssets || 0;
   const totalLiabilities = netWorth?.totalLiabilities || 0;
+  const savings        = netWorth?.savings || 0;
   const portfolioValue = netWorth?.portfolioCurrentValue || 0;
   const portfolioPnl   = netWorth?.portfolioPnl || 0;
   const portfolioCount = netWorth?.portfolioCount || 0;
@@ -458,21 +524,32 @@ function NetWorthManagement({
           {liabilities.map((liability) => (
             <div key={liability.id}>
               {editingLiabilityId === liability.id ? (
-                <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:12, padding:14, marginBottom:8 }}>
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(140px,100%), 1fr))", gap:10, marginBottom:10 }}>
-                    <input className="nwm-input" value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="Name"/>
-                    <input className="nwm-input" type="number" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} placeholder="Amount"/>
-                    <select className="nwm-select" value={editType} onChange={(e)=>setEditType(e.target.value)}>
+                <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:10, padding:10, marginBottom:8 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(108px,100%), 1fr))", gap:7, marginBottom:8 }}>
+                    <input className="nwm-input" style={{ padding:"7px 10px", fontSize:12 }} value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="Name"/>
+                    <input className="nwm-input" style={{ padding:"7px 10px", fontSize:12 }} type="number" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} placeholder="Amount"/>
+                    <select className="nwm-select" style={{ padding:"7px 10px", fontSize:12 }} value={editType} onChange={(e)=>setEditType(e.target.value)}>
                       {LIABILITY_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
+                    <input className="nwm-input" style={{ padding:"7px 10px", fontSize:12 }} type="number" value={editEmi} onChange={(e)=>setEditEmi(e.target.value)} placeholder="EMI (₹, optional)"/>
+                    <input className="nwm-input" style={{ padding:"7px 10px", fontSize:12 }} type="number" value={editRate} onChange={(e)=>setEditRate(e.target.value)} placeholder="Rate (% p.a., optional)"/>
+                    <input className="nwm-input" style={{ padding:"7px 10px", fontSize:12 }} type="number" value={editTerm} onChange={(e)=>setEditTerm(e.target.value)} placeholder="Months left (optional)"/>
                   </div>
-                  <div style={{ display:"flex", gap:8 }}>
-                    <button className="nwm-btn" style={{ background:"rgba(74,222,128,0.2)", color:"#4ade80" }}
-                      onClick={async()=>{ await updateLiability(liability.id,{name:editName,amount:Number(editAmount),type:editType}); setEditingLiabilityId(null); }}>
-                      <Check size={13}/> Save
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button className="nwm-btn" style={{ background:"rgba(74,222,128,0.2)", color:"#4ade80", padding:"7px 14px", fontSize:11 }}
+                      onClick={async()=>{
+                        await updateLiability(liability.id,{
+                          name:editName, amount:Number(editAmount), type:editType,
+                          emi: editEmi ? Number(editEmi) : null,
+                          interestRate: editRate ? Number(editRate) : null,
+                          termMonths: editTerm ? Number(editTerm) : null,
+                        });
+                        setEditingLiabilityId(null);
+                      }}>
+                      <Check size={12}/> Save
                     </button>
-                    <button className="nwm-btn" style={{ background:"rgba(255,255,255,0.06)", color:"rgba(148,163,184,0.7)" }} onClick={()=>setEditingLiabilityId(null)}>
-                      <X size={13}/> Cancel
+                    <button className="nwm-btn" style={{ background:"rgba(255,255,255,0.06)", color:"rgba(148,163,184,0.7)", padding:"7px 14px", fontSize:11 }} onClick={()=>setEditingLiabilityId(null)}>
+                      <X size={12}/> Cancel
                     </button>
                   </div>
                 </div>
@@ -487,20 +564,59 @@ function NetWorthManagement({
                       <p style={{ fontSize:11, color:"rgba(148,163,184,0.5)", margin:"2px 0 0" }}>{liability.type}</p>
                     </div>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
                     <span style={{ fontSize:15, fontWeight:700, color:"#f87171", fontVariantNumeric:"tabular-nums" }}>
                       ₹{liability.amount?.toLocaleString("en-IN")}
                     </span>
-                    <button className="nwm-icon-btn" style={{ background:"rgba(34,211,238,0.1)", color:"#22d3ee" }}
-                      onClick={()=>{ setEditingLiabilityId(liability.id); setEditName(liability.name); setEditAmount(liability.amount); setEditType(liability.type); }}>
-                      <Edit2 size={12}/>
-                    </button>
-                    <button className="nwm-icon-btn" style={{ background:"rgba(248,113,113,0.1)", color:"#f87171" }} onClick={()=>deleteLiability(liability.id)}>
-                      <Trash2 size={12}/>
-                    </button>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <button
+                        className="nwm-btn"
+                        title="Mark this liability as fully paid off and remove it from your obligations"
+                        style={{ background:"rgba(74,222,128,0.12)", color:"#16a34a", border:"1px solid rgba(74,222,128,0.3)", padding:"5px 9px", fontSize:10.5 }}
+                        onClick={()=>deleteLiability(liability.id)}
+                      >
+                        <Check size={11}/> Paid Off
+                      </button>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:8 }}>
+                        <button className="nwm-icon-btn" style={{ background:"rgba(34,211,238,0.1)", color:"#22d3ee" }}
+                          onClick={()=>{
+                            setEditingLiabilityId(liability.id);
+                            setEditName(liability.name); setEditAmount(liability.amount); setEditType(liability.type);
+                            setEditEmi(liability.emi ?? ""); setEditRate(liability.interestRate ?? ""); setEditTerm(liability.termMonths ?? "");
+                          }}>
+                          <Edit2 size={12}/>
+                        </button>
+                        <button className="nwm-icon-btn" style={{ background:"rgba(248,113,113,0.1)", color:"#f87171" }} onClick={()=>deleteLiability(liability.id)}>
+                          <Trash2 size={12}/>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
+
+              {editingLiabilityId !== liability.id && (() => {
+                const insight = getLiabilityInsight(liability, savings);
+                const toneStyle = {
+                  good:    { icon:"#16a34a", text:"#14532d", bg:"rgba(74,222,128,0.14)",  border:"rgba(22,163,74,0.3)" },
+                  warning: { icon:"#d97706", text:"#78350f", bg:"rgba(251,191,36,0.16)",  border:"rgba(217,119,6,0.32)" },
+                  info:    { icon:"#0891b2", text:"#164e63", bg:"rgba(34,211,238,0.14)",  border:"rgba(8,145,178,0.3)" },
+                  neutral: { icon:"#64748b", text:"#334155", bg:"rgba(148,163,184,0.12)", border:"rgba(100,116,139,0.28)" },
+                }[insight.tone];
+
+                return (
+                  <div style={{
+                    display:"flex", alignItems:"flex-start", gap:8,
+                    background:toneStyle.bg, border:`1px solid ${toneStyle.border}`,
+                    borderRadius:10, padding:"9px 12px", marginTop:-2, marginBottom:10,
+                  }}>
+                    <Info size={13} color={toneStyle.icon} style={{ marginTop:1, flexShrink:0 }}/>
+                    <p style={{ fontSize:11.5, lineHeight:1.5, fontWeight:500, color:toneStyle.text, margin:0 }}>
+                      {insight.message}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

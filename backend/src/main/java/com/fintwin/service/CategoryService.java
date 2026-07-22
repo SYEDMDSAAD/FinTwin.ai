@@ -1,7 +1,14 @@
 package com.fintwin.service;
 
-import org.springframework.stereotype.Service;
+import com.fintwin.model.User;
+import com.fintwin.model.UserMerchantCategory;
+import com.fintwin.repository.UserMerchantCategoryRepository;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -43,14 +50,37 @@ private static final Map<String, String> RULES = Map.ofEntries(
         Map.entry("transfer to self", "Transfer")
 );
 
+@Autowired
+private UserMerchantCategoryRepository learnedRepo;
+
 public String categorize(String merchant) {
+    return categorize(merchant, Map.of());
+}
+
+/**
+ * Categorize with the user's learned rules checked FIRST — a manual
+ * correction the user made always beats the global keyword rules.
+ * Pass the map from {@link #learnedRulesFor(User)} so bulk ingest paths
+ * hit the DB once, not once per row.
+ */
+public String categorize(String merchant, Map<String, String> learnedRules) {
 
     if (merchant == null) {
         return "Other";
     }
 
-    String value =
-            merchant.toLowerCase().trim();
+    String value = normalizeMerchant(merchant);
+
+    if (learnedRules != null && !learnedRules.isEmpty()) {
+        String exact = learnedRules.get(value);
+        if (exact != null) return exact;
+
+        for (Map.Entry<String, String> rule : learnedRules.entrySet()) {
+            if (value.contains(rule.getKey())) {
+                return rule.getValue();
+            }
+        }
+    }
 
     for (Map.Entry<String, String> rule :
             RULES.entrySet()) {
@@ -62,6 +92,50 @@ public String categorize(String merchant) {
     }
 
     return "Other";
+}
+
+/** Learned rules for a user: normalized merchant pattern → category. */
+public Map<String, String> learnedRulesFor(User user) {
+    Map<String, String> rules = new LinkedHashMap<>();
+    for (UserMerchantCategory rule : learnedRepo.findByUser(user)) {
+        rules.put(rule.getMerchantPattern(), rule.getCategory());
+    }
+    return rules;
+}
+
+/**
+ * Upsert a learned rule after a manual recategorization, so every future
+ * transaction from this payee auto-categorizes for this user.
+ */
+@Transactional
+public void rememberRule(User user, String merchant, String category) {
+    if (merchant == null || merchant.isBlank()
+            || category == null || category.isBlank()) {
+        return;
+    }
+
+    String normalized = normalizeMerchant(merchant);
+    final String pattern = normalized.length() > 400
+            ? normalized.substring(0, 400) : normalized;
+
+    UserMerchantCategory rule = learnedRepo
+            .findByUserAndMerchantPattern(user, pattern)
+            .orElseGet(() -> {
+                UserMerchantCategory r = new UserMerchantCategory();
+                r.setUser(user);
+                r.setMerchantPattern(pattern);
+                return r;
+            });
+
+    rule.setCategory(category.trim());
+    learnedRepo.save(rule);
+}
+
+/** Lowercase, trim, collapse internal whitespace. */
+public String normalizeMerchant(String merchant) {
+    return merchant == null
+            ? ""
+            : merchant.toLowerCase().trim().replaceAll("\\s+", " ");
 }
 
 }

@@ -85,6 +85,21 @@ public class TransactionController {
                 service.addManualTransaction(date, merchant, amount, category));
     }
 
+    @PatchMapping("/{id}/category")
+    public ResponseEntity<Map<String, Object>> updateCategory(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        String category = body.get("category") != null
+                ? body.get("category").toString() : null;
+        boolean applyToSimilar = Boolean.TRUE.equals(body.get("applyToSimilar"));
+        // "remember" defaults to true — the learned rule is the whole point
+        boolean remember = !Boolean.FALSE.equals(body.get("remember"));
+
+        return ResponseEntity.ok(
+                service.updateCategory(id, category, applyToSimilar, remember));
+    }
+
     @PostMapping("/upload-screenshot")
     public TransactionDTO uploadScreenshot(
             @RequestParam("file")
@@ -99,8 +114,10 @@ public class TransactionController {
             @Valid @RequestBody ChatRequestDTO body
     ) {
         try {
-            String reply = chatService.chat(body.getMessage(), body.getMode());
-            return ResponseEntity.ok(Map.of("success", true, "reply", reply));
+            Map<String, Object> result = chatService.chat(body.getMessage(), body.getMode());
+            Map<String, Object> response = new java.util.HashMap<>(result);
+            response.put("success", true);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(Map.of("success", false, "reply", "FinTwin AI unavailable."));
@@ -124,6 +141,12 @@ public class TransactionController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @DeleteMapping("/chat/history/{id}")
+    public ResponseEntity<?> deleteChatMessage(@PathVariable Long id) {
+        chatService.deleteChatMessage(id);
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
 }

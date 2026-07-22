@@ -22,7 +22,9 @@ public record FinancialGoalDTO(
         Double progressPercent,
         Double availableSavings,
         String goalHealth,
-        LocalDate createdAt
+        LocalDate createdAt,
+        Boolean completed,
+        LocalDate completedAt
 ) {
     public static FinancialGoalDTO from(FinancialGoal g) {
         return new FinancialGoalDTO(
@@ -38,7 +40,9 @@ public record FinancialGoalDTO(
                 g.getProgressPercent(),
                 g.getAvailableSavings(),
                 g.getGoalHealth(),
-                g.getCreatedAt()
+                g.getCreatedAt(),
+                g.getCompleted(),
+                g.getCompletedAt()
         );
     }
 }

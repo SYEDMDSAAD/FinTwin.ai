@@ -84,6 +84,7 @@ import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
 import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
+import ServicesPage from "./ServicesPage";
 
 function Dashboard() {
 
@@ -301,6 +302,24 @@ function Dashboard() {
             setLoading(false);
             markCriticalDone();
         }
+    };
+
+    // =========================
+    // Category change — patch state in place (mirrors the backend's update)
+    // instead of refetching, so the table doesn't flash a loading skeleton.
+    // =========================
+
+    const normMerchant = (m) =>
+        (m || "").toLowerCase().trim().replace(/\s+/g, " ");
+
+    const handleCategoryChanged = ({ id, category, applyToSimilar, merchant }) => {
+        const pattern = normMerchant(merchant);
+        setTransactions(prev => prev.map(t => {
+            if (t.id === id) return { ...t, category };
+            if (applyToSimilar && normMerchant(t.merchant) === pattern)
+                return { ...t, category };
+            return t;
+        }));
     };
 
     // =========================
@@ -1126,6 +1145,19 @@ function Dashboard() {
         }
     };
 
+    // Deletes one exchange (the user message and its AI reply share an exchangeId).
+    const deleteExchange = async (exchangeId) => {
+        try {
+            await API.delete(`/transactions/chat/history/${exchangeId}`);
+            setMessages((prev) =>
+                prev.filter((m) => m.exchangeId !== exchangeId)
+            );
+            toast.success("Message deleted.");
+        } catch {
+            toast.error("Failed to delete message.");
+        }
+    };
+
     const sendMessage = async () => {
 
         if (!chatMessage.trim()) {
@@ -1186,6 +1218,11 @@ function Dashboard() {
             const aiReply =
                 (response.data.reply || "").replace(/\$\s*([\d,]+)/g, "₹$1");
 
+            const exchangeId =
+                response.data.exchangeId != null
+                    ? String(response.data.exchangeId)
+                    : undefined;
+
             // =====================================
             // ASSISTANT MESSAGE
             // =====================================
@@ -1194,16 +1231,24 @@ function Dashboard() {
 
                 role: "assistant",
 
-                content: aiReply
+                content: aiReply,
+
+                exchangeId
             };
 
             // =====================================
-            // ADD AI MESSAGE
+            // ADD AI MESSAGE (and tag the user message
+            // with the same exchangeId so both can be
+            // deleted together)
             // =====================================
 
             setMessages((prev) => [
 
-                ...prev,
+                ...prev.map((m) =>
+                    m === userMessage
+                        ? { ...m, exchangeId }
+                        : m
+                ),
 
                 assistantMessage
             ]);
@@ -1305,6 +1350,30 @@ function Dashboard() {
         );
 
     const savings = income + expenses;
+
+    // Current-month income/expenses (for the headline cards — savings above stays all-time)
+    const currentMonthKey =
+        `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+    const monthlyIncome = transactions
+
+        .filter((t) => t.amount > 0 && t.date?.slice(0, 7) === currentMonthKey)
+
+        .reduce(
+            (acc, curr) =>
+                acc + curr.amount,
+            0
+        );
+
+    const monthlyExpenses = transactions
+
+        .filter((t) => t.amount < 0 && t.date?.slice(0, 7) === currentMonthKey)
+
+        .reduce(
+            (acc, curr) =>
+                acc + curr.amount,
+            0
+        );
 
     // =========================
     // Fetch Financial Goals
@@ -1478,6 +1547,46 @@ function Dashboard() {
     };
 
     // =========================
+    // MARK GOAL COMPLETE
+    // =========================
+
+    const completeGoal = async (id) => {
+
+        try {
+
+            const response =
+                await API.post(
+                    `/goals/${id}/complete`
+                );
+
+            setGoals((prev) =>
+
+                prev.map((goal) =>
+
+                    goal.id === id
+
+                        ? response.data
+
+                        : goal
+                )
+            );
+
+            toast.success(
+                "🎉 Congratulations on achieving your goal!",
+                { duration: 5000 }
+            );
+
+        } catch {
+
+
+
+            toast.error(
+                "Goal hasn't reached 100% yet — couldn't mark it complete."
+            );
+        }
+    };
+
+    // =========================
     // UI
     // =========================
 
@@ -1485,7 +1594,8 @@ function Dashboard() {
 
         <div
             className="
-                min-h-screen
+                h-screen
+                overflow-hidden
                 w-full
                 bg-[#080A0F]
                 text-white
@@ -1578,8 +1688,8 @@ function Dashboard() {
                         ) : (
 
                             <AnalyticsCards
-                                income={income}
-                                expenses={expenses}
+                                income={monthlyIncome}
+                                expenses={monthlyExpenses}
                                 savings={savings}
                                 prediction={
                                     forecast?.predictedExpenses || 0
@@ -1711,6 +1821,7 @@ function Dashboard() {
 
                             <EnhancedTransactionsTable
                                 transactions={transactions}
+                                onChanged={handleCategoryChanged}
                             />
 
                         )}
@@ -1784,6 +1895,10 @@ function Dashboard() {
                             clearChat
                         }
 
+                        deleteExchange={
+                            deleteExchange
+                        }
+
                     />
 
                 )}
@@ -1799,6 +1914,7 @@ function Dashboard() {
                         transactions={transactions}
                         recurringExpenses={recurringExpenses}
                         insights={insights}
+                        onCategoryChanged={handleCategoryChanged}
                     />
 
                 )}
@@ -1880,6 +1996,7 @@ function Dashboard() {
                         regenerateGoal={
                             regenerateGoal
                         }
+                        completeGoal={completeGoal}
                     />
 
                 </>
@@ -2001,6 +2118,14 @@ function Dashboard() {
 
                 {activeSection === "Settings" && (
                     <SettingsPage navigateTo={navigateTo} />
+                )}
+
+                {/* =========================
+                    Services (mobile nav hub)
+                ========================= */}
+
+                {activeSection === "Services" && (
+                    <ServicesPage navigateTo={navigateTo} />
                 )}
 
             </div>

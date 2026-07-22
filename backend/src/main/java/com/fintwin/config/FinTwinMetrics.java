@@ -18,6 +18,9 @@ public class FinTwinMetrics {
     public final Counter smsOtpSent;
     public final Counter smsFailed;
     public final Timer   aiForecastLatency;
+    public final Counter aiCoachCalls;
+    public final Counter aiCoachFallbacks;
+    public final Counter aiCoachCacheHits;
 
     public FinTwinMetrics(MeterRegistry registry) {
         this.loginSuccess       = Counter.builder("fintwin_auth_logins_total")
@@ -52,6 +55,17 @@ public class FinTwinMetrics {
                 .register(registry);
         this.aiForecastLatency  = Timer.builder("fintwin_ai_forecast_duration_seconds")
                 .description("Time taken by the AI forecast endpoint")
+                .register(registry);
+        this.aiCoachCalls       = Counter.builder("fintwin_ai_requests_total")
+                .tag("type", "coach").tag("path", "ai")
+                .register(registry);
+        this.aiCoachFallbacks   = Counter.builder("fintwin_ai_requests_total")
+                .tag("type", "coach").tag("path", "fallback")
+                .description("Coach fallbacks — AI service was down or timed out")
+                .register(registry);
+        this.aiCoachCacheHits   = Counter.builder("fintwin_ai_requests_total")
+                .tag("type", "coach").tag("path", "cache")
+                .description("Coach responses served from cache — identical transaction window")
                 .register(registry);
     }
 }

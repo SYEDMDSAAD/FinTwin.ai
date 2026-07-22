@@ -733,7 +733,7 @@ export default function LandingPage() {
                     <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🤖</div>
                     <div className="feat-card-title">AI Copilot with advisor modes</div>
                     <div className="feat-card-desc" style={{ marginBottom: 20 }}>
-                      Ask anything about your money in plain language. Switch between advisor personalities depending on what you need — budget help, investment guidance, or fraud investigation.
+                      Ask anything about your money in plain language. Five advisor personalities, one chat.
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {["💰 Savings", "📈 Investing", "📋 Budget", "🛡️ Fraud", "🛍️ Purchase"].map(m => (
@@ -751,7 +751,7 @@ export default function LandingPage() {
               <div className="feat-card">
                 <div className="feat-card-icon" style={{ background: "rgba(74,222,128,0.1)" }} aria-hidden="true">🎯</div>
                 <div className="feat-card-title">Your financial score, explained</div>
-                <div className="feat-card-desc">A real-time score across savings rate, debt ratio, investment diversification, and emergency fund coverage. Not a black box — every point is explained.</div>
+                <div className="feat-card-desc">One real-time score across savings, debt, investments and emergency fund — every point explained.</div>
                 <div className="mini-score-ring" style={{ position: "relative" }}>
                   <ScoreRing score={78} size={120} />
                   <div style={{ position: "absolute", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -775,7 +775,7 @@ export default function LandingPage() {
               <div className="feat-card">
                 <div className="feat-card-icon" style={{ background: "rgba(251,191,36,0.1)" }} aria-hidden="true">🏁</div>
                 <div className="feat-card-title">AI-generated goal plans</div>
-                <div className="feat-card-desc">Tell FinTwin your goal — house down payment, emergency fund, dream trip — and it builds a personalized monthly savings plan to get you there.</div>
+                <div className="feat-card-desc">Name your goal — house, emergency fund, dream trip — and get a monthly savings plan to reach it.</div>
                 <div className="mini-goal">
                   {[
                     { name: "Emergency Fund", emoji: "🏦", pct: 64, color: "#22d3ee"  },
@@ -948,7 +948,7 @@ export default function LandingPage() {
             <div className="price-card">
               <div className="price-badge">✦ Free Early Access</div>
               <div className="price-amount">₹0 <span>/ month</span></div>
-              <p className="price-desc">Full access to every feature — AI Copilot, bank linking, goal planning, anomaly detection, financial score. Everything. Free, for now.</p>
+              <p className="price-desc">Full access to every feature. Free, for now.</p>
               <div className="price-features" role="list">
                 {[
                   "AI Copilot with 5 advisor personalities",

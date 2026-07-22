@@ -1,21 +1,21 @@
 import {
     useEffect,
-    useRef
+    useRef,
+    useState
 } from "react";
 
-import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext";
-import GlassCard from "./GlassCard";
 
 import {
-    Bot,
-    User,
     Sparkles,
-    SendHorizonal,
-    Trash2
+    ArrowUp,
+    Trash2,
+    ChevronDown,
+    Check
 } from "lucide-react";
 
 import ReactMarkdown from "react-markdown";
+import { AI_MODE_IDS } from "../constants/aiModes";
 
 function CopilotSection({
 
@@ -28,31 +28,45 @@ function CopilotSection({
     selectedMode,
     setSelectedMode,
 
-    clearChat
+    clearChat,
+    deleteExchange
 
 }) {
 
     const { isDark } = useTheme();
 
     // =====================================
-    // Modes
+    // Mode picker (dropdown inside the composer, Claude-style)
     // =====================================
 
-    const modes = [
+    const [modeMenuOpen, setModeMenuOpen] = useState(false);
+    const modeMenuRef = useRef(null);
 
-        "Savings Advisor",
+    useEffect(() => {
 
-        "Investment Advisor",
+        if (!modeMenuOpen) return;
 
-        "Budget Coach",
+        const handleClickOutside = (e) => {
+            if (
+                modeMenuRef.current
+                &&
+                !modeMenuRef.current.contains(e.target)
+            ) {
+                setModeMenuOpen(false);
+            }
+        };
 
-        "Fraud Analyst",
+        document.addEventListener("mousedown", handleClickOutside);
 
-        "Purchase Advisor"
-    ];
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+
+    }, [modeMenuOpen]);
+
+    const modes = AI_MODE_IDS;
 
     // =====================================
-    // Suggested Prompts
+    // Suggested Prompts (empty state only)
     // =====================================
 
     const prompts = [
@@ -96,9 +110,7 @@ function CopilotSection({
         if (
 
             e.key === "Enter"
-
             &&
-
             !e.shiftKey
 
         ) {
@@ -109,620 +121,596 @@ function CopilotSection({
         }
     };
 
-    return (
+    // =====================================
+    // THEME TOKENS
+    // =====================================
 
-        <GlassCard
+    const subtleText  = isDark ? "text-zinc-500"   : "text-gray-400";
+    const bodyText    = isDark ? "text-zinc-200"   : "text-gray-800";
+    const userBubble  = isDark
+        ? "bg-purple-500/[0.16] border border-purple-500/25"
+        : "bg-white border border-purple-200/70 shadow-[0_2px_10px_rgba(109,40,217,0.07)]";
+    const composerBg  = isDark
+        ? "bg-[#15171e] border-white/[0.09] shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-purple-500/40"
+        : "bg-white border-gray-200 shadow-[0_8px_30px_rgba(15,23,42,0.08)] focus-within:border-purple-400/70 focus-within:shadow-[0_8px_30px_rgba(109,40,217,0.12)]";
+    const chipStyle   = isDark
+        ? "border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.07] hover:border-purple-500/30"
+        : "border-gray-200 bg-white text-gray-600 shadow-sm hover:border-purple-300 hover:text-purple-700";
+    const proseTheme  = isDark
+        ? `prose-invert
+           prose-p:text-zinc-200
+           prose-headings:text-white
+           prose-strong:text-purple-300
+           prose-li:text-zinc-300`
+        : `prose-p:text-gray-800
+           prose-headings:text-gray-900
+           prose-strong:text-purple-700
+           prose-li:text-gray-700`;
+
+    const canSend = !aiLoading && chatMessage.trim().length > 0;
+
+    // =====================================
+    // AI AVATAR (small sparkle disc)
+    // =====================================
+
+    const AiAvatar = () => (
+        <div
             className="
-                relative
-                overflow-hidden
-                p-7
-                border
-                border-white/10
-                bg-white/[0.03]
-                backdrop-blur-xl
+                w-7 h-7
+                shrink-0
+                rounded-full
+                flex items-center justify-center
+                bg-gradient-to-br
+                from-purple-500
+                to-violet-600
+                shadow-md
+                mt-0.5
             "
         >
+            <Sparkles size={14} color="#fff" />
+        </div>
+    );
 
-            <div
-                className="
-                    absolute
-                    inset-x-0
-                    top-0
-                    h-px
-                    bg-gradient-to-r
-                    from-transparent
-                    via-white/20
-                    to-transparent
-                "
-            />
+    return (
+
+        <div
+            className={`
+                relative
+                overflow-hidden
+                flex
+                flex-col
+                pt-3
+                h-[calc(100vh-6rem)]
+                w-full
+                md:w-auto
+                md:h-screen
+                md:-my-6
+                md:-mx-6
+                xl:-my-10
+                xl:-mx-10
+                rounded-2xl
+                md:rounded-none
+                border
+                ${isDark
+                    ? "bg-[#0d0f14] border-white/[0.07]"
+                    : "bg-[#fbfaf9] border-gray-200 shadow-[0_2px_16px_rgba(15,23,42,0.05)]"}
+            `}
+        >
 
             {/* =====================================
-                HEADER
+                SLIM HEADER
             ===================================== */}
 
             <div
-                className="
+                className={`
                     flex
                     items-center
                     justify-between
-                    mb-6
-                "
+                    px-5
+                    py-3.5
+                    border-b
+                    ${isDark
+                        ? "border-purple-500/15 bg-purple-500/[0.05]"
+                        : "border-purple-200/60 bg-purple-50/50"}
+                `}
             >
 
-                <div
-                    className="
-                        flex
-                        items-center
-                        gap-3
-                    "
-                >
+                <div className="flex items-center gap-3">
 
                     <div
-                        className="
-                            w-10
-                            h-10
-                            rounded-xl
-                            flex
-                            items-center
-                            justify-center
-                            bg-gradient-to-r
-                            from-purple-500/30
-                            to-cyan-500/20
-                            border
-                            border-purple-500/20
-                        "
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{
+                            background: "linear-gradient(135deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))",
+                            border: "1px solid rgba(167,139,250,0.3)",
+                        }}
                     >
-                        <Sparkles size={18} />
+                        <Sparkles size={18} color="#a78bfa" />
                     </div>
 
                     <div>
-
                         <div
-                            className="
-                                text-[11px]
+                            className={`
+                                text-[10px]
                                 font-bold
-                                tracking-[0.12em]
-                                text-zinc-500
-                            "
+                                tracking-[0.1em]
+                                ${isDark ? "text-slate-400/60" : "text-gray-500/80"}
+                            `}
                         >
                             AI SUITE
                         </div>
-
-                        <h2
-                            className="
-                                text-lg
-                                font-bold
-                            "
-                        >
+                        <h2 className="text-[22px] font-bold leading-tight tracking-[-0.02em]">
                             Financial Copilot
                         </h2>
-
                     </div>
 
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <div
-                        className="
-                            px-3
-                            py-1
-                            rounded-lg
-                            text-xs
-                            font-bold
-                            border
-                            border-purple-500/20
-                            bg-purple-500/10
-                            text-purple-300
-                        "
+                <div className="flex items-center gap-2.5">
+
+                    <span
+                        className={`
+                            hidden sm:block
+                            text-[10px]
+                            font-mono
+                            ${isDark ? "text-slate-500/60" : "text-gray-400"}
+                        `}
                     >
-                        {selectedMode.replace(" Advisor", "")}
-                    </div>
+                        {selectedMode}
+                    </span>
 
                     {messages.length > 0 && (
                         <button
-                            onClick={() => {
-                                toast.custom((t) => (
-                                    <div style={{
-                                        background: isDark ? "#18181b" : "#ffffff",
-                                        border: `1px solid ${isDark ? "rgba(248,113,113,0.25)" : "rgba(248,113,113,0.35)"}`,
-                                        borderRadius: 14,
-                                        padding: "14px 18px",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 10,
-                                        minWidth: 280,
-                                        boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.4)" : "0 4px 24px rgba(0,0,0,0.12)",
-                                    }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <Trash2 size={15} color="#f87171" />
-                                            <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#f1f5f9" : "#111827" }}>
-                                                Clear all chat history?
-                                            </span>
-                                        </div>
-                                        <p style={{ fontSize: 12, color: isDark ? "rgba(148,163,184,0.7)" : "rgba(75,85,99,0.8)", margin: 0 }}>
-                                            This cannot be undone.
-                                        </p>
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                            <button
-                                                onClick={() => { toast.dismiss(t.id); clearChat(); }}
-                                                style={{
-                                                    flex: 1, padding: "7px 0", borderRadius: 8,
-                                                    background: "rgba(248,113,113,0.15)",
-                                                    border: "1px solid rgba(248,113,113,0.3)",
-                                                    color: "#f87171", fontSize: 12, fontWeight: 700,
-                                                    cursor: "pointer",
-                                                }}
-                                            >
-                                                Yes, clear
-                                            </button>
-                                            <button
-                                                onClick={() => toast.dismiss(t.id)}
-                                                style={{
-                                                    flex: 1, padding: "7px 0", borderRadius: 8,
-                                                    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-                                                    border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"}`,
-                                                    color: isDark ? "rgba(148,163,184,0.8)" : "rgba(75,85,99,0.9)", fontSize: 12, fontWeight: 600,
-                                                    cursor: "pointer",
-                                                }}
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                ), { duration: Infinity });
-                            }}
-                            title="Clear chat history"
-                            className="
-                                flex items-center gap-1.5
-                                px-2.5 py-1
-                                rounded-lg text-xs font-semibold
-                                border border-red-500/20
-                                bg-red-500/10 text-red-400
-                                hover:bg-red-500/20
+                            onClick={clearChat}
+                            title="Delete the entire chat history"
+                            className={`
+                                flex items-center gap-2
+                                px-[18px] py-[9px]
+                                rounded-[10px]
+                                border
+                                text-xs
+                                font-bold
                                 transition-colors
-                            "
+                                ${isDark
+                                    ? "border-red-500/25 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                    : "border-red-300 bg-red-50 text-red-500 hover:bg-red-100"}
+                            `}
                         >
-                            <Trash2 size={12} />
-                            Clear
+                            <Trash2 size={13} />
+                            Delete full chat
                         </button>
                     )}
+
                 </div>
 
             </div>
 
             {/* =====================================
-                AI MODES
+                MESSAGES
             ===================================== */}
 
-            <div className="
-                flex
-                flex-wrap
-                gap-3
-                mb-6
-            ">
+            <div className="flex-1 min-h-0 overflow-y-auto">
 
-                {modes.map((mode) => (
+                <div className="w-full px-6 py-6 flex flex-col gap-6">
 
-                    <button
-                        key={mode}
-                        onClick={() =>
-                            setSelectedMode(mode)
-                        }
-                        className={`
-                            px-3
-                            py-1.5
-                            rounded-lg
-                            text-xs
-                            font-semibold
-                            border
-                            transition-all
-                            duration-200
+                    {/* ── Empty state: centered greeting + prompt chips ── */}
 
-                            ${
-                                selectedMode === mode
+                    {messages.length === 0 && !aiLoading && (
 
-                                ? `
-                                    bg-purple-500/10
-                                    border-purple-500/20
-                                    text-purple-300
-                                `
+                        <div className="flex flex-col items-center justify-center text-center pt-[14vh]">
 
-                                : `
-                                    bg-white/[0.02]
-                                    border-white/10
-                                    text-zinc-400
-                                    hover:bg-white/[0.05]
-                                `
-                            }
-                        `}
-                    >
-                        {mode}
-                    </button>
-
-                ))}
-
-            </div>
-
-            {/* =====================================
-                SUGGESTED PROMPTS
-            ===================================== */}
-
-            <div className="
-                flex
-                flex-wrap
-                gap-3
-                mb-6
-            ">
-
-                {prompts.map((prompt) => (
-
-                    <button
-                        key={prompt}
-                        onClick={() =>
-                            setChatMessage(prompt)
-                        }
-                        className="
-                            px-3
-                            py-1.5
-                            rounded-lg
-                            text-xs
-                            font-medium
-                            border
-                            border-white/10
-                            bg-white/[0.02]
-                            text-zinc-400
-                            hover:bg-white/[0.05]
-                            transition-all
-                            duration-200
-                        "
-                    >
-                        {prompt}
-                    </button>
-
-                ))}
-
-            </div>
-
-            {/* =====================================
-                STORAGE WARNING
-            ===================================== */}
-
-            {messages.length >= 80 && (
-                <div className="
-                    flex items-start gap-3
-                    mb-4 px-4 py-3
-                    rounded-xl
-                    border border-amber-500/25
-                    bg-amber-500/8
-                    text-amber-300
-                ">
-                    <span className="text-base leading-none mt-0.5">⚠</span>
-                    <p className="text-xs leading-relaxed">
-                        You have <span className="font-bold">{Math.floor(messages.length / 2)} / 50</span> saved exchanges.
-                        Once you hit 50, the oldest messages will be automatically removed as new ones come in.
-                        Use <span className="font-bold">Clear</span> above to reset if needed.
-                    </p>
-                </div>
-            )}
-
-            {/* =====================================
-                CHAT AREA
-            ===================================== */}
-
-            <div className="
-                flex
-                flex-col
-                gap-5
-                mb-6
-                max-h-[45vh]
-                overflow-y-auto
-                pr-2
-            ">
-
-                {messages.length === 0 && (
-
-                    <div
-                        className="
-                            text-center
-                            py-16
-                            text-zinc-500
-                        "
-                    >
-
-                        <Sparkles
-                            size={40}
-                            className="
-                                mx-auto
-                                mb-4
-                                text-purple-400/60
-                            "
-                        />
-
-                        <p>
-                            Ask anything about your finances
-                        </p>
-
-                    </div>
-
-                )}
-
-                {messages.map((msg, index) => (
-
-                    <div
-                        key={index}
-                        className={`
-                            flex
-
-                            ${
-
-                                msg.role === "user"
-
-                                ? "justify-end"
-
-                                : "justify-start"
-                            }
-                        `}
-                    >
-
-                        <div
-                            className="max-w-[78%] shadow-xl"
-                            style={{
-                                background: "rgba(255,255,255,0.04)",
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                borderRadius: 18,
-                                color: "#e2e8f0",
-                                padding: "14px 18px",
-                            }}
-                        >
-
-                            {/* HEADER */}
-
-                            <div className="
-                                flex
-                                items-center
-                                gap-2
-                                mb-4
-                            ">
-
-                                {
-
-                                    msg.role === "user"
-
-                                    ? (
-                                        <User
-                                            size={18}
-                                        />
-                                    )
-
-                                    : (
-                                        <Bot
-                                            size={18}
-                                            className="
-                                                text-purple-400
-                                            "
-                                        />
-                                    )
-                                }
-
-                                <span
-                                    className="
-                                        text-[10px]
-                                        font-bold
-                                        tracking-[0.08em]
-                                        text-zinc-500
-                                    "
-                                >
-
-                                    {
-
-                                        msg.role === "user"
-
-                                        ? "You"
-
-                                        : "FinTwin AI"
-                                    }
-
-                                </span>
-
+                            <div
+                                className="
+                                    w-12 h-12
+                                    rounded-2xl
+                                    flex items-center justify-center
+                                    bg-gradient-to-br
+                                    from-purple-500
+                                    to-violet-600
+                                    shadow-lg
+                                    mb-5
+                                "
+                            >
+                                <Sparkles size={22} color="#fff" />
                             </div>
 
-                            {/* =====================================
-                                MESSAGE CONTENT
-                            ===================================== */}
+                            <h3 className="text-xl font-semibold mb-1.5">
+                                How can I help with your finances?
+                            </h3>
 
-                            {
+                            <p className={`text-sm mb-8 ${subtleText}`}>
+                                Ask about spending, goals, budgets or anything money.
+                            </p>
 
-                                msg.role === "assistant"
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-xl">
+                                {prompts.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        onClick={() => setChatMessage(prompt)}
+                                        className={`
+                                            px-4 py-3
+                                            rounded-xl
+                                            border
+                                            text-[13px]
+                                            text-left
+                                            font-medium
+                                            transition-colors
+                                            duration-150
+                                            ${chipStyle}
+                                        `}
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
 
-                                ? (
+                        </div>
 
-                                    <div className="
-                                        prose
-                                        prose-invert
-                                        max-w-none
-                                        prose-sm
-                                        prose-p:text-zinc-200
-                                        prose-headings:text-white
-                                        prose-strong:text-purple-300
-                                        prose-li:text-zinc-300
-                                        break-words
-                                    ">
+                    )}
 
-                                        <ReactMarkdown>
+                    {/* ── Storage warning ── */}
 
-                                            {msg.content}
+                    {messages.length >= 80 && (
+                        <div className="
+                            flex items-start gap-3
+                            px-4 py-3
+                            rounded-xl
+                            border border-amber-500/25
+                            bg-amber-500/10
+                            text-amber-500
+                        ">
+                            <span className="text-base leading-none mt-0.5">⚠</span>
+                            <p className="text-xs leading-relaxed">
+                                You have <span className="font-bold">{Math.floor(messages.length / 2)} / 50</span> saved exchanges.
+                                Once you hit 50, the oldest messages will be automatically removed as new ones come in.
+                            </p>
+                        </div>
+                    )}
 
-                                        </ReactMarkdown>
+                    {/* ── Conversation ── */}
 
-                                    </div>
+                    {messages.map((msg, index) => (
 
-                                )
+                        msg.role === "user"
 
-                                : (
+                        ? (
 
-                                    <p className="
+                            /* USER — compact right-aligned bubble, delete on hover */
+
+                            <div
+                                key={
+                                    msg.exchangeId
+                                        ? `${msg.exchangeId}-user`
+                                        : `i-${index}`
+                                }
+                                className="group flex items-center justify-end gap-2"
+                            >
+
+                                {msg.exchangeId && deleteExchange && (
+                                    <button
+                                        onClick={() => deleteExchange(msg.exchangeId)}
+                                        title="Delete this message and its reply"
+                                        className={`
+                                            opacity-0
+                                            group-hover:opacity-100
+                                            transition-opacity
+                                            duration-150
+                                            p-1.5
+                                            rounded-md
+                                            ${subtleText}
+                                            hover:text-red-400
+                                        `}
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                )}
+
+                                <div
+                                    className={`
+                                        max-w-[80%]
+                                        px-4 py-2.5
+                                        rounded-2xl
+                                        rounded-br-md
                                         text-sm
+                                        leading-relaxed
                                         whitespace-pre-wrap
                                         break-words
-                                        leading-relaxed
-                                    ">
-                                        {msg.content}
-                                    </p>
-
-                                )
-                            }
-
-                        </div>
-
-                    </div>
-
-                ))}
-
-                {/* =====================================
-                    AI THINKING
-                ===================================== */}
-
-                {aiLoading && (
-
-                    <div className="
-                        flex
-                        justify-start
-                    ">
-
-                        <div className="
-                            bg-white/[0.03]
-                            border-white/10
-                            backdrop-blur-xl
-                            border
-                            rounded-3xl
-                            px-5
-                            py-4
-                            flex
-                            items-center
-                            gap-3
-                            shadow-xl
-                        ">
-
-                            <Bot
-                                className="
-                                    text-purple-400
-                                "
-                                size={18}
-                            />
-
-                            <div className="
-                                flex
-                                gap-1
-                            ">
-
-                                <div className="
-                                    w-2
-                                    h-2
-                                    bg-purple-400
-                                    rounded-full
-                                    animate-bounce
-                                " />
-
-                                <div className="
-                                    w-2
-                                    h-2
-                                    bg-purple-400
-                                    rounded-full
-                                    animate-bounce
-                                    delay-100
-                                " />
-
-                                <div className="
-                                    w-2
-                                    h-2
-                                    bg-purple-400
-                                    rounded-full
-                                    animate-bounce
-                                    delay-200
-                                " />
+                                        ${userBubble}
+                                        ${bodyText}
+                                    `}
+                                >
+                                    {msg.content}
+                                </div>
 
                             </div>
 
-                            <span className="
-                                text-sm
-                                opacity-70
-                            ">
-                                FinTwin AI is analyzing your finances...
-                            </span>
+                        )
+
+                        : (
+
+                            /* ASSISTANT — avatar + plain markdown, no box */
+
+                            <div
+                                key={
+                                    msg.exchangeId
+                                        ? `${msg.exchangeId}-assistant`
+                                        : `i-${index}`
+                                }
+                            >
+
+                                <div className="flow-root">
+
+                                    <div className="float-left mr-3">
+                                        <AiAvatar />
+                                    </div>
+
+                                    <div
+                                        className={`
+                                            prose
+                                            prose-sm
+                                            max-w-none
+                                            break-words
+                                            ${proseTheme}
+                                        `}
+                                    >
+                                        <ReactMarkdown>
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                    </div>
+
+                                </div>
+
+                                {/* End-of-exchange divider — short centered
+                                    dotted line so exchanges are easy to tell
+                                    apart. Skipped after the newest message. */}
+                                {index < messages.length - 1 && (
+                                    <div
+                                        className={`
+                                            w-24
+                                            mx-auto
+                                            mt-7
+                                            border-t-2
+                                            border-dotted
+                                            ${isDark
+                                                ? "border-white/[0.14]"
+                                                : "border-gray-300"}
+                                        `}
+                                    />
+                                )}
+
+                            </div>
+
+                        )
+
+                    ))}
+
+                    {/* ── Thinking indicator ── */}
+
+                    {aiLoading && (
+
+                        <div className="flex items-start gap-3">
+
+                            <style>{`
+                                @keyframes copilot-shimmer {
+                                    0%   { background-position: 200% 0; }
+                                    100% { background-position: -200% 0; }
+                                }
+                                @keyframes copilot-glow {
+                                    0%, 100% { opacity: 0.35; transform: scale(1); }
+                                    50%      { opacity: 0.9;  transform: scale(1.25); }
+                                }
+                                .copilot-thinking-text {
+                                    background: linear-gradient(
+                                        90deg,
+                                        #a78bfa 0%,
+                                        #e879f9 25%,
+                                        #22d3ee 50%,
+                                        #e879f9 75%,
+                                        #a78bfa 100%
+                                    );
+                                    background-size: 200% 100%;
+                                    -webkit-background-clip: text;
+                                    background-clip: text;
+                                    color: transparent;
+                                    animation: copilot-shimmer 2s linear infinite;
+                                }
+                                .copilot-skel {
+                                    height: 10px;
+                                    border-radius: 6px;
+                                    background: linear-gradient(
+                                        90deg,
+                                        rgba(167,139,250,0.10) 25%,
+                                        rgba(167,139,250,0.30) 50%,
+                                        rgba(167,139,250,0.10) 75%
+                                    );
+                                    background-size: 200% 100%;
+                                    animation: copilot-shimmer 1.6s ease-in-out infinite;
+                                }
+                                .copilot-glow-ring {
+                                    animation: copilot-glow 1.8s ease-in-out infinite;
+                                }
+                            `}</style>
+
+                            <div className="relative shrink-0">
+                                <div className="copilot-glow-ring absolute inset-0 rounded-full bg-purple-500 blur-md" />
+                                <AiAvatar />
+                            </div>
+
+                            <div className="flex-1 min-w-0 pt-0.5">
+
+                                <div className="copilot-thinking-text text-[13px] font-bold tracking-wide mb-3">
+                                    Analyzing your finances…
+                                </div>
+
+                                <div className="flex flex-col gap-2.5 max-w-md">
+                                    <div className="copilot-skel w-[92%]" />
+                                    <div className="copilot-skel w-[74%]" />
+                                    <div className="copilot-skel w-[56%]" />
+                                </div>
+
+                            </div>
 
                         </div>
 
-                    </div>
+                    )}
 
-                )}
+                    <div ref={messagesEndRef} />
 
-                <div ref={messagesEndRef} />
+                </div>
 
             </div>
 
             {/* =====================================
-                INPUT AREA
+                COMPOSER (Claude-style: textarea + mode
+                picker chip + send button in one card)
             ===================================== */}
 
-            <div className="
-                flex
-                gap-3
-                items-end
-            ">
+            <div className="px-5 pb-5 pt-2">
 
-                <textarea
-                    placeholder="Ask FinTwin AI..."
-                    value={chatMessage}
-                    onChange={(e) =>
-                        setChatMessage(
-                            e.target.value
-                        )
-                    }
-                    onKeyDown={handleKeyDown}
-                    rows={2}
-                    className="
-                        flex-1
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                        p-4
-                        rounded-xl
-                        outline-none
-                        text-sm
-                        resize-none
+                <div
+                    className={`
+                        w-full
+                        rounded-3xl
                         border
-                        border-white/10
-                        focus:border-purple-500/40
-                    "
-                />
-
-                {/* SEND BUTTON */}
-
-                <button
-                    onClick={sendMessage}
-                    disabled={aiLoading}
-                    className="
-                        bg-gradient-to-r
-                        from-purple-500
-                        to-violet-600
-                        hover:opacity-90
-                        rounded-xl
-                        w-12
-                        h-12
-                        transition
-                        flex
-                        items-center
-                        justify-center
-                        disabled:opacity-50
-                    "
+                        transition-all
+                        duration-200
+                        ${composerBg}
+                    `}
                 >
 
-                    <SendHorizonal size={22} />
+                    <textarea
+                        placeholder="Ask FinTwin AI anything about your money..."
+                        value={chatMessage}
+                        onChange={(e) => setChatMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        rows={2}
+                        className={`
+                            w-full
+                            bg-transparent
+                            px-5
+                            pt-4
+                            pb-1
+                            outline-none
+                            text-[15px]
+                            resize-none
+                            leading-relaxed
+                            ${bodyText}
+                            ${isDark
+                                ? "placeholder:text-zinc-600"
+                                : "placeholder:text-gray-400"}
+                        `}
+                    />
 
-                </button>
+                    <div className="flex items-center justify-between px-2.5 pb-2.5">
+
+                        {/* Mode picker — opens upward */}
+
+                        <div ref={modeMenuRef} className="relative">
+
+                            <button
+                                onClick={() => setModeMenuOpen(o => !o)}
+                                className={`
+                                    flex items-center gap-1.5
+                                    px-2.5 py-1.5
+                                    rounded-lg
+                                    text-xs
+                                    font-medium
+                                    transition-colors
+                                    ${subtleText}
+                                    ${isDark ? "hover:bg-white/[0.06]" : "hover:bg-gray-100"}
+                                `}
+                            >
+                                {selectedMode}
+                                <ChevronDown
+                                    size={13}
+                                    className={`
+                                        transition-transform
+                                        duration-200
+                                        ${modeMenuOpen ? "rotate-180" : ""}
+                                    `}
+                                />
+                            </button>
+
+                            {modeMenuOpen && (
+                                <div
+                                    className={`
+                                        absolute
+                                        bottom-full
+                                        left-0
+                                        mb-2
+                                        w-52
+                                        rounded-xl
+                                        border
+                                        shadow-xl
+                                        overflow-hidden
+                                        z-20
+                                        ${isDark
+                                            ? "bg-zinc-900 border-white/10"
+                                            : "bg-white border-gray-200"}
+                                    `}
+                                >
+                                    {modes.map((mode) => (
+                                        <button
+                                            key={mode}
+                                            onClick={() => {
+                                                setSelectedMode(mode);
+                                                setModeMenuOpen(false);
+                                            }}
+                                            className={`
+                                                w-full
+                                                flex items-center justify-between
+                                                px-3.5 py-2.5
+                                                text-xs
+                                                font-medium
+                                                text-left
+                                                transition-colors
+                                                ${isDark
+                                                    ? "hover:bg-white/[0.06]"
+                                                    : "hover:bg-gray-50"}
+                                                ${selectedMode === mode
+                                                    ? "text-purple-400"
+                                                    : (isDark ? "text-zinc-300" : "text-gray-700")}
+                                            `}
+                                        >
+                                            {mode}
+                                            {selectedMode === mode && (
+                                                <Check size={13} />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Send */}
+
+                        <button
+                            onClick={sendMessage}
+                            disabled={!canSend}
+                            title="Send"
+                            className={`
+                                w-9 h-9
+                                rounded-full
+                                flex items-center justify-center
+                                transition-all
+                                duration-150
+                                ${canSend
+                                    ? "bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-[0_4px_14px_rgba(139,92,246,0.4)] hover:scale-105"
+                                    : (isDark
+                                        ? "bg-white/[0.06] text-zinc-600"
+                                        : "bg-gray-200/80 text-gray-400")}
+                            `}
+                        >
+                            <ArrowUp size={17} />
+                        </button>
+
+                    </div>
+
+                </div>
 
             </div>
 
-        </GlassCard>
+        </div>
     );
 }
 

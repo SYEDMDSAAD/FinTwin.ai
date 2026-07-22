@@ -55,16 +55,19 @@ public class ChatService {
 
     @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
     @Audited(action = "READ", resource = "ai-chat", description = "AI Copilot financial chat session")
-    public String chat(String message, String mode) {
+    public Map<String, Object> chat(String message, String mode) {
         if (message == null || message.isBlank()) {
-            return "Please enter a message.";
+            return Map.of("reply", "Please enter a message.");
         }
         metrics.aiChatCalls.increment();
         User user = resolveCurrentUser();
         FinancialSummaryDTO summary = aggregator.aggregate(user);
         String reply = callAiProvider(message, mode, summary);
-        persistExchange(user, message, reply);
-        return reply;
+        ChatHistory saved = persistExchange(user, message, reply);
+        // exchangeId lets the client delete this exchange without a reload.
+        return saved != null
+                ? Map.of("reply", reply, "exchangeId", saved.getId())
+                : Map.of("reply", reply);
     }
 
     @CircuitBreaker(name = "ai-service", fallbackMethod = "chatFallback")
@@ -86,8 +89,9 @@ public class ChatService {
         List<ChatHistory> history = chatHistoryRepository.findAllByUserOrderByTimestampAsc(user);
         List<Map<String, String>> result = new ArrayList<>();
         for (ChatHistory chat : history) {
-            result.add(Map.of("role", "user",      "content", chat.getMessage()));
-            result.add(Map.of("role", "assistant", "content", chat.getReply()));
+            String id = String.valueOf(chat.getId());
+            result.add(Map.of("role", "user",      "content", chat.getMessage(), "exchangeId", id));
+            result.add(Map.of("role", "assistant", "content", chat.getReply(),   "exchangeId", id));
         }
         return result;
     }
@@ -98,6 +102,20 @@ public class ChatService {
         chatHistoryRepository.deleteByUser(resolveCurrentUser());
     }
 
+    // Deletes one exchange (user message + AI reply). Ownership is enforced:
+    // the row must belong to the calling user.
+    @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
+    @Transactional
+    public void deleteChatMessage(Long id) {
+        User user = resolveCurrentUser();
+        ChatHistory chat = chatHistoryRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Chat message not found"));
+        if (chat.getUser() == null || !chat.getUser().getId().equals(user.getId())) {
+            throw new NotFoundException("Chat message not found");
+        }
+        chatHistoryRepository.delete(chat);
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────────────
 
     private User resolveCurrentUser() {
@@ -105,14 +123,14 @@ public class ChatService {
                 .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
-    private void persistExchange(User user, String message, String reply) {
+    private ChatHistory persistExchange(User user, String message, String reply) {
         ChatHistory chat = new ChatHistory();
         chat.setRole("user");
         chat.setMessage(message);
         chat.setReply(reply);
         chat.setTimestamp(LocalDateTime.now());
         chat.setUser(user);
-        chatHistoryRepository.save(chat);
+        ChatHistory saved = chatHistoryRepository.save(chat);
 
         long count = chatHistoryRepository.countByUser(user);
         if (count > MAX_HISTORY) {
@@ -121,5 +139,6 @@ public class ChatService {
                     .stream().map(ChatHistory::getId).collect(Collectors.toList());
             chatHistoryRepository.deleteAllById(toDelete);
         }
+        return saved;
     }
 }

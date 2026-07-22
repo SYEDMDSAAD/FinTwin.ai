@@ -1,18 +1,41 @@
 import json
 import logging
 import re
-import pandas as pd
+import time
+
+from spending_coach.analysis import analyse, classify_category, estimate_leakage
+from spending_coach.insights import build_insights, build_recommendations, label
+from utils.metrics import COACH_GENERATIONS, COACH_LLM_LATENCY, COACH_TIPS_DROPPED
+# The grounding primitives live in utils.grounding — the goal planner runs the
+# same check on its own model output, and two copies of a hallucination guard
+# means one of them silently rots. Imported under the original private names
+# so the rest of this module (and its tests) read unchanged.
+from utils.grounding import (
+    amounts as _amounts,
+    canon_figure as _canon_figure,
+    entities as _entities,
+    figure_owners as _figure_owners,
+    is_grounded,
+)
 from utils.ollama_client import ask
 
 logger = logging.getLogger(__name__)
 
+# Bumped on any change to _build_prompt's wording or structure, and stamped
+# into every response's coverage block — so a shift in grounding-rejection
+# rate on the dashboard can be lined up against the prompt that caused it.
+PROMPT_VERSION = "2026-07-21.1"
 
-def _amount(t: dict) -> float:
-    """Coerce a transaction amount to float, tolerating missing/garbage values."""
-    try:
-        return float(t.get("amount", 0) or 0)
-    except (TypeError, ValueError):
-        return 0.0
+# The Spring backend abandons the call at 20s (AiServiceConfig read timeout)
+# and serves its statistical fallback; any generation still running past that
+# is compute nobody will see. Budget below it, connect time and JSON overhead
+# included.
+LLM_TIMEOUT_S = 15.0
+
+# The coach prompt embeds findings built from real bank narrations and can run
+# well past the old 2048-token default — which Ollama handles by silently
+# dropping the *start* of the prompt, i.e. exactly the rules section.
+LLM_NUM_CTX = 4096
 
 
 def _parse_llm_json(text):
@@ -57,199 +80,374 @@ def _normalize_tips(tips):
     return [t for t in result if t]
 
 
-# Deterministic leakage: fixed % of discretionary categories so it never changes on regenerate
-_LEAKAGE_RATES = {
-    "food": 0.25,
-    "dining": 0.25,
-    "entertainment": 0.40,
-    "shopping": 0.30,
-    "others": 0.20,
-    "subscriptions": 0.35,
-    "transport": 0.15,
-}
+def ground_tips(tips: list[str], prompt: str) -> list[str]:
+    """Drop tips that misuse the analysis layer's figures.
 
-def _compute_leakage(category_totals: dict, months: int) -> float:
-    leakage = 0.0
-    for cat, total in category_totals.items():
-        key = cat.lower()
-        for label, rate in _LEAKAGE_RATES.items():
-            if label in key:
-                leakage += total * rate
-                break
-        else:
-            leakage += total * 0.10  # default 10% for unknown categories
-    return round(leakage / months, 2)  # monthly average
+    A 3B model pads a tip it has nothing left to say in three ways: inventing
+    arithmetic ("cut ₹14,500 to ₹3,700"), pinning a real figure to the wrong
+    merchant, and restating the tip before it. All three are caught here, and
+    the emptied slots are refilled from the evidence tips by _top_up().
+    """
+    allowed = _amounts(prompt)
+    owners = _figure_owners(prompt)
+    kept: list[str] = []
+    covered: set[str] = set()
+
+    for tip in tips:
+        if not is_grounded(tip, allowed, owners):
+            logger.info("Dropping ungrounded tip: %s", tip)
+            COACH_TIPS_DROPPED.labels(reason="ungrounded").inc()
+            continue
+
+        entities = _entities(tip)
+        if entities and entities <= covered:
+            logger.info("Dropping tip restating an earlier one: %s", tip)
+            COACH_TIPS_DROPPED.labels(reason="restated").inc()
+            continue
+
+        covered |= entities
+        kept.append(tip)
+
+    return kept
 
 
-def _months_present(transactions: list) -> int:
-    """Distinct calendar months in the data; never below 1. A hardcoded /3
-    understated monthly figures up to 3x for users with less history."""
-    months = set()
-    for t in transactions:
-        date = str(t.get("date") or "")
-        if len(date) >= 7:
-            months.add(date[:7])
-    return max(1, len(months))
+def _health(savings_rate) -> str:
+    """A verdict, or an honest refusal to give one.
+
+    Spending health here means "how much of what you earn do you keep", so
+    without trustworthy earnings there is no verdict to give. Printing
+    "Excellent" from an imported opening balance would be the page's single
+    most confident lie.
+    """
+    if savings_rate is None:
+        return "Unrated"
+    if savings_rate >= 30:
+        return "Excellent"
+    if savings_rate >= 15:
+        return "Good"
+    if savings_rate >= 5:
+        return "Average"
+    return "Poor"
+
+
+def _rupees(value) -> str:
+    return f"₹{round(value):,}"
+
+
+def _findings(evidence: dict, leakage: dict) -> list[str]:
+    """The evidence pack as short factual lines the model has to work from.
+
+    Written as prose rather than raw JSON: the 3B model reliably parrots
+    numbers it can read in a sentence, and hallucinates less than when it has
+    to navigate nested objects.
+    """
+    lines = []
+
+    # Committed spend is summarised once in the snapshot as off-limits; listing
+    # every rent and EMI line here would crowd out the findings advice can act
+    # on, and a 3B model tends to seize on the biggest number it can see.
+    def actionable(category: str) -> bool:
+        return classify_category(category) != "fixed"
+
+    for t in evidence["trends"]:
+        if t["deltaPct"] is None or abs(t["deltaPct"]) < 15 or not actionable(t["category"]):
+            continue
+        direction = "up" if t["delta"] > 0 else "down"
+        lines.append(
+            f"- {label(t['category'])} is {direction} {abs(t['deltaPct'])}% last month "
+            f"({_rupees(t['latestMonth'])} vs {_rupees(t['priorAverage'])} average before)."
+        )
+
+    for r in evidence["recurring"]:
+        if not actionable(r["category"]):
+            continue
+        lines.append(
+            f"- Cancellable subscription: {r['merchant']} ({r['category']}), "
+            f"{_rupees(r['typicalAmount'])} in each of {r['monthsSeen']} months."
+        )
+
+    for o in evidence["outliers"]:
+        reference = f"typical {o['category']}" if o["basis"] == "category" else "typical"
+        lines.append(
+            f"- One-off: {_rupees(o['amount'])} at {o['merchant']} on {o['date']}, "
+            f"{o['timesTypical']}x their {reference} charge."
+        )
+
+    shown = 0
+    for m in evidence["topMerchants"]:
+        # A merchant visited less than monthly is a purchase, not a habit — it
+        # is already covered as a one-off above, and amortising it into a
+        # "per month" line invites advice to cut spending that isn't recurring.
+        if shown == 3 or not actionable(m["category"]) or m["visitsPerMonth"] < 1:
+            continue
+        lines.append(
+            f"- {m['merchant']}: {_rupees(m['monthlyTotal'])}/month across "
+            f"{m['visitsPerMonth']} visits, {_rupees(m['averageTicket'])} average."
+        )
+        shown += 1
+
+    for c in evidence["channelTotals"][:3]:
+        if c["channel"] == "Other":
+            continue
+        lines.append(
+            f"- {c['channel']}: {_rupees(c['monthlyTotal'])}/month, "
+            f"{c['share']:.0f}% of all spend across {c['count']} charges."
+        )
+
+    if evidence["discretionaryFloor"] is not None:
+        # Both figures exclude one-offs and cover the same months, or the
+        # comparison measures a spike or a half-month rather than the habit.
+        lines.append(
+            f"- Day-to-day discretionary spend averages "
+            f"{_rupees(evidence['habitualBaseline'])}/month, and their cheapest month "
+            f"ran {_rupees(evidence['discretionaryFloor'])}."
+        )
+
+    if leakage["subscriptions"] > 0:
+        lines.append(
+            f"- Cancellable subscriptions total {_rupees(leakage['subscriptions'] * 2)}/month."
+        )
+
+    # The client runs a 2048-token context; the findings are ordered strongest
+    # first, so truncating here drops the weakest evidence rather than risking
+    # a prompt that crowds out the response.
+    return lines[:12]
+
+
+def _build_prompt(evidence: dict, leakage: dict, health: str) -> str:
+    findings = _findings(evidence, leakage)
+    quality = evidence["dataQuality"]
+
+    if quality["uncategorisedShare"] >= 50:
+        # Without categories nothing can be called committed or discretionary,
+        # so the model is told the split does not exist rather than handed a
+        # ₹0-committed figure it would read as "none of this is rent".
+        fixed_note = (
+            f"Their transactions are {quality['uncategorisedShare']:.0f}% uncategorised, so "
+            f"committed spend (rent, EMI, bills) cannot be told apart from discretionary "
+            f"spend. Never describe any amount as discretionary or as safe to cut."
+        )
+    else:
+        fixed_note = (
+            f"{_rupees(evidence['monthlyFixed'])}/month is committed (rent, EMI, insurance, "
+            f"utilities) and cannot be cut — never suggest touching it. "
+            f"{_rupees(evidence['monthlyDiscretionary'])}/month is discretionary; that is the "
+            f"only money advice can move."
+        )
+
+    if evidence["savingsRate"] is None:
+        income_note = ("Income cannot be verified from this data, so there is no savings "
+                       "rate and no health verdict. Do not estimate either, and do not "
+                       "comment on how much they save or invest.")
+    else:
+        income_note = (f"Monthly income: {_rupees(evidence['monthlyIncome'])} · "
+                       f"Savings rate: {evidence['savingsRate']}% (assessed as {health})")
+
+    coverage = (
+        f"Data covers {evidence['months']} month(s) and "
+        f"{evidence['transactionCount']} expenses — confidence {evidence['confidence']}."
+    )
+    hedge = (
+        "\nConfidence is low, so hedge: say what the data suggests, not what is certain."
+        if evidence["confidence"] == "low" else ""
+    )
+    caveats = evidence["dataQuality"]["caveats"]
+    if caveats:
+        # Without this the model reads an import artefact as a triumph and
+        # congratulates the user on a 96% savings rate.
+        hedge += "\nThe data has known limits: " + " ".join(caveats) + \
+                 " Do not celebrate figures these caveats undermine."
+
+    return f"""You are a senior personal finance advisor with 15 years of experience helping Indians build wealth. Speak directly to the user — confident, warm, and precise.
+
+An analysis engine has already examined every transaction. Your job is to explain and act on its findings, NOT to invent new ones. Every number you write must appear below verbatim. Do not compute new figures.
+
+SNAPSHOT
+- Monthly spend: {_rupees(evidence['monthlyExpense'])}
+- {income_note}
+- Recoverable per month: {_rupees(leakage['monthly'])}
+- {fixed_note}
+- {coverage}
+
+FINDINGS
+{chr(10).join(findings) if findings else "- No notable patterns beyond the totals above."}
+
+RULES
+- Only the FINDINGS are findings. The committed total is context; never call it a problem, an outlier or a place to cut.
+- Never state a number or a percentage that does not appear above. Do not add, subtract or scale figures, and do not invent targets like "cut by 20%".
+- Say nothing about a merchant beyond what its finding says.
+- Never recommend a specific investment, fund or product. You are not their financial adviser.
+
+Write a coachMessage (2-3 sentences, max 90 words): open with the single strongest finding above, and end with one concrete step for this week tied to a number from the findings.
+
+Write exactly 2 tips, 1-2 sentences each. Each tip must act on a different finding and name that merchant, category or amount. Tell the user exactly what to do — no platitudes like "track your spending" or "make a budget".{hedge}
+
+Return ONLY this JSON (no markdown, no extra text):
+{{"coachMessage":"your message here","tips":["tip 1","tip 2"]}}"""
 
 
 def generate_spending_coach(transactions):
-    # Normalise defensively: tolerate missing/garbage "amount" and missing
-    # "category" rather than raising KeyError/ValueError on malformed input.
-    expenses = []
-    income = 0.0
-    for t in transactions:
-        amt = _amount(t)
-        if amt < 0:
-            row = dict(t)
-            row["amount"] = amt
-            row["category"] = (t.get("category") or "Uncategorised")
-            expenses.append(row)
-        elif amt > 0:
-            income += amt
+    evidence = analyse(transactions or [])
 
-    if not expenses:
+    if evidence["transactionCount"] == 0:
+        COACH_GENERATIONS.labels(result="no_data").inc()
         return {
             "spendingHealth": "Unknown",
             "monthlyLeakage": 0,
             "tips": [],
             "coachMessage": "No spending data available.",
+            "coachMessageSource": "analysis",
+            "insights": [],
+            "recommendations": [],
+            "leakageBreakdown": {},
+            "snapshot": {},
+            "coverage": _coverage(evidence),
         }
 
-    months = _months_present(transactions)
+    leakage = estimate_leakage(evidence)
+    health = _health(evidence["savingsRate"])
+    recommendations = build_recommendations(evidence, leakage)
+    prompt = _build_prompt(evidence, leakage, health)
+    message = ""
 
-    df = pd.DataFrame(expenses)
-    df["amount"] = df["amount"].abs()
-
-    total_expenses = float(df["amount"].sum())
-    savings = income - total_expenses
-    savings_rate = round((savings / income * 100), 1) if income > 0 else 0
-    tx_count = len(expenses)
-
-    category_totals = (
-        df.groupby("category")["amount"].sum()
-        .sort_values(ascending=False)
-        .round(2)
-        .to_dict()
-    )
-
-    merchant_totals = {}
-    if "merchant" in df.columns:
-        merchant_totals = (
-            df.groupby("merchant")["amount"].sum()
-            .sort_values(ascending=False)
-            .head(6)
-            .round(2)
-            .to_dict()
-        )
-
-    # Compute leakage deterministically — never changes on regenerate
-    monthly_leakage = _compute_leakage(category_totals, months)
-
-    # Determine health from savings rate
-    if savings_rate >= 30:
-        health = "Excellent"
-    elif savings_rate >= 15:
-        health = "Good"
-    elif savings_rate >= 5:
-        health = "Average"
-    else:
-        health = "Poor"
-
-    top_category = list(category_totals.keys())[0] if category_totals else "discretionary"
-    top_category_amount = round(list(category_totals.values())[0]) if category_totals else 0
-    monthly_expense = round(total_expenses / months)
-    monthly_income = round(income / months) if income > 0 else 0
-
-    prompt = f"""You are a senior personal finance advisor with 15 years of experience helping Indians build wealth. Speak directly to the user — confident, warm, and precise. Never be vague or generic. Every sentence must reference the user's actual numbers.
-
-USER'S FINANCIAL SNAPSHOT (recent months):
-- Monthly Income: ₹{monthly_income:,}
-- Monthly Expenses: ₹{monthly_expense:,}
-- Savings Rate: {savings_rate}%
-- Total Transactions: {tx_count}
-
-CATEGORY BREAKDOWN (window total, ₹):
-{json.dumps(category_totals, indent=2)}
-
-TOP MERCHANTS (window total, ₹):
-{json.dumps(merchant_totals, indent=2)}
-
-Write a coachMessage (2-3 sentences, max 90 words): Start with a direct assessment of their financial health using their savings rate. Identify the single biggest pattern you see in their spending. End with one concrete next step they can take this week — mention an actual number or category.
-
-Write exactly 4 tips. Each tip must be 1-2 sentences. Reference specific categories or merchants from the data. Be practical — tell the user exactly what to do, not just what to notice. No platitudes like "track your spending" or "make a budget".
-
-Return ONLY this JSON (no markdown, no extra text):
-{{"coachMessage":"your message here","tips":["tip 1","tip 2","tip 3","tip 4"]}}"""
-
+    # Exactly one result label per generation, decided where the truth is known.
+    outcome = "llm_error"
     try:
-        text = ask(prompt, max_tokens=300)
-        parsed = _parse_llm_json(text)
+        started = time.monotonic()
+        try:
+            text = ask(prompt, max_tokens=350,
+                       timeout=LLM_TIMEOUT_S, num_ctx=LLM_NUM_CTX)
+        finally:
+            COACH_LLM_LATENCY.observe(time.monotonic() - started)
 
-        if parsed:
-            tips_raw = parsed.get("tips", [])
-            tips = _normalize_tips(tips_raw)
-            return {
-                "spendingHealth": health,
-                "monthlyLeakage": monthly_leakage,
-                "coachMessage": parsed.get("coachMessage", ""),
-                "tips": tips if tips else _fallback_tips(category_totals, merchant_totals, savings_rate, months),
-            }
-        raise ValueError("Parse failed")
+        parsed = _parse_llm_json(text)
+        if not parsed:
+            outcome = "parse_failed"
+            raise ValueError("Parse failed")
+
+        # The model is asked for two tips and the analysis layer supplies the
+        # rest. A 3B model padding to four invents arithmetic and contradicts
+        # itself ("cancel Spotify, it is non-cancellable"); two is what it can
+        # write well, and the computed recommendations are stronger than its
+        # padding because they carry a rupee impact it cannot work out.
+        suggestions = ground_tips(_normalize_tips(parsed.get("tips", [])), prompt)[:2]
+        recommendations = _merge_ai_suggestions(recommendations, suggestions)
+
+        message = parsed.get("coachMessage", "")
+        if message and not is_grounded(message, _amounts(prompt), _figure_owners(prompt)):
+            logger.info("Coach message misused the findings, using fallback: %s", message)
+            message = ""
+        outcome = "ai" if message else "rejected"
 
     except Exception as e:
         logger.warning("Spending coach LLM/parse failed, using fallback: %s", e)
-        top_cat = list(category_totals.keys())[0] if category_totals else "discretionary"
-        top_amt = round(list(category_totals.values())[0] / months) if category_totals else 0
-        monthly_exp = round(total_expenses / months)
-        monthly_inc = round(income / months) if income > 0 else 0
-        gap = max(0, round(monthly_inc * 0.20) - round(income * savings_rate / 100 / months))
-        return {
-            "spendingHealth": health,
-            "monthlyLeakage": monthly_leakage,
-            "tips": _fallback_tips(category_totals, merchant_totals, savings_rate, months),
-            "coachMessage": (
-                f"Your savings rate stands at {savings_rate}% — "
-                f"{'well above' if savings_rate >= 30 else 'below' if savings_rate < 20 else 'close to'} the recommended 20% benchmark. "
-                f"Your largest monthly outflow is {top_cat} at ₹{top_amt:,}, which is worth examining closely. "
-                f"{'Cutting that category by 15% would free up ₹' + str(round(top_amt * 0.15)) + ' every month.' if top_amt > 0 else 'Review your top categories to find room to save.'}"
-            ),
-        }
+
+    COACH_GENERATIONS.labels(result=outcome).inc()
+
+    return {
+        "spendingHealth": health,
+        "monthlyLeakage": leakage["monthly"],
+        "coachMessage": message or _fallback_message(evidence, leakage),
+        # The page badges this line by author. When the model's message is
+        # rejected or it never answered, the sentence below is written by the
+        # analysis layer, and labelling that "AI written" would be a lie about
+        # where the user's advice came from.
+        "coachMessageSource": "ai" if message else "analysis",
+        # Plain sentences for any caller still reading the original contract.
+        "tips": [f"{r['action']}. {r['rationale']}".strip(". ").replace("..", ".")
+                 for r in recommendations[:4]],
+        "insights": build_insights(evidence, leakage),
+        "recommendations": recommendations[:6],
+        "leakageBreakdown": leakage,
+        "snapshot": {
+            "monthlyIncome": evidence["monthlyIncome"],
+            "monthlyExpense": evidence["monthlyExpense"],
+            "monthlyFixed": evidence["monthlyFixed"],
+            "monthlyDiscretionary": evidence["monthlyDiscretionary"],
+            "savingsRate": evidence["savingsRate"],
+            "expenseByMonth": evidence["expenseByMonth"],
+            "categoryTotals": dict(list(evidence["categoryTotals"].items())[:6]),
+        },
+        "coverage": _coverage(evidence),
+    }
 
 
-def _fallback_tips(category_totals, merchant_totals, savings_rate, months=3):
-    tips = []
-    cats = list(category_totals.keys())
-    amounts = list(category_totals.values())
-    merchants = list(merchant_totals.keys())
-    m_amounts = list(merchant_totals.values())
+def _coverage(evidence: dict) -> dict:
+    """What the figures are built from, so the page can say so out loud."""
+    quality = evidence.get("dataQuality", {})
+    return {
+        "months": evidence["months"],
+        "monthKeys": evidence["monthKeys"],
+        "transactions": evidence["transactionCount"],
+        "confidence": evidence["confidence"],
+        "uncategorisedShare": quality.get("uncategorisedShare", 0.0),
+        "caveats": quality.get("caveats", []),
+        # Which prompt produced this response — stamped so a quality shift in
+        # stored/monitored output can be traced to the prompt change behind it.
+        "promptVersion": PROMPT_VERSION,
+    }
 
-    if cats:
-        cap = round(amounts[0] / months * 0.80)
-        tips.append(
-            f"{cats[0]} is your top spending category at ₹{round(amounts[0]/months):,}/month on average. "
-            f"Set a hard monthly cap of ₹{cap:,} — that's a 20% reduction that compounds over time."
-        )
-    if len(cats) > 1:
-        tips.append(
-            f"Your {cats[1]} spend of ₹{round(amounts[1]/months):,}/month is your second-largest category. "
-            f"Review this category's transactions and identify 2-3 recurring charges you can eliminate or downgrade."
-        )
-    if merchants:
-        tips.append(
-            f"You've spent ₹{round(m_amounts[0]):,} at {merchants[0]} over the recent months — roughly ₹{round(m_amounts[0]/months):,}/month. "
-            f"Set a monthly limit for this merchant and stop when you hit it."
-        )
-    if savings_rate < 20:
-        monthly_exp = sum(amounts) / months
-        est_income = monthly_exp / (1 - savings_rate / 100) if savings_rate < 100 else monthly_exp
-        shortfall = round((20 - savings_rate) / 100 * est_income)
-        tips.append(
-            f"At {savings_rate}% savings rate, you're ₹{shortfall:,}/month short of the 20% benchmark. "
-            f"Set up an automatic transfer to a separate savings account the day your salary arrives — before you spend."
-        )
+
+def _merge_ai_suggestions(recommendations: list[dict], suggestions: list[str]) -> list[dict]:
+    """Append the model's suggestions after the computed ones.
+
+    Computed recommendations lead because they carry a rupee impact and a
+    ranking; the model's are kept only where they raise something the
+    computed set never mentioned, which is where a language model is
+    genuinely additive rather than decorative.
+    """
+    covered = set().union(*(_entities(r["action"] + " " + r["rationale"])
+                            for r in recommendations)) if recommendations else set()
+
+    for suggestion in suggestions:
+        entities = _entities(suggestion)
+        if entities and entities <= covered:
+            continue
+        covered |= entities
+        recommendations.append({
+            "action": suggestion,
+            "rationale": "",
+            "impactPerMonth": None,
+            "effort": None,
+            "priority": len(recommendations) + 1,
+            "evidence": "",
+            "source": "ai",
+        })
+
+    return recommendations
+
+
+def _fallback_message(evidence: dict, leakage: dict) -> str:
+    """The coach's read when the model has not earned the byline.
+
+    Every clause is gated on the data supporting it: no savings rate without
+    verified income, and no promise that committed bills are untouched when
+    nothing is categorised well enough to know which bills those are.
+    """
+    rate = evidence["savingsRate"]
+    categorised = evidence["dataQuality"]["uncategorisedShare"] < 50
+    parts = []
+
+    if rate is not None:
+        verdict = "well above" if rate >= 30 else "close to" if rate >= 20 else "below"
+        parts.append(f"Your savings rate stands at {rate}% — {verdict} the "
+                     f"recommended 20% benchmark.")
     else:
-        tips.append(
-            f"Your {savings_rate}% savings rate is strong. Put the surplus to work — a Nifty 50 index fund SIP "
-            f"or a high-yield FD will outperform letting it sit in a savings account."
-        )
-    return tips
+        parts.append(f"You are spending {_rupees(evidence['monthlyExpense'])} a month. "
+                     f"Your income could not be verified from this data, so there is no "
+                     f"savings rate to report yet.")
+
+    top = next(iter(evidence["categoryMonthly"]), None)
+    if top and categorised:
+        parts.append(f"Your largest outflow is {top} at "
+                     f"{_rupees(evidence['categoryMonthly'][top])}/month.")
+
+    if leakage["monthly"] > 0:
+        # Only claim the committed bills are safe where they can be identified.
+        safety = (" without touching your committed bills" if categorised else
+                  ", though with your transactions uncategorised this may include "
+                  "rent and bills")
+        parts.append(f"Roughly {_rupees(leakage['monthly'])} a month is the gap between "
+                     f"an average month and your cheapest one{safety}.")
+
+    return " ".join(parts)

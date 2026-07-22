@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, X, RotateCcw, BarChart3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, RotateCcw, BarChart3 } from "lucide-react";
 import SpendingHeatmap from "../components/SpendingHeatmap";
 import RecurringExpenses from "../components/RecurringExpenses";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 
 // ─── Categories (Wallet-style) ───────────────────────────────────────────────
@@ -82,35 +82,31 @@ function prevPeriodTransactions(transactions, period) {
   });
 }
 
-// ─── Filter Sidebar ───────────────────────────────────────────────────────────
-function FilterSidebar({ filters, setFilters, open, onClose }) {
+// ─── Filter Panel (horizontal, matches Transactions page) ───────────────────
+function FilterPanel({ filters, setFilters, open }) {
   const reset = () => setFilters({
     search: "", category: "All", recordType: "All", recordState: "All",
     minAmount: "", maxAmount: "", includeTransfers: true,
   });
 
+  if (!open) return null;
+
   return (
     <div style={{
-      position: "relative", width: open ? 240 : 0, flexShrink: 0,
-      overflow: "hidden", transition: "width 0.25s ease",
+      margin: "0 0 16px", padding: 16,
+      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+      borderRadius: 14, fontFamily: "'DM Sans', system-ui, sans-serif",
     }}>
-      <div style={{
-        width: 240, height: "100%",
-        background: "rgba(255,255,255,0.018)",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        padding: open ? "20px 16px" : 0, overflowY: "auto",
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        minHeight: 600,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.1em" }}>MY FILTER</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", padding: 2 }}>
-            <X size={14} />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div style={{ marginBottom: 16 }}>
+      <style>{`
+        .afp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .afp-grid2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
+        @media (max-width: 640px) {
+          .afp-grid { grid-template-columns: 1fr 1fr; }
+          .afp-grid2 { grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+        }
+      `}</style>
+      <div className="afp-grid">
+        <div>
           <label style={labelStyle}>Search</label>
           <input
             style={inputStyle}
@@ -119,9 +115,7 @@ function FilterSidebar({ filters, setFilters, open, onClose }) {
             onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
           />
         </div>
-
-        {/* Category */}
-        <div style={{ marginBottom: 16 }}>
+        <div>
           <label style={labelStyle}>Categories</label>
           <select
             style={selectStyle}
@@ -132,9 +126,7 @@ function FilterSidebar({ filters, setFilters, open, onClose }) {
             {CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
           </select>
         </div>
-
-        {/* Record type */}
-        <div style={{ marginBottom: 16 }}>
+        <div>
           <label style={labelStyle}>Record types</label>
           <select
             style={selectStyle}
@@ -144,28 +136,9 @@ function FilterSidebar({ filters, setFilters, open, onClose }) {
             {RECORD_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-
-        {/* Amount range */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Amount range</label>
-          <div style={{ display: "flex", gap: 6 }}>
-            <input
-              type="number" placeholder="Min" style={{ ...inputStyle, flex: 1, fontSize: 11 }}
-              value={filters.minAmount}
-              onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))}
-            />
-            <input
-              type="number" placeholder="Max" style={{ ...inputStyle, flex: 1, fontSize: 11 }}
-              value={filters.maxAmount}
-              onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        {/* Transfers toggle */}
-        <div style={{ marginBottom: 16 }}>
+        <div>
           <label style={labelStyle}>Transfers</label>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
             <input
               type="checkbox"
               checked={filters.includeTransfers}
@@ -175,9 +148,25 @@ function FilterSidebar({ filters, setFilters, open, onClose }) {
             <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Include transfers</span>
           </label>
         </div>
-
-        {/* Record state */}
-        <div style={{ marginBottom: 20 }}>
+      </div>
+      <div className="afp-grid2">
+        <div>
+          <label style={labelStyle}>Min amount</label>
+          <input
+            type="number" placeholder="Min" style={inputStyle}
+            value={filters.minAmount}
+            onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Max amount</label>
+          <input
+            type="number" placeholder="Max" style={inputStyle}
+            value={filters.maxAmount}
+            onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
+          />
+        </div>
+        <div>
           <label style={labelStyle}>Record States</label>
           <select
             style={selectStyle}
@@ -187,19 +176,18 @@ function FilterSidebar({ filters, setFilters, open, onClose }) {
             {RECORD_STATES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-
-        {/* Reset */}
+      </div>
+      <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
         <button
           onClick={reset}
           style={{
-            width: "100%", padding: "9px 0", borderRadius: 10,
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-            color: "var(--text-secondary)", fontSize: 12, fontWeight: 600,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "6px 14px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)",
+            color: "#f87171", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
           }}
         >
-          <RotateCcw size={12} /> Reset Filter
+          <RotateCcw size={12} /> Reset all filters
         </button>
       </div>
     </div>
@@ -319,7 +307,7 @@ function BalanceTrendTab({ transactions }) {
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>RUNNING BALANCE OVER TIME</div>
       <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData}>
+        <LineChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
           <YAxis tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
@@ -355,22 +343,43 @@ function CashFlowTab({ transactions }) {
     return <EmptyState msg="No transactions in this period to show cash flow." />;
   }
 
+  // Indian-style compact formatting (k / L / Cr) — also doubles as the direct
+  // bar labels below, since a sqrt-scaled axis still leaves small months only
+  // a few px tall and unreadable without a printed value.
+  const compactINR = v => {
+    if (v >= 1e7) return `₹${(v / 1e7).toFixed(v >= 1e8 ? 0 : 1)}Cr`;
+    if (v >= 1e5) return `₹${(v / 1e5).toFixed(v >= 1e6 ? 0 : 1)}L`;
+    if (v >= 1e3) return `₹${(v / 1e3).toFixed(0)}k`;
+    return `₹${v}`;
+  };
+
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={data} barGap={4}>
+        <BarChart data={data} barGap={4} margin={{ top: 20, right: 8, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
-          <YAxis tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+          {/* sqrt scale: one huge month no longer flattens every other bar to
+              a sliver, while zero still sits at zero (unlike a log scale) */}
+          <YAxis
+            scale="sqrt"
+            domain={[0, "dataMax"]}
+            tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }}
+            tickFormatter={compactINR}
+          />
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.04)" }}
             contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 }}
             formatter={(v, n) => [`₹${v.toLocaleString("en-IN")}`, n === "income" ? "Income" : "Expenses"]}
           />
           <Legend formatter={v => v === "income" ? "Money In" : "Money Out"} />
-          <Bar dataKey="income"   fill="#4ade80" radius={[4,4,0,0]} fillOpacity={0.85} />
-          <Bar dataKey="expenses" fill="#f87171" radius={[4,4,0,0]} fillOpacity={0.85} />
+          <Bar dataKey="income"   fill="#4ade80" radius={[4,4,0,0]} fillOpacity={0.85}>
+            <LabelList dataKey="income" position="top" formatter={compactINR} style={{ fontSize: 9, fill: "rgba(148,163,184,0.7)" }} />
+          </Bar>
+          <Bar dataKey="expenses" fill="#f87171" radius={[4,4,0,0]} fillOpacity={0.85}>
+            <LabelList dataKey="expenses" position="top" formatter={compactINR} style={{ fontSize: 9, fill: "rgba(148,163,184,0.7)" }} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -389,9 +398,9 @@ function EmptyState({ msg }) {
 // ─── Main AnalyticsPage ───────────────────────────────────────────────────────
 const TABS = ["Incomes & Expenses Report", "Balance Trend", "Cash Flow"];
 
-export default function AnalyticsPage({ transactions = [], recurringExpenses = [] }) {
+export default function AnalyticsPage({ transactions = [], recurringExpenses = [], onCategoryChanged }) {
   const [activeTab, setActiveTab] = useState(TABS[0]);
-  const [filterOpen, setFilterOpen] = useState(typeof window !== "undefined" && window.innerWidth > 768);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [period, setPeriod] = useState("This month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -452,10 +461,9 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 0, minHeight: 600 }}>
-        {/* Filter Sidebar */}
-        <FilterSidebar filters={filters} setFilters={setFilters} open={filterOpen} onClose={() => setFilterOpen(false)} />
+      <FilterPanel filters={filters} setFilters={setFilters} open={filterOpen} />
 
+      <div style={{ display: "flex", gap: 0, minHeight: 600 }}>
         {/* Main content */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
           {/* Month navigation */}
@@ -550,7 +558,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
 
           {/* Spending Heatmap */}
           <div style={{ marginTop: 24 }}>
-            <SpendingHeatmap transactions={currentTxns} />
+            <SpendingHeatmap transactions={currentTxns} onCategoryChanged={onCategoryChanged} />
           </div>
 
           {/* Recurring Expenses */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw } from "lucide-react";
+import { ShieldCheck, RefreshCw, ChevronDown } from "lucide-react";
 import API from "../services/api";
 
 const SCORE_BANDS = [
@@ -76,6 +76,8 @@ export default function CreditScoreCard() {
   const [loading,  setLoading]  = useState(true);
   const [checking, setChecking] = useState(false);
   const [error,    setError]    = useState(false);
+  // Collapsed by default — only matters on mobile (`lg:` forces it open below).
+  const [factorsOpen, setFactorsOpen] = useState(false);
 
   const fetchScore = async () => {
     setChecking(true);
@@ -157,11 +159,36 @@ export default function CreditScoreCard() {
             </div>
           </div>
 
-          {/* Score Factors */}
+          {/* Score Factors — collapsible on mobile, always expanded on desktop */}
           {data?.factors?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>SCORE FACTORS</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <button
+                type="button"
+                onClick={() => setFactorsOpen(o => !o)}
+                className="lg:pointer-events-none lg:!bg-transparent lg:!border-0 lg:!p-0 lg:!rounded-none"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 11, fontWeight: 800, color: "var(--text-primary)",
+                  letterSpacing: "0.1em", marginBottom: 12,
+                  background: "var(--bg-subtle)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                }}
+              >
+                <span>SCORE FACTORS</span>
+                <ChevronDown
+                  size={16}
+                  strokeWidth={3}
+                  className="lg:hidden"
+                  style={{ transition: "transform 0.2s ease", transform: factorsOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                />
+              </button>
+              <div
+                className="lg:!flex"
+                style={{ display: factorsOpen ? "flex" : "none", flexDirection: "column", gap: 14 }}
+              >
                 {data.factors.map(f => <FactorBar key={f.label} factor={f} />)}
               </div>
             </div>

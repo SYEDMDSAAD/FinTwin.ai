@@ -1,6 +1,7 @@
 package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
+import com.fintwin.exception.ConflictException;
 import com.fintwin.exception.ForbiddenException;
 import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.GoalRequestDTO;
@@ -22,7 +23,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
@@ -139,6 +139,16 @@ public class GoalPlannerService {
                         new NotFoundException("User not found")
                 );
 
+        return getGoalsForUser(user);
+    }
+
+    // Recalculated goals for an explicit user — progress/health/expectedSaved are
+    // computed in-memory on every fetch and never persisted, so any consumer that
+    // reads the repository directly (e.g. the internal AI data API) gets stale
+    // zeros. Service-to-service callers use this; getGoals() keeps the
+    // security-context resolution and authorization on the public path.
+    public List<FinancialGoal> getGoalsForUser(User user) {
+
         List<FinancialGoal> goals = goalRepository.findByUser(user);
 
         FinancialContext ctx = buildFinancialContext(user);
@@ -155,9 +165,9 @@ public class GoalPlannerService {
             goal.setGoalHealth(
                     computeGoalHealth(ctx.monthlySavings, goal.getMonthlyTarget())
             );
-
-            updateProgress(goal);
         }
+
+        recomputeProgress(user, goals);
 
         return goals;
     }
@@ -227,7 +237,7 @@ public class GoalPlannerService {
         goal.setAvailableSavings(ctx.monthlySavings);
         goal.setGoalHealth(computeGoalHealth(ctx.monthlySavings, monthlyTarget));
 
-        updateProgress(goal);
+        recomputeProgressFor(user, goal);
 
         FinancialGoal saved = goalRepository.save(goal);
         profileService.saveScoreSnapshot(user);
@@ -264,6 +274,57 @@ public class GoalPlannerService {
 
         goalRepository.delete(goal);
         profileService.saveScoreSnapshot(user);
+    }
+
+    // =========================
+    // MARK GOAL COMPLETE
+    // Only allowed once progress has genuinely reached 100% — recomputed here
+    // rather than trusting the possibly-stale stored value, since getGoals()
+    // recalculates progress in-memory on every fetch without persisting it.
+    // =========================
+
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
+    @Audited(action = "WRITE", resource = "goals", description = "Financial goal marked complete")
+    public FinancialGoal completeGoal(Long id) {
+
+        String email = SecurityUtils.getCurrentUserEmail();
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new NotFoundException("User not found")
+                );
+
+        FinancialGoal goal = goalRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new NotFoundException("Goal not found")
+                );
+
+        if (goal.getUser().getId().longValue()
+        != user.getId().longValue()) {
+            throw new ForbiddenException("Unauthorized Goal Access");
+        }
+
+        if (Boolean.TRUE.equals(goal.getCompleted())) {
+            return goal;
+        }
+
+        FinancialContext ctx = buildFinancialContext(user);
+        goal.setAvailableSavings(ctx.monthlySavings);
+        recomputeProgressFor(user, goal);
+
+        if (goal.getProgressPercent() == null || goal.getProgressPercent() < 100) {
+            throw new ConflictException("Goal has not yet reached 100% progress.");
+        }
+
+        goal.setCompleted(true);
+        goal.setCompletedAt(LocalDate.now());
+
+        FinancialGoal saved = goalRepository.save(goal);
+        profileService.saveScoreSnapshot(user);
+
+        return saved;
     }
 
     // =========================
@@ -325,7 +386,7 @@ public class GoalPlannerService {
                 computeGoalHealth(ctx.monthlySavings, goal.getMonthlyTarget())
         );
 
-        updateProgress(goal);
+        recomputeProgressFor(user, goal);
 
         FinancialGoal saved = goalRepository.save(goal);
         profileService.saveScoreSnapshot(user);
@@ -388,30 +449,71 @@ public class GoalPlannerService {
         return com.fintwin.util.GoalMath.health(monthlySavings, monthlyTarget);
     }
 
-    private void updateProgress(FinancialGoal goal) {
-        double availSavings = goal.getAvailableSavings() != null
-                ? goal.getAvailableSavings() : 0.0;
+    // =========================
+    // PROGRESS (measured, allocated)
+    // REWORKED: progress used to be monthsElapsed x the *current* monthly
+    // savings rate — extrapolation that rewrote past progress whenever the
+    // rate moved, and let every goal claim the same savings in full. Now each
+    // month since the earliest goal is measured from actual transactions and
+    // split across the goals active that month (GoalMath.allocateSavings), so
+    // a rupee counts toward exactly one goal.
+    // =========================
 
-        // No progress if user has zero or negative monthly savings
-        double positiveMonthly = Math.max(0.0, availSavings);
+    private void recomputeProgress(User user, List<FinancialGoal> goals) {
+        if (goals.isEmpty()) return;
 
-        long monthsElapsed = goal.getCreatedAt() == null ? 1
-                : Math.max(1,
-                        ChronoUnit.MONTHS.between(
-                                goal.getCreatedAt(), LocalDate.now()
-                        ) + 1
-                  );
+        LocalDate earliest = LocalDate.now();
+        for (FinancialGoal g : goals) {
+            if (g.getCreatedAt() != null && g.getCreatedAt().isBefore(earliest)) {
+                earliest = g.getCreatedAt();
+            }
+        }
 
-        double expectedSaved = Math.min(
-                monthsElapsed * positiveMonthly,
-                goal.getTargetAmount()
+        // Goal windows outgrow the 3-month default; same query, wider cutoff.
+        // Amounts are encrypted at rest, so aggregation happens here, not in SQL.
+        List<Transaction> transactions = transactionRepository
+                .findLatestThreeMonthsTransactions(
+                        user.getId(), earliest.withDayOfMonth(1));
+
+        Map<Long, Double> allocated = com.fintwin.util.GoalMath.allocateSavings(
+                goals,
+                com.fintwin.util.TransactionMath.netSavingsByMonth(transactions),
+                java.time.YearMonth.now()
         );
 
-        double progressPercent = goal.getTargetAmount() > 0
-                ? (expectedSaved / goal.getTargetAmount()) * 100 : 0;
+        for (FinancialGoal goal : goals) {
+            applyProgress(goal, allocated.getOrDefault(goal.getId(), 0.0));
+        }
+    }
 
-        goal.setExpectedSaved(expectedSaved);
-        goal.setProgressPercent(round1(progressPercent));
+    // Allocation is cross-goal, so recomputing one goal still needs the whole
+    // set. The caller's (possibly modified, not yet saved) instance replaces
+    // its stored counterpart — repository calls outside a shared transaction
+    // return a different instance for the same row.
+    private void recomputeProgressFor(User user, FinancialGoal goal) {
+        List<FinancialGoal> goals = new ArrayList<>();
+        goals.add(goal);
+        for (FinancialGoal g : goalRepository.findByUser(user)) {
+            if (!Objects.equals(g.getId(), goal.getId())) goals.add(g);
+        }
+        recomputeProgress(user, goals);
+    }
+
+    private void applyProgress(FinancialGoal goal, double allocatedSaved) {
+        // A completed goal passed the 100% gate; data drift afterwards must
+        // not un-complete it on screen.
+        if (Boolean.TRUE.equals(goal.getCompleted())) {
+            goal.setExpectedSaved(goal.getTargetAmount());
+            goal.setProgressPercent(100.0);
+            return;
+        }
+
+        double target = goal.getTargetAmount() != null ? goal.getTargetAmount() : 0.0;
+        double saved = Math.min(allocatedSaved, target);
+
+        goal.setExpectedSaved(saved);
+        goal.setProgressPercent(round1(
+                target > 0 ? (saved / target) * 100 : 0.0));
     }
 
     private String generateAIPlan(
@@ -454,29 +556,94 @@ public class GoalPlannerService {
             );
 
             if (response == null || response.get("plan") == null) {
-                return buildFallbackPlan(dto, monthlyTarget);
+                return buildFallbackPlan(dto, monthlyTarget, savings);
             }
 
             return response.get("plan").toString();
 
         } catch (Exception e) {
             log.warn("AI goal-plan generation failed, using fallback plan", e);
-            return buildFallbackPlan(dto, monthlyTarget);
+            return buildFallbackPlan(dto, monthlyTarget, savings);
         }
     }
 
-    // IMPROVEMENT: meaningful fallback instead of generic message
-    private String buildFallbackPlan(GoalRequestDTO dto, double monthlyTarget) {
-        return String.format(
-                "To achieve your goal '%s' of ₹%.0f in %d months, "
-                + "save ₹%.0f per month. "
-                + "Review discretionary spending and automate transfers "
-                + "on salary day to stay on track.",
-                dto.getTitle(),
-                dto.getTargetAmount(),
-                dto.getDurationMonths(),
-                monthlyTarget
-        );
+    /**
+     * The plan shown when the AI service itself is unreachable — a different
+     * failure from the model misbehaving, which the AI service already handles
+     * with its own grounded fallback.
+     *
+     * Written in the same markdown section skeleton the AI service emits
+     * (headline, "Do this now", "Milestones", "Biggest risk") because this
+     * string is persisted on the goal and rendered by the same card: a bare
+     * sentence where every other goal shows a structured plan reads as a bug,
+     * and stays on the goal until someone regenerates it.
+     */
+    private String buildFallbackPlan(GoalRequestDTO dto, double monthlyTarget,
+                                     double monthlySavings) {
+
+        double target = dto.getTargetAmount();
+        int months = dto.getDurationMonths();
+        double gap = Math.max(0, monthlyTarget - monthlySavings);
+
+        StringBuilder plan = new StringBuilder();
+
+        plan.append(gap > 0
+                ? String.format(
+                        "Reaching this goal on time needs %s a month, which is %s more "
+                        + "than you currently save.",
+                        rupees(monthlyTarget), rupees(gap))
+                : String.format(
+                        "Your current saving of %s a month already covers this goal.",
+                        rupees(monthlySavings)));
+
+        plan.append("\n\n### Do this now\n");
+        plan.append(String.format(
+                "- Automate a %s transfer on salary day so the goal is funded before "
+                + "anything else is spent.\n", rupees(monthlyTarget)));
+        if (gap > 0 && monthlySavings > 0) {
+            // Ceiling division: the last, partial month still has to be saved.
+            long realisticMonths = (long) Math.ceil(target / monthlySavings);
+            plan.append(String.format(
+                    "- Or hold your current %s a month and accept %d months instead "
+                    + "of %d.\n", rupees(monthlySavings), realisticMonths, months));
+        } else {
+            plan.append("- Review your discretionary spending for the difference "
+                    + "before the next salary date.\n");
+        }
+
+        plan.append("\n### Milestones\n");
+        for (int mark : milestoneMarks(months)) {
+            double cumulative = Math.min(monthlyTarget * mark, target);
+            long share = target > 0 ? Math.round(cumulative / target * 100) : 0;
+            plan.append(String.format("- Month %d — %s saved (%d%%)\n",
+                    mark, rupees(cumulative), share));
+        }
+
+        plan.append("\n### Biggest risk\n");
+        plan.append(gap > 0
+                ? String.format("- The most likely failure is treating the %s gap as "
+                        + "something next month will fix.", rupees(gap))
+                : "- The most likely failure is drift — letting spending rise to meet "
+                        + "the surplus until the transfer stops clearing.");
+
+        return plan.toString();
+    }
+
+    /** Quarter-point checkpoints plus the finish line, deduplicated. */
+    private List<Integer> milestoneMarks(int months) {
+        Set<Integer> marks = new TreeSet<>();
+        for (double fraction : new double[]{0.25, 0.5, 0.75}) {
+            marks.add(Math.max(1, (int) Math.round(months * fraction)));
+        }
+        marks.add(months);
+        return new ArrayList<>(marks);
+    }
+
+    /** Indian digit grouping — ₹1,50,000, matching what the card renders. */
+    private String rupees(double value) {
+        return "₹" + java.text.NumberFormat
+                .getIntegerInstance(Locale.forLanguageTag("en-IN"))
+                .format(Math.round(value));
     }
 
     private double round1(double v) {

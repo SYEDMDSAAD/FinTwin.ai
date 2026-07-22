@@ -3,16 +3,23 @@ package com.fintwin.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // Typed application exceptions carry their own status — handled before the
     // generic RuntimeException fallback below. New code should throw these.
@@ -90,12 +97,25 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(error);
         }
+        // Method-security failures (@PreAuthorize) surface here, not at the filter
+        // chain — without this handler they fall into the RuntimeException fallback
+        // and masquerade as 500s.
+        @ExceptionHandler(AccessDeniedException.class)
+        public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Forbidden");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(error);
+        }
+
         // Fallback for any uncaught RuntimeException. Client-facing errors should be
         // thrown as ApiException subclasses (handled above) which carry their own
         // status; anything reaching here is treated as an unexpected server error.
         // Internal details are never exposed to the client.
         @ExceptionHandler(RuntimeException.class)
         public ResponseEntity<?> handleRuntime(RuntimeException ex) {
+                log.error("Unhandled server error", ex);
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "An unexpected error occurred");
                 return ResponseEntity

@@ -11,14 +11,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useCurrency, CURRENCIES } from "../context/CurrencyContext";
 import ChangePasswordModal from "./ChangePasswordModal";
 import DeleteAccountModal from "./DeleteAccountModal";
-
-const AI_MODES = [
-  { id: "Savings Advisor",    icon: "🐷", desc: "Optimise your savings rate and build an emergency fund" },
-  { id: "Investment Advisor", icon: "📈", desc: "Grow wealth through smart investment recommendations" },
-  { id: "Budget Coach",       icon: "📊", desc: "Stay on track with personalised budget management" },
-  { id: "Fraud Analyst",      icon: "🔍", desc: "Detect suspicious patterns and protect your finances" },
-  { id: "Purchase Advisor",   icon: "🛒", desc: "Analyse affordability before any major purchase" },
-];
+import { AI_MODES } from "../constants/aiModes";
 
 const TABS = [
   { id: "general",      label: "General",        Icon: Settings   },
@@ -720,17 +713,10 @@ export default function SettingsPage({ navigateTo }) {
               <div className="sp-card">
                 <SectionLabel>APP INFORMATION</SectionLabel>
                 <div style={{ padding: "14px 0" }}>
-                  {[
-                    { label: "Version", value: "v1.0.0" },
-                    { label: "Encryption", value: "AES-256 GCM" },
-                    { label: "Bank sync", value: "Setu Account Aggregator" },
-                    { label: "AI engine", value: "Ollama / phi3:mini" },
-                  ].map(row => (
-                    <div key={row.label} className="sp-row">
-                      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{row.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{row.value}</span>
-                    </div>
-                  ))}
+                  <div className="sp-row">
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Version</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>v1.0.0</span>
+                  </div>
                 </div>
                 <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button className="sp-action-btn" style={{ fontSize: 12 }} onClick={() => window.open('/privacy-policy', '_blank')}>

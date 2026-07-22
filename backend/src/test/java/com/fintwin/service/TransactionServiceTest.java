@@ -15,11 +15,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
+import com.fintwin.exception.NotFoundException;
+import com.fintwin.model.Transaction;
+
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -87,7 +97,7 @@ class TransactionServiceTest {
                 "file", "txns.csv", "text/csv",
                 csv.getBytes(StandardCharsets.UTF_8));
 
-        when(categoryService.categorize("Swiggy")).thenReturn("Food");
+        when(categoryService.categorize(eq("Swiggy"), any())).thenReturn("Food");
 
         // Should not throw
         service.uploadCSV(file);
@@ -102,7 +112,7 @@ class TransactionServiceTest {
                 "file", "txns.csv", "application/csv",
                 csv.getBytes(StandardCharsets.UTF_8));
 
-        when(categoryService.categorize("Amazon")).thenReturn("Shopping");
+        when(categoryService.categorize(eq("Amazon"), any())).thenReturn("Shopping");
 
         service.uploadCSV(file);
     }
@@ -120,6 +130,85 @@ class TransactionServiceTest {
         service.uploadCSV(file);
     }
 
+    // ── updateCategory — manual recategorization + learned rule ──────────────
+
+    private Transaction ownedTxn(Long id, String merchant, String category) {
+        Transaction t = new Transaction();
+        ReflectionTestUtils.setField(t, "id", id);
+        t.setMerchant(merchant);
+        t.setCategory(category);
+        t.setAmount(-500.0);
+        t.setDate(java.time.LocalDate.of(2026, 7, 1));
+        t.setUser(user);
+        return t;
+    }
+
+    @Test
+    void updateCategory_updatesTransactionAndRemembersRule() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn = ownedTxn(5L, "SHARMA GENERAL STORE", "Other");
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+
+        Map<String, Object> result =
+                service.updateCategory(5L, "Groceries", false, true);
+
+        assertThat(txn.getCategory()).isEqualTo("Groceries");
+        assertThat(result.get("similarUpdated")).isEqualTo(0);
+        verify(categoryService).rememberRule(user, "SHARMA GENERAL STORE", "Groceries");
+        verify(repository).save(txn);
+    }
+
+    @Test
+    void updateCategory_skipsRuleWhenRememberFalse() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn = ownedTxn(5L, "SHARMA GENERAL STORE", "Other");
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+
+        service.updateCategory(5L, "Groceries", false, false);
+
+        verify(categoryService, never()).rememberRule(any(), anyString(), anyString());
+    }
+
+    @Test
+    void updateCategory_appliesToSimilarPastTransactions() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn     = ownedTxn(5L, "SHARMA GENERAL STORE", "Other");
+        Transaction similar = ownedTxn(6L, "Sharma General Store",  "Other");
+        Transaction other   = ownedTxn(7L, "Zomato Order",          "Food");
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+        when(repository.findByUser(user)).thenReturn(List.of(txn, similar, other));
+        when(categoryService.normalizeMerchant(anyString())).thenAnswer(
+                inv -> inv.getArgument(0, String.class).toLowerCase().trim());
+
+        Map<String, Object> result =
+                service.updateCategory(5L, "Groceries", true, true);
+
+        assertThat(result.get("similarUpdated")).isEqualTo(1);
+        assertThat(similar.getCategory()).isEqualTo("Groceries");
+        assertThat(other.getCategory()).isEqualTo("Food");
+    }
+
+    @Test
+    void updateCategory_rejectsOtherUsersTransaction() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        User stranger = new User();
+        ReflectionTestUtils.setField(stranger, "id", 2L);
+        Transaction txn = ownedTxn(5L, "SHARMA GENERAL STORE", "Other");
+        txn.setUser(stranger);
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+
+        assertThatThrownBy(() -> service.updateCategory(5L, "Groceries", false, true))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void updateCategory_rejectsBlankCategory() {
+        assertThatThrownBy(() -> service.updateCategory(5L, "  ", false, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be empty");
+    }
+
     @Test
     void uploadCSV_skipsRowsWithInvalidAmount() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
@@ -131,5 +220,34 @@ class TransactionServiceTest {
                 csv.getBytes(StandardCharsets.UTF_8));
 
         service.uploadCSV(file);
+    }
+
+    // ── importBatch — a row's date is never fabricated ───────────────────────
+
+    @Test
+    void importBatch_skipsRowsWithNoDateRatherThanStampingThemToday() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        // Dating an undated row "today" piles whole batches onto the import
+        // date and corrupts every month-based figure built on top of it.
+        int saved = service.importBatch(List.of(
+                Map.of("merchant", "Swiggy", "amount", -500.0),
+                Map.of("date", "not-a-date", "merchant", "Uber", "amount", -300.0),
+                Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0)
+        ));
+
+        assertThat(saved).isEqualTo(1);
+    }
+
+    @Test
+    void importBatch_keepsRowsWhoseDateParses() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        int saved = service.importBatch(List.of(
+                Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0),
+                Map.of("date", "05/01/2026", "merchant", "Swiggy", "amount", -500.0)
+        ));
+
+        assertThat(saved).isEqualTo(2);
     }
 }

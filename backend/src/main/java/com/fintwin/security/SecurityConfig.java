@@ -79,6 +79,7 @@ public class SecurityConfig {
                         "GET",
                         "POST",
                         "PUT",
+                        "PATCH",
                         "DELETE",
                         "OPTIONS"
                 )
@@ -206,6 +207,11 @@ public class SecurityConfig {
 
                                 // Admin endpoints authenticate via X-Admin-Key header, not JWT
                                 .requestMatchers("/admin/**")
+                                .permitAll()
+
+                                // AI-service tool calls authenticate via X-Internal-Key header
+                                // (checked in InternalAIController), not JWT
+                                .requestMatchers("/internal/ai/**")
                                 .permitAll()
 
                                 // Public market proxy — fetches Yahoo Finance server-side, no user context needed

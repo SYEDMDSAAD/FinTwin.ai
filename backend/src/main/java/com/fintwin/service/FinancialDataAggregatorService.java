@@ -77,6 +77,7 @@ public class FinancialDataAggregatorService {
                 .toList();
 
         return FinancialSummaryDTO.builder()
+                .userId(user.getId())
                 .income(Math.round(income))
                 .expenses(Math.round(expenses))
                 .savings(Math.round(savings))

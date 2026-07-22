@@ -1,5 +1,8 @@
 import { useState, useMemo, memo, Fragment } from "react";
-import { Download, SlidersHorizontal, X, Search } from "lucide-react";
+import { Download, SlidersHorizontal, X, Search, Check, Pencil } from "lucide-react";
+import API from "../services/api";
+import { EDIT_CATEGORIES } from "../constants/categories";
+import CategoryDropdown from "./CategoryDropdown";
 
 const CATEGORIES = [
   "Food & Drinks","Shopping","Housing","Transportation","Vehicle",
@@ -58,6 +61,30 @@ function groupByDate(transactions) {
     .map(([key, { display, txns }]) => [key, display, txns]);
 }
 
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+// Groups date-groups into months, newest first:
+// [monthKey, monthLabel, monthNet, dayGroups]
+function groupByMonth(dayGroups) {
+  const months = {};
+  dayGroups.forEach(([key, display, txns]) => {
+    const monthKey = key.slice(0, 7); // YYYY-MM
+    if (!months[monthKey]) months[monthKey] = { dayGroups: [], net: 0 };
+    months[monthKey].dayGroups.push([key, display, txns]);
+    months[monthKey].net += txns.reduce((s, t) => s + t.amount, 0);
+  });
+  return Object.entries(months)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([monthKey, { dayGroups: dg, net }]) => {
+      const [y, m] = monthKey.split("-").map(Number);
+      const label = y && m ? `${MONTH_NAMES[m - 1]} ${y}` : monthKey;
+      return [monthKey, label, net, dg];
+    });
+}
+
 function formatDate(sortableKey, originalDisplay) {
   // sortableKey is always YYYY-MM-DD; parse as UTC to avoid timezone shift
   const [y, m, d] = sortableKey.split("-").map(Number);
@@ -72,13 +99,13 @@ function formatDate(sortableKey, originalDisplay) {
 
 const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18 };
 const inputStyle = {
-  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: 10, padding: "8px 12px", color: "#fff", fontSize: 13,
+  background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
+  borderRadius: 10, padding: "8px 12px", color: "var(--text-primary, #fff)", fontSize: 13,
   outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box",
 };
 const selectStyle = { ...inputStyle };
 
-const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ transactions = [] }) {
+const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ transactions = [], onChanged }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -88,6 +115,63 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
   const [minAmt, setMinAmt] = useState("");
   const [maxAmt, setMaxAmt] = useState("");
   const [showBalance, setShowBalance] = useState(true);
+
+  // ── Inline category editing ──
+  const CUSTOM = "__custom__";
+  const [editingId, setEditingId] = useState(null);
+  const [editCategory, setEditCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
+  const [applySimilar, setApplySimilar] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const editOptions = useMemo(() => {
+    const present = new Set(transactions.map(t => t.category).filter(Boolean));
+    return [...new Set([...EDIT_CATEGORIES, ...present])];
+  }, [transactions]);
+
+  const startEdit = (t) => {
+    setEditingId(t.id);
+    setEditCategory(t.category || "Other");
+    setCustomCategory("");
+    setApplySimilar(true);
+    setEditError("");
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditError(""); };
+
+  const saveCategory = async (t) => {
+    const category = editCategory === CUSTOM
+      ? customCategory.trim()
+      : editCategory;
+    if (editCategory === CUSTOM && !category) {
+      setEditError("Type a category name first.");
+      return;
+    }
+    if (!category || category === t.category) { cancelEdit(); return; }
+    try {
+      setSaving(true);
+      setEditError("");
+      await API.patch(`/transactions/${t.id}/category`, {
+        category,
+        applyToSimilar: applySimilar,
+        remember: true,
+      });
+      setEditingId(null);
+      // Report what changed so the parent can patch its state in place —
+      // a full refetch here would flash the loading skeleton over the table.
+      onChanged?.({
+        id: t.id,
+        category,
+        applyToSimilar: applySimilar,
+        merchant: t.merchant,
+      });
+    } catch {
+      setEditError("Could not save. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const reset = () => { setSearch(""); setCategory("All"); setType("All"); setDateFrom(""); setDateTo(""); setMinAmt(""); setMaxAmt(""); };
 
@@ -118,7 +202,88 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
     return balMap;
   }, [filtered]);
 
-  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  const renderCategoryChip = (t) => (
+    <button
+      onClick={() => startEdit(t)}
+      title="Edit category"
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        gap: 5, fontSize: 11, fontWeight: 600,
+        padding: "3px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit",
+        background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)",
+        color: "#a78bfa", width: 130, whiteSpace: "nowrap", boxSizing: "border-box",
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t.category}</span>
+      <Pencil size={9} style={{ opacity: 0.55, flexShrink: 0 }} />
+    </button>
+  );
+
+  const renderCategoryEditor = (t) => (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 7, minWidth: 170, maxWidth: 210,
+      padding: 10, borderRadius: 10,
+      background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.18)",
+    }}>
+      <CategoryDropdown
+        value={editCategory === CUSTOM ? "＋ Custom…" : editCategory}
+        options={editOptions}
+        onSelect={c => setEditCategory(c)}
+        onCustomClick={() => setEditCategory(CUSTOM)}
+        disabled={saving}
+      />
+      {editCategory === CUSTOM && (
+        <input
+          autoFocus
+          type="text"
+          placeholder="Type a category…"
+          maxLength={40}
+          value={customCategory}
+          onChange={e => setCustomCategory(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") saveCategory(t); }}
+          style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }}
+        />
+      )}
+      <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-dim)", cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={applySimilar}
+          onChange={e => setApplySimilar(e.target.checked)}
+          style={{ accentColor: "#a78bfa" }}
+        />
+        Also fix past transactions from this payee
+      </label>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={() => saveCategory(t)}
+          disabled={saving}
+          style={{
+            display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
+            borderRadius: 7, cursor: saving ? "wait" : "pointer", fontFamily: "inherit",
+            background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)",
+            color: "#4ade80", fontSize: 11, fontWeight: 600, opacity: saving ? 0.6 : 1,
+          }}
+        >
+          <Check size={11} /> {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          disabled={saving}
+          style={{
+            display: "flex", alignItems: "center", padding: "4px 10px",
+            borderRadius: 7, cursor: "pointer", fontFamily: "inherit",
+            background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
+            color: "var(--text-muted)", fontSize: 11,
+          }}
+        >
+          <X size={11} />
+        </button>
+      </div>
+      {editError && <span style={{ fontSize: 10, color: "#f87171" }}>{editError}</span>}
+    </div>
+  );
+
+  const grouped = useMemo(() => groupByMonth(groupByDate(filtered)), [filtered]);
   const totalIncome  = filtered.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
   const totalExpense = filtered.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
 
@@ -133,11 +298,13 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
         .tx-row-desktop.balance { grid-template-columns: 3fr 2fr 2fr 1.5fr 1.5fr; }
         .tx-mobile-card { display: none; padding: 10px 16px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
         .tx-filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .tx-amount-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
         @media (max-width: 640px) {
           .tx-row-desktop { display: none !important; }
           .tx-col-headers { display: none !important; }
           .tx-mobile-card { display: flex; flex-direction: column; gap: 6px; }
           .tx-filter-grid { grid-template-columns: 1fr 1fr; }
+          .tx-amount-grid { grid-template-columns: 1fr 1fr; gap: 12px 10px; }
           .tx-header-wrap { flex-wrap: wrap; gap: 8px; }
           .tx-export-btn { display: none; }
         }
@@ -235,7 +402,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
               </label>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, alignItems: "end" }}>
+          <div className="tx-amount-grid">
             <div>
               <label style={lbl}>Date from</label>
               <input type="date" style={inputStyle} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
@@ -283,22 +450,35 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
             No transactions match your filters.
           </div>
         )}
-        {grouped.map(([key, display, txns]) => {
-          const dayNet = txns.reduce((s,t) => s + t.amount, 0);
-          return (
+        {grouped.map(([monthKey, monthLabel, monthNet, dayGroups]) => (
+          <div key={monthKey}>
+            {/* Month band — the only tally shown */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 24px",
+              background: "rgba(167,139,250,0.06)",
+              borderTop: "1px solid rgba(167,139,250,0.12)",
+              borderBottom: "1px solid rgba(167,139,250,0.12)",
+              position: "sticky", top: 0, zIndex: 1,
+              backdropFilter: "blur(8px)",
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text-primary, #fff)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                {monthLabel}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: monthNet >= 0 ? "#4ade80" : "#f87171", fontVariantNumeric: "tabular-nums" }}>
+                {monthNet >= 0 ? "+" : "-"}₹{Math.abs(monthNet).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+
+            {dayGroups.map(([key, display, txns]) => (
             <div key={key}>
-              {/* Date group header */}
+              {/* Date group header — label only, no per-day tally */}
               <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 24px", background: "rgba(255,255,255,0.012)",
+                padding: "7px 24px", background: "rgba(255,255,255,0.012)",
                 borderBottom: "1px solid rgba(255,255,255,0.03)",
-                borderTop: "1px solid rgba(255,255,255,0.03)",
               }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.06em" }}>
                   {formatDate(key, display)}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: dayNet >= 0 ? "#4ade80" : "#f87171" }}>
-                  {dayNet >= 0 ? "+" : ""}₹{Math.abs(dayNet).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </span>
               </div>
 
@@ -330,15 +510,10 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
                       <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)" }}>{t.merchant}</span>
                     </div>
 
-                    {/* Category */}
-                    <span style={{
-                      display: "inline-block", fontSize: 11, fontWeight: 600,
-                      padding: "3px 10px", borderRadius: 6, textAlign: "center", justifySelf: "center",
-                      background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)",
-                      color: "#a78bfa", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {t.category}
-                    </span>
+                    {/* Category — click to edit; correction is remembered per payee */}
+                    <div style={{ justifySelf: "center" }}>
+                      {editingId === t.id ? renderCategoryEditor(t) : renderCategoryChip(t)}
+                    </div>
 
                     {/* Date */}
                     <span style={{ fontSize: 12, color: "var(--text-label)", fontVariantNumeric: "tabular-nums" }}>
@@ -372,7 +547,14 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
                       </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 36 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 6, padding: "2px 8px" }}>{t.category}</span>
+                      {editingId === t.id ? renderCategoryEditor(t) : (
+                        <button
+                          onClick={() => startEdit(t)}
+                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 10, fontWeight: 600, color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 6, padding: "2px 6px", cursor: "pointer", fontFamily: "inherit", width: 110, whiteSpace: "nowrap", overflow: "hidden", boxSizing: "border-box" }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t.category}</span> <Pencil size={8} style={{ opacity: 0.55, flexShrink: 0 }} />
+                        </button>
+                      )}
                       <span style={{ fontSize: 11, color: "var(--text-label)" }}>{t.date}</span>
                     </div>
                   </div>
@@ -380,8 +562,9 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
                 );
               })}
             </div>
-          );
-        })}
+            ))}
+          </div>
+        ))}
       </div>
 
       {/* Footer */}

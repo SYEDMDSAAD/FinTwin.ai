@@ -67,80 +67,6 @@ function BudgetSection({
 
             </div>
 
-
-            {budgets.length > 0 && (
-
-            <div
-                className="
-                    grid
-                    grid-cols-1
-                    md:grid-cols-3
-                    gap-4
-                    mb-6
-                "
-            >
-
-                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
-                    <p className="text-[10px] text-zinc-500 uppercase">
-                        Total Limit
-                    </p>
-
-                    <h3 className="text-xl font-bold">
-                        ₹{
-                            budgets
-                            .reduce(
-                                (sum,b)=>sum+(b.limit||0),
-                                0
-                            )
-                            .toLocaleString("en-IN")
-                        }
-                    </h3>
-                </div>
-
-                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
-                    <p className="text-[10px] text-zinc-500 uppercase">
-                        Total Spent
-                    </p>
-
-                    <h3 className="text-xl font-bold text-red-400">
-                        ₹{
-                            budgets
-                            .reduce(
-                                (sum,b)=>sum+(b.spent||0),
-                                0
-                            )
-                            .toLocaleString("en-IN")
-                        }
-                    </h3>
-                </div>
-
-                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
-                    <p className="text-[10px] text-zinc-500 uppercase">
-                        Remaining
-                    </p>
-
-                    <h3 className="text-xl font-bold text-green-400">
-                        ₹{
-                            (
-                                budgets.reduce(
-                                    (s,b)=>s+(b.limit||0),
-                                    0
-                                )
-                                -
-                                budgets.reduce(
-                                    (s,b)=>s+(b.spent||0),
-                                    0
-                                )
-                            )
-                            .toLocaleString("en-IN")
-                        }
-                    </h3>
-                </div>
-
-            </div>
-
-            )}
-
             <BudgetModal
                 createBudget={
                     createBudget
@@ -172,6 +98,83 @@ function BudgetSection({
                 ))}
 
             </div>
+
+            {/* =========================
+                Summary — after the budget cards, before "Can I Afford This?"
+            ========================= */}
+
+            {budgets.length > 0 && (
+
+            <div
+                className="
+                    grid
+                    grid-cols-3
+                    gap-2
+                    sm:gap-4
+                    mt-6
+                "
+            >
+
+                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-2.5 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] text-zinc-500 uppercase truncate">
+                        Total Limit
+                    </p>
+
+                    <h3 className="text-sm sm:text-lg md:text-xl font-bold truncate">
+                        ₹{
+                            budgets
+                            .reduce(
+                                (sum,b)=>sum+(b.limit||0),
+                                0
+                            )
+                            .toLocaleString("en-IN")
+                        }
+                    </h3>
+                </div>
+
+                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-2.5 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] text-zinc-500 uppercase truncate">
+                        Total Spent
+                    </p>
+
+                    <h3 className="text-sm sm:text-lg md:text-xl font-bold text-red-400 truncate">
+                        ₹{
+                            budgets
+                            .reduce(
+                                (sum,b)=>sum+(b.spent||0),
+                                0
+                            )
+                            .toLocaleString("en-IN")
+                        }
+                    </h3>
+                </div>
+
+                <div className="bg-white/[0.03] border border-white/10 rounded-xl p-2.5 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] text-zinc-500 uppercase truncate">
+                        Remaining
+                    </p>
+
+                    <h3 className="text-sm sm:text-lg md:text-xl font-bold text-green-400 truncate">
+                        ₹{
+                            (
+                                budgets.reduce(
+                                    (s,b)=>s+(b.limit||0),
+                                    0
+                                )
+                                -
+                                budgets.reduce(
+                                    (s,b)=>s+(b.spent||0),
+                                    0
+                                )
+                            )
+                            .toLocaleString("en-IN")
+                        }
+                    </h3>
+                </div>
+
+            </div>
+
+            )}
 
         </div>
     );

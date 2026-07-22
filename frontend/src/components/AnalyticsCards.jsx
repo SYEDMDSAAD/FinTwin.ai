@@ -86,7 +86,7 @@ function AnalyticsCards({
             color: "#22d3ee",
             trend: `${savingsTrend > 0 ? "+" : ""}${savingsTrend}%`,
             icon: <ArrowUp size={12} />,
-            sub: "vs last month"
+            sub: "all time"
         },
 
         {
@@ -107,10 +107,10 @@ function AnalyticsCards({
             transition={{ duration: 0.5 }}
             className="
                 grid
-                grid-cols-1
-                md:grid-cols-2
+                grid-cols-2
                 xl:grid-cols-4
-                gap-4
+                gap-3
+                sm:gap-4
                 mb-8
             "
         >
@@ -127,7 +127,9 @@ function AnalyticsCards({
                         border-white/10
                         bg-white/[0.03]
                         backdrop-blur-xl
-                        p-6
+                        p-4
+                        sm:p-5
+                        md:p-6
                         transition-all
                         duration-300
                         hover:-translate-y-1
@@ -155,14 +157,17 @@ function AnalyticsCards({
                         flex
                         justify-between
                         items-start
-                        mb-5
+                        mb-4
+                        sm:mb-5
                     ">
 
                         <span
                             className="
-                                text-[11px]
+                                text-[10px]
+                                sm:text-[11px]
                                 uppercase
-                                tracking-widest
+                                tracking-wide
+                                sm:tracking-widest
                                 text-zinc-500
                                 font-semibold
                             "
@@ -175,11 +180,15 @@ function AnalyticsCards({
                                 flex
                                 items-center
                                 gap-1
-                                px-2
-                                py-1
+                                px-1.5
+                                py-0.5
+                                sm:px-2
+                                sm:py-1
                                 rounded-md
-                                text-[10px]
+                                text-[9px]
+                                sm:text-[10px]
                                 font-bold
+                                shrink-0
                             "
                             style={{
                                 color: card.color,
@@ -194,7 +203,9 @@ function AnalyticsCards({
 
                     <h2
                         className="
-                            text-3xl
+                            text-xl
+                            sm:text-2xl
+                            md:text-3xl
                             font-bold
                             text-white
                             tracking-tight

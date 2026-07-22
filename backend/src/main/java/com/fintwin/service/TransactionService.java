@@ -131,6 +131,10 @@ public class TransactionService {
 
             List<Transaction> toSave = new ArrayList<>();
 
+            // One DB hit for the user's learned rules, reused for every row
+            Map<String, String> learnedRules =
+                    categoryService.learnedRulesFor(user);
+
             for (int i = 1; i < rows.size(); i++) {
 
                 String[] row = rows.get(i);
@@ -152,7 +156,7 @@ public class TransactionService {
                     );
 
                     String category = categoryService.categorize(
-                            transaction.getMerchant()
+                            transaction.getMerchant(), learnedRules
                     );
                     transaction.setCategory(
                             category != null ? category : "Other"
@@ -245,7 +249,8 @@ public class TransactionService {
         }
 
         String category = categoryService.categorize(
-                transaction.getMerchant()
+                transaction.getMerchant(),
+                categoryService.learnedRulesFor(user)
         );
         transaction.setCategory(
                 category != null ? category : "Other"
@@ -373,13 +378,22 @@ public class TransactionService {
 
         List<Transaction> toSave = new ArrayList<>();
 
+        Map<String, String> learnedRules =
+                categoryService.learnedRulesFor(user);
+
         for (Map<String, Object> row : rows) {
             try {
+                // A bulk import carries its own dates; a row without one is not
+                // a transaction that happened today, it is a row we cannot
+                // place in time. Stamping it with today's date silently piles
+                // whole batches onto the import date and corrupts every
+                // month-based figure built on top.
                 LocalDate date = row.get("date") != null
                         ? DateNormalizer.parseFlexible(row.get("date").toString())
-                        : LocalDate.now();
+                        : null;
                 if (date == null) {
-                    log.warn("Skipping import row — unparseable date '{}'", row.get("date"));
+                    log.warn("Skipping import row — missing or unparseable date '{}'",
+                             row.get("date"));
                     continue;
                 }
 
@@ -392,12 +406,11 @@ public class TransactionService {
                 double amount = ((Number) rawAmt).doubleValue();
                 if (amount == 0.0) continue;
 
+                String derived = categoryService.categorize(merchant, learnedRules);
                 String category = row.get("category") != null
                         && !row.get("category").toString().isBlank()
                         ? row.get("category").toString()
-                        : categoryService.categorize(merchant) != null
-                                ? categoryService.categorize(merchant)
-                                : "Other";
+                        : derived != null ? derived : "Other";
 
                 Transaction t = new Transaction();
                 t.setDate(date);
@@ -419,6 +432,78 @@ public class TransactionService {
         }
 
         return toSave.size();
+    }
+
+    // =========================
+    // UPDATE CATEGORY (manual recategorization)
+    // Learns a per-user merchant→category rule so future transactions
+    // from the same payee auto-categorize; optionally fixes history too.
+    // =========================
+
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Audited(
+            action = "WRITE",
+            resource = "transactions",
+            description = "Transaction manually recategorized"
+    )
+    @Transactional
+    public Map<String, Object> updateCategory(
+            Long id, String category, boolean applyToSimilar, boolean remember) {
+
+        if (category == null || category.isBlank()) {
+            throw new IllegalArgumentException("Category must not be empty");
+        }
+        category = category.trim();
+
+        String email = SecurityUtils.getCurrentUserEmail();
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Transaction txn = repository.findById(id)
+                .filter(t -> t.getUser() != null
+                        && t.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new NotFoundException("Transaction not found"));
+
+        txn.setCategory(category);
+        repository.save(txn);
+
+        if (remember) {
+            categoryService.rememberRule(user, txn.getMerchant(), category);
+        }
+
+        int similarUpdated = 0;
+        if (applyToSimilar) {
+            String pattern = categoryService.normalizeMerchant(txn.getMerchant());
+            if (!pattern.isBlank()) {
+                List<Transaction> toUpdate = new ArrayList<>();
+                for (Transaction t : repository.findByUser(user)) {
+                    if (t.getId().equals(txn.getId())) continue;
+                    if (category.equals(t.getCategory())) continue;
+                    if (categoryService.normalizeMerchant(t.getMerchant())
+                            .equals(pattern)) {
+                        t.setCategory(category);
+                        toUpdate.add(t);
+                    }
+                }
+                if (!toUpdate.isEmpty()) {
+                    repository.saveAll(toUpdate);
+                    similarUpdated = toUpdate.size();
+                }
+            }
+        }
+
+        return Map.of(
+                "transaction", com.fintwin.dto.TransactionDTO.from(txn),
+                "similarUpdated", similarUpdated
+        );
     }
 
     // =========================
@@ -508,7 +593,8 @@ public class TransactionService {
             transaction.setAmount(-amount);
             transaction.setDate(java.time.LocalDate.now());
 
-            String category = categoryService.categorize(merchant);
+            String category = categoryService.categorize(
+                    merchant, categoryService.learnedRulesFor(user));
             transaction.setCategory(
                     category != null ? category : "Other"
             );

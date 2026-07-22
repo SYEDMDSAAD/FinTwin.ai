@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 function CircleScore({ score }) {
     const radius = 54;
@@ -64,6 +65,9 @@ function FactorBar({ factor }) {
 }
 
 function FinancialScoreCard({ scoreData }) {
+    // Collapsed by default — only matters on mobile (`lg:` forces it open below).
+    const [factorsOpen, setFactorsOpen] = useState(false);
+
     if (!scoreData) return null;
 
     const color = scoreColor(scoreData.score);
@@ -116,11 +120,38 @@ function FinancialScoreCard({ scoreData }) {
                     </div>
                 </div>
 
-                {/* Right — factor bars */}
+                {/* Right — factor bars. Collapsible on mobile — a long factor list
+                    pushed everything below it off-screen; desktop keeps it expanded
+                    since there's room next to the score ring. */}
                 {scoreData.factors?.length > 0 && (
                     <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>SCORE FACTORS</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        <button
+                            type="button"
+                            onClick={() => setFactorsOpen(o => !o)}
+                            className="lg:pointer-events-none lg:!bg-transparent lg:!border-0 lg:!p-0 lg:!rounded-none"
+                            style={{
+                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                                width: "100%", cursor: "pointer", fontFamily: "inherit",
+                                fontSize: 11, fontWeight: 800, color: "var(--text-primary)",
+                                letterSpacing: "0.1em", marginBottom: 12,
+                                background: "var(--bg-subtle)",
+                                border: "1px solid var(--border-subtle)",
+                                borderRadius: 10,
+                                padding: "10px 14px",
+                            }}
+                        >
+                            <span>SCORE FACTORS</span>
+                            <ChevronDown
+                                size={16}
+                                strokeWidth={3}
+                                className="lg:hidden"
+                                style={{ transition: "transform 0.2s ease", transform: factorsOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                            />
+                        </button>
+                        <div
+                            className="lg:!flex"
+                            style={{ display: factorsOpen ? "flex" : "none", flexDirection: "column", gap: 14 }}
+                        >
                             {scoreData.factors.map(f => <FactorBar key={f.label} factor={f} />)}
                         </div>
                     </div>

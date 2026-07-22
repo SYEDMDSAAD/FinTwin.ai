@@ -56,6 +56,22 @@ public class BankConnectionController {
         return ResponseEntity.ok(Map.of("message", result));
     }
 
+    // Replace an expired/unusable connection with a fresh consent in one step —
+    // no separate disconnect click needed, transaction history is unaffected
+    @PostMapping("/refresh/{id}")
+    public ResponseEntity<Map<String, Object>> refresh(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        try {
+            String vua = body != null ? body.get("vua") : null;
+            return ResponseEntity.ok(service.refreshConnection(id, vua));
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "Bank connection refresh failed";
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("error", msg));
+        }
+    }
+
     // Revoke / disconnect a bank connection
     @DeleteMapping("/{id}")
     public ResponseEntity<?> disconnect(@PathVariable Long id) {

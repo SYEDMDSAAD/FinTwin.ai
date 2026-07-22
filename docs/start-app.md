@@ -119,7 +119,7 @@ pip install -r requirements.txt
 source venv/bin/activate
 source .env   # ai-service has its own .env
 
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app:app --reload
 ```
 
 Wait for: `Application startup complete`
@@ -223,3 +223,7 @@ npm test
 # Identity service (needs Docker)
 (cd identity-service && set -a && source ../backend/.env && set +a && mvn test -q)
 ```
+
+ngrok http 5173 --domain=shout-strongly-naturist.ngrok-free.dev
+
+cloudflared tunnel --url http://localhost:8080

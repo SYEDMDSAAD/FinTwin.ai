@@ -3,6 +3,7 @@
 # scipy<1.16 requirement, and was missing the OCR deps entirely).
 python-dotenv==1.2.2
 requests==2.34.2
+prometheus-client==0.24.1   # /metrics endpoint + AI guardrail counters
 
 # ── Web framework ────────────────────────────────────────────────────────────
 fastapi==0.138.2

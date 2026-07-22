@@ -1,4 +1,5 @@
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Trash2, ChevronDown } from "lucide-react";
 import GlassCard from "./GlassCard";
 
 function BudgetCard({
@@ -22,11 +23,14 @@ function BudgetCard({
         100
     );
 
+    const [collapsed, setCollapsed] = useState(false);
+
     return (
 
         <GlassCard
             className="
                 relative
+                self-start
                 overflow-hidden
                 p-6
                 border
@@ -67,17 +71,30 @@ function BudgetCard({
                 mb-4
             ">
 
-                <h2 className="
-                    text-lg
-                    font-bold
-                ">
-                    {budget.category}
-                </h2>
+                <div>
+                    <h2 className="
+                        text-lg
+                        font-bold
+                    ">
+                        {budget.category}
+                    </h2>
+
+                    {collapsed && (
+                        <span
+                            className="text-xs font-semibold"
+                            style={{
+                                color: percentage >= 90 ? "#f87171" : percentage >= 70 ? "#eab308" : "#4ade80"
+                            }}
+                        >
+                            {percentage.toFixed(0)}% used
+                        </span>
+                    )}
+                </div>
 
                 <div className="
                     flex
                     items-center
-                    gap-3
+                    gap-2
                 ">
 
                     {budget.exceeded && (
@@ -94,6 +111,27 @@ function BudgetCard({
                         </span>
 
                     )}
+
+                    <button
+                        onClick={() => setCollapsed(c => !c)}
+                        className="
+                            w-9
+                            h-9
+                            rounded-lg
+                            flex
+                            items-center
+                            justify-center
+                            bg-purple-500/10
+                            border
+                            border-purple-500/20
+                            text-purple-300
+                            hover:bg-purple-500/20
+                            transition-all
+                        "
+                        title={collapsed ? "Expand" : "Collapse"}
+                    >
+                        <ChevronDown size={14} style={{ transition: "transform 0.2s ease", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }} />
+                    </button>
 
                     <button
 
@@ -132,6 +170,9 @@ function BudgetCard({
                 </div>
 
             </div>
+
+            {!collapsed && (
+            <>
 
             {/* =========================
                 Numbers
@@ -346,6 +387,9 @@ function BudgetCard({
 
                 </div>
 
+            )}
+
+            </>
             )}
 
         </GlassCard>

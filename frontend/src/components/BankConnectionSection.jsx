@@ -14,6 +14,7 @@ function BankConnectionSection({ onSynced }) {
     const [mobileError, setMobileError]   = useState("");
     const [autoSynced, setAutoSynced]     = useState(false);
     const [showDisclosure, setShowDisclosure] = useState(false);
+    const [refreshTargetId, setRefreshTargetId] = useState(null);
 
     useEffect(() => { fetchConnections(); }, []);
 
@@ -65,7 +66,17 @@ function BankConnectionSection({ onSynced }) {
     const openModal = () => {
         setMobile("");
         setMobileError("");
+        setRefreshTargetId(null);
         setShowDisclosure(true);
+    };
+
+    // Skips the disclosure screen — the user already accepted it when this
+    // connection was first created, so refresh only needs the mobile number.
+    const openRefreshModal = (id) => {
+        setMobile("");
+        setMobileError("");
+        setRefreshTargetId(id);
+        setShowModal(true);
     };
 
     const handleConnect = async () => {
@@ -76,21 +87,29 @@ function BankConnectionSection({ onSynced }) {
         }
 
         const vua = `${digits}@onemoney`;
+        const targetId = refreshTargetId;
         setShowModal(false);
         setConnecting(true);
 
         try {
-            const res = await API.post("/bank/connect", { vua });
+            const res = targetId
+                ? await API.post(`/bank/refresh/${targetId}`, { vua })
+                : await API.post("/bank/connect", { vua });
             const { redirectUrl } = res.data;
 
             window.open(redirectUrl, "_blank", "noopener,noreferrer");
-            toast.success("Complete the consent in the new tab. Bank transactions, MF holdings and stocks will sync automatically.");
+            toast.success(targetId
+                ? "Complete the consent in the new tab to refresh your connection. Your existing transactions are unaffected."
+                : "Complete the consent in the new tab. Bank transactions, MF holdings and stocks will sync automatically.");
 
             setTimeout(() => { fetchConnections(); onSynced?.(); }, 8000);
         } catch {
-            toast.error("Could not initiate bank connection. Please try again.");
+            toast.error(targetId
+                ? "Could not refresh bank connection. Please try again."
+                : "Could not initiate bank connection. Please try again.");
         } finally {
             setConnecting(false);
+            setRefreshTargetId(null);
         }
     };
 
@@ -128,21 +147,23 @@ function BankConnectionSection({ onSynced }) {
 
     const statusIcon = (status) => {
         switch (status) {
-            case "ACTIVE":   return <CheckCircle2 size={14} className="text-green-400" />;
-            case "FETCHING": return <RefreshCw    size={14} className="text-cyan-400 animate-spin" />;
+            case "ACTIVE":         return <CheckCircle2 size={14} className="text-green-400" />;
+            case "FETCHING":       return <RefreshCw    size={14} className="text-cyan-400 animate-spin" />;
             case "REVOKED":
-            case "EXPIRED":  return <AlertCircle  size={14} className="text-red-400" />;
-            default:         return <Clock        size={14} className="text-yellow-400" />;
+            case "EXPIRED":        return <AlertCircle  size={14} className="text-red-400" />;
+            case "NEEDS_REFRESH":  return <AlertCircle  size={14} className="text-orange-400" />;
+            default:               return <Clock        size={14} className="text-yellow-400" />;
         }
     };
 
     const statusColor = (status) => {
         switch (status) {
-            case "ACTIVE":   return "text-green-400";
-            case "FETCHING": return "text-cyan-400";
+            case "ACTIVE":         return "text-green-400";
+            case "FETCHING":       return "text-cyan-400";
             case "REVOKED":
-            case "EXPIRED":  return "text-red-400";
-            default:         return "text-yellow-400";
+            case "EXPIRED":        return "text-red-400";
+            case "NEEDS_REFRESH":  return "text-orange-400";
+            default:               return "text-yellow-400";
         }
     };
 
@@ -241,6 +262,16 @@ function BankConnectionSection({ onSynced }) {
                                         Sync Transactions
                                     </button>
                                 )}
+                                {conn.consentStatus === "NEEDS_REFRESH" && (
+                                    <button
+                                        onClick={() => openRefreshModal(conn.id)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                        style={{ background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.4)", color: "#fb923c" }}
+                                    >
+                                        <RefreshCw size={12} color="#fb923c" />
+                                        Refresh Connection
+                                    </button>
+                                )}
                                 {conn.consentStatus !== "REVOKED" && (
                                     <button
                                         onClick={() => handleDisconnect(conn.id)}
@@ -316,8 +347,14 @@ function BankConnectionSection({ onSynced }) {
                                 <Smartphone size={18} className="text-blue-300" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-white">Enter your AA mobile number</h3>
-                                <p className="text-xs text-zinc-500">Registered with your Account Aggregator</p>
+                                <h3 className="text-sm font-bold text-white">
+                                    {refreshTargetId ? "Refresh your bank connection" : "Enter your AA mobile number"}
+                                </h3>
+                                <p className="text-xs text-zinc-500">
+                                    {refreshTargetId
+                                        ? "Re-approve consent to keep your data syncing — existing transactions stay put"
+                                        : "Registered with your Account Aggregator"}
+                                </p>
                             </div>
                         </div>
 
@@ -353,7 +390,7 @@ function BankConnectionSection({ onSynced }) {
                             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 transition-all"
                         >
                             <Link2 size={15} />
-                            Proceed to Bank Consent
+                            {refreshTargetId ? "Proceed to Refresh Consent" : "Proceed to Bank Consent"}
                         </button>
                     </div>
                 </div>

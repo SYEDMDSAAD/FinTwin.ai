@@ -35,19 +35,22 @@ public class BankConnectionService {
     private final TransactionRepository    txnRepo;
     private final UserRepository           userRepo;
     private final InvestmentRepository     investmentRepo;
+    private final CategoryService          categoryService;
 
     public BankConnectionService(
             SetuAAService setuAAService,
             BankConnectionRepository bankRepo,
             TransactionRepository txnRepo,
             UserRepository userRepo,
-            InvestmentRepository investmentRepo
+            InvestmentRepository investmentRepo,
+            CategoryService categoryService
     ) {
-        this.setuAAService  = setuAAService;
-        this.bankRepo       = bankRepo;
-        this.txnRepo        = txnRepo;
-        this.userRepo       = userRepo;
-        this.investmentRepo = investmentRepo;
+        this.setuAAService   = setuAAService;
+        this.bankRepo        = bankRepo;
+        this.txnRepo         = txnRepo;
+        this.userRepo        = userRepo;
+        this.investmentRepo  = investmentRepo;
+        this.categoryService = categoryService;
     }
 
     // ── Initiate consent ──────────────────────────────────────────────────────
@@ -200,6 +203,9 @@ public class BankConnectionService {
             // Pre-load all existing external IDs in one query to avoid N+1
             Set<String> existingExternalIds = txnRepo.findExternalIdsByUser(user);
 
+            // User's learned merchant→category rules, applied before deriveCategory
+            Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
+
             List<Transaction> newTxns = new ArrayList<>();
             for (Map<String, Object> account : allData.getOrDefault("DEPOSIT", List.of())) {
                 try {
@@ -208,7 +214,7 @@ public class BankConnectionService {
                     List<Map<String, Object>> txns = (List<Map<String, Object>>) txnWrapper.get("transaction");
                     if (txns == null) continue;
                     for (Map<String, Object> raw : txns) {
-                        Transaction t = buildIfNew(raw, user, conn, existingExternalIds);
+                        Transaction t = buildIfNew(raw, user, conn, existingExternalIds, learnedRules);
                         if (t != null) newTxns.add(t);
                     }
                 } catch (Exception e) {
@@ -433,8 +439,37 @@ public class BankConnectionService {
             if (msg.contains("Consent use exceeded")) {
                 return "This consent has reached its monthly fetch limit. Please disconnect and reconnect your bank to create a new consent.";
             }
+            if (msg.contains("FIDataRange") || msg.contains("dataRange")) {
+                // The AA-approved consent window has closed — no backend retry can
+                // extend an already-granted consent, so flag it for a one-click
+                // refresh instead of forcing a manual disconnect + reconnect.
+                conn.setConsentStatus("NEEDS_REFRESH");
+                bankRepo.save(conn);
+                return "This bank connection's approved access window has ended. Tap \"Refresh Connection\" to reconnect — your existing transaction history stays intact.";
+            }
             return "Sync failed: " + msg;
         }
+    }
+
+    // ── Refresh: replace an expired connection without a separate disconnect step ──
+    // Transactions are keyed by user + externalId, not by connection row, so dropping
+    // the old (already-unusable) consent here loses nothing but the dead consent link.
+
+    @Transactional
+    @PreAuthorize("hasAuthority('CONNECT_BANK_ACCOUNT')")
+    @Audited(action = "WRITE", resource = "bank_connection", description = "Bank connection refreshed")
+    public Map<String, Object> refreshConnection(Long id, String vua) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user    = userRepo.findByEmail(email).orElseThrow();
+
+        BankConnection old = bankRepo.findById(id)
+                .orElseThrow(() -> new NotFoundException("Connection not found"));
+        if (!old.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("Unauthorized");
+        }
+
+        bankRepo.delete(old);
+        return initiateConnection(vua);
     }
 
     // ── Manual sync: recover PENDING connections whose webhook was missed ─────
@@ -563,7 +598,8 @@ public class BankConnectionService {
     // ── Private: map Setu transaction → Transaction entity (no DB call) ────────
 
     private Transaction buildIfNew(Map<String, Object> raw, User user, BankConnection conn,
-                                   Set<String> existingExternalIds) {
+                                   Set<String> existingExternalIds,
+                                   Map<String, String> learnedRules) {
         String externalId = safeStr(raw, "txnId");
         if (externalId == null || existingExternalIds.contains(externalId)) return null;
 
@@ -576,9 +612,25 @@ public class BankConnectionService {
         else                                 amount =  Math.abs(amount);
 
         String narration = safeStr(raw, "narration");
-        String timestamp = safeStr(raw, "transactionTimestamp");
-        LocalDate parsedDate = com.fintwin.util.DateNormalizer.parseFlexible(timestamp);
-        LocalDate date       = parsedDate != null ? parsedDate : LocalDate.now();
+
+        // FIPs populate one of these two — not always the same one, and not
+        // always both. Falling back to today's date instead used to stamp
+        // whole batches with the sync date: half this user's history landed on
+        // one day, which silently wrecked every month-based figure downstream
+        // (a year of credits read as one day's income). A transaction whose
+        // date is unknown is not imported at all — the next sync picks it up
+        // once the FIP supplies a date, and txnId dedup keeps that safe.
+        LocalDate date = com.fintwin.util.DateNormalizer.parseFlexible(
+                safeStr(raw, "transactionTimestamp"));
+        if (date == null) {
+            date = com.fintwin.util.DateNormalizer.parseFlexible(safeStr(raw, "valueDate"));
+        }
+        if (date == null) {
+            log.warn("Skipping transaction {} — no parseable date "
+                     + "(transactionTimestamp={}, valueDate={})",
+                     externalId, safeStr(raw, "transactionTimestamp"), safeStr(raw, "valueDate"));
+            return null;
+        }
 
         // Populate masked account number on the connection object (once)
         if (conn.getMaskedAccountNumber() == null) {
@@ -591,16 +643,27 @@ public class BankConnectionService {
         t.setDate(date);
         t.setMerchant(narration != null ? narration : "Bank Transaction");
         t.setAmount(amount);
-        t.setCategory(deriveCategory(narration, type));
+        t.setCategory(deriveCategory(narration, type, learnedRules));
         t.setSource("BANK");
         t.setExternalId(externalId);
         existingExternalIds.add(externalId); // prevent duplicates within the same batch
         return t;
     }
 
-    private String deriveCategory(String narration, String type) {
+    private String deriveCategory(String narration, String type,
+                                  Map<String, String> learnedRules) {
         if (narration == null) return "Other";
         String n = narration.toLowerCase();
+
+        // The user's own corrections always win over keyword heuristics
+        if (learnedRules != null && !learnedRules.isEmpty()) {
+            String normalized = categoryService.normalizeMerchant(narration);
+            String exact = learnedRules.get(normalized);
+            if (exact != null) return exact;
+            for (Map.Entry<String, String> rule : learnedRules.entrySet()) {
+                if (normalized.contains(rule.getKey())) return rule.getValue();
+            }
+        }
 
         if (n.contains("swiggy") || n.contains("zomato") || n.contains("food"))
             return "Food";

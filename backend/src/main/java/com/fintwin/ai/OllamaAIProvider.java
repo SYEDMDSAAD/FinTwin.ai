@@ -31,6 +31,7 @@ public class OllamaAIProvider implements AIProvider {
     @Override
     public String chat(String message, String mode, FinancialSummaryDTO summary) {
         Map<String, Object> financialData = new HashMap<>();
+        financialData.put("userId",              summary.getUserId());
         financialData.put("income",              summary.getIncome());
         financialData.put("expenses",            summary.getExpenses());
         financialData.put("savings",             summary.getSavings());

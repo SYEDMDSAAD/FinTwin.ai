@@ -19,6 +19,16 @@ scrape_configs:
         labels:
           application: fintwin-identity
 
+  # ── AI service ───────────────────────────────────────────────────────────────
+  # Guardrail counters: generations by outcome, tips dropped by the grounding
+  # layer, LLM latency against the backend's 20s deadline.
+  - job_name: fintwin-ai-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: [ai-service:8000]
+        labels:
+          application: fintwin-ai-service
+
   # ── Prometheus self-scrape ───────────────────────────────────────────────────
   - job_name: prometheus
     static_configs:

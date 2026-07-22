@@ -61,7 +61,12 @@ public class SetuAAService {
         body.put("consentMode",     "STORE");
         body.put("consentTypes",    List.of("TRANSACTIONS", "SUMMARY", "PROFILE"));
         body.put("fiTypes",         List.of("DEPOSIT", "MUTUAL_FUNDS", "EQUITIES", "NPS"));
-        body.put("dataRange",       Map.of("from", isoNow(-90), "to", isoNow(1)));
+        // "to" must cover the whole consentDuration below — Setu rejects any later FI
+        // session whose requested range falls outside this consent-level dataRange,
+        // so a narrow "+1 day" window here would make resync fail after day 1.
+        // Setu also rejects dataRange.to >= consentDuration's end (12 months out), so
+        // stay a few days short of that boundary rather than exactly at it.
+        body.put("dataRange",       Map.of("from", isoNow(-90), "to", isoNow(360)));
         body.put("consentDuration", Map.of("unit", "MONTH", "value", 12));
         body.put("frequency",       Map.of("unit", "MONTH", "value", 30));
         body.put("redirectUrl",     redirectUrl);

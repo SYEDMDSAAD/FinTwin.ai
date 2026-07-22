@@ -68,6 +68,10 @@ public class FinancialGoal {
 
     private java.time.LocalDate createdAt;
 
+    private Boolean completed = false;
+
+    private LocalDate completedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
@@ -219,6 +223,26 @@ public class FinancialGoal {
         java.time.LocalDate createdAt
     ) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getCompleted() {
+        return completed;
+    }
+
+    public void setCompleted(
+        Boolean completed
+    ) {
+        this.completed = completed;
+    }
+
+    public LocalDate getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(
+        LocalDate completedAt
+    ) {
+        this.completedAt = completedAt;
     }
 
     public User getUser() {

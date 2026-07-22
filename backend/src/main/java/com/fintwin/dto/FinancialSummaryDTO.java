@@ -9,6 +9,8 @@ import java.util.Map;
  */
 public class FinancialSummaryDTO {
 
+    // Lets the AI service call back into /internal/ai/{userId}/** for tool data
+    private Long userId;
     private long income;
     private long expenses;
     private long savings;
@@ -31,6 +33,7 @@ public class FinancialSummaryDTO {
     public static class Builder {
         private final FinancialSummaryDTO dto = new FinancialSummaryDTO();
 
+        public Builder userId(Long v)                               { dto.userId = v;               return this; }
         public Builder income(long v)                               { dto.income = v;               return this; }
         public Builder expenses(long v)                             { dto.expenses = v;              return this; }
         public Builder savings(long v)                              { dto.savings = v;               return this; }
@@ -47,6 +50,7 @@ public class FinancialSummaryDTO {
         public FinancialSummaryDTO build() { return dto; }
     }
 
+    public Long getUserId()                                { return userId; }
     public long getIncome()                                { return income; }
     public long getExpenses()                              { return expenses; }
     public long getSavings()                               { return savings; }
