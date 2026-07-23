@@ -35,13 +35,18 @@ export default function MarketTicker() {
       try {
         const symbols = INDICES.map(i => i.symbol).join(",");
         const res = await fetch(
-          `/api/market/quotes?symbols=${encodeURIComponent(symbols)}`,
+          `/api/v1/market/quotes?symbols=${encodeURIComponent(symbols)}`,
           { signal: AbortSignal.timeout(10000) }
         );
         const quotes = await res.json();
         if (cancelled) return;
-        const merged = INDICES.map((idx, i) => {
-          const q = quotes[i] || {};
+        // Match by symbol, not index — the backend drops timed-out quotes,
+        // and a positional merge would shift prices under the wrong label.
+        const bySymbol = Object.fromEntries(
+          (Array.isArray(quotes) ? quotes : []).map(q => [q.symbol, q])
+        );
+        const merged = INDICES.map((idx) => {
+          const q = bySymbol[idx.symbol] || {};
           return {
             ...idx,
             value: q.price ?? null,

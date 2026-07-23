@@ -17,8 +17,12 @@ def generate_investment_recommendation(data: dict) -> dict:
     # Liquid savings (stated balance / transactional flow). Falls back to net
     # worth for older callers — but net worth includes illiquid assets, so a
     # homeowner with no cash could previously skip the emergency-fund branch.
-    liquid_savings = float(data.get("liquidSavings") or net_worth)
+    # `is not None` so a legitimate zero balance doesn't trigger the fallback.
+    raw_liquid = data.get("liquidSavings")
+    liquid_savings = float(raw_liquid) if raw_liquid is not None else net_worth
     goal_health = data.get("goalHealth") or "N/A"
+    portfolio_value = float(data.get("portfolioValue") or 0)
+    current_allocation = data.get("currentAllocation") or {}
 
     monthly_savings = round(savings, 2)
 
@@ -38,7 +42,10 @@ def generate_investment_recommendation(data: dict) -> dict:
     emergency_fund_needed = expenses * 6
     emergency_fund_ratio = (liquid_savings / emergency_fund_needed) if emergency_fund_needed > 0 else 1.0
 
-    if emergency_fund_ratio < 0.1:
+    # Below ~3 months of expenses (half the 6-month target), the buffer comes
+    # first — standard advisory practice funds the emergency reserve before
+    # committing savings to market-linked instruments.
+    if emergency_fund_ratio < 0.5:
         result = _build_result(
             risk_profile="Conservative",
             expected_return="4-6%",
@@ -97,14 +104,24 @@ def generate_investment_recommendation(data: dict) -> dict:
     monthly_income = round(income, 0)
     monthly_expenses = round(expenses, 0)
 
+    if portfolio_value > 0 and current_allocation:
+        alloc_str = ", ".join(f"{k} {round(v)}%" for k, v in current_allocation.items())
+        holdings_line = f"Existing portfolio: ₹{round(portfolio_value)} ({alloc_str})"
+        holdings_rule = "- Recommendations must complement the existing portfolio: favour what is under-represented, avoid over-concentrating what already dominates"
+    else:
+        holdings_line = "Existing portfolio: none"
+        holdings_rule = "- This is a first-time investor: keep instruments simple and mainstream"
+
     portfolio_prompt = f"""You are a certified financial advisor in India. Return a JSON investment portfolio for this user.
 
 Monthly income: ₹{round(monthly_income)}, Monthly expenses: ₹{round(monthly_expenses)}, Monthly savings: ₹{round(monthly_savings)} ({savings_rate}% rate)
 Net worth: ₹{round(net_worth)}, Financial score: {financial_score}/100, Goal health: {goal_health}
+{holdings_line}
 
 Rules:
 - riskProfile: Conservative / Moderate / Aggressive based on savings rate and score
 - 4-5 Indian instruments, allocations sum to exactly 100
+{holdings_rule}
 - Each reason: one sentence with the monthly rupee amount (allocation% of ₹{round(monthly_savings)})
 - expectedReturn: realistic annual range e.g. "9-13%"
 - investmentHorizon: fits the risk profile

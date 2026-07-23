@@ -56,6 +56,10 @@ function fmt(n) {
     return typeof n === "number" ? n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—";
 }
 
+// These types have no live market price — their current value is a compound
+// interest projection, so the UI marks them rather than implying a quote.
+const ESTIMATED_TYPES = new Set(["Fixed Deposit", "PPF", "NPS", "Bonds"]);
+
 export default function PortfolioTab() {
     const [summary, setSummary] = useState(_portfolioCache);
     const [loading, setLoading] = useState(!_portfolioCache);
@@ -69,6 +73,7 @@ export default function PortfolioTab() {
     const [selected, setSelected] = useState({});
     const [importing, setImporting] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [refreshNote, setRefreshNote] = useState(null);
     const [netWorth, setNetWorth] = useState(_nwCache);
 
     const load = async () => {
@@ -98,12 +103,26 @@ export default function PortfolioTab() {
 
     const handleRefresh = async () => {
         setRefreshing(true);
+        setRefreshNote(null);
         try {
             const res = await API.post("/portfolio/refresh");
             _portfolioCache = res.data;
             setSummary(res.data);
+
+            // pricesUpdated: null = the market-data call failed, a number =
+            // how many holdings actually got a live price. Only types with a
+            // ticker/units/rate can be priced, so 0 is meaningful feedback.
+            const n = res.data?.pricesUpdated;
+            if (n === null || n === undefined) {
+                setRefreshNote({ ok: false, text: "Market data unavailable — prices unchanged." });
+            } else if (n === 0) {
+                setRefreshNote({ ok: false, text: "No holdings could be priced. Add a ticker code, units or interest rate." });
+            } else {
+                setRefreshNote({ ok: true, text: `Updated ${n} holding${n === 1 ? "" : "s"} with live prices.` });
+            }
         } catch (err) {
             console.error(err);
+            setRefreshNote({ ok: false, text: "Price refresh failed. Please try again." });
         } finally {
             setRefreshing(false);
         }
@@ -288,6 +307,18 @@ export default function PortfolioTab() {
                 </button>
             </div>
 
+            {refreshNote && (
+                <div
+                    className={`mb-4 px-4 py-2.5 rounded-xl text-xs border ${
+                        refreshNote.ok
+                            ? "bg-green-500/5 border-green-500/20 text-green-300"
+                            : "bg-amber-500/5 border-amber-500/20 text-amber-300"
+                    }`}
+                >
+                    {refreshNote.text}
+                </div>
+            )}
+
             {/* Summary cards */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <SummaryCard label="Total Invested" value={`₹${fmt(summary?.totalInvested)}`} color="text-white" />
@@ -379,7 +410,17 @@ export default function PortfolioTab() {
                                                     <div className="text-[10px] text-zinc-500 mt-0.5" style={{ color: TYPE_COLORS[h.type] || "#94a3b8" }}>{h.type}</div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-zinc-300 text-xs">₹{fmt(h.investedAmount)}</td>
-                                                <td className="px-4 py-3 text-right text-xs text-blue-400">₹{fmt(h.currentValue)}</td>
+                                                <td className="px-4 py-3 text-right text-xs text-blue-400">
+                                                    ₹{fmt(h.currentValue)}
+                                                    {ESTIMATED_TYPES.has(h.type) && (
+                                                        <span
+                                                            className="text-[9px] text-zinc-500 ml-1"
+                                                            title="Projected from interest rate — not a live market price"
+                                                        >
+                                                            est.
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className={`px-4 py-3 text-right text-xs font-medium ${pos ? "text-green-400" : "text-red-400"}`}>
                                                     {pos ? "+" : ""}₹{fmt(h.pnl)}
                                                     <div className="text-[10px] font-normal">{pos ? "+" : ""}{h.pnlPercent}%</div>

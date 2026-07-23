@@ -114,9 +114,12 @@ public class InvestmentService {
     // ── Auto-detect investments from bank transactions ────────────────────────
 
     /**
-     * Scans all DEBIT transactions, identifies investment-related ones by
-     * narration keywords, groups by instrument, and returns as unconfirmed
-     * suggestions. Nothing is saved — the frontend presents them for user review.
+     * Scans transactions, identifies investment-related ones by narration
+     * keywords, groups by instrument, and returns as unconfirmed suggestions.
+     * Debits (purchases) add to the invested amount; credits from the same
+     * instrument (redemptions, broker withdrawals) subtract, so the net
+     * figure reflects what is actually still deployed. Nothing is saved —
+     * the frontend presents them for user review.
      */
     @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
     public List<InvestmentDTO> autoDetect() {
@@ -127,7 +130,8 @@ public class InvestmentService {
         Map<String, DetectedEntry> grouped = new LinkedHashMap<>();
 
         for (Transaction t : txns) {
-            if (t.getAmount() == null || t.getAmount() >= 0) continue; // only outgoing payments
+            if (t.getAmount() == null || t.getAmount() == 0) continue;
+            boolean isDebit = t.getAmount() < 0;
 
             String raw = t.getMerchant() != null ? t.getMerchant() : "";
             String n   = raw.toLowerCase();
@@ -139,9 +143,10 @@ public class InvestmentService {
             double amount = Math.abs(t.getAmount());
             LocalDate date = t.getDate();
 
-            DetectedEntry entry = grouped.computeIfAbsent(name, k -> new DetectedEntry(type, date));
-            entry.totalAmount += amount;
-            if (date != null && (entry.earliestDate == null || date.isBefore(entry.earliestDate))) {
+            DetectedEntry entry = grouped.computeIfAbsent(name, k -> new DetectedEntry(type, isDebit ? date : null));
+            entry.totalAmount += isDebit ? amount : -amount;
+            // Purchase date tracks the first outgoing payment, not redemptions.
+            if (isDebit && date != null && (entry.earliestDate == null || date.isBefore(entry.earliestDate))) {
                 entry.earliestDate = date;
             }
         }
@@ -156,6 +161,8 @@ public class InvestmentService {
             if (savedNames.contains(e.getKey().toLowerCase())) continue;
 
             DetectedEntry d = e.getValue();
+            if (d.totalAmount <= 0) continue; // fully redeemed — nothing left to import
+
             Investment inv = new Investment();
             inv.setName(e.getKey());
             inv.setType(d.type);
@@ -186,14 +193,19 @@ public class InvestmentService {
         Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
         if (!inv.getUser().getId().equals(user.getId())) throw new org.springframework.security.access.AccessDeniedException("Access denied");
 
+        // PUT = full replace. The frontend always sends the complete form, so
+        // null means "cleared" — the old null-means-ignore made it impossible
+        // to remove a ticker/units/rate once set. Name, type and amount keep
+        // the null guard: they are required fields a partial caller must not
+        // blank out.
         if (updated.getName()           != null) inv.setName(updated.getName());
         if (updated.getType()           != null) inv.setType(updated.getType());
         if (updated.getInvestedAmount() != null) inv.setInvestedAmount(updated.getInvestedAmount());
         if (updated.getCurrentValue()   != null) inv.setCurrentValue(updated.getCurrentValue());
-        if (updated.getPurchaseDate()   != null) inv.setPurchaseDate(updated.getPurchaseDate());
-        if (updated.getTickerCode()     != null) inv.setTickerCode(updated.getTickerCode());
-        if (updated.getUnits()          != null) inv.setUnits(updated.getUnits());
-        if (updated.getInterestRate()   != null) inv.setInterestRate(updated.getInterestRate());
+        inv.setPurchaseDate(updated.getPurchaseDate());
+        inv.setTickerCode(updated.getTickerCode());
+        inv.setUnits(updated.getUnits());
+        inv.setInterestRate(updated.getInterestRate());
         inv.setNotes(updated.getNotes());
 
         return InvestmentDTO.from(repo.save(inv));
@@ -204,7 +216,11 @@ public class InvestmentService {
     public PortfolioSummaryDTO refreshPrices() {
         User user = currentUser();
         List<Investment> all = repo.findByUser(user);
-        if (all.isEmpty()) return getSummary();
+        if (all.isEmpty()) {
+            PortfolioSummaryDTO empty = getSummary();
+            empty.setPricesUpdated(0);
+            return empty;
+        }
 
         // Build request payload for AI service
         List<Map<String, Object>> payload = new ArrayList<>();
@@ -220,6 +236,10 @@ public class InvestmentService {
             payload.add(m);
         }
 
+        // null = the refresh call itself failed; a number = how many holdings
+        // actually received a live price. The frontend surfaces both — silent
+        // failure here previously looked identical to success.
+        Integer pricesUpdated = null;
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -240,19 +260,24 @@ public class InvestmentService {
                                      Double.valueOf(u.get("currentValue").toString()));
                     }
                 }
+                List<Investment> changed = new ArrayList<>();
                 for (Investment inv : all) {
                     Double newVal = priceMap.get(inv.getId());
                     if (newVal != null) {
                         inv.setCurrentValue(newVal);
-                        repo.save(inv);
+                        changed.add(inv);
                     }
                 }
+                repo.saveAll(changed);
+                pricesUpdated = changed.size();
             }
         } catch (Exception e) {
             log.warn("Price refresh failed: {}", e.getMessage());
         }
 
-        return getSummary();
+        PortfolioSummaryDTO summary = getSummary();
+        summary.setPricesUpdated(pricesUpdated);
+        return summary;
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
@@ -309,6 +334,13 @@ public class InvestmentService {
         if (n.contains("bond") || n.contains("debenture") || n.contains("rbi bond") || n.contains("54ec"))
             return "Bonds";
 
+        // Crypto exchanges (after Gold, so "digital gold" bought via these
+        // apps still classifies as Gold)
+        if (n.contains("wazirx") || n.contains("coindcx") || n.contains("coinswitch")
+                || n.contains("zebpay") || n.contains("binance") || n.contains("mudrex")
+                || n.contains("giottus"))
+            return "Crypto";
+
         return null;
     }
 
@@ -321,6 +353,13 @@ public class InvestmentService {
                 if (n.contains(broker.toLowerCase())) return broker + " Portfolio";
             }
             return "Stock Portfolio";
+        }
+        if ("Crypto".equals(type)) {
+            for (String exchange : new String[]{"WazirX", "CoinDCX", "CoinSwitch",
+                    "ZebPay", "Binance", "Mudrex", "Giottus"}) {
+                if (n.contains(exchange.toLowerCase())) return exchange + " Portfolio";
+            }
+            return "Crypto Portfolio";
         }
         if ("PPF".equals(type))  return "PPF Account";
         if ("NPS".equals(type))  return "NPS Account";

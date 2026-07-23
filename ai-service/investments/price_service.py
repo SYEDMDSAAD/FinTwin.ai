@@ -23,6 +23,11 @@ FX_API     = "https://open.er-api.com/v6/latest/USD"
 _FALLBACK_USD_INR       = float(os.environ.get("FALLBACK_USD_INR", "84.0"))
 _FALLBACK_GOLD_INR_GRAM = float(os.environ.get("FALLBACK_GOLD_INR_PER_GRAM", "7500.0"))
 
+# Indian retail gold trades above the COMEX-derived landed price (import duty
+# + GST + local premium). Applied to the converted GC=F price, not the INR
+# fallback (which is already a local retail figure).
+_GOLD_INDIA_PREMIUM = float(os.environ.get("GOLD_INDIA_PREMIUM", "1.10"))
+
 # Simple in-process cache (reset on each AI service restart)
 _fx_cache   = {"rate": None, "day": None}
 _gold_cache = {"price": None, "day": None}
@@ -48,7 +53,7 @@ def _gold_inr_per_gram() -> float:
         return _gold_cache["price"]
     try:
         gold_usd_oz = yf.Ticker("GC=F").fast_info["last_price"]
-        price = (gold_usd_oz / 31.1035) * _usd_inr()
+        price = (gold_usd_oz / 31.1035) * _usd_inr() * _GOLD_INDIA_PREMIUM
         _gold_cache.update({"price": price, "day": today})
         return price
     except Exception:
@@ -88,23 +93,24 @@ def _crypto_price_inr(ticker: str) -> Optional[float]:
     return None
 
 
-def _compound(principal: float, rate_pct: float, purchase_date_str: Optional[str]) -> float:
-    """Annual compounding of the full principal from the purchase date.
+def _compound(principal: float, rate_pct: float, purchase_date_str: Optional[str],
+              periods_per_year: int = 1) -> float:
+    """Compounding of the full principal from the purchase date.
 
-    Two documented approximations:
-    - The stored investedAmount may be a SUM of contributions (e.g. detected
-      SIPs), all compounded from the earliest date — this OVERSTATES value,
-      since later contributions earn interest they never had time for.
-    - Indian FDs typically compound quarterly; annual compounding slightly
-      UNDERSTATES. The two errors partially offset, but treat the result as
-      an estimate, not an accrual.
+    Indian FDs compound quarterly (periods_per_year=4); PPF/NPS/Bonds use
+    annual. One documented approximation remains: the stored investedAmount
+    may be a SUM of contributions (e.g. detected SIPs), all compounded from
+    the earliest date — this OVERSTATES value, since later contributions earn
+    interest they never had time for. Treat the result as an estimate, not an
+    accrual.
     """
     if not purchase_date_str:
         return principal
     try:
         purchase = date.fromisoformat(purchase_date_str[:10])
         years = (date.today() - purchase).days / 365.25
-        return round(principal * (1 + rate_pct / 100) ** years, 2)
+        n = max(1, periods_per_year)
+        return round(principal * (1 + rate_pct / 100 / n) ** (n * years), 2)
     except Exception:
         return principal
 
@@ -144,7 +150,7 @@ def refresh_prices(investments: List[Dict]) -> List[Dict]:
 
         elif inv_type == "Fixed Deposit":
             effective_rate = float(rate) if rate else 7.0
-            current_value = _compound(invested, effective_rate, purchase)
+            current_value = _compound(invested, effective_rate, purchase, periods_per_year=4)
 
         elif inv_type == "PPF":
             current_value = _compound(invested, 7.1, purchase)

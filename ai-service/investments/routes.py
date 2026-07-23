@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,11 +17,20 @@ class InvestmentRecommendationRequest(BaseModel):
     savings: float = 0
     financialScore: int = 0
     netWorth: float = 0
+    # Liquid savings (stated balance / transactional flow) — must be declared
+    # here or pydantic drops it from model_dump() and the engine silently
+    # falls back to net worth for the emergency-fund check.
+    liquidSavings: Optional[float] = None
     goalHealth: Optional[str] = "N/A"
+    # Existing portfolio context so recommendations complement current holdings.
+    portfolioValue: float = 0
+    currentAllocation: Optional[Dict[str, float]] = None
 
 
 class InvestmentItem(BaseModel):
-    id: Optional[str] = None
+    # The backend sends the JPA id as a JSON number; declaring str here makes
+    # pydantic v2 reject the whole payload with a 422.
+    id: Optional[int] = None
     type: Optional[str] = None
     tickerCode: Optional[str] = None
     units: Optional[float] = None

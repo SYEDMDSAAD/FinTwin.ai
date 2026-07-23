@@ -32,6 +32,9 @@ export default function MutualFundsTab() {
   const [watchlist, setWatchlist] = useState(getWatchlist);
   const [navCache, setNavCache] = useState({});
   const debRef = useRef(null);
+  // Ref, not navCache — the closure over navCache is stale by the time a
+  // second search runs, so already-fetched codes were being re-fetched.
+  const fetchedRef = useRef(new Set());
 
   const search = async (q) => {
     if (!q.trim()) { setResults([]); return; }
@@ -49,20 +52,38 @@ export default function MutualFundsTab() {
     }
   };
 
+  // mfapi returns "dd-mm-yyyy" entries for business days only, newest first —
+  // indexing by array position (data[365]) lands ~1.5 calendar years back.
+  // Look NAVs up by date instead.
+  const parseNavDate = (s) => {
+    const [d, m, y] = (s || "").split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const navAsOf = (data, yearsAgo) => {
+    const target = new Date();
+    target.setFullYear(target.getFullYear() - yearsAgo);
+    const entry = data.find(e => parseNavDate(e.date) <= target);
+    return entry ? parseFloat(entry.nav) || null : null;
+  };
+
   const fetchNAVs = async (codes) => {
     for (const code of codes.slice(0, 8)) {
-      if (navCache[code]) continue;
+      if (fetchedRef.current.has(code)) continue;
+      fetchedRef.current.add(code);
       try {
         const res = await fetch(`https://api.mfapi.in/mf/${code}`);
         const json = await res.json();
         const data = json.data || [];
         const nav = parseFloat(data[0]?.nav) || null;
-        const nav1y = parseFloat(data[365]?.nav) || null;
-        const nav3y = parseFloat(data[365*3]?.nav) || null;
+        const nav1y = navAsOf(data, 1);
+        const nav3y = navAsOf(data, 3);
         const ret1y = nav && nav1y ? (((nav - nav1y) / nav1y) * 100).toFixed(1) : null;
-        const ret3y = nav && nav3y ? (((nav - nav3y) / nav3y) * 100 / 3).toFixed(1) : null;
-        setNavCache(c => ({ ...c, [code]: { nav, ret1y, ret3y } }));
-      } catch {}
+        // CAGR, not total-return-divided-by-years
+        const ret3y = nav && nav3y ? ((Math.pow(nav / nav3y, 1 / 3) - 1) * 100).toFixed(1) : null;
+        setNavCache(c => ({ ...c, [code]: nav ? { nav, ret1y, ret3y } : { error: true } }));
+      } catch {
+        setNavCache(c => ({ ...c, [code]: { error: true } }));
+      }
     }
   };
 
@@ -148,7 +169,9 @@ export default function MutualFundsTab() {
 
               {/* NAV & returns */}
               <div style={{ display: "flex", gap: 20, flexShrink: 0, alignItems: "center" }}>
-                {nav ? (
+                {nav?.error ? (
+                  <div style={{ fontSize: 11, color: "#f87171", textAlign: "right" }}>NAV unavailable</div>
+                ) : nav ? (
                   <>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>NAV</div>

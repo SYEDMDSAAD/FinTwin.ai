@@ -12,6 +12,10 @@ public class PortfolioSummaryDTO {
     private List<InvestmentDTO> holdings;
     private Map<String, Double> allocationByType;
 
+    // Only set by the refresh endpoint: number of holdings that received a
+    // live price, or null when the market-data call failed outright.
+    private Integer pricesUpdated;
+
     public double getTotalInvested()       { return totalInvested; }
     public void setTotalInvested(double v) { this.totalInvested = v; }
 
@@ -29,4 +33,7 @@ public class PortfolioSummaryDTO {
 
     public Map<String, Double> getAllocationByType()          { return allocationByType; }
     public void setAllocationByType(Map<String, Double> m)   { this.allocationByType = m; }
+
+    public Integer getPricesUpdated()          { return pricesUpdated; }
+    public void setPricesUpdated(Integer n)    { this.pricesUpdated = n; }
 }

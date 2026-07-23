@@ -1,9 +1,11 @@
 package com.fintwin.service;
 
 import com.fintwin.model.FinancialGoal;
+import com.fintwin.model.Investment;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.FinancialGoalRepository;
+import com.fintwin.repository.InvestmentRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
@@ -39,6 +41,9 @@ public class InvestmentRecommendationService {
 
     @Autowired
     private FinancialGoalRepository goalRepository;
+
+    @Autowired
+    private InvestmentRepository investmentRepository;
 
     @Autowired
     @Qualifier("aiRestTemplate")
@@ -79,14 +84,36 @@ public class InvestmentRecommendationService {
 
         String goalHealth = computeWorstGoalHealth(user);
 
+        // Existing holdings — an advisor that ignores what the user already
+        // owns can only over-concentrate; send value + allocation by type.
+        List<Investment> holdings = investmentRepository.findByUser(user);
+        double portfolioValue = holdings.stream()
+                .mapToDouble(i -> i.getCurrentValue() != null ? i.getCurrentValue()
+                        : (i.getInvestedAmount() != null ? i.getInvestedAmount() : 0))
+                .sum();
+        Map<String, Double> currentAllocation = new LinkedHashMap<>();
+        if (portfolioValue > 0) {
+            holdings.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                        i -> i.getType() != null ? i.getType() : "Other",
+                        java.util.stream.Collectors.summingDouble(
+                            i -> i.getCurrentValue() != null ? i.getCurrentValue()
+                                    : (i.getInvestedAmount() != null ? i.getInvestedAmount() : 0))
+                    ))
+                    .forEach((type, val) ->
+                        currentAllocation.put(type, Math.round((val / portfolioValue) * 1000.0) / 10.0));
+        }
+
         Map<String, Object> body = new HashMap<>();
-        body.put("income",         income);
-        body.put("expenses",       expenses);
-        body.put("savings",        savings);
-        body.put("financialScore", financialScore);
-        body.put("netWorth",       netWorth);
-        body.put("liquidSavings",  liquidSavings);
-        body.put("goalHealth",     goalHealth);
+        body.put("income",            income);
+        body.put("expenses",          expenses);
+        body.put("savings",           savings);
+        body.put("financialScore",    financialScore);
+        body.put("netWorth",          netWorth);
+        body.put("liquidSavings",     liquidSavings);
+        body.put("goalHealth",        goalHealth);
+        body.put("portfolioValue",    Math.round(portfolioValue * 100.0) / 100.0);
+        body.put("currentAllocation", currentAllocation);
 
         try {
             Map response = aiRestTemplate.postForObject(

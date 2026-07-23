@@ -570,6 +570,31 @@ function InvestmentRecommendationSection({
 
             </GlassCard>
 
+            <div
+                className="
+                    mt-4
+                    px-4
+                    py-3
+                    rounded-xl
+                    border
+                    border-white/10
+                    bg-white/[0.02]
+                    text-[11px]
+                    leading-5
+                    text-zinc-500
+                "
+            >
+                <span className="font-semibold text-zinc-400">
+                    Educational estimate — not investment advice.
+                </span>{" "}
+                These allocations are generated automatically from your own
+                income, spending and goal data. FinTwin is not a SEBI-registered
+                investment adviser, and nothing here is a personal
+                recommendation to buy or sell any security. Returns shown are
+                illustrative ranges, not guarantees — market-linked investments
+                can lose value. Consult a SEBI-registered adviser before acting.
+            </div>
+
         </div>
     );
 }

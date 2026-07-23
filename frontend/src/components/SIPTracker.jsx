@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X, RefreshCw, Calendar } from "lucide-react";
 
 const STORAGE_KEY = "fintwin-sips";
 const FREQUENCIES  = ["Monthly","Quarterly"];
+const MONTHS_PER_DEBIT = { Monthly: 1, Quarterly: 3 };
 
 function getSIPs() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
@@ -13,6 +14,59 @@ function daysUntil(dateStr) {
   if (!dateStr) return null;
   const diff = new Date(dateStr) - new Date();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+// A ₹30k quarterly SIP is ₹10k/month of committed cashflow — summing raw
+// amounts across frequencies overstates the monthly commitment.
+export function monthlyEquivalent(sip) {
+  const amount = parseFloat(sip.amount || 0);
+  return amount / (MONTHS_PER_DEBIT[sip.frequency] || 1);
+}
+
+// "yyyy-mm-dd" as a LOCAL date. `new Date(str)` parses it as UTC, which
+// shifts the day by one in western timezones.
+function parseLocalDate(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str || "");
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d) ? null : d;
+}
+
+function toISODate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Real SIPs recur: once a debit date passes, roll it forward by the frequency
+// until it is in the future, instead of showing "Nd overdue" forever.
+//
+// Each candidate is derived from the ORIGINAL anchor (anchor + k months), not
+// by mutating the previous result. Mutating drifts: a SIP on the 31st clamps
+// to Feb 28, and every later step then anchors on 28 — which both loses the
+// intended day and never advances past a short month.
+export function rollForward(sip, now = new Date()) {
+  const anchor = parseLocalDate(sip.nextDebitDate);
+  if (!anchor) return sip;
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (anchor >= today) return sip;
+
+  const step = MONTHS_PER_DEBIT[sip.frequency] || 1;
+  const day = anchor.getDate();
+
+  let next = anchor;
+  // Bounded: covers ~100 years of monthly steps, so a corrupt date can never
+  // hang the tab.
+  for (let k = step; k <= 1200; k += step) {
+    const candidate = new Date(anchor.getFullYear(), anchor.getMonth() + k, 1);
+    // Clamp to the last valid day when the target month is shorter, so a
+    // 31st SIP lands on Feb 28 without shifting into March.
+    const lastDay = new Date(candidate.getFullYear(), candidate.getMonth() + 1, 0).getDate();
+    candidate.setDate(Math.min(day, lastDay));
+    next = candidate;
+    if (candidate >= today) break;
+  }
+
+  return { ...sip, nextDebitDate: toISODate(next) };
 }
 
 const EMPTY = { fundName: "", amount: "", frequency: "Monthly", nextDebitDate: "", notes: "" };
@@ -38,8 +92,15 @@ function SIPCard({ sip, onDelete }) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>MONTHLY AMOUNT</div>
+          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>
+            {sip.frequency === "Quarterly" ? "QUARTERLY AMOUNT" : "MONTHLY AMOUNT"}
+          </div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>₹{parseFloat(sip.amount || 0).toLocaleString("en-IN")}</div>
+          {sip.frequency === "Quarterly" && (
+            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+              ₹{Math.round(monthlyEquivalent(sip)).toLocaleString("en-IN")}/month equivalent
+            </div>
+          )}
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>NEXT DEBIT</div>
@@ -64,7 +125,15 @@ export default function SIPTracker() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY);
 
-  const totalMonthly = sips.reduce((s, sip) => s + parseFloat(sip.amount || 0), 0);
+  // Advance any elapsed debit dates on mount and persist the result.
+  useEffect(() => {
+    const rolled = sips.map(rollForward);
+    if (rolled.some((s, i) => s.nextDebitDate !== sips[i].nextDebitDate)) {
+      setSIPs(rolled); saveSIPs(rolled);
+    }
+  }, []);
+
+  const totalMonthly = sips.reduce((s, sip) => s + monthlyEquivalent(sip), 0);
 
   const handleSave = () => {
     if (!form.fundName.trim() || !form.amount) return;
@@ -82,8 +151,12 @@ export default function SIPTracker() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 2 }}>TOTAL MONTHLY SIP</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#a78bfa" }}>₹{totalMonthly.toLocaleString("en-IN")}</div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{sips.length} active SIP{sips.length !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "#a78bfa" }}>
+            ₹{Math.round(totalMonthly).toLocaleString("en-IN")}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
+            {sips.length} active SIP{sips.length !== 1 ? "s" : ""} · stored in this browser only
+          </div>
         </div>
         <button
           onClick={() => setShowAdd(o => !o)}

@@ -21,11 +21,11 @@ function IndexCard({ idx }) {
     const fetch_ = async () => {
       try {
         const res = await fetch(
-          `/api/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`,
+          `/api/v1/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`,
           { signal: AbortSignal.timeout(10000) }
         );
         const quotes = await res.json();
-        const q = quotes[0];
+        const q = (Array.isArray(quotes) ? quotes : []).find(x => x.symbol === idx.symbol);
         if (q?.price != null && !cancelled) setData({
           price: q.price,
           change: q.change,
@@ -68,6 +68,34 @@ export default function USStocksTab() {
   const [holdings, setHoldings] = useState(getHoldings);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Live-price the holdings that have a ticker; without this, currentPrice
+  // stays frozen at buyPrice and P&L reads 0 forever.
+  const refreshHoldingPrices = async (list) => {
+    const tickers = [...new Set(list.map(h => h.ticker).filter(Boolean))];
+    if (!tickers.length) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch(
+        `/api/v1/market/quotes?symbols=${encodeURIComponent(tickers.join(","))}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      const quotes = await res.json();
+      const bySymbol = Object.fromEntries(
+        (Array.isArray(quotes) ? quotes : []).map(q => [q.symbol, q])
+      );
+      const next = list.map(h => {
+        const q = h.ticker ? bySymbol[h.ticker] : null;
+        return q?.price != null ? { ...h, currentPrice: q.price } : h;
+      });
+      setHoldings(next); saveHoldings(next);
+    } catch {} finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { refreshHoldingPrices(getHoldings()); }, []);
 
   const handleSave = () => {
     if (!form.name.trim() || !form.buyPrice) return;
@@ -80,6 +108,7 @@ export default function USStocksTab() {
     };
     const next = [...holdings, h];
     setHoldings(next); saveHoldings(next); setShowAdd(false); setForm(EMPTY);
+    refreshHoldingPrices(next);
   };
   const handleDelete = (id) => {
     const next = holdings.filter(h => h.id !== id);
@@ -103,7 +132,12 @@ export default function USStocksTab() {
       {/* My US Holdings */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 2 }}>MY US STOCK HOLDINGS</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 2 }}>
+            MY US STOCK HOLDINGS
+            <span style={{ fontWeight: 500, letterSpacing: 0, textTransform: "none", marginLeft: 8, color: "var(--text-dimmer)" }}>
+              stored in this browser only
+            </span>
+          </div>
           {holdings.length > 0 && (
             <div style={{ display: "flex", gap: 16 }}>
               <div>
@@ -119,12 +153,23 @@ export default function USStocksTab() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowAdd(o => !o)}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 11, border: "1px solid rgba(74,222,128,0.25)", background: "rgba(74,222,128,0.08)", color: "#4ade80", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-        >
-          <Plus size={13} /> Add Holding
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {holdings.some(h => h.ticker) && (
+            <button
+              onClick={() => refreshHoldingPrices(holdings)}
+              disabled={refreshing}
+              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 11, border: "1px solid rgba(34,211,238,0.25)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: refreshing ? 0.6 : 1 }}
+            >
+              {refreshing ? "Refreshing..." : "Refresh Prices"}
+            </button>
+          )}
+          <button
+            onClick={() => setShowAdd(o => !o)}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 11, border: "1px solid rgba(74,222,128,0.25)", background: "rgba(74,222,128,0.08)", color: "#4ade80", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            <Plus size={13} /> Add Holding
+          </button>
+        </div>
       </div>
 
       {/* Add form */}
