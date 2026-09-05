@@ -33,6 +33,15 @@ public interface TransactionRepository
     @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.date >= :cutoff ORDER BY t.date ASC")
     List<Transaction> findLatestThreeMonthsTransactions(@Param("userId") Long userId, @Param("cutoff") java.time.LocalDate cutoff);
 
+    /**
+     * Same query under an honest name, for callers that need a window other than
+     * three months — recurring-charge detection needs a year to see an annual
+     * subscription bill even once.
+     */
+    default List<Transaction> findSince(Long userId, java.time.LocalDate cutoff) {
+        return findLatestThreeMonthsTransactions(userId, cutoff);
+    }
+
     default List<Transaction> findLatestThreeMonthsTransactions(Long userId) {
         java.time.LocalDate cutoff = java.time.LocalDate.now().minusMonths(2).withDayOfMonth(1);
         return findLatestThreeMonthsTransactions(userId, cutoff);

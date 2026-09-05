@@ -4,7 +4,40 @@ import {
     RefreshCw
 } from "lucide-react";
 
-function RecurringExpenses({ recurringExpenses }) {
+const inr = (value) =>
+    "₹" + Math.round(value || 0).toLocaleString("en-IN");
+
+// "in 3 days" reads better than a date when a charge is imminent, which is
+// exactly when someone still has time to cancel it.
+export function describeNextCharge(nextChargeDate) {
+
+    if (!nextChargeDate) return null;
+
+    const next  = new Date(nextChargeDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (Number.isNaN(next.getTime())) return null;
+
+    const days = Math.round((next - today) / 86400000);
+
+    if (days <= 0) return "due now";
+    if (days === 1) return "tomorrow";
+    if (days <= 14) return `in ${days} days`;
+
+    return next.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function RecurringExpenses({ recurringExpenses = [] }) {
+
+    const active = recurringExpenses.filter((e) => e.active !== false);
+
+    // What these cost over the next twelve months if nothing changes — the
+    // number that makes a ₹199 subscription feel like a decision.
+    const annualTotal = active.reduce(
+        (sum, e) => sum + (e.annualisedCost || 0),
+        0
+    );
 
     return (
 
@@ -74,23 +107,38 @@ function RecurringExpenses({ recurringExpenses }) {
                 </div>
 
                 {
-                    recurringExpenses.length > 0 && (
+                    active.length > 0 && (
 
                         <div
                             className="
                                 ml-auto
-                                px-3
-                                py-1
-                                rounded-lg
-                                text-xs
-                                font-bold
-                                bg-red-500/10
-                                border
-                                border-red-500/20
-                                text-red-400
+                                text-right
                             "
                         >
-                            {recurringExpenses.length} subscriptions
+
+                            <div
+                                className="
+                                    text-lg
+                                    font-black
+                                    text-red-400
+                                    leading-none
+                                "
+                            >
+                                {inr(annualTotal)}
+                            </div>
+
+                            <div
+                                className="
+                                    text-[11px]
+                                    text-zinc-500
+                                    mt-1
+                                "
+                            >
+                                a year across {active.length}
+                                {" "}
+                                {active.length === 1 ? "charge" : "charges"}
+                            </div>
+
                         </div>
 
                     )
@@ -125,67 +173,124 @@ function RecurringExpenses({ recurringExpenses }) {
                 ">
 
                     {recurringExpenses.map(
-                        (expense, index) => (
+                        (expense, index) => {
 
-                            <div
-                                key={index}
-                                className="
-                                    rounded-2xl
-                                    border
-                                    border-red-500/10
-                                    bg-red-500/[0.04]
-                                    p-5
-                                    transition-all
-                                    duration-300
-                                    hover:bg-red-500/[0.08]
-                                    hover:border-red-500/20
-                                "
-                            >
+                            const lapsed = expense.active === false;
+                            const due    = describeNextCharge(expense.nextChargeDate);
 
-                                <h3 className="
-                                    text-base
-                                    font-bold
-                                    text-white
-                                    mb-2
-                                ">
-                                    {expense.merchant}
-                                </h3>
+                            return (
 
-                                <p className="
-                                    text-red-400
-                                    text-2xl
-                                    font-black
-                                    tracking-tight
-                                ">
-                                    ₹{
-                                        expense.amount
-                                            .toLocaleString("en-IN")
-                                    }
-                                </p>
-
-                                <p
-                                    className="
-                                        text-xs
-                                        text-zinc-500
-                                        mt-3
-                                    "
+                                <div
+                                    key={index}
+                                    className={`
+                                        rounded-2xl
+                                        border
+                                        p-5
+                                        transition-all
+                                        duration-300
+                                        ${lapsed
+                                            ? "border-white/10 bg-white/[0.02] opacity-60"
+                                            : "border-red-500/10 bg-red-500/[0.04] hover:bg-red-500/[0.08] hover:border-red-500/20"}
+                                    `}
                                 >
-                                    Repeated
-                                    {" "}
-                                    <span className="
-                                        text-zinc-200
-                                        font-bold
-                                    ">
-                                        {
-                                            expense.occurrences
-                                        }
-                                    </span>
-                                    {" "}
-                                    ×
-                                </p>
 
-                            </div>
-                        )
+                                    <div
+                                        className="
+                                            flex
+                                            items-start
+                                            justify-between
+                                            gap-2
+                                            mb-2
+                                        "
+                                    >
+
+                                        <h3 className="
+                                            text-base
+                                            font-bold
+                                            text-white
+                                            break-words
+                                        ">
+                                            {expense.merchant}
+                                        </h3>
+
+                                        {expense.cadence && (
+                                            <span className="
+                                                shrink-0
+                                                px-2
+                                                py-0.5
+                                                rounded-md
+                                                text-[10px]
+                                                font-bold
+                                                tracking-wide
+                                                bg-white/5
+                                                text-zinc-400
+                                            ">
+                                                {expense.cadence.toUpperCase()}
+                                            </span>
+                                        )}
+
+                                    </div>
+
+                                    <p className="
+                                        text-red-400
+                                        text-2xl
+                                        font-black
+                                        tracking-tight
+                                    ">
+                                        {inr(expense.amount)}
+                                        {expense.amountVaries && (
+                                            <span className="
+                                                text-xs
+                                                font-medium
+                                                text-zinc-500
+                                                ml-1.5
+                                            ">
+                                                approx
+                                            </span>
+                                        )}
+                                    </p>
+
+                                    {expense.annualisedCost > 0 && (
+                                        <p className="
+                                            text-xs
+                                            text-zinc-400
+                                            mt-1
+                                        ">
+                                            {inr(expense.annualisedCost)} a year
+                                        </p>
+                                    )}
+
+                                    <p
+                                        className="
+                                            text-xs
+                                            text-zinc-500
+                                            mt-3
+                                        "
+                                    >
+                                        {lapsed ? (
+                                            <>
+                                                No charge in a while — possibly cancelled
+                                            </>
+                                        ) : (
+                                            <>
+                                                Next charge
+                                                {" "}
+                                                <span className="
+                                                    text-zinc-200
+                                                    font-bold
+                                                ">
+                                                    {due || "—"}
+                                                </span>
+                                                {" · "}
+                                                {expense.occurrences}
+                                                {" charges so far"}
+                                            </>
+                                        )}
+                                    </p>
+
+                                </div>
+                            );
+                        }
                     )}
 
                 </div>

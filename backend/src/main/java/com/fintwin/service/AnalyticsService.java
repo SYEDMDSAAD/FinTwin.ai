@@ -177,6 +177,16 @@ public class AnalyticsService {
         return dto;
     }
 
+    /**
+     * How far back recurring detection looks. A year plus a month: long enough
+     * to see an annual subscription bill twice at the edges, and to give a
+     * quarterly one four data points.
+     */
+    private static final int RECURRING_WINDOW_MONTHS = 13;
+
+    /** Charges below this are noise — a ₹10 repeat is not worth surfacing. */
+    private static final double RECURRING_MIN_AMOUNT = 20.0;
+
     @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     @Audited(action = "READ", resource = "analytics", description = "User viewed recurring expense analysis")
     public List<RecurringExpenseDTO>
@@ -190,79 +200,66 @@ public class AnalyticsService {
                         .findByEmail(email)
                         .orElseThrow();
 
-        List<Transaction> transactions =
-            transactionRepository.findLatestThreeMonthsTransactions(user.getId());
+        LocalDate today = LocalDate.now();
 
-        LocalDate cutoffDate =
-                LocalDate.now()
-                        .minusMonths(2)
-                        .withDayOfMonth(1);
+        List<Transaction> transactions = transactionRepository.findSince(
+                user.getId(),
+                today.minusMonths(RECURRING_WINDOW_MONTHS).withDayOfMonth(1));
 
-        transactions = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return d != null && !d.isBefore(cutoffDate);
-                })
-                .toList();
-
+        // Group spending by normalized merchant so the same subscription billed
+        // as "NETFLIX*IN 4417" and "UPI-NETFLIX COM" lands in one bucket instead
+        // of two that are each too small to detect.
         Map<String, List<Transaction>> grouped = transactions.stream()
                 .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .filter(t -> t.getMerchant() != null)  // groupingBy throws on null keys
-                .collect(Collectors.groupingBy(Transaction::getMerchant));
+                .filter(t -> Math.abs(t.getAmount()) >= RECURRING_MIN_AMOUNT)
+                .filter(t -> t.getMerchant() != null)
+                // Card bill payments repeat monthly and would otherwise be
+                // reported as the largest "subscription" a user has — they are
+                // the repayment of spending already listed, not a charge.
+                .filter(t -> !com.fintwin.util.TransactionMath.isSelfTransfer(t))
+                .collect(Collectors.groupingBy(
+                        t -> com.fintwin.util.RecurringMath.normalizeMerchant(t.getMerchant())));
 
-        List<RecurringExpenseDTO> result =
-            new ArrayList<>();
+        List<RecurringExpenseDTO> result = new ArrayList<>();
 
-        for (
-            Map.Entry<String,
-            List<Transaction>> entry
-            : grouped.entrySet()
-        ) {
+        for (Map.Entry<String, List<Transaction>> entry : grouped.entrySet()) {
 
-            List<Transaction> txns =
-                    entry.getValue();
+            com.fintwin.util.RecurringMath.Recurrence r =
+                    com.fintwin.util.RecurringMath.detect(entry.getKey(), entry.getValue(), today);
 
-            long distinctMonths = txns.stream()
-                    .map(t -> toYearMonth(t.getDate()))
-                    .filter(m -> !m.equals("unknown"))
-                    .distinct()
-                    .count();
+            if (r == null) continue;
 
-            if (distinctMonths >= 3)
-            {
+            RecurringExpenseDTO dto = new RecurringExpenseDTO();
+            // Show the merchant as the bank wrote it most recently — the
+            // normalized key is a grouping device, not something to read.
+            dto.setMerchant(displayName(entry.getValue()));
+            dto.setAmount(r.typicalAmount());
+            dto.setOccurrences(r.occurrences());
+            dto.setCadence(r.cadenceLabel());
+            dto.setAnnualisedCost(r.annualisedCost());
+            dto.setLastCharged(r.lastCharged());
+            dto.setNextChargeDate(r.nextChargeDate());
+            dto.setAmountVaries(r.amountVaries());
+            dto.setActive(r.active());
 
-                RecurringExpenseDTO dto =
-                    new RecurringExpenseDTO();
-
-                dto.setMerchant(
-                    entry.getKey()
-                );
-
-                dto.setOccurrences(
-                    entry.getValue().size()
-                );
-
-                // Average of this merchant's charges — the first row was an
-                // arbitrary pick and misrepresented variable recurring bills.
-                dto.setAmount(
-                    Math.round(txns.stream()
-                            .filter(t -> t.getAmount() != null)
-                            .mapToDouble(t -> Math.abs(t.getAmount()))
-                            .average().orElse(0) * 100.0) / 100.0
-                );
-
-                result.add(dto);
-            }
+            result.add(dto);
         }
-        result.sort(
 
-            Comparator.comparing(
-                RecurringExpenseDTO::getAmount
-            ).reversed()
-
-        );
+        // Costliest per year first — that is the order someone cancelling reads in.
+        result.sort(Comparator
+                .comparing(RecurringExpenseDTO::isActive).reversed()
+                .thenComparing(Comparator.comparingDouble(RecurringExpenseDTO::getAnnualisedCost).reversed()));
 
         return result;
+    }
+
+    /** The most recent raw merchant string in a group. */
+    private static String displayName(List<Transaction> group) {
+        return group.stream()
+                .filter(t -> t.getDate() != null)
+                .max(Comparator.comparing(Transaction::getDate))
+                .map(Transaction::getMerchant)
+                .orElseGet(() -> group.get(0).getMerchant());
     }
 
     private static String toYearMonth(LocalDate d) {
