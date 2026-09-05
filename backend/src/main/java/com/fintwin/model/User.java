@@ -60,6 +60,12 @@ public class User {
     @Column(name = "last_logout_at")
     private LocalDateTime lastLogoutAt;
 
+    // When the user last read the daily spending recap. Deliberately not
+    // last_login_at: a session can span days, and opening the app is not the
+    // same as having seen what changed. NULL means never — a first visit.
+    @Column(name = "last_recap_seen_at")
+    private LocalDateTime lastRecapSeenAt;
+
     // GDPR Article 7 — timestamp of explicit user consent at registration
     @Column(name = "consent_given_at")
     private LocalDateTime consentGivenAt;
@@ -204,6 +210,14 @@ public class User {
 
     public void setLastLogoutAt(LocalDateTime lastLogoutAt) {
         this.lastLogoutAt = lastLogoutAt;
+    }
+
+    public LocalDateTime getLastRecapSeenAt() {
+        return lastRecapSeenAt;
+    }
+
+    public void setLastRecapSeenAt(LocalDateTime lastRecapSeenAt) {
+        this.lastRecapSeenAt = lastRecapSeenAt;
     }
 
     public LocalDateTime getConsentGivenAt() {

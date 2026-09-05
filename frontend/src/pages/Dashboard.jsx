@@ -21,6 +21,8 @@ import Sidebar from "../components/Sidebar";
 
 import Header from "../components/Header";
 
+import DailyRecap from "../components/DailyRecap";
+
 import AnalyticsCards from "../components/AnalyticsCards";
 
 
@@ -139,7 +141,7 @@ function Dashboard() {
 
     const [activeSection,
         setActiveSection] =
-        useState(() => localStorage.getItem("activeSection") || "Dashboard");
+        useState(() => localStorage.getItem("activeSection") || "Today");
 
     const [, startTransition] = useTransition();
     const navigateTo = useCallback((section) => {
@@ -1675,6 +1677,14 @@ function Dashboard() {
                     notifications={notifications}
                     scoreData={scoreData}
                   />
+                )}
+
+                {/* =========================
+                    Today — the daily front door
+                ========================= */}
+
+                {activeSection === "Today" && (
+                    <DailyRecap />
                 )}
 
                 

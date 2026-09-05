@@ -15,12 +15,16 @@ import {
     ShieldCheck,
     Shield,
     FileInput,
+    Sparkles,
 } from "lucide-react";
 
 const NAV_GROUPS = [
     {
         label: "OVERVIEW",
         items: [
+            // First, and the default landing section: the everyday-spending
+            // question people actually have daily, ahead of the monthly ones.
+            { name: "Today",        icon: <Sparkles size={17} /> },
             { name: "Dashboard",    icon: <LayoutDashboard size={17} /> },
             { name: "Analytics",    icon: <BarChart3 size={17} /> },
             { name: "Transactions", icon: <Wallet size={17} /> },
