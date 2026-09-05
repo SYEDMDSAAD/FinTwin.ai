@@ -152,6 +152,82 @@ class RecurringMathTest {
         ), TODAY)).isNull();
     }
 
+    // ── detectAll: the shared entry point ─────────────────────────────────────
+
+    @Test
+    void detectAllGroupsMerchantSpellingsIntoOneSubscription() {
+        // The same subscription as the rails wrote it on three different months.
+        // Grouped raw, this is three merchants with one charge each and nothing
+        // is detected at all.
+        List<Transaction> txns = List.of(
+                named("NETFLIX*IN 4417",       -649.0, LocalDate.of(2026, 6, 14)),
+                named("UPI-NETFLIX COM-8891",  -649.0, LocalDate.of(2026, 7, 14)),
+                named("ACH/NETFLIX INDIA/992", -649.0, LocalDate.of(2026, 8, 13))
+        );
+
+        List<RecurringMath.Recurrence> found = RecurringMath.detectAll(txns, TODAY);
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0).occurrences()).isEqualTo(3);
+        assertThat(found.get(0).cadenceLabel()).isEqualTo("Monthly");
+        // Named as the bank most recently wrote it, not by the normalized key
+        assertThat(found.get(0).merchant()).isEqualTo("ACH/NETFLIX INDIA/992");
+    }
+
+    @Test
+    void detectAllExcludesCardBillPayments() {
+        // A bill payment repeats monthly at a steady amount and is the single
+        // largest thing on the statement — exactly the shape of a subscription,
+        // and it would head the list if it were not filtered.
+        List<Transaction> txns = new ArrayList<>(series(-649.0, LocalDate.of(2026, 6, 14), 30, 3));
+        for (Transaction t : series(-45_000.0, LocalDate.of(2026, 6, 28), 30, 3)) {
+            t.setMerchant("NEFT DR-CREDIT CARD PAYMENT");
+            t.setCategory(TransactionMath.CARD_PAYMENT_CATEGORY);
+            txns.add(t);
+        }
+
+        List<RecurringMath.Recurrence> found = RecurringMath.detectAll(txns, TODAY);
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0).merchant()).isEqualTo("m");
+    }
+
+    @Test
+    void detectAllOrdersByYearlyCost_withLapsedChargesLast() {
+        List<Transaction> txns = new ArrayList<>();
+        txns.addAll(namedSeries("CHEAP APP",  -99.0,  LocalDate.of(2026, 6, 10), 30, 3));
+        txns.addAll(namedSeries("BIG PLAN",   -999.0, LocalDate.of(2026, 6, 12), 30, 3));
+        // Lapsed: last charged in February
+        txns.addAll(namedSeries("OLD APP",   -5000.0, LocalDate.of(2025, 12, 5), 30, 3));
+
+        List<RecurringMath.Recurrence> found = RecurringMath.detectAll(txns, TODAY);
+
+        assertThat(found).extracting(RecurringMath.Recurrence::merchant)
+                .containsExactly("BIG PLAN", "CHEAP APP", "OLD APP");
+        assertThat(found.get(2).active()).isFalse();
+    }
+
+    @Test
+    void detectAllIgnoresIncomeTinyChargesAndAnEmptyHistory() {
+        List<Transaction> txns = new ArrayList<>();
+        // Salary: a credit, not a charge
+        txns.addAll(namedSeries("EMPLOYER", 60_000.0, LocalDate.of(2026, 6, 1), 30, 3));
+        // Below the noise floor
+        txns.addAll(namedSeries("ROUNDING",     -5.0, LocalDate.of(2026, 6, 2), 30, 3));
+
+        assertThat(RecurringMath.detectAll(txns, TODAY)).isEmpty();
+        assertThat(RecurringMath.detectAll(List.of(), TODAY)).isEmpty();
+        assertThat(RecurringMath.detectAll(null, TODAY)).isEmpty();
+    }
+
+    @Test
+    void detectAllIgnoresChargesOlderThanTheWindow() {
+        // Two years back: outside the 13-month window even though it is regular
+        List<Transaction> ancient = namedSeries("OLD SUB", -299.0, LocalDate.of(2024, 1, 5), 30, 4);
+
+        assertThat(RecurringMath.detectAll(ancient, TODAY)).isEmpty();
+    }
+
     // ── Merchant normalization ────────────────────────────────────────────────
 
     @Test
@@ -189,6 +265,19 @@ class RecurringMathTest {
             d = d.plusDays(gapDays);
         }
         return out;
+    }
+
+    private static List<Transaction> namedSeries(String merchant, double amount,
+                                                LocalDate start, int gapDays, int count) {
+        List<Transaction> out = series(amount, start, gapDays, count);
+        out.forEach(t -> t.setMerchant(merchant));
+        return out;
+    }
+
+    private static Transaction named(String merchant, double amount, LocalDate date) {
+        Transaction t = txn(amount, date);
+        t.setMerchant(merchant);
+        return t;
     }
 
     private static Transaction txn(Double amount, LocalDate date) {

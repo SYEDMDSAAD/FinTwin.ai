@@ -68,12 +68,14 @@ public class FinancialDataAggregatorService {
         // chatbot quoted a different score than the score page.
         int    financialScore = financialScoreService.calculateScoreFor(user).getScore();
 
-        List<String> subscriptions = merchantSpending.entrySet().stream()
-                .filter(e -> transactions.stream()
-                        .filter(t -> t.getAmount() != null && t.getAmount() < 0
-                                && e.getKey().equals(t.getMerchant() != null ? t.getMerchant() : "Unknown"))
-                        .count() >= 2)
-                .map(Map.Entry::getKey)
+        // Same detection the dashboard shows. This listed any merchant charged
+        // twice — no cadence, no merchant normalization — so the copilot named
+        // supermarkets as subscriptions while missing an annual plan, and its
+        // list never matched the one on screen.
+        List<String> subscriptions = com.fintwin.util.RecurringMath
+                .detectAll(transactions, java.time.LocalDate.now()).stream()
+                .filter(com.fintwin.util.RecurringMath.Recurrence::active)
+                .map(com.fintwin.util.RecurringMath.Recurrence::merchant)
                 .toList();
 
         return FinancialSummaryDTO.builder()

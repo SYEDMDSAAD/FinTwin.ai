@@ -9,7 +9,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Detects recurring charges — subscriptions, rent, EMIs, utility bills — from a
@@ -164,6 +166,70 @@ public final class RecurringMath {
                 variation > AMOUNT_STEADY_LIMIT,
                 active
         );
+    }
+
+    // ── Whole-history detection ───────────────────────────────────────────────
+
+    /**
+     * How far back to look. A year plus a month: long enough to see an annual
+     * subscription bill twice at the edges, and to give a quarterly one four
+     * data points.
+     */
+    public static final int WINDOW_MONTHS = 13;
+
+    /** Charges below this are noise — a ₹10 repeat is not worth surfacing. */
+    private static final double MIN_AMOUNT = 20.0;
+
+    /**
+     * Finds every recurring charge in a transaction history, costliest per year
+     * first with lapsed charges last.
+     *
+     * The single entry point for recurring detection. The dashboard, the
+     * financial score's item count and the AI copilot's subscription list each
+     * grew their own version of this — with different thresholds and no merchant
+     * normalization — so the same user could be told they had four
+     * subscriptions, six, and a different six.
+     *
+     * Merchant names come back as the bank most recently wrote them; the
+     * normalized key is a grouping device, not something to read.
+     */
+    public static List<Recurrence> detectAll(List<Transaction> transactions, LocalDate today) {
+        if (transactions == null || transactions.isEmpty()) return List.of();
+
+        LocalDate cutoff = today.minusMonths(WINDOW_MONTHS).withDayOfMonth(1);
+
+        Map<String, List<Transaction>> grouped = transactions.stream()
+                .filter(t -> t.getDate() != null && !t.getDate().isBefore(cutoff))
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
+                .filter(t -> Math.abs(t.getAmount()) >= MIN_AMOUNT)
+                .filter(t -> t.getMerchant() != null)
+                // Card bill payments repeat monthly and would otherwise be
+                // reported as the largest "subscription" a user has — they are
+                // the repayment of spending already itemised, not a charge.
+                .filter(t -> !TransactionMath.isSelfTransfer(t))
+                .collect(Collectors.groupingBy(t -> normalizeMerchant(t.getMerchant())));
+
+        List<Recurrence> found = new ArrayList<>();
+        for (Map.Entry<String, List<Transaction>> entry : grouped.entrySet()) {
+            Recurrence r = detect(displayName(entry.getValue()), entry.getValue(), today);
+            if (r != null) found.add(r);
+        }
+
+        // Costliest per year first — the order someone cancelling reads in.
+        found.sort(Comparator
+                .comparing(Recurrence::active).reversed()
+                .thenComparing(Comparator.comparingDouble(Recurrence::annualisedCost).reversed()));
+
+        return found;
+    }
+
+    /** The most recent raw merchant string in a group. */
+    private static String displayName(List<Transaction> group) {
+        return group.stream()
+                .filter(t -> t.getDate() != null)
+                .max(Comparator.comparing(Transaction::getDate))
+                .map(Transaction::getMerchant)
+                .orElseGet(() -> group.get(0).getMerchant());
     }
 
     /** The cadence whose period the observed gap falls within, or null. */

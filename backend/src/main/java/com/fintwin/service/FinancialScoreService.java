@@ -198,19 +198,21 @@ public class FinancialScoreService {
         else if (score >= 50) rating = "Average";
         else                  rating = "Poor";
 
-        // Recurring merchants: expenses at the same merchant in 3+ distinct
-        // months of the window (computed inline from the already-loaded
-        // window, with a null-merchant guard).
-        int recurringCount = (int) txns.stream()
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0
-                        && t.getMerchant() != null && t.getDate() != null)
-                .collect(Collectors.groupingBy(
-                        Transaction::getMerchant,
-                        Collectors.mapping(
-                                t -> t.getDate().toString().substring(0, 7),
-                                Collectors.toSet())))
-                .values().stream()
-                .filter(monthsSeen -> monthsSeen.size() >= 3)
+        // Recurring charges — the same detection the dashboard shows, so the
+        // "Recurring" chip on the score card cannot disagree with the recurring
+        // expenses list beside it. Display only: the score itself is the sum of
+        // the five factors below and is unaffected by this count.
+        //
+        // Loaded over its own longer window: three months cannot see an annual
+        // or quarterly subscription bill even once.
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<Transaction> recurringWindow = transactionRepository.findSince(
+                user.getId(),
+                today.minusMonths(com.fintwin.util.RecurringMath.WINDOW_MONTHS).withDayOfMonth(1));
+
+        int recurringCount = (int) com.fintwin.util.RecurringMath
+                .detectAll(recurringWindow, today).stream()
+                .filter(com.fintwin.util.RecurringMath.Recurrence::active)
                 .count();
 
         List<FactorDTO> factors = List.of(
