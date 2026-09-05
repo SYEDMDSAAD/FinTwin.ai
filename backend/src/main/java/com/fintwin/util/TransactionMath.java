@@ -32,16 +32,41 @@ public final class TransactionMath {
     // Conservative markers for money moving between the user's own accounts.
     // Both legs of such a move can be visible (or just the incoming one),
     // inflating income and expenses — and every ratio built on them.
-    // Credit-card bill payments are deliberately NOT excluded: card
-    // transactions aren't synced separately, so the bill payment is the only
-    // visible trace of that spending.
     private static final String[] SELF_TRANSFER_MARKERS = {
             "self transfer", "self-transfer", "own account", "transfer to self"
     };
 
-    /** True when the transaction is money moved between the user's own accounts. */
+    /**
+     * Category stamped on both legs of a credit-card bill payment: the debit
+     * leaving the bank account, and the matching credit on the card.
+     *
+     * Card bill payments used to be counted as ordinary spending on purpose —
+     * with no card sync, the bill was the only visible trace of that month's
+     * card purchases. Now that CREDIT_CARD is part of the AA consent, the
+     * individual purchases arrive on their own, so counting the bill as well
+     * would charge the same rupee twice: once as the purchase, once as the
+     * repayment. Neither leg is spending in its own right, so both are
+     * excluded wherever self-transfers are.
+     *
+     * The category is only ever assigned when card data is actually present
+     * for that user (see BankConnectionService), so a user with no card
+     * connected keeps the old behaviour and their bill payment still counts.
+     */
+    public static final String CARD_PAYMENT_CATEGORY = "Card Payment";
+
+    /** True when the transaction is one leg of a credit-card bill payment. */
+    public static boolean isCardBillPayment(Transaction t) {
+        return CARD_PAYMENT_CATEGORY.equalsIgnoreCase(t.getCategory());
+    }
+
+    /**
+     * True when the transaction should be kept out of income and expense
+     * aggregates — money moved between the user's own accounts, or either leg
+     * of a credit-card bill payment.
+     */
     public static boolean isSelfTransfer(Transaction t) {
         if ("Transfer".equalsIgnoreCase(t.getCategory())) return true;
+        if (isCardBillPayment(t)) return true;
         String m = t.getMerchant();
         if (m == null) return false;
         String lower = m.toLowerCase();

@@ -62,9 +62,45 @@ class TransactionMathTest {
         assertThat(TransactionMath.isSelfTransfer(txn(-1.0, "SELF TRANSFER to SBI", null, null))).isTrue();
         assertThat(TransactionMath.isSelfTransfer(txn(-1.0, "transfer to own account", null, null))).isTrue();
         assertThat(TransactionMath.isSelfTransfer(txn(-1.0, "Swiggy", "transfer", null))).isTrue();
-        // Credit-card bill payments are deliberately NOT excluded
+        // A card-payment-looking narration alone is NOT enough to exclude a row:
+        // for a user with no card connected the bill payment is still the only
+        // trace of that spending, and ingest leaves its category alone.
         assertThat(TransactionMath.isSelfTransfer(txn(-1.0, "Credit Card Payment", "Bills", null))).isFalse();
         assertThat(TransactionMath.isSelfTransfer(txn(-1.0, null, null, null))).isFalse();
+    }
+
+    @Test
+    void cardBillPayments_areExcludedOnceIngestHasStampedTheCategory() {
+        // Ingest only assigns this category when the card's own purchases were
+        // synced too, so both legs of the bill payment drop out together and the
+        // underlying purchases are what remain.
+        Transaction bankLeg = txn(-45_000.0, "NEFT DR-CREDIT CARD PAYMENT", "Card Payment", null);
+        Transaction cardLeg = txn(45_000.0,  "PAYMENT RECEIVED",            "Card Payment", null);
+
+        assertThat(TransactionMath.isCardBillPayment(bankLeg)).isTrue();
+        assertThat(TransactionMath.isSelfTransfer(bankLeg)).isTrue();
+        assertThat(TransactionMath.isSelfTransfer(cardLeg)).isTrue();
+
+        // Case-insensitive, like the Transfer category check beside it
+        assertThat(TransactionMath.isCardBillPayment(txn(-1.0, "x", "card payment", null))).isTrue();
+        assertThat(TransactionMath.isCardBillPayment(txn(-1.0, "x", "Food", null))).isFalse();
+    }
+
+    @Test
+    void cardSpendIsCountedOnce_notTwice() {
+        // One month: a card purchase, the bill that repays it, and the credit
+        // that lands on the card. Only the purchase is spending.
+        List<Transaction> txns = List.of(
+                txn(60_000.0,  "Salary",                 "Income",       LocalDate.of(2026, 5, 1)),
+                txn(-12_000.0, "AMAZON",                 "Shopping",     LocalDate.of(2026, 5, 8)),
+                txn(-12_000.0, "CREDIT CARD PAYMENT",    "Card Payment", LocalDate.of(2026, 5, 28)),
+                txn(12_000.0,  "PAYMENT RECEIVED",       "Card Payment", LocalDate.of(2026, 5, 28))
+        );
+
+        assertThat(TransactionMath.expenses(txns)).isEqualTo(12_000.0);
+        assertThat(TransactionMath.income(txns)).isEqualTo(60_000.0);
+        assertThat(TransactionMath.netSavingsByMonth(txns).get(java.time.YearMonth.of(2026, 5)))
+                .isEqualTo(48_000.0);
     }
 
     @Test

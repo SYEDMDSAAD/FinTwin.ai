@@ -60,7 +60,7 @@ public class SetuAAService {
         body.put("vua",             customerVua);
         body.put("consentMode",     "STORE");
         body.put("consentTypes",    List.of("TRANSACTIONS", "SUMMARY", "PROFILE"));
-        body.put("fiTypes",         List.of("DEPOSIT", "MUTUAL_FUNDS", "EQUITIES", "NPS"));
+        body.put("fiTypes",         List.of("DEPOSIT", "MUTUAL_FUNDS", "EQUITIES", "NPS", "CREDIT_CARD"));
         // "to" must cover the whole consentDuration below — Setu rejects any later FI
         // session whose requested range falls outside this consent-level dataRange,
         // so a narrow "+1 day" window here would make resync fail after day 1.

@@ -6,10 +6,12 @@ import com.fintwin.exception.ForbiddenException;
 import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.BankConnection;
 import com.fintwin.model.Investment;
+import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.BankConnectionRepository;
 import com.fintwin.repository.InvestmentRepository;
+import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
@@ -30,11 +32,16 @@ public class BankConnectionService {
 
     private static final Logger log = LoggerFactory.getLogger(BankConnectionService.class);
 
+    // Matches the liability type the frontend's picker offers, so an AA-synced
+    // card is indistinguishable from a manually added one on the net worth page.
+    private static final String CARD_LIABILITY_TYPE = "Credit Card";
+
     private final SetuAAService            setuAAService;
     private final BankConnectionRepository bankRepo;
     private final TransactionRepository    txnRepo;
     private final UserRepository           userRepo;
     private final InvestmentRepository     investmentRepo;
+    private final LiabilityRepository      liabilityRepo;
     private final CategoryService          categoryService;
 
     public BankConnectionService(
@@ -43,6 +50,7 @@ public class BankConnectionService {
             TransactionRepository txnRepo,
             UserRepository userRepo,
             InvestmentRepository investmentRepo,
+            LiabilityRepository liabilityRepo,
             CategoryService categoryService
     ) {
         this.setuAAService   = setuAAService;
@@ -50,6 +58,7 @@ public class BankConnectionService {
         this.txnRepo         = txnRepo;
         this.userRepo        = userRepo;
         this.investmentRepo  = investmentRepo;
+        this.liabilityRepo   = liabilityRepo;
         this.categoryService = categoryService;
     }
 
@@ -206,6 +215,17 @@ public class BankConnectionService {
             // User's learned merchant→category rules, applied before deriveCategory
             Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
 
+            List<Map<String, Object>> cardAccounts =
+                    allData.getOrDefault("CREDIT_CARD", List.of());
+
+            // Whether this user's card purchases are stored in their own right.
+            // True as soon as any card data has ever synced — not just when this
+            // particular session returned some — because a sync where the card
+            // FIP fails must not quietly start counting bill payments as spending
+            // again on top of card purchases already in the database.
+            boolean cardSyncActive = !cardAccounts.isEmpty()
+                    || txnRepo.countByUserAndSource(user, "CARD") > 0;
+
             List<Transaction> newTxns = new ArrayList<>();
             for (Map<String, Object> account : allData.getOrDefault("DEPOSIT", List.of())) {
                 try {
@@ -214,19 +234,52 @@ public class BankConnectionService {
                     List<Map<String, Object>> txns = (List<Map<String, Object>>) txnWrapper.get("transaction");
                     if (txns == null) continue;
                     for (Map<String, Object> raw : txns) {
-                        Transaction t = buildIfNew(raw, user, conn, existingExternalIds, learnedRules);
+                        Transaction t = buildIfNew(raw, user, conn, existingExternalIds, learnedRules, false, cardSyncActive);
                         if (t != null) newTxns.add(t);
                     }
                 } catch (Exception e) {
                     log.warn("Deposit parse error: {}", e.getMessage());
                 }
             }
+
+            // ── CREDIT_CARD → card transactions + outstanding balance ─────────
+            // Card purchases are the half of everyday spending a DEPOSIT-only
+            // consent cannot see: the bank account shows one lump bill payment
+            // where the card shows the forty purchases behind it.
+            int cardTxnCount = 0;
+            for (Map<String, Object> account : cardAccounts) {
+                try {
+                    Map<String, Object> txnWrapper = (Map<String, Object>) account.get("transactions");
+                    if (txnWrapper == null) continue;
+                    List<Map<String, Object>> txns = (List<Map<String, Object>>) txnWrapper.get("transaction");
+                    if (txns == null) continue;
+                    for (Map<String, Object> raw : txns) {
+                        Transaction t = buildIfNew(raw, user, conn, existingExternalIds, learnedRules, true, true);
+                        if (t != null) { newTxns.add(t); cardTxnCount++; }
+                    }
+                } catch (Exception e) {
+                    log.warn("Credit card parse error: {}", e.getMessage());
+                }
+            }
+
             if (!newTxns.isEmpty()) {
                 // Real bank data arrived — replace synthetic seeded placeholder transactions
                 txnRepo.deleteAll(txnRepo.findSeededByUser(user));
                 txnRepo.saveAll(newTxns);
             }
-            log.info("Bank sync: {} new transactions saved for user #{}", newTxns.size(), user.getId());
+            log.info("Bank sync: {} new transactions saved for user #{} ({} from cards)",
+                     newTxns.size(), user.getId(), cardTxnCount);
+
+            // Card purchases are now stored in their own right, so the bank-side
+            // bill payment has become a duplicate of them. Restamp it — including
+            // rows imported before the card was ever connected — so that both legs
+            // drop out of income and expense aggregates together.
+            if (cardSyncActive) {
+                reclassifyCardBillPayments(user);
+            }
+            if (!cardAccounts.isEmpty()) {
+                syncCardLiabilities(user, cardAccounts);
+            }
 
             // ── MUTUAL_FUNDS / EQUITIES / NPS → investment holdings ───
             // Pre-load existing investment names in one query to avoid N+1
@@ -599,9 +652,15 @@ public class BankConnectionService {
 
     private Transaction buildIfNew(Map<String, Object> raw, User user, BankConnection conn,
                                    Set<String> existingExternalIds,
-                                   Map<String, String> learnedRules) {
+                                   Map<String, String> learnedRules,
+                                   boolean isCard, boolean cardSyncActive) {
         String externalId = safeStr(raw, "txnId");
-        if (externalId == null || existingExternalIds.contains(externalId)) return null;
+        if (externalId == null) return null;
+        // Card and bank txnIds are minted by different FIPs and can collide.
+        // Namespacing keeps a colliding card row from being silently swallowed
+        // by the shared dedup set.
+        if (isCard) externalId = "CARD:" + externalId;
+        if (existingExternalIds.contains(externalId)) return null;
 
         Object amtObj = raw.get("amount");
         if (amtObj == null) return null;
@@ -626,14 +685,20 @@ public class BankConnectionService {
             date = com.fintwin.util.DateNormalizer.parseFlexible(safeStr(raw, "valueDate"));
         }
         if (date == null) {
+            // The credit-card schema names this field differently to DEPOSIT
+            date = com.fintwin.util.DateNormalizer.parseFlexible(safeStr(raw, "transactionDate"));
+        }
+        if (date == null) {
             log.warn("Skipping transaction {} — no parseable date "
                      + "(transactionTimestamp={}, valueDate={})",
                      externalId, safeStr(raw, "transactionTimestamp"), safeStr(raw, "valueDate"));
             return null;
         }
 
-        // Populate masked account number on the connection object (once)
-        if (conn.getMaskedAccountNumber() == null) {
+        // Populate masked account number on the connection object (once).
+        // Only from the deposit account — the connection represents the bank
+        // account, so stamping a card's masked number here would mislabel it.
+        if (!isCard && conn.getMaskedAccountNumber() == null) {
             Object masked = raw.get("maskedAccNumber");
             if (masked != null) conn.setMaskedAccountNumber(masked.toString());
         }
@@ -641,17 +706,46 @@ public class BankConnectionService {
         Transaction t = new Transaction();
         t.setUser(user);
         t.setDate(date);
-        t.setMerchant(narration != null ? narration : "Bank Transaction");
+        t.setMerchant(narration != null ? narration : (isCard ? "Card Transaction" : "Bank Transaction"));
         t.setAmount(amount);
-        t.setCategory(deriveCategory(narration, type, learnedRules));
-        t.setSource("BANK");
+        t.setCategory(deriveCategory(narration, type, learnedRules, isCard, cardSyncActive));
+        t.setSource(isCard ? "CARD" : "BANK");
         t.setExternalId(externalId);
         existingExternalIds.add(externalId); // prevent duplicates within the same batch
         return t;
     }
 
+    // Bank-side narrations for a credit-card bill payment. Deliberately narrow:
+    // a false positive here silently erases real spending from every aggregate.
+    private static final String[] CARD_PAYMENT_MARKERS = {
+            "credit card payment", "creditcard payment", "cc payment", "card payment",
+            "payment to credit card", "cc bill", "credit card bill", "bbps cc",
+            "autopay si-tad", "cred club", "cred.club"
+    };
+
     private String deriveCategory(String narration, String type,
-                                  Map<String, String> learnedRules) {
+                                  Map<String, String> learnedRules,
+                                  boolean isCard, boolean cardSyncActive) {
+        boolean isCredit = "CREDIT".equalsIgnoreCase(type);
+
+        if (isCard) {
+            // On a card, a credit is either the user repaying the bill or money
+            // coming back from a merchant. A repayment is the mirror image of the
+            // bank-side debit and must not be counted twice; a refund or cashback
+            // genuinely offsets that month's card spending and stays.
+            if (isCredit && !isRefundLike(narration)) {
+                return com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY;
+            }
+            // A card credit is never income, whatever the narration says — the
+            // keyword rules below would read "CREDIT"/"inward" as salary.
+            if (isCredit) return "Other";
+        } else if (cardSyncActive && !isCredit && matchesCardPayment(narration)) {
+            // Bank-side leg of the same bill payment. Guarded on cardSyncActive:
+            // without the card's purchases in the database this debit is the only
+            // record of that spending, and dropping it would understate expenses.
+            return com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY;
+        }
+
         if (narration == null) return "Other";
         String n = narration.toLowerCase();
 
@@ -675,7 +769,11 @@ public class BankConnectionService {
             return "Shopping";
         if (n.contains("electricity") || n.contains("water") || n.contains("gas") || n.contains("bill") || n.contains("recharge"))
             return "Utilities";
-        if (n.contains("salary") || n.contains("credit") || n.contains("neft cr") || n.contains("inward"))
+        // Guarded on isCredit: a debit is never income, whatever it is called.
+        // "CREDIT CARD ANNUAL FEE" is a charge, not salary — and on the bank side
+        // a debit narration mentioning "credit" was landing as income too.
+        if (isCredit && (n.contains("salary") || n.contains("credit")
+                         || n.contains("neft cr") || n.contains("inward")))
             return "Income";
         if (n.contains("rent") || n.contains("maintenance"))
             return "Housing";
@@ -687,6 +785,134 @@ public class BankConnectionService {
             return "Income";
 
         return "Other";
+    }
+
+    // Card-side credits that are money coming back rather than a repayment.
+    private static final String[] REFUND_MARKERS = {
+            "refund", "reversal", "reversed", "chargeback", "cashback",
+            "cash back", "returned", "disputed"
+    };
+
+    private static boolean isRefundLike(String narration) {
+        if (narration == null) return false;
+        String n = narration.toLowerCase();
+        for (String marker : REFUND_MARKERS) {
+            if (n.contains(marker)) return true;
+        }
+        return false;
+    }
+
+    private static boolean matchesCardPayment(String narration) {
+        if (narration == null) return false;
+        String n = narration.toLowerCase();
+        for (String marker : CARD_PAYMENT_MARKERS) {
+            if (n.contains(marker)) return true;
+        }
+        return false;
+    }
+
+    // ── Card bill payment reclassification ────────────────────────────────────
+
+    /**
+     * Restamps bank-account debits that are credit-card bill payments so they
+     * stop counting as spending once the card's own purchases are synced.
+     *
+     * This has to reach backwards: the AA pulls up to twelve months of card
+     * history, and the bank side already holds twelve months of bill payments
+     * that were imported (correctly, at the time) as ordinary expenses. Without
+     * this pass the first card sync would double-count a year of card spending.
+     *
+     * Only rows whose narration clearly names a card payment are touched, and
+     * only for a user who now has card data — a user with no card connected is
+     * left exactly as before.
+     */
+    private void reclassifyCardBillPayments(User user) {
+        List<Transaction> restamped = txnRepo.findByUser(user).stream()
+                .filter(t -> "BANK".equals(t.getSource()))
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
+                .filter(t -> !com.fintwin.util.TransactionMath.isCardBillPayment(t))
+                .filter(t -> matchesCardPayment(t.getMerchant()))
+                .peek(t -> t.setCategory(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY))
+                .toList();
+
+        if (!restamped.isEmpty()) {
+            txnRepo.saveAll(restamped);
+            log.info("Card sync: reclassified {} bank-side bill payments for user #{}",
+                     restamped.size(), user.getId());
+        }
+    }
+
+    // ── Card outstanding balance → liability ──────────────────────────────────
+
+    /**
+     * Mirrors each card's outstanding balance into a liability so net worth
+     * accounts for money already spent but not yet repaid. Upserted by name so
+     * repeated syncs update the balance instead of stacking duplicates.
+     */
+    @SuppressWarnings("unchecked")
+    private void syncCardLiabilities(User user, List<Map<String, Object>> cardAccounts) {
+        Map<String, Liability> existing = liabilityRepo.findByUser(user).stream()
+                .filter(l -> CARD_LIABILITY_TYPE.equalsIgnoreCase(l.getType()))
+                .filter(l -> l.getName() != null)
+                .collect(Collectors.toMap(Liability::getName, l -> l, (a, b) -> a));
+
+        // Collected by name first. The masked number is what makes the name
+        // unique, so two cards that arrive without one share a row — summing
+        // them keeps the total debt right, where last-write-wins would hide a
+        // whole card's balance.
+        Map<String, Double> outstandingByName = new LinkedHashMap<>();
+        for (Map<String, Object> account : cardAccounts) {
+            try {
+                Map<String, Object> summary = (Map<String, Object>) account.get("summary");
+                if (summary == null) continue;
+
+                Double outstanding = firstNumber(summary,
+                        "currentBalance", "outstandingBalance", "totalDueAmount", "currentDue");
+                if (outstanding == null) continue;
+
+                String masked = safeStr(account, "maskedAccNumber");
+                if (masked == null) masked = safeStr(summary, "maskedAccNumber");
+                String name = CARD_LIABILITY_TYPE + (masked != null ? " " + masked : "");
+
+                // A card balance is what is owed — always a positive liability,
+                // however the FIP signs it.
+                outstandingByName.merge(name, Math.abs(outstanding), Double::sum);
+            } catch (Exception e) {
+                log.warn("Card summary parse error: {}", e.getMessage());
+            }
+        }
+
+        List<Liability> toSave = new ArrayList<>();
+        for (Map.Entry<String, Double> entry : outstandingByName.entrySet()) {
+            Liability l = existing.get(entry.getKey());
+            if (l == null) {
+                l = new Liability();
+                l.setUser(user);
+                l.setName(entry.getKey());
+                l.setType(CARD_LIABILITY_TYPE);
+            }
+            l.setAmount(entry.getValue());
+            toSave.add(l);
+        }
+
+        if (!toSave.isEmpty()) {
+            liabilityRepo.saveAll(toSave);
+            log.info("Card sync: {} card liabilities updated for user #{}", toSave.size(), user.getId());
+        }
+    }
+
+    /** First of the given keys that parses as a number, or null. */
+    private Double firstNumber(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            String v = safeStr(map, key);
+            if (v == null) continue;
+            try {
+                return Double.parseDouble(v.replace(",", "").trim());
+            } catch (NumberFormatException ignored) {
+                // try the next key
+            }
+        }
+        return null;
     }
 
     private String safeStr(Map<String, Object> map, String key) {

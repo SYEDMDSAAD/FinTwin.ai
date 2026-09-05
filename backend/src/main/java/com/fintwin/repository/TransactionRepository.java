@@ -23,6 +23,8 @@ public interface TransactionRepository
 
     long countByUser(User user);
 
+    long countByUserAndSource(User user, String source);
+
     void deleteByUser(User user);
 
     @Query("SELECT t FROM Transaction t WHERE t.user = :user AND (t.source = 'SEED' OR t.source IS NULL)")
