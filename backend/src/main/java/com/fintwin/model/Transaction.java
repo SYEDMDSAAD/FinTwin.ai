@@ -20,8 +20,13 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class Transaction {
 
+    // A pooled sequence, not IDENTITY: with IDENTITY Hibernate must run each
+    // INSERT alone to learn its id, which silently disables JDBC batching. A
+    // 300-row statement then cost 300 round trips (~50 s to a remote DB);
+    // pooled ids let inserts go 50 per batch. Matches V18's INCREMENT BY 50.
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "transaction_id_seq")
+    @SequenceGenerator(name = "transaction_id_seq", sequenceName = "transaction_id_seq", allocationSize = 50)
     private Long id;
 
     @Version

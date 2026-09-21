@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { screen, fireEvent, render } from "@testing-library/react";
+import MockAdapter from "axios-mock-adapter";
+import API from "../services/api";
 import { renderPage } from "../test/renderPage";
-import OnboardingPage, { StatementProgress } from "./OnboardingPage";
+import OnboardingPage, { StatementProgress, StatementSnapshot } from "./OnboardingPage";
 
 // Two months of a real-looking statement: Aug and Sep 2026
 const STATEMENT = [
@@ -92,3 +94,49 @@ describe("StatementProgress", () => {
     expect(screen.getByRole("status")).toHaveTextContent(text);
   });
 });
+
+describe("StatementSnapshot", () => {
+  let mock;
+  beforeEach(() => { mock = new MockAdapter(API); });
+  afterEach(() => { mock.restore(); });
+
+  it("invites an upload before there is anything to show", () => {
+    render(<StatementSnapshot months={[]} refreshKey={0} />);
+    expect(screen.getByText(/Upload a statement and your money in/)).toBeInTheDocument();
+    expect(mock.history.get).toHaveLength(0);
+  });
+
+  it("shows what the imported statements contain", async () => {
+    mock.onGet("/analytics/monthly-summary").reply(200, {
+      income: 117720, expenses: 94628, transactionCount: 341,
+      topCategory: "Food", topMerchant: "Paid to Apple Services",
+    });
+    render(<StatementSnapshot months={["2026-07", "2026-08", "2026-09"]} refreshKey={1} />);
+
+    expect(await screen.findByText("₹1,17,720")).toBeInTheDocument();
+    expect(screen.getByText("₹94,628")).toBeInTheDocument();
+    expect(screen.getByText("341")).toBeInTheDocument();
+    expect(screen.getByText("Food")).toBeInTheDocument();
+    expect(screen.getByText("3 MONTHS")).toBeInTheDocument();
+  });
+
+  it("refreshes after each import", async () => {
+    mock.onGet("/analytics/monthly-summary").reply(200, { income: 1, expenses: 1, transactionCount: 1 });
+    const { rerender } = render(<StatementSnapshot months={["2026-09"]} refreshKey={1} />);
+    await screen.findByText("1 MONTH");
+    rerender(<StatementSnapshot months={["2026-08", "2026-09"]} refreshKey={2} />);
+    await screen.findByText("2 MONTHS");
+    expect(mock.history.get.length).toBe(2);
+  });
+});
+
+describe("OnboardingPage — step 2 right-hand panel", () => {
+  beforeEach(() => sessionStorage.clear());
+
+  it("shows the statement snapshot, not a bank sync that will never come", () => {
+    openStepTwo();
+    expect(screen.getByText("FROM YOUR STATEMENTS")).toBeInTheDocument();
+    expect(screen.queryByText("LIVE SNAPSHOT")).not.toBeInTheDocument();
+  });
+});
+

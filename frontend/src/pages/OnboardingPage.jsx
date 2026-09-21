@@ -323,6 +323,74 @@ const monthLabel = (ym) => {
   return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 };
 
+// Right-hand panel on the statement path: what the imported statements show.
+// Net worth needs assets and debts, which come in the next step — a statement
+// can't supply them — so this reports the money that moved instead.
+export function StatementSnapshot({ months, refreshKey }) {
+  const [summary, setSummary] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (months.length === 0) return undefined;
+    let alive = true;
+    API.get("/analytics/monthly-summary")
+      .then(r => { if (alive) { setSummary(r.data); setFailed(false); } })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [months.length, refreshKey]);
+
+  const fmt = v => `₹${Math.round(v || 0).toLocaleString("en-IN")}`;
+  const has = months.length > 0 && summary && !failed;
+
+  return (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 20, padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.1em" }}>FROM YOUR STATEMENTS</div>
+        {has && (
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", color: "#4ade80" }}>
+            {months.length} {months.length === 1 ? "MONTH" : "MONTHS"}
+          </span>
+        )}
+      </div>
+
+      {!has ? (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
+          {months.length === 0
+            ? "Upload a statement and your money in, money out and top spending appear here."
+            : failed ? "Imported. The summary will show on your dashboard." : "Adding up your statements…"}
+        </p>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: "var(--text-label)", marginBottom: 4 }}>Last 3 months</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Money in</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#4ade80" }}>{fmt(summary.income)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Money out</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#f87171" }}>{fmt(summary.expenses)}</div>
+            </div>
+          </div>
+          {[
+            { label: "Transactions",  val: (summary.transactionCount || 0).toLocaleString("en-IN") },
+            { label: "Top category",  val: summary.topCategory || "—" },
+            { label: "Top merchant",  val: summary.topMerchant || "—" },
+          ].map(r => (
+            <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--border-subtle)", fontSize: 13 }}>
+              <span style={{ color: "var(--text-secondary)" }}>{r.label}</span>
+              <span style={{ color: "var(--text-primary)", fontWeight: 600, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 190 }}>{r.val}</span>
+            </div>
+          ))}
+          <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "12px 0 0", lineHeight: 1.5 }}>
+            Transfers between your own accounts and card bill payments aren't counted as spending.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // How many months the uploaded statements cover, against the 2–3 FinTwin needs
 export function StatementProgress({ months }) {
   const n = months.length;
@@ -379,6 +447,7 @@ export default function OnboardingPage() {
   const [bankPhase,       setBankPhase]       = useState(() => sessionStorage.getItem("ob-bank-phase") === "statements" ? "statements" : "connect");
   const [setuOpen,        setSetuOpen]        = useState(false);
   // Months ("2026-07") covered by statements uploaded during onboarding
+  const [stmtImports,     setStmtImports]     = useState(0);   // refreshes the snapshot
   const [stmtMonths,      setStmtMonths]      = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("ob-stmt-months") || "[]"); } catch { return []; }
   });
@@ -556,6 +625,7 @@ export default function OnboardingPage() {
     setIsManualPath(false);
     const months = summary?.months || [];
     setStmtMonths(prev => [...new Set([...prev, ...months])].sort());
+    setStmtImports(n => n + 1);
   };
 
   const handleManualPath = () => {
@@ -1434,7 +1504,9 @@ export default function OnboardingPage() {
           {/* Right: ambient panel */}
           <div className="ob-right-panel" style={{ position: "sticky", top: 80, height: "fit-content" }}>
             {step === 0 && <SecurityPanel />}
-            {step === 1 && <BankPanel data={netWorthData} />}
+            {step === 1 && (bankPhase === "syncing"
+              ? <BankPanel data={netWorthData} />
+              : <StatementSnapshot months={stmtMonths} refreshKey={stmtImports} />)}
             {step === 2 && <ProfilePanel income={monthlyIncome} expenses={monthlyExpenses} />}
             {step === 3 && (
               <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "24px" }}>
