@@ -59,6 +59,63 @@ public final class TransactionMath {
         return CARD_PAYMENT_CATEGORY.equalsIgnoreCase(t.getCategory());
     }
 
+    // Bank-side narrations for a credit-card bill payment. Deliberately narrow:
+    // a false positive here silently erases real spending from every aggregate.
+    private static final String[] CARD_PAYMENT_MARKERS = {
+            "credit card payment", "creditcard payment", "cc payment", "card payment",
+            "payment to credit card", "cc bill", "credit card bill", "bbps cc",
+            "autopay si-tad", "cred club", "cred.club"
+    };
+
+    // Card-side credits that are money coming back rather than a repayment.
+    private static final String[] REFUND_MARKERS = {
+            "refund", "reversal", "reversed", "chargeback", "cashback",
+            "cash back", "returned", "disputed"
+    };
+
+    /** True when a bank-side narration names a credit-card bill payment. */
+    public static boolean matchesCardPayment(String narration) {
+        return containsAny(narration, CARD_PAYMENT_MARKERS);
+    }
+
+    /** True when a card-side credit is a refund or cashback, not a repayment. */
+    public static boolean isRefundLike(String narration) {
+        return containsAny(narration, REFUND_MARKERS);
+    }
+
+    /**
+     * Sources whose debits can be the bank-side leg of a card bill payment:
+     * AA-synced bank accounts and uploaded bank statements.
+     */
+    private static final java.util.Set<String> BANK_SIDE_SOURCES = java.util.Set.of("BANK", "STATEMENT");
+
+    /**
+     * Restamps bank-side debits that are credit-card bill payments, and returns
+     * the rows it changed so the caller can persist them.
+     *
+     * Call only once the user has card purchases on record (AA-synced or from
+     * an uploaded card statement). Before that, the bill payment is the only
+     * trace of that card spending and must keep counting.
+     */
+    public static List<Transaction> restampCardBillPayments(List<Transaction> transactions) {
+        return transactions.stream()
+                .filter(t -> BANK_SIDE_SOURCES.contains(t.getSource()))
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
+                .filter(t -> !isCardBillPayment(t))
+                .filter(t -> matchesCardPayment(t.getMerchant()))
+                .peek(t -> t.setCategory(CARD_PAYMENT_CATEGORY))
+                .toList();
+    }
+
+    private static boolean containsAny(String text, String[] markers) {
+        if (text == null) return false;
+        String lower = text.toLowerCase();
+        for (String marker : markers) {
+            if (lower.contains(marker)) return true;
+        }
+        return false;
+    }
+
     /**
      * True when the transaction should be kept out of income and expense
      * aggregates — money moved between the user's own accounts, or either leg

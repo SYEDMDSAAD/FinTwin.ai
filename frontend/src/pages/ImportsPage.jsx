@@ -2,46 +2,11 @@ import { useState, useRef } from "react";
 import { Upload, FileText, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
+import { parseStatement, guessMapping, buildImportRows, summarize } from "../services/statementParser";
 
 const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 
-function normalizeDate(str) {
-  if (!str) return new Date().toISOString().slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-  const d = new Date(str);
-  return isNaN(d) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
-  const rows = lines.slice(1).map(line => {
-    const vals = [];
-    let cur = "", inQ = false;
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; continue; }
-      if (ch === "," && !inQ) { vals.push(cur.trim()); cur = ""; }
-      else cur += ch;
-    }
-    vals.push(cur.trim());
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
-    return obj;
-  });
-  return { headers, rows };
-}
-
-function getAmount(row, mapping, debitCreditMode) {
-  if (debitCreditMode) {
-    const credit = parseFloat(row[mapping.credit]) || 0;
-    const debit  = parseFloat(row[mapping.debit])  || 0;
-    return credit - debit; // positive = income, negative = expense
-  }
-  return parseFloat(row[mapping.amount]) || 0;
-}
+const EMPTY_MAPPING = { date: "", merchant: "", amount: "", category: "", debit: "", credit: "", balance: "" };
 
 function StepIndicator({ step }) {
   return (
@@ -76,22 +41,32 @@ export default function ImportsPage({ onImported }) {
   const [step, setStep] = useState(0);
   const [csvData, setCsvData] = useState(null);
   const [fileName, setFileName] = useState("");
+  const [accountType, setAccountType] = useState("BANK");
   const [debitCreditMode, setDebitCreditMode] = useState(false);
-  const [mapping, setMapping] = useState({ date: "", merchant: "", amount: "", category: "", debit: "", credit: "" });
-  const [preview, setPreview] = useState([]);
+  const [flipSign, setFlipSign] = useState(false);
+  const [mapping, setMapping] = useState(EMPTY_MAPPING);
+  const [built, setBuilt] = useState({ rows: [], skipped: 0 });
   const [importing, setImporting] = useState(false);
-  const [importDone, setImportDone] = useState(false);
+  const [result, setResult] = useState(null);
   const fileRef = useRef();
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.endsWith(".csv")) { toast.error("Please select a .csv file"); return; }
+    // HDFC and a few others export tab-delimited .txt; the parser sniffs the delimiter
+    if (!/\.(csv|txt)$/i.test(file.name)) { toast.error("Please select a .csv or .txt statement"); return; }
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const parsed = parseCSV(ev.target.result);
+      const parsed = parseStatement(ev.target.result);
+      if (parsed.rows.length === 0) {
+        toast.error("No transactions found in this file");
+        return;
+      }
+      const guess = guessMapping(parsed.headers);
       setCsvData(parsed);
+      setMapping({ ...EMPTY_MAPPING, ...guess.mapping });
+      setDebitCreditMode(guess.debitCreditMode);
       setStep(1);
     };
     reader.readAsText(file);
@@ -102,31 +77,25 @@ export default function ImportsPage({ onImported }) {
     : (mapping.date && mapping.amount);
 
   const buildPreview = () => {
-    const rows = (csvData?.rows || []).slice(0, 10).map((row, i) => ({
-      id: i,
-      date: normalizeDate(row[mapping.date]),
-      merchant: row[mapping.merchant] || row[Object.keys(row)[0]] || "Unknown",
-      amount: getAmount(row, mapping, debitCreditMode),
-      category: row[mapping.category] || "Others",
-    }));
-    setPreview(rows);
+    const next = buildImportRows(csvData?.rows || [], mapping, { debitCreditMode, flipSign });
+    if (next.rows.length === 0) {
+      toast.error("No rows could be read with this mapping — check the date and amount columns.");
+      return;
+    }
+    setBuilt(next);
     setStep(2);
   };
 
   const doImport = async () => {
-    const all = (csvData?.rows || []).map(row => ({
-      date: normalizeDate(row[mapping.date]),
-      merchant: row[mapping.merchant] || "Unknown",
-      amount: getAmount(row, mapping, debitCreditMode),
-      category: row[mapping.category] || "Others",
-    })).filter(r => r.amount !== 0);
-
     setImporting(true);
     try {
-      const res = await API.post("/transactions/batch", all);
-      const count = res.data?.imported ?? all.length;
-      toast.success(`Imported ${count} transactions!`);
-      setImportDone(true);
+      const res = await API.post("/transactions/batch", built.rows, { params: { accountType } });
+      const imported = res.data?.imported ?? built.rows.length;
+      const duplicates = res.data?.duplicates ?? 0;
+      setResult({ imported, duplicates, skipped: (res.data?.skipped ?? 0) + built.skipped });
+      toast.success(duplicates
+        ? `Imported ${imported} transactions · ${duplicates} already imported earlier`
+        : `Imported ${imported} transactions!`);
       if (onImported) onImported();
     } catch (err) {
       toast.error("Import failed: " + (err?.response?.data?.message || "Check your column mapping."));
@@ -139,10 +108,12 @@ export default function ImportsPage({ onImported }) {
     setStep(0);
     setCsvData(null);
     setFileName("");
+    setAccountType("BANK");
     setDebitCreditMode(false);
-    setMapping({ date: "", merchant: "", amount: "", category: "", debit: "", credit: "" });
-    setPreview([]);
-    setImportDone(false);
+    setFlipSign(false);
+    setMapping(EMPTY_MAPPING);
+    setBuilt({ rows: [], skipped: 0 });
+    setResult(null);
   };
 
   const headers = csvData?.headers || [];
@@ -167,9 +138,9 @@ export default function ImportsPage({ onImported }) {
       {step === 0 && (
         <div style={CARD}>
           <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent)", borderRadius: 18 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 14 }}>STEP 1 — UPLOAD CSV FILE</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 14 }}>STEP 1 — UPLOAD STATEMENT</div>
           <p style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", lineHeight: 1.6, marginBottom: 20 }}>
-            Export your bank statement as a CSV file and upload it here. In the next step you'll map which columns contain the date, amount, and merchant.
+            Download your bank or credit-card statement from net banking as CSV (or delimited .txt) and upload it here. We'll find the table and guess the columns; you can correct them in the next step. Uploading the same statement twice is safe — rows already imported are skipped.
           </p>
 
           <label
@@ -183,10 +154,10 @@ export default function ImportsPage({ onImported }) {
             onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(167,139,250,0.25)"}
           >
             <FileText size={36} color="rgba(167,139,250,0.4)" style={{ marginBottom: 10 }} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Click to select a CSV file</span>
-            <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>Supports SBI, HDFC, Zerodha, Groww and more</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Click to select a statement file</span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>CSV or .txt · SBI, HDFC, ICICI, Axis, Kotak and most others</span>
           </label>
-          <input ref={fileRef} id="csv-upload" type="file" accept=".csv" style={{ display: "none" }} onChange={handleFile} />
+          <input ref={fileRef} id="csv-upload" type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFile} />
 
           <div style={{ marginTop: 20, padding: 16, background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 12, fontSize: 12, color: "rgba(148,163,184,0.6)" }}>
             💡 For bank statement screenshots (PDF or image), use <strong style={{ color: "#22d3ee" }}>OCR Uploads</strong> in the sidebar instead.
@@ -200,6 +171,35 @@ export default function ImportsPage({ onImported }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 2 — MAP COLUMNS</div>
           <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", marginBottom: 16 }}>
             File: <strong style={{ color: "#a78bfa" }}>{fileName}</strong> · {csvData.rows.length} rows detected
+            {csvData.preambleLines > 0 && <> · skipped {csvData.preambleLines} header lines</>}
+          </div>
+
+          {/* Account type — card statements invert the meaning of credits */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>THIS STATEMENT IS FROM</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[
+                { value: "BANK", label: "Bank account", hint: "Savings or current account" },
+                { value: "CARD", label: "Credit card", hint: "Card payments you make are not counted twice" },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setAccountType(opt.value)}
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 12, fontWeight: 600, transition: "all 0.2s", textAlign: "left",
+                    background: accountType === opt.value ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${accountType === opt.value ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.08)"}`,
+                    color: accountType === opt.value ? "#a78bfa" : "rgba(148,163,184,0.5)",
+                  }}
+                >
+                  {opt.label}
+                  <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, color: accountType === opt.value ? "rgba(167,139,250,0.7)" : "rgba(148,163,184,0.35)" }}>
+                    {opt.hint}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Bank format toggle */}
@@ -293,6 +293,15 @@ export default function ImportsPage({ onImported }) {
                 {headers.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
+
+            {/* Balance — lets identical same-day rows be told apart on re-import */}
+            <div>
+              <label style={lbl}>Balance Column</label>
+              <select style={inp} value={mapping.balance} onChange={e => setMapping(m => ({ ...m, balance: e.target.value }))}>
+                <option value="">-- Running balance (optional) --</option>
+                {headers.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Sample row preview */}
@@ -308,6 +317,13 @@ export default function ImportsPage({ onImported }) {
                 ))}
               </div>
             </div>
+          )}
+
+          {!debitCreditMode && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 12, color: "rgba(148,163,184,0.7)", cursor: "pointer" }}>
+              <input type="checkbox" checked={flipSign} onChange={e => setFlipSign(e.target.checked)} />
+              Spending shows as positive numbers in this file (common on card statements) — flip the signs
+            </label>
           )}
 
           {debitCreditMode && (
@@ -334,7 +350,15 @@ export default function ImportsPage({ onImported }) {
         <div style={CARD}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 3 — PREVIEW & IMPORT</div>
           <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", marginBottom: 16 }}>
-            Showing first 10 of {csvData.rows.length} rows. Review before importing.
+            {(() => {
+              const sum = summarize(built.rows);
+              const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
+              return <>
+                {sum.count} transactions from {sum.from} to {sum.to} · {inr(sum.out)} out · {inr(sum.in)} in
+                {built.skipped > 0 && <> · {built.skipped} rows without a date or amount skipped</>}
+                <br />Showing the first {Math.min(10, sum.count)}. Categories marked Auto are filled in from the description.
+              </>;
+            })()}
           </div>
 
           <div style={{ overflowX: "auto", marginBottom: 20 }}>
@@ -347,7 +371,7 @@ export default function ImportsPage({ onImported }) {
                 </tr>
               </thead>
               <tbody>
-                {preview.map((row, i) => (
+                {built.rows.slice(0, 10).map((row, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                     <td style={{ padding: "9px 12px", fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{row.date}</td>
                     <td style={{ padding: "9px 12px", fontSize: 13, color: "#fff" }}>{row.merchant}</td>
@@ -356,7 +380,7 @@ export default function ImportsPage({ onImported }) {
                     </td>
                     <td style={{ padding: "9px 12px" }}>
                       <span style={{ fontSize: 11, color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 6, padding: "2px 8px" }}>
-                        {row.category}
+                        {row.category || "Auto"}
                       </span>
                     </td>
                   </tr>
@@ -365,11 +389,15 @@ export default function ImportsPage({ onImported }) {
             </table>
           </div>
 
-          {importDone ? (
+          {result ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>Import Complete!</div>
-              <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", marginBottom: 20 }}>{csvData.rows.length} transactions imported.</div>
+              <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", marginBottom: 20 }}>
+                {result.imported} transactions imported
+                {result.duplicates > 0 && <> · {result.duplicates} already imported earlier, skipped</>}
+                {result.skipped > 0 && <> · {result.skipped} rows could not be read</>}
+              </div>
               <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
             </div>
           ) : (
@@ -380,7 +408,7 @@ export default function ImportsPage({ onImported }) {
                 disabled={importing}
                 style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
               >
-                {importing ? "Importing..." : `Import All ${csvData.rows.length} Transactions`}
+                {importing ? "Importing..." : `Import ${built.rows.length} Transactions`}
               </button>
             </div>
           )}

@@ -156,6 +156,47 @@ class TransactionMathTest {
         assertThat(TransactionMath.incomeReliable(txns)).isTrue();
     }
 
+    // ── Card bill payment rules (shared by AA sync and statement import) ────
+
+    @Test
+    void matchesCardPayment_readsBankSideBillNarrations() {
+        assertThat(TransactionMath.matchesCardPayment("NEFT DR CREDIT CARD PAYMENT HDFC")).isTrue();
+        assertThat(TransactionMath.matchesCardPayment("UPI/CRED CLUB/cred.club@axisb")).isTrue();
+        assertThat(TransactionMath.matchesCardPayment("UPI/SWIGGY/swiggy@icici")).isFalse();
+        assertThat(TransactionMath.matchesCardPayment(null)).isFalse();
+    }
+
+    @Test
+    void isRefundLike_separatesMoneyBackFromRepayments() {
+        assertThat(TransactionMath.isRefundLike("REFUND AMAZON ORDER 123")).isTrue();
+        assertThat(TransactionMath.isRefundLike("CASHBACK CREDITED")).isTrue();
+        assertThat(TransactionMath.isRefundLike("PAYMENT RECEIVED - THANK YOU")).isFalse();
+    }
+
+    @Test
+    void restampCardBillPayments_touchesOnlyBankSideBillDebits() {
+        Transaction aaBill    = sourced(txn(-12_000.0, "CREDIT CARD PAYMENT", "Other", LocalDate.of(2026, 8, 5)), "BANK");
+        Transaction stmtBill  = sourced(txn(-9_000.0,  "CC PAYMENT ICICI",    "Other", LocalDate.of(2026, 7, 5)), "STATEMENT");
+        Transaction cardSide  = sourced(txn(12_000.0,  "PAYMENT RECEIVED",    "Card Payment", LocalDate.of(2026, 8, 5)), "CARD");
+        Transaction manual    = sourced(txn(-500.0,    "card payment to dad", "Other", LocalDate.of(2026, 8, 6)), "MANUAL");
+        Transaction groceries = sourced(txn(-800.0,    "BIGBASKET",           "Food",  LocalDate.of(2026, 8, 7)), "BANK");
+        Transaction refundIn  = sourced(txn(9_000.0,   "CREDIT CARD PAYMENT REVERSAL", "Other", LocalDate.of(2026, 8, 8)), "BANK");
+
+        List<Transaction> restamped = TransactionMath.restampCardBillPayments(
+                List.of(aaBill, stmtBill, cardSide, manual, groceries, refundIn));
+
+        assertThat(restamped).containsExactlyInAnyOrder(aaBill, stmtBill);
+        assertThat(aaBill.getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
+        assertThat(stmtBill.getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
+        assertThat(manual.getCategory()).isEqualTo("Other");
+        assertThat(refundIn.getCategory()).isEqualTo("Other");
+    }
+
+    private static Transaction sourced(Transaction t, String source) {
+        t.setSource(source);
+        return t;
+    }
+
     private static Transaction txn(Double amount, String merchant, String category, LocalDate date) {
         Transaction t = new Transaction();
         t.setAmount(amount);

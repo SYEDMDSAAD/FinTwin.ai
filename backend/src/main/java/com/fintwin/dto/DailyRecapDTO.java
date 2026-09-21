@@ -39,7 +39,7 @@ public class DailyRecapDTO {
         private double    amount;
         private String    category;
         private LocalDate date;
-        /** "BANK", "CARD", "MANUAL" — which rail this came from. */
+        /** "BANK", "CARD", "STATEMENT", "MANUAL" — which rail this came from. */
         private String    source;
 
         public RecapChargeDTO() {}

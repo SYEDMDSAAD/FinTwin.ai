@@ -715,14 +715,6 @@ public class BankConnectionService {
         return t;
     }
 
-    // Bank-side narrations for a credit-card bill payment. Deliberately narrow:
-    // a false positive here silently erases real spending from every aggregate.
-    private static final String[] CARD_PAYMENT_MARKERS = {
-            "credit card payment", "creditcard payment", "cc payment", "card payment",
-            "payment to credit card", "cc bill", "credit card bill", "bbps cc",
-            "autopay si-tad", "cred club", "cred.club"
-    };
-
     private String deriveCategory(String narration, String type,
                                   Map<String, String> learnedRules,
                                   boolean isCard, boolean cardSyncActive) {
@@ -733,13 +725,14 @@ public class BankConnectionService {
             // coming back from a merchant. A repayment is the mirror image of the
             // bank-side debit and must not be counted twice; a refund or cashback
             // genuinely offsets that month's card spending and stays.
-            if (isCredit && !isRefundLike(narration)) {
+            if (isCredit && !com.fintwin.util.TransactionMath.isRefundLike(narration)) {
                 return com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY;
             }
             // A card credit is never income, whatever the narration says — the
             // keyword rules below would read "CREDIT"/"inward" as salary.
             if (isCredit) return "Other";
-        } else if (cardSyncActive && !isCredit && matchesCardPayment(narration)) {
+        } else if (cardSyncActive && !isCredit
+                   && com.fintwin.util.TransactionMath.matchesCardPayment(narration)) {
             // Bank-side leg of the same bill payment. Guarded on cardSyncActive:
             // without the card's purchases in the database this debit is the only
             // record of that spending, and dropping it would understate expenses.
@@ -787,30 +780,6 @@ public class BankConnectionService {
         return "Other";
     }
 
-    // Card-side credits that are money coming back rather than a repayment.
-    private static final String[] REFUND_MARKERS = {
-            "refund", "reversal", "reversed", "chargeback", "cashback",
-            "cash back", "returned", "disputed"
-    };
-
-    private static boolean isRefundLike(String narration) {
-        if (narration == null) return false;
-        String n = narration.toLowerCase();
-        for (String marker : REFUND_MARKERS) {
-            if (n.contains(marker)) return true;
-        }
-        return false;
-    }
-
-    private static boolean matchesCardPayment(String narration) {
-        if (narration == null) return false;
-        String n = narration.toLowerCase();
-        for (String marker : CARD_PAYMENT_MARKERS) {
-            if (n.contains(marker)) return true;
-        }
-        return false;
-    }
-
     // ── Card bill payment reclassification ────────────────────────────────────
 
     /**
@@ -827,13 +796,8 @@ public class BankConnectionService {
      * left exactly as before.
      */
     private void reclassifyCardBillPayments(User user) {
-        List<Transaction> restamped = txnRepo.findByUser(user).stream()
-                .filter(t -> "BANK".equals(t.getSource()))
-                .filter(t -> t.getAmount() != null && t.getAmount() < 0)
-                .filter(t -> !com.fintwin.util.TransactionMath.isCardBillPayment(t))
-                .filter(t -> matchesCardPayment(t.getMerchant()))
-                .peek(t -> t.setCategory(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY))
-                .toList();
+        List<Transaction> restamped = com.fintwin.util.TransactionMath
+                .restampCardBillPayments(txnRepo.findByUser(user));
 
         if (!restamped.isEmpty()) {
             txnRepo.saveAll(restamped);

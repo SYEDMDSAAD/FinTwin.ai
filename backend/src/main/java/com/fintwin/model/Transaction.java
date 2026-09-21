@@ -43,10 +43,11 @@ public class Transaction {
     @Column(length = 400)
     private String category;
 
-    // "MANUAL" or "BANK" — null treated as MANUAL for legacy rows
+    // "MANUAL", "BANK" (AA sync), "CARD" (AA card sync or card statement),
+    // "STATEMENT" (uploaded bank statement) — null treated as MANUAL for legacy rows
     private String source;
 
-    // Setu txnId — used for deduplication on re-sync
+    // Dedupe key: Setu txnId ("CARD:" prefix for cards) or a statement-row hash ("STMT:")
     @Column(name = "external_id")
     private String externalId;
 

@@ -44,8 +44,9 @@ export function groupByDay(charges = [], today = new Date()) {
 // user the card is actually connected.
 const SOURCE_LABEL = {
     CARD:   "Card",
-    BANK:   "Bank",
-    MANUAL: "Added by you",
+    BANK:      "Bank",
+    STATEMENT: "Statement",
+    MANUAL:    "Added by you",
 };
 
 function DailyRecap() {

@@ -6,6 +6,7 @@ import com.fintwin.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,9 +18,13 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fintwin.exception.NotFoundException;
 import com.fintwin.model.Transaction;
+import com.fintwin.util.StatementImport;
+import com.fintwin.util.TransactionMath;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -230,24 +236,176 @@ class TransactionServiceTest {
 
         // Dating an undated row "today" piles whole batches onto the import
         // date and corrupts every month-based figure built on top of it.
-        int saved = service.importBatch(List.of(
+        TransactionService.ImportResult result = service.importBatch(List.of(
                 Map.of("merchant", "Swiggy", "amount", -500.0),
                 Map.of("date", "not-a-date", "merchant", "Uber", "amount", -300.0),
                 Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0)
-        ));
+        ), "BANK");
 
-        assertThat(saved).isEqualTo(1);
+        assertThat(result.imported()).isEqualTo(1);
+        assertThat(result.skipped()).isEqualTo(2);
     }
 
     @Test
     void importBatch_keepsRowsWhoseDateParses() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
-        int saved = service.importBatch(List.of(
+        TransactionService.ImportResult result = service.importBatch(List.of(
                 Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0),
                 Map.of("date", "05/01/2026", "merchant", "Swiggy", "amount", -500.0)
-        ));
+        ), "BANK");
 
-        assertThat(saved).isEqualTo(2);
+        assertThat(result.imported()).isEqualTo(2);
+    }
+
+    // ── importBatch — statements ─────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private List<Transaction> savedRows() {
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(repository, atLeastOnce()).saveAll(captor.capture());
+        return captor.getAllValues().get(0);
+    }
+
+    private static Map<String, Object> row(String date, String merchant, Object amount) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("date", date);
+        m.put("merchant", merchant);
+        m.put("amount", amount);
+        return m;
+    }
+
+    @Test
+    void importBatch_placeholderCategoryDoesNotBlockAutoCategorisation() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(categoryService.categorize(eq("UPI/SWIGGY"), any())).thenReturn("Food");
+
+        // The import page used to send "Others" for every unmapped row, which
+        // the service took as a real category — every statement landed there.
+        Map<String, Object> r = row("2026-09-01", "UPI/SWIGGY", -450.0);
+        r.put("category", "Others");
+        service.importBatch(List.of(r), "BANK");
+
+        assertThat(savedRows().get(0).getCategory()).isEqualTo("Food");
+    }
+
+    @Test
+    void importBatch_keepsARealCategoryFromTheFile() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        Map<String, Object> r = row("2026-09-01", "Zerodha fund transfer", -5000.0);
+        r.put("category", "Investments");
+        service.importBatch(List.of(r), "BANK");
+
+        assertThat(savedRows().get(0).getCategory()).isEqualTo("Investments");
+    }
+
+    @Test
+    void importBatch_readsIndianFormattedAmountStrings() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        service.importBatch(List.of(
+                row("2026-09-01", "RENT SEPT", "25,000.00 Dr"),
+                row("2026-09-01", "NEFT CR ACME PAYROLL", "1,20,000.00 Cr")
+        ), "BANK");
+
+        List<Transaction> saved = savedRows();
+        assertThat(saved).extracting(Transaction::getAmount).containsExactly(-25_000.0, 120_000.0);
+    }
+
+    @Test
+    void importBatch_tagsBankStatementRowsWithAStableExternalId() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        service.importBatch(List.of(row("2026-09-01", "UPI/NETFLIX", -649.0)), "BANK");
+
+        Transaction t = savedRows().get(0);
+        assertThat(t.getSource()).isEqualTo("STATEMENT");
+        assertThat(t.getExternalId()).isEqualTo(
+                StatementImport.externalId(java.time.LocalDate.of(2026, 9, 1), -649.0, "UPI/NETFLIX", null, 0));
+    }
+
+    @Test
+    void importBatch_skipsRowsAlreadyImported() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        String alreadyThere = StatementImport.externalId(
+                java.time.LocalDate.of(2026, 9, 1), -649.0, "UPI/NETFLIX", null, 0);
+        when(repository.findExternalIdsByUser(user)).thenReturn(Set.of(alreadyThere));
+
+        TransactionService.ImportResult result = service.importBatch(List.of(
+                row("2026-09-01", "UPI/NETFLIX", -649.0),
+                row("2026-09-02", "UPI/SWIGGY", -300.0)
+        ), "BANK");
+
+        assertThat(result.imported()).isEqualTo(1);
+        assertThat(result.duplicates()).isEqualTo(1);
+        assertThat(savedRows()).extracting(Transaction::getMerchant).containsExactly("UPI/SWIGGY");
+    }
+
+    @Test
+    void importBatch_keepsIdenticalSameDayRowsAsSeparateTransactions() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        TransactionService.ImportResult result = service.importBatch(List.of(
+                row("2026-09-01", "UPI/CHAI POINT", -20.0),
+                row("2026-09-01", "UPI/CHAI POINT", -20.0)
+        ), "BANK");
+
+        assertThat(result.imported()).isEqualTo(2);
+        assertThat(result.duplicates()).isZero();
+    }
+
+    @Test
+    void importBatch_bankBillPaymentStillCountsWithoutCardData() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        // No card purchases on record: the bill is the only trace of that spending
+        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK");
+
+        assertThat(savedRows().get(0).getCategory()).isNotEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
+    }
+
+    @Test
+    void importBatch_bankBillPaymentExcludedOnceCardDataExists() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(repository.countByUserAndSource(user, "CARD")).thenReturn(40L);
+
+        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK");
+
+        assertThat(savedRows().get(0).getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
+    }
+
+    @Test
+    void importBatch_cardStatementSeparatesPurchasesRepaymentsAndRefunds() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(categoryService.categorize(eq("AMAZON PAY INDIA"), any())).thenReturn("Shopping");
+
+        service.importBatch(List.of(
+                row("2026-09-03", "AMAZON PAY INDIA", "2,499.00 Dr"),
+                row("2026-09-10", "PAYMENT RECEIVED - THANK YOU", "12,000.00 Cr"),
+                row("2026-09-12", "REFUND AMAZON PAY INDIA", "499.00 Cr")
+        ), "CARD");
+
+        List<Transaction> saved = savedRows();
+        assertThat(saved).extracting(Transaction::getSource).containsOnly("CARD");
+        assertThat(saved).extracting(Transaction::getCategory)
+                .containsExactly("Shopping", TransactionMath.CARD_PAYMENT_CATEGORY, "Other");
+    }
+
+    @Test
+    void importBatch_cardStatementRestampsBillPaymentsAlreadyOnRecord() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction oldBill = new Transaction();
+        oldBill.setAmount(-12_000.0);
+        oldBill.setMerchant("CREDIT CARD PAYMENT HDFC");
+        oldBill.setCategory("Other");
+        oldBill.setSource("STATEMENT");
+        when(repository.findByUser(user)).thenReturn(List.of(oldBill));
+
+        service.importBatch(List.of(row("2026-09-03", "AMAZON PAY INDIA", "2,499.00 Dr")), "CARD");
+
+        // Otherwise the bill and the purchases it paid for both count as spending
+        assertThat(oldBill.getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
+        verify(repository).saveAll(List.of(oldBill));
     }
 }

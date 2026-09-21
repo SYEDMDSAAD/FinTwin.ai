@@ -9,6 +9,8 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.util.DateNormalizer;
+import com.fintwin.util.StatementImport;
+import com.fintwin.util.TransactionMath;
 import com.fintwin.audit.Audited;
 
 import java.time.LocalDate;
@@ -129,53 +131,20 @@ public class TransactionService {
 
             if (rows.isEmpty()) return;
 
-            List<Transaction> toSave = new ArrayList<>();
-
-            // One DB hit for the user's learned rules, reused for every row
-            Map<String, String> learnedRules =
-                    categoryService.learnedRulesFor(user);
-
+            // Fixed layout: date, merchant, amount. Routed through the same
+            // import path as the column-mapped importer, so this endpoint gets
+            // the same dedupe, amount parsing and categorisation.
+            List<Map<String, Object>> mapped = new ArrayList<>();
             for (int i = 1; i < rows.size(); i++) {
-
                 String[] row = rows.get(i);
-
-                try {
-                    if (row.length < 3) continue;
-
-                    LocalDate txDate = DateNormalizer.parseFlexible(row[0]);
-                    if (txDate == null) {
-                        log.warn("Skipping CSV row {} — unparseable date '{}'", i, row[0]);
-                        continue;
-                    }
-
-                    Transaction transaction = new Transaction();
-                    transaction.setDate(txDate);
-                    transaction.setMerchant(row[1].trim());
-                    transaction.setAmount(
-                            Double.parseDouble(row[2].trim())
-                    );
-
-                    String category = categoryService.categorize(
-                            transaction.getMerchant(), learnedRules
-                    );
-                    transaction.setCategory(
-                            category != null ? category : "Other"
-                    );
-
-                    transaction.setUser(user);
-                    toSave.add(transaction);
-
-                } catch (NumberFormatException e) {
-                    // FIXED: use logger instead of System.err
-                    log.warn("Skipping invalid CSV row {}: {}",
-                            i, Arrays.toString(row));
-                }
+                if (row.length < 3) continue;
+                Map<String, Object> m = new HashMap<>();
+                m.put("date", row[0]);
+                m.put("merchant", row[1]);
+                m.put("amount", row[2]);
+                mapped.add(m);
             }
-
-            if (!toSave.isEmpty()) {
-                repository.saveAll(toSave);
-                profileService.saveScoreSnapshot(user);
-            }
+            importRows(user, mapped, false);
 
         } catch (Exception e) {
             throw new RuntimeException(
@@ -351,10 +320,23 @@ public class TransactionService {
     }
 
     // =========================
-    // BATCH IMPORT (CSV)
+    // BATCH IMPORT (bank / card statement)
     // Single request for all rows — avoids per-row rate limiting
     // =========================
 
+    /**
+     * Imports rows from a bank or credit-card statement.
+     *
+     * Re-importing a statement, or two statements whose dates overlap, must not
+     * double the user's spending, so each row gets a stable externalId and rows
+     * already on record are skipped. Categories are derived from the narration
+     * unless the file carried a real one — statements never do, and a generic
+     * placeholder must not block auto-categorisation.
+     *
+     * @param accountType "BANK" (default) or "CARD". Card rows are stored with
+     *                    source CARD, which switches on the bill-payment
+     *                    double-count guard exactly as an AA card sync does.
+     */
     @Caching(evict = {
         @CacheEvict(value = "user-insights",
                     key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
@@ -365,10 +347,10 @@ public class TransactionService {
     @Audited(
             action = "UPLOAD",
             resource = "transactions",
-            description = "Batch CSV transaction import"
+            description = "Statement transaction import"
     )
     @Transactional
-    public int importBatch(List<Map<String, Object>> rows) {
+    public ImportResult importBatch(List<Map<String, Object>> rows, String accountType) {
 
         String email = SecurityUtils.getCurrentUserEmail();
 
@@ -376,10 +358,30 @@ public class TransactionService {
                 .findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        List<Transaction> toSave = new ArrayList<>();
+        return importRows(user, rows, ACCOUNT_CARD.equalsIgnoreCase(accountType));
+    }
 
-        Map<String, String> learnedRules =
-                categoryService.learnedRulesFor(user);
+    /** Outcome of one import, so the UI can say "12 already imported". */
+    public record ImportResult(int imported, int duplicates, int skipped) {}
+
+    public static final String ACCOUNT_BANK = "BANK";
+    public static final String ACCOUNT_CARD = "CARD";
+
+    // Placeholder categories an importer sends when the file had none. Treated
+    // as absent so the narration still gets categorised.
+    private static final Set<String> PLACEHOLDER_CATEGORIES =
+            Set.of("", "other", "others", "uncategorized", "uncategorised", "misc");
+
+    private ImportResult importRows(User user, List<Map<String, Object>> rows, boolean isCard) {
+
+        Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
+        Set<String> existingIds = new HashSet<>(repository.findExternalIdsByUser(user));
+        boolean cardDataPresent = isCard || repository.countByUserAndSource(user, ACCOUNT_CARD) > 0;
+
+        Map<String, Integer> siblingCounts = new HashMap<>();
+        List<Transaction> toSave = new ArrayList<>();
+        int duplicates = 0;
+        int skipped = 0;
 
         for (Map<String, Object> row : rows) {
             try {
@@ -394,44 +396,100 @@ public class TransactionService {
                 if (date == null) {
                     log.warn("Skipping import row — missing or unparseable date '{}'",
                              row.get("date"));
+                    skipped++;
+                    continue;
+                }
+
+                Double amount = StatementImport.parseAmount(row.get("amount"));
+                if (amount == null || amount == 0.0) {
+                    skipped++;
                     continue;
                 }
 
                 String merchant = row.get("merchant") != null
-                        ? row.get("merchant").toString()
+                        && !row.get("merchant").toString().isBlank()
+                        ? row.get("merchant").toString().trim()
                         : "Unknown";
+                Double balance = StatementImport.parseAmount(row.get("balance"));
 
-                Object rawAmt = row.get("amount");
-                if (rawAmt == null) continue;
-                double amount = ((Number) rawAmt).doubleValue();
-                if (amount == 0.0) continue;
-
-                String derived = categoryService.categorize(merchant, learnedRules);
-                String category = row.get("category") != null
-                        && !row.get("category").toString().isBlank()
-                        ? row.get("category").toString()
-                        : derived != null ? derived : "Other";
+                // Identical rows in one file are real (two ₹20 chais), so each
+                // gets its position among its siblings as part of its identity.
+                String sibling = StatementImport.siblingKey(date, amount, merchant, balance);
+                int ordinal = siblingCounts.merge(sibling, 1, Integer::sum) - 1;
+                String externalId = StatementImport.externalId(date, amount, merchant, balance, ordinal);
+                if (!existingIds.add(externalId)) {
+                    duplicates++;
+                    continue;
+                }
 
                 Transaction t = new Transaction();
                 t.setDate(date);
                 t.setMerchant(merchant);
                 t.setAmount(amount);
-                t.setCategory(category);
-                t.setSource("MANUAL");
+                t.setCategory(importCategory(row.get("category"), merchant, amount,
+                                             isCard, cardDataPresent, learnedRules));
+                t.setSource(isCard ? ACCOUNT_CARD : "STATEMENT");
+                t.setExternalId(externalId);
                 t.setUser(user);
                 toSave.add(t);
 
             } catch (Exception e) {
                 log.warn("Skipping malformed import row: {}", e.getMessage());
+                skipped++;
             }
         }
 
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
+
+            // The first card statement makes bank-side bill payments already on
+            // record duplicates of these purchases — restamp them, as the AA
+            // card sync does.
+            if (isCard) {
+                List<Transaction> restamped =
+                        TransactionMath.restampCardBillPayments(repository.findByUser(user));
+                if (!restamped.isEmpty()) {
+                    repository.saveAll(restamped);
+                    log.info("Statement import: reclassified {} bank-side bill payments for user #{}",
+                             restamped.size(), user.getId());
+                }
+            }
+
             profileService.saveScoreSnapshot(user);
         }
 
-        return toSave.size();
+        return new ImportResult(toSave.size(), duplicates, skipped);
+    }
+
+    /**
+     * Category for an imported row. Mirrors the AA ingest rules so a statement
+     * and a bank sync of the same money land in the same place.
+     */
+    private String importCategory(Object provided, String narration, double amount,
+                                  boolean isCard, boolean cardDataPresent,
+                                  Map<String, String> learnedRules) {
+        boolean isCredit = amount > 0;
+
+        if (isCard && isCredit) {
+            // A card credit is the user repaying the bill (not spending, not
+            // income) or money coming back from a merchant.
+            return TransactionMath.isRefundLike(narration)
+                    ? "Other"
+                    : TransactionMath.CARD_PAYMENT_CATEGORY;
+        }
+        if (!isCard && !isCredit && cardDataPresent
+                && TransactionMath.matchesCardPayment(narration)) {
+            // Bank-side leg of a bill payment whose card purchases are on record.
+            return TransactionMath.CARD_PAYMENT_CATEGORY;
+        }
+
+        if (provided != null
+                && !PLACEHOLDER_CATEGORIES.contains(provided.toString().trim().toLowerCase())) {
+            return provided.toString().trim();
+        }
+
+        String derived = categoryService.categorize(narration, learnedRules);
+        return derived != null ? derived : "Other";
     }
 
     // =========================
