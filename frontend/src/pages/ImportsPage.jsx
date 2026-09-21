@@ -2,9 +2,13 @@ import { useState, useRef } from "react";
 import { Upload, FileText, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
-import { parseStatement, guessMapping, buildImportRows, summarize } from "../services/statementParser";
+import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize } from "../services/statementParser";
 
 const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
+
+// Read in the browser vs. sent to the server, which has the PDF and Excel readers
+const LOCAL_TYPES = /\.(csv|txt)$/i;
+const SERVER_TYPES = /\.(pdf|xls|xlsx)$/i;
 
 const EMPTY_MAPPING = { date: "", merchant: "", amount: "", category: "", debit: "", credit: "", balance: "" };
 
@@ -48,27 +52,68 @@ export default function ImportsPage({ onImported }) {
   const [built, setBuilt] = useState({ rows: [], skipped: 0 });
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
+  const [reading, setReading] = useState(false);
+  // A password-protected PDF waits here while the user types its password.
+  // The password is sent once with the file and never stored.
+  const [lockedFile, setLockedFile] = useState(null);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const fileRef = useRef();
+
+  const startMapping = (parsed, name) => {
+    if (parsed.rows.length === 0) {
+      toast.error("No transactions found in this file");
+      return;
+    }
+    const guess = guessMapping(parsed.headers);
+    setFileName(name);
+    setCsvData(parsed);
+    setMapping({ ...EMPTY_MAPPING, ...guess.mapping });
+    setDebitCreditMode(guess.debitCreditMode);
+    setStep(1);
+  };
+
+  const readOnServer = async (file, pw) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (pw) form.append("password", pw);
+    setReading(true);
+    try {
+      const res = await API.post("/transactions/statement/extract", form);
+      setLockedFile(null);
+      setPassword("");
+      setPasswordError("");
+      startMapping(parseGrid(res.data?.grid), file.name);
+    } catch (err) {
+      const code = err?.response?.data?.code;
+      const message = err?.response?.data?.error || "This file could not be read.";
+      if (code === "password_required" || code === "password_incorrect") {
+        setLockedFile(file);
+        setPasswordError(code === "password_incorrect" ? message : "");
+      } else {
+        setLockedFile(null);
+        toast.error(message);
+      }
+    } finally {
+      setReading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (SERVER_TYPES.test(file.name)) {
+      readOnServer(file);
+      return;
+    }
     // HDFC and a few others export tab-delimited .txt; the parser sniffs the delimiter
-    if (!/\.(csv|txt)$/i.test(file.name)) { toast.error("Please select a .csv or .txt statement"); return; }
-    setFileName(file.name);
+    if (!LOCAL_TYPES.test(file.name)) {
+      toast.error("Upload your statement as PDF, Excel (.xls, .xlsx), CSV or .txt");
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const parsed = parseStatement(ev.target.result);
-      if (parsed.rows.length === 0) {
-        toast.error("No transactions found in this file");
-        return;
-      }
-      const guess = guessMapping(parsed.headers);
-      setCsvData(parsed);
-      setMapping({ ...EMPTY_MAPPING, ...guess.mapping });
-      setDebitCreditMode(guess.debitCreditMode);
-      setStep(1);
-    };
+    reader.onload = (ev) => startMapping(parseStatement(ev.target.result), file.name);
     reader.readAsText(file);
   };
 
@@ -114,6 +159,9 @@ export default function ImportsPage({ onImported }) {
     setMapping(EMPTY_MAPPING);
     setBuilt({ rows: [], skipped: 0 });
     setResult(null);
+    setLockedFile(null);
+    setPassword("");
+    setPasswordError("");
   };
 
   const headers = csvData?.headers || [];
@@ -140,7 +188,7 @@ export default function ImportsPage({ onImported }) {
           <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent)", borderRadius: 18 }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 14 }}>STEP 1 — UPLOAD STATEMENT</div>
           <p style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", lineHeight: 1.6, marginBottom: 20 }}>
-            Download your bank or credit-card statement from net banking as CSV (or delimited .txt) and upload it here. We'll find the table and guess the columns; you can correct them in the next step. Uploading the same statement twice is safe — rows already imported are skipped.
+            Download your bank or credit-card statement from net banking — PDF, Excel or CSV — and upload it here. We'll find the table and guess the columns; you can correct them in the next step. Uploading the same statement twice is safe — rows already imported are skipped.
           </p>
 
           <label
@@ -154,13 +202,50 @@ export default function ImportsPage({ onImported }) {
             onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(167,139,250,0.25)"}
           >
             <FileText size={36} color="rgba(167,139,250,0.4)" style={{ marginBottom: 10 }} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Click to select a statement file</span>
-            <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>CSV or .txt · SBI, HDFC, ICICI, Axis, Kotak and most others</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
+              {reading ? "Reading your statement…" : "Click to select a statement file"}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>PDF, Excel, CSV or .txt · SBI, HDFC, ICICI, Axis, Kotak and most others</span>
           </label>
-          <input ref={fileRef} id="csv-upload" type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFile} />
+          <input ref={fileRef} id="csv-upload" type="file" accept=".pdf,.xls,.xlsx,.csv,.txt" disabled={reading} style={{ display: "none" }} onChange={handleFile} />
+
+          {lockedFile && (
+            <form
+              onSubmit={e => { e.preventDefault(); if (password) readOnServer(lockedFile, password); }}
+              style={{ marginTop: 16, padding: 16, background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: 12 }}
+            >
+              <label htmlFor="statement-password" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 6 }}>
+                {lockedFile.name} is password-protected
+              </label>
+              <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                Banks usually build it from your name, date of birth or customer ID — the email the statement came with says which. It's used once to open the file and never saved.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  id="statement-password"
+                  type="password"
+                  autoComplete="off"
+                  autoFocus
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setPasswordError(""); }}
+                  style={{ ...inp, flex: 1 }}
+                />
+                <button
+                  type="submit"
+                  disabled={!password || reading}
+                  style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: password && !reading ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.05)", color: password && !reading ? "#fff" : "rgba(148,163,184,0.4)", fontSize: 13, fontWeight: 700, cursor: password && !reading ? "pointer" : "default", fontFamily: "inherit" }}
+                >
+                  {reading ? "Opening…" : "Open"}
+                </button>
+              </div>
+              {passwordError && (
+                <div role="alert" style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>{passwordError}</div>
+              )}
+            </form>
+          )}
 
           <div style={{ marginTop: 20, padding: 16, background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 12, fontSize: 12, color: "rgba(148,163,184,0.6)" }}>
-            💡 For bank statement screenshots (PDF or image), use <strong style={{ color: "#22d3ee" }}>OCR Uploads</strong> in the sidebar instead.
+            💡 For a single receipt or payment screenshot, use <strong style={{ color: "#22d3ee" }}>OCR Uploads</strong> in the sidebar instead.
           </div>
         </div>
       )}

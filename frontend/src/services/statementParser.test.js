@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-    parseDelimited, sniffDelimiter, findHeaderRow, parseStatement,
+    parseDelimited, sniffDelimiter, findHeaderRow, parseStatement, parseGrid,
     guessMapping, parseAmount, normalizeDate, buildImportRows, summarize,
 } from "./statementParser";
 
@@ -58,6 +58,28 @@ describe("findHeaderRow / parseStatement", () => {
     it("makes duplicate column names distinct", () => {
         const { headers } = parseStatement("Date,Amount,Amount\n01/09/2026,5,6");
         expect(headers).toEqual(["Date", "Amount", "Amount (2)"]);
+    });
+});
+
+describe("parseGrid", () => {
+    it("treats a server-read grid exactly like a parsed CSV", () => {
+        const fromText = parseStatement(SBI_LIKE);
+        const fromGrid = parseGrid(parseDelimited(SBI_LIKE));
+        expect(fromGrid).toEqual(fromText);
+    });
+
+    it("tolerates null cells and non-string values", () => {
+        const { headers, rows } = parseGrid([
+            ["Date", "Narration", "Debit", "Balance"],
+            ["2026-09-01", "UPI/SWIGGY", 1250, null],
+        ]);
+        expect(headers).toEqual(["Date", "Narration", "Debit", "Balance"]);
+        expect(rows[0]).toEqual({ Date: "2026-09-01", Narration: "UPI/SWIGGY", Debit: "1250", Balance: "" });
+    });
+
+    it("returns an empty table for an empty grid", () => {
+        expect(parseGrid([])).toEqual({ headers: [], rows: [], preambleLines: 0 });
+        expect(parseGrid(undefined).rows).toEqual([]);
     });
 });
 

@@ -73,3 +73,77 @@ describe("ImportsPage — statement import", () => {
     expect(await screen.findByText(/1 already imported earlier, skipped/)).toBeInTheDocument();
   });
 });
+
+// What the server's statement reader returns for a PDF or Excel file
+const GRID = [
+  ["HDFC BANK LTD", "", "", "", ""],
+  ["Date", "Narration", "Withdrawal Amt.", "Deposit Amt.", "Closing Balance"],
+  ["01/09/26", "UPI-SWIGGY-SWIGGY8@YBL", "1,250.00", "", "24,550.00"],
+  ["02/09/26", "NEFT CR-ACME PAYROLL", "", "1,20,000.00", "1,44,550.00"],
+];
+
+describe("ImportsPage — PDF and Excel statements", () => {
+  let mock;
+  beforeEach(() => { mock = new MockAdapter(API); });
+  afterEach(() => { mock.restore(); });
+
+  const choose = (container, name) => fireEvent.change(container.querySelector("#csv-upload"), {
+    target: { files: [new File(["%PDF-1.7"], name, { type: "application/pdf" })] },
+  });
+
+  it("sends a PDF to the server reader and maps the grid it returns", async () => {
+    mock.onPost("/transactions/statement/extract").reply(200, { grid: GRID, format: "pdf", pages: 1 });
+    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+
+    choose(container, "HDFC_Sept.pdf");
+
+    await screen.findByText(/skipped 1 header lines/);
+    const form = mock.history.post[0].data;
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.get("file").name).toBe("HDFC_Sept.pdf");
+    expect(form.has("password")).toBe(false);
+
+    fireEvent.click(screen.getByText(/Preview →/));
+    expect(await screen.findByText(/₹1,250 out · ₹1,20,000 in/)).toBeInTheDocument();
+  });
+
+  it("asks for the password of a protected PDF, then opens it", async () => {
+    mock.onPost("/transactions/statement/extract").replyOnce(422, {
+      error: "This PDF is password-protected.", code: "password_required",
+    });
+    mock.onPost("/transactions/statement/extract").replyOnce(422, {
+      error: "That password didn't open the PDF. Try again.", code: "password_incorrect",
+    });
+    mock.onPost("/transactions/statement/extract").replyOnce(200, { grid: GRID, format: "pdf", pages: 1 });
+    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+
+    choose(container, "locked.pdf");
+    const field = await screen.findByLabelText(/locked.pdf is password-protected/);
+
+    fireEvent.change(field, { target: { value: "wrong" } });
+    fireEvent.click(screen.getByText("Open"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("didn't open the PDF");
+
+    fireEvent.change(field, { target: { value: "SAAD0109" } });
+    fireEvent.click(screen.getByText("Open"));
+    await screen.findByText(/skipped 1 header lines/);
+
+    expect(mock.history.post[2].data.get("password")).toBe("SAAD0109");
+    // the password does not linger once the file is open
+    expect(screen.queryByLabelText(/password-protected/)).not.toBeInTheDocument();
+  });
+
+  it("stays on the upload step when the server can't read the file", async () => {
+    mock.onPost("/transactions/statement/extract").reply(422, {
+      error: "This PDF is a scanned image with no text in it.", code: "scanned_pdf",
+    });
+    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+
+    choose(container, "scan.pdf");
+
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(screen.getByText("STEP 1 — UPLOAD STATEMENT")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/password-protected/)).not.toBeInTheDocument();
+  });
+});
+

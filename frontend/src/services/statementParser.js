@@ -88,7 +88,17 @@ export function findHeaderRow(rows) {
  * Returns { headers, rows, preambleLines }.
  */
 export function parseStatement(text) {
-    const grid = parseDelimited(text);
+    return parseGrid(parseDelimited(text));
+}
+
+/**
+ * Same as parseStatement, for a grid that was already split into cells —
+ * what the server returns after reading a PDF or Excel statement.
+ */
+export function parseGrid(rawGrid) {
+    const grid = (rawGrid || [])
+        .map(r => r.map(c => (c === null || c === undefined ? "" : String(c).trim())))
+        .filter(r => r.some(c => c !== ""));
     if (grid.length === 0) return { headers: [], rows: [], preambleLines: 0 };
 
     const headerIdx = findHeaderRow(grid);

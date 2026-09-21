@@ -13,6 +13,7 @@ from ocr.routes import router as ocr_router
 from report_routes import router as report_router
 from investments.routes import router as investment_router
 from spending_coach.routes import router as coach_router
+from statements.routes import router as statements_router
 
 _INTERNAL_KEY = os.environ.get("AI_INTERNAL_KEY", "")
 if not _INTERNAL_KEY:
@@ -83,3 +84,4 @@ app.include_router(ocr_router, tags=["OCR"])
 app.include_router(report_router, prefix="/reports")
 app.include_router(investment_router)
 app.include_router(coach_router)
+app.include_router(statements_router, tags=["Statements"])

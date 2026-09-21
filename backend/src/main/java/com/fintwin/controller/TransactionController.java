@@ -1,6 +1,7 @@
 package com.fintwin.controller;
 
 import com.fintwin.service.ChatService;
+import com.fintwin.service.StatementExtractService;
 import com.fintwin.service.TransactionService;
 import com.fintwin.dto.ExpenseRequest;
 import com.fintwin.dto.ChatRequestDTO;
@@ -26,6 +27,9 @@ public class TransactionController {
 
     @Autowired
     private ChatService chatService;
+
+    @Autowired
+    private StatementExtractService statementExtractService;
 
     @PostMapping("/upload")
     public ResponseEntity<String> uploadCSV(
@@ -77,6 +81,17 @@ public class TransactionController {
                 "duplicates", result.duplicates(),
                 "skipped",    result.skipped(),
                 "success",    true));
+    }
+
+    /**
+     * Reads a PDF or Excel statement into a grid for the import page to map
+     * and preview. Saves nothing; confirmed rows come back through /batch.
+     */
+    @PostMapping("/statement/extract")
+    public Map<String, Object> extractStatement(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "password", required = false) String password) {
+        return statementExtractService.extract(file, password);
     }
 
     @PostMapping("/manual")
