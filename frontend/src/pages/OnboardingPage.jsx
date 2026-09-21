@@ -4,9 +4,10 @@ import API, { identityApi } from "../services/api";
 import toast from "react-hot-toast";
 import {
   CheckCircle, Sparkles, ChevronRight, Building2, RefreshCw,
-  Shield, Bell, Edit2, Lock
+  Shield, Bell, Edit2, Lock, FileText, FlaskConical
 } from "lucide-react";
 import { AI_MODES } from "../constants/aiModes";
+import ImportsPage from "./ImportsPage";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -317,6 +318,38 @@ function AIPanel({ aiModes }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+const monthLabel = (ym) => {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+};
+
+// How many months the uploaded statements cover, against the 2–3 FinTwin needs
+export function StatementProgress({ months }) {
+  const n = months.length;
+  const tone = n >= 2 ? "#4ade80" : n === 1 ? "#fbbf24" : "rgba(148,163,184,0.6)";
+  const text = n === 0
+    ? "Nothing imported yet — start with your main bank account."
+    : n === 1
+      ? "1 month in. Add 1–2 more months for reliable insights."
+      : n === 2
+        ? "2 months in — good to go. A third month makes trends sharper."
+        : `${n} months in — great, that's enough to see your patterns.`;
+  return (
+    <div role="status" style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: `1px solid ${n ? tone + "55" : "rgba(255,255,255,0.07)"}`, marginBottom: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: tone, marginBottom: n ? 8 : 0 }}>{text}</div>
+      {n > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {months.map(m => (
+            <span key={m} style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: 999, padding: "3px 10px" }}>
+              {monthLabel(m)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const navigate = useNavigate();
 
@@ -342,7 +375,13 @@ export default function OnboardingPage() {
   const [mobile,          setMobile]          = useState("");
   const [mobileError,     setMobileError]     = useState("");
   const [bankConnecting,  setBankConnecting]  = useState(false);
-  const [bankPhase,       setBankPhase]       = useState("connect"); // "connect" | "syncing"
+  // "connect" = choose how to add data | "statements" = uploading | "syncing" = Setu sandbox
+  const [bankPhase,       setBankPhase]       = useState(() => sessionStorage.getItem("ob-bank-phase") === "statements" ? "statements" : "connect");
+  const [setuOpen,        setSetuOpen]        = useState(false);
+  // Months ("2026-07") covered by statements uploaded during onboarding
+  const [stmtMonths,      setStmtMonths]      = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("ob-stmt-months") || "[]"); } catch { return []; }
+  });
   const [syncStatus,      setSyncStatus]      = useState("pending"); // pending | consented | synced
   const [syncMsg,         setSyncMsg]         = useState("Complete the bank consent in the other tab.");
   const [skipVisible,     setSkipVisible]     = useState(false);
@@ -352,6 +391,12 @@ export default function OnboardingPage() {
   const skipTimer         = useRef(null);
   const resyncTriggered   = useRef(false);
   const resyncRetryTimer  = useRef(null);
+
+  useEffect(() => { sessionStorage.setItem("ob-stmt-months", JSON.stringify(stmtMonths)); }, [stmtMonths]);
+  useEffect(() => {
+    if (bankPhase === "statements") sessionStorage.setItem("ob-bank-phase", "statements");
+    else sessionStorage.removeItem("ob-bank-phase");
+  }, [bankPhase]);
 
   // Step 2 — Financial Profile
   const [monthlyIncome,   setMonthlyIncome]   = useState("");
@@ -505,6 +550,14 @@ export default function OnboardingPage() {
     }
   };
 
+  // Statements are the user's real transactions: never the manual path, which
+  // would replace them with AI-generated history when onboarding completes
+  const handleStatementImported = (summary) => {
+    setIsManualPath(false);
+    const months = summary?.months || [];
+    setStmtMonths(prev => [...new Set([...prev, ...months])].sort());
+  };
+
   const handleManualPath = () => {
     setIsManualPath(true);
     setStep(2);
@@ -585,6 +638,8 @@ export default function OnboardingPage() {
       await API.post("/onboarding/complete", payload);
       sessionStorage.removeItem("ob-step");
       sessionStorage.removeItem("ob-manual");
+      sessionStorage.removeItem("ob-stmt-months");
+      sessionStorage.removeItem("ob-bank-phase");
       toast.success("Welcome to FinTwin AI! Your financial profile is ready.", { duration: 5000 });
       navigate("/dashboard", { replace: true });
     } catch {
@@ -817,79 +872,129 @@ export default function OnboardingPage() {
             {step === 1 && bankPhase === "connect" && (
               <div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Connect your accounts</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 28px", lineHeight: 1.7 }}>
-                  Securely link your bank accounts via RBI's Account Aggregator framework. We never see your credentials — only the data you consent to share.
+                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Add your transactions</h1>
+                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 24px", lineHeight: 1.7 }}>
+                  FinTwin is in beta. Choose how to bring your data in — you can add more any time from <strong style={{ color: "rgba(226,232,240,0.8)" }}>Imports</strong>.
                 </p>
 
-                {/* Connect bank card */}
-                <div style={{ background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 16, padding: "24px", marginBottom: 14 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Building2 size={18} color="#a78bfa" />
+                {/* Option 1 — statements (recommended) */}
+                <div style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 16, padding: 22, marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FileText size={18} color="#4ade80" />
                     </div>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>Auto-import Transactions</div>
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Powered by Setu Account Aggregator</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>OPTION 1</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Upload your bank statements</div>
                     </div>
-                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", color: "#4ade80", whiteSpace: "nowrap" }}>RBI Regulated</span>
+                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", whiteSpace: "nowrap" }}>RECOMMENDED</span>
                   </div>
-
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 7 }}>MOBILE NUMBER (linked to your bank)</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      className="ob-input"
-                      type="tel"
-                      maxLength={10}
-                      placeholder="10-digit mobile number"
-                      value={mobile}
-                      onChange={e => { setMobile(e.target.value.replace(/\D/g, "")); setMobileError(""); }}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      onClick={handleBankConnect}
-                      disabled={bankConnecting}
-                      style={{ padding: "13px 20px", borderRadius: 13, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: bankConnecting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: bankConnecting ? 0.7 : 1, whiteSpace: "nowrap" }}
-                    >
-                      {bankConnecting ? "Connecting…" : "Connect →"}
-                    </button>
-                  </div>
-                  {mobileError && <div style={{ fontSize: 11, color: "#f87171", marginTop: 6 }}>{mobileError}</div>}
-                  <div style={{ display: "flex", gap: 16, marginTop: 14 }}>
-                    {["🔒 Read-only", "🏦 No credentials shared", "⚡ Instant sync"].map(s => (
-                      <span key={s} style={{ fontSize: 12, color: "rgba(100,116,139,0.6)" }}>{s}</span>
+                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.75)", margin: "0 0 12px", lineHeight: 1.65 }}>
+                    Download your statement from net banking — PDF, Excel or CSV — and upload it here. Add <strong style={{ color: "#fff" }}>at least 2–3 months</strong> so FinTwin can see your patterns, recurring payments and spending pace.
+                    These are your real transactions, so this is the best way to test the app.
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 16 }}>
+                    {["✓ Your real spending", "✓ Any bank or credit card", "✓ Password-protected PDFs work"].map(t => (
+                      <span key={t} style={{ fontSize: 12, color: "rgba(148,163,184,0.65)" }}>{t}</span>
                     ))}
                   </div>
+                  <button
+                    onClick={() => { setIsManualPath(false); setBankPhase("statements"); }}
+                    style={{ padding: "12px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    Upload statements <ChevronRight size={15} />
+                  </button>
                 </div>
 
-                {/* Browse by type */}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>BROWSE BY TYPE</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    {[
-                      { icon: "🏦", label: "Bank Accounts",    desc: "Savings, current, salary" },
-                      { icon: "📈", label: "Mutual Funds",      desc: "SIP, lumpsum, redemptions" },
-                      { icon: "📊", label: "Stocks / Equities", desc: "Demat, trading accounts" },
-                      { icon: "🛡️", label: "Insurance",        desc: "Life, health, general" },
-                      { icon: "🏗️", label: "EPF",              desc: "Provident fund balance" },
-                    ].map(t => (
-                      <div key={t.label} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "12px 14px", cursor: "pointer", transition: "all 0.15s" }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(167,139,250,0.3)"; e.currentTarget.style.background = "rgba(167,139,250,0.06)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                      >
-                        <span style={{ fontSize: 18, display: "block", marginBottom: 4 }}>{t.icon}</span>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>{t.label}</div>
-                        <div style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>{t.desc}</div>
-                      </div>
-                    ))}
+                {/* Option 2 — Setu sandbox (demo) */}
+                <div style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 16, padding: 22, marginBottom: 22 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FlaskConical size={18} color="#fbbf24" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>OPTION 2</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Try the Setu bank-link sandbox</div>
+                    </div>
+                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", whiteSpace: "nowrap" }}>DEMO ONLY</span>
                   </div>
+                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.75)", margin: "0 0 4px", lineHeight: 1.65 }}>
+                    This is a <strong style={{ color: "#fbbf24" }}>demo sandbox — not real transactions</strong>. It links to Setu's test banks, which return sample data, not your own accounts or money.
+                  </p>
+                  <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 14px", lineHeight: 1.6 }}>
+                    Use it to see how automatic bank linking will work. To judge what FinTwin tells you about your own spending, use option 1.
+                  </p>
+
+                  {!setuOpen ? (
+                    <button
+                      onClick={() => setSetuOpen(true)}
+                      style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.06)", color: "#fbbf24", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Use the sandbox
+                    </button>
+                  ) : (
+                    <>
+                      <label htmlFor="ob-mobile" style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 7 }}>MOBILE NUMBER FOR THE SANDBOX CONSENT</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          id="ob-mobile"
+                          className="ob-input"
+                          type="tel"
+                          maxLength={10}
+                          placeholder="10-digit mobile number"
+                          value={mobile}
+                          onChange={e => { setMobile(e.target.value.replace(/\D/g, "")); setMobileError(""); }}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          onClick={handleBankConnect}
+                          disabled={bankConnecting}
+                          style={{ padding: "13px 20px", borderRadius: 13, border: "none", background: "linear-gradient(135deg,#fbbf24,#d97706)", color: "#111827", fontSize: 13, fontWeight: 800, cursor: bankConnecting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: bankConnecting ? 0.7 : 1, whiteSpace: "nowrap" }}
+                        >
+                          {bankConnecting ? "Connecting…" : "Connect sandbox →"}
+                        </button>
+                      </div>
+                      {mobileError && <div style={{ fontSize: 11, color: "#f87171", marginTop: 6 }}>{mobileError}</div>}
+                      <div style={{ fontSize: 11, color: "rgba(148,163,184,0.45)", marginTop: 8 }}>
+                        Sample transactions from the sandbox appear in your dashboard like real ones — remember they aren't yours.
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Nav */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <button onClick={() => setStep(0)} style={{ fontSize: 13, fontWeight: 600, color: "rgba(148,163,184,0.5)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
-                  <button onClick={handleManualPath} style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                    Skip — I'll add manually →
+                  {stmtMonths.length === 0 && (
+                    <button onClick={handleManualPath} style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                      Skip — I'll add manually →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 1 — statement upload phase */}
+            {step === 1 && bankPhase === "statements" && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Upload your bank statements</h1>
+                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 20px", lineHeight: 1.7 }}>
+                  Import the last 2–3 months for each account you use. Upload as many files as you like — one per account or per month is fine, and anything already imported is skipped.
+                </p>
+
+                <StatementProgress months={stmtMonths} />
+
+                <ImportsPage compact onImported={handleStatementImported} />
+
+                <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                  <button onClick={() => setBankPhase("connect")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Other options</button>
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={stmtMonths.length === 0}
+                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: stmtMonths.length ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.04)", color: stmtMonths.length ? "#fff" : "rgba(148,163,184,0.3)", fontSize: 14, fontWeight: 800, cursor: stmtMonths.length ? "pointer" : "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                  >
+                    {stmtMonths.length === 0 ? "Upload a statement to continue" : stmtMonths.length === 1 ? "Continue with 1 month" : "Continue to Profile"} <ChevronRight size={16} />
                   </button>
                 </div>
               </div>

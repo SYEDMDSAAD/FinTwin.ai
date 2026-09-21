@@ -43,7 +43,9 @@ function StepIndicator({ step }) {
   );
 }
 
-export default function ImportsPage({ onImported }) {
+// compact: just the import wizard, for embedding in onboarding — no coverage
+// panel, no alert-email setup, no page header.
+export default function ImportsPage({ onImported, compact = false }) {
   const [step, setStep] = useState(0);
   const [csvData, setCsvData] = useState(null);
   const [fileName, setFileName] = useState("");
@@ -150,7 +152,10 @@ export default function ImportsPage({ onImported }) {
       toast.success(duplicates
         ? `Imported ${imported} transactions · ${duplicates} already imported earlier`
         : `Imported ${imported} transactions!`);
-      if (onImported) onImported();
+      if (onImported) {
+        const months = [...new Set(built.rows.map(r => r.date.slice(0, 7)))].sort();
+        onImported({ imported, duplicates, reconciled, months, accountType, account: account.trim() });
+      }
     } catch (err) {
       toast.error("Import failed: " + (err?.response?.data?.message || "Check your column mapping."));
     } finally {
@@ -179,6 +184,7 @@ export default function ImportsPage({ onImported }) {
 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 720 }}>
+      {!compact && <>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -191,6 +197,7 @@ export default function ImportsPage({ onImported }) {
       </div>
 
       <DataCoverage refreshKey={coverageKey} />
+      </>}
 
       <StepIndicator step={step} />
 
@@ -528,7 +535,7 @@ export default function ImportsPage({ onImported }) {
         </div>
       )}
 
-      <EmailAlertsSetup />
+      {!compact && <EmailAlertsSetup />}
     </div>
   );
 }
