@@ -141,9 +141,13 @@ export function guessMapping(headers) {
     const balance = find(headers, /balance/i);
     const amount = find(headers, /amount/i, /balance/i);
     const category = find(headers, /category/i);
+    // A column saying which way each amount went: PhonePe's "Type" (Credit /
+    // Debit), "Dr/Cr", "Transaction Type". Only used with a single amount column.
+    const direction = debit && credit ? ""
+        : find(headers, /^(type|txn type|transaction type|dr\s*\/\s*cr|cr\s*\/\s*dr|debit\s*\/\s*credit|credit\s*\/\s*debit)$/i);
 
     return {
-        mapping: { date, merchant, amount, debit, credit, balance, category },
+        mapping: { date, merchant, amount, debit, credit, balance, category, direction },
         debitCreditMode: Boolean(debit && credit),
     };
 }
@@ -216,6 +220,13 @@ export function normalizeDate(raw) {
         const month = MONTHS[m[2].toLowerCase().slice(0, 3)];
         return month ? iso(+m[3], month, +m[1]) : null;
     }
+
+    // Month first, as UPI apps write it: "Jun 24, 2026", "Sep 1 2026"
+    m = s.match(/^([A-Za-z]{3,9})\.?[\s-]*(\d{1,2}),?[\s-]*(\d{4})(?:\s.*)?$/);
+    if (m) {
+        const month = MONTHS[m[1].toLowerCase().slice(0, 3)];
+        return month ? iso(+m[3], month, +m[2]) : null;
+    }
     return null;
 }
 
@@ -235,6 +246,7 @@ export function buildImportRows(rows, mapping, { debitCreditMode = false, flipSi
         const date = normalizeDate(row[mapping.date]);
 
         let amount;
+        let spill = "";
         if (debitCreditMode) {
             // The column says which way the money moved; the cell's own sign
             // (or Dr/Cr suffix) is not trusted over it.
@@ -243,14 +255,26 @@ export function buildImportRows(rows, mapping, { debitCreditMode = false, flipSi
             amount = (credit ? Math.abs(credit) : 0) - (debit ? Math.abs(debit) : 0);
         } else {
             amount = parseAmount(row[mapping.amount]);
+            // The amount is unsigned and another column says which way it went
+            if (amount !== null && mapping.direction) {
+                const dir = directionOf(row[mapping.direction]);
+                if (dir === null) { skipped++; continue; }
+                amount = dir * Math.abs(amount);
+                spill = spilledText(row[mapping.direction]);
+            }
         }
 
-        if (!date || !amount) { skipped++; continue; }
+        if (!date || !amount) {
+            // Page footers and stray text have neither; only a row that looks
+            // like a transaction but can't be read counts as skipped
+            if (date || amount !== null) skipped++;
+            continue;
+        }
         if (flipSign) amount = -amount;
 
         const item = {
             date,
-            merchant: (row[mapping.merchant] || "").replace(/\s+/g, " ").trim() || "Unknown",
+            merchant: `${row[mapping.merchant] || ""} ${spill}`.replace(/\s+/g, " ").trim() || "Unknown",
             amount: Math.round(amount * 100) / 100,
         };
         const balance = mapping.balance ? parseAmount(row[mapping.balance]) : null;
@@ -260,6 +284,23 @@ export function buildImportRows(rows, mapping, { debitCreditMode = false, flipSi
         out.push(item);
     }
     return { rows: out, skipped };
+}
+
+const DIRECTION = /(?:^|\s)(dr|debit|debited|withdrawal|paid|sent|out|cr|credit|credited|deposit|received|in)\.?$/i;
+
+/** -1 for money out, +1 for money in, null when the cell doesn't say. */
+export function directionOf(raw) {
+    const m = String(raw ?? "").trim().match(DIRECTION);
+    if (!m) return null;
+    return /^(dr|debit|debited|withdrawal|paid|sent|out)$/i.test(m[1]) ? -1 : 1;
+}
+
+// A long merchant name can spill into the next column of a PDF:
+// "STATIONERS Debit". The words before the direction belong to the merchant.
+function spilledText(raw) {
+    const v = String(raw ?? "").trim();
+    const m = v.match(DIRECTION);
+    return m ? v.slice(0, m.index).trim() : "";
 }
 
 /** Totals for the preview: count, money out, money in, date range. */
@@ -280,6 +321,9 @@ export function summarize(importRows) {
 // the same short names as the server's alert-email parser ("HDFC ··1234"), so
 // a statement and alerts for one account are grouped together.
 const BANKS = [
+    [/phone\s*pe/i, "PhonePe"],
+    [/\bpaytm\b/i, "Paytm"],
+    [/google\s*pay|\bgpay\b/i, "Google Pay"],
     [/\bhdfc\b|hdfcbank/i, "HDFC"],
     [/\bicici\b/i, "ICICI"],
     [/\bsbi\s*card\b/i, "SBI Card"],

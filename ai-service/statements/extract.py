@@ -229,7 +229,10 @@ _HEADER_WORDS = (
     "transaction", "txn", "chq", "cheque", "ref", "value", "dr", "cr",
 )
 _DATE_RE = re.compile(
-    r"^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{1,2}[\s\-/]?[A-Za-z]{3,9}[\s\-/,]*\d{2,4})$")
+    r"^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{1,2}[\s\-/]?[A-Za-z]{3,9}[\s\-/,]*\d{2,4}"
+    # month first, as UPI apps write it: "Jun 24, 2026"
+    r"|[A-Za-z]{3,9}\.?[\s\-]*\d{1,2},?[\s\-]*\d{4})$")
+_BARE_CURRENCY = re.compile(r"^(₹|rs\.?|inr)$", re.I)
 _AMOUNT_RE = re.compile(r"^\(?[-+]?(₹|rs\.?|inr)?\s?[\d,]*\d(\.\d{1,2})?\)?\s*(dr|cr)?\.?$", re.I)
 
 
@@ -359,6 +362,18 @@ def _layout_rows(words: list[dict], layout):
         # nothing continues into the date column.
         adjacent = prev_bottom is not None and top - prev_bottom < 1.2 * height
         prev_is_txn = bool(rows) and bool(_DATE_RE.match(rows[-1][date_col]))
+        # An amount can wrap too: "INR" on one line, "5000.00" on the next —
+        # which may also carry the transaction's time under its date. Digits
+        # under a bare currency word finish that amount; only they move up,
+        # the rest of the line is judged as usual.
+        if prev_is_txn and adjacent and not has_date:
+            for i, c in enumerate(cells):
+                if c and _BARE_CURRENCY.match(rows[-1][i]) and _AMOUNT_RE.match(c):
+                    rows[-1][i] = rows[-1][i] + " " + c
+                    cells[i] = ""
+            filled = [c for c in cells if c]
+            has_amount = any(_AMOUNT_RE.match(c) and any(ch.isdigit() for ch in c)
+                             for i, c in enumerate(cells) if i != date_col and c)
         if (filled and not has_date and not has_amount and prev_is_txn
                 and adjacent and not cells[date_col]):
             prev = rows[-1]

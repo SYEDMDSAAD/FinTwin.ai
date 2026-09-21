@@ -12,7 +12,10 @@ const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 const LOCAL_TYPES = /\.(csv|txt)$/i;
 const SERVER_TYPES = /\.(pdf|xls|xlsx)$/i;
 
-const EMPTY_MAPPING = { date: "", merchant: "", amount: "", category: "", debit: "", credit: "", balance: "" };
+// Statements from UPI apps list payments that also leave a bank account
+const UPI_APPS = /phone\s*pe|paytm|google\s*pay|gpay|bhim|cred\b/i;
+
+const EMPTY_MAPPING = { date: "", merchant: "", amount: "", category: "", debit: "", credit: "", balance: "", direction: "" };
 
 function StepIndicator({ step }) {
   return (
@@ -319,6 +322,12 @@ export default function ImportsPage({ onImported, compact = false }) {
             <div style={{ fontSize: 11, color: "rgba(148,163,184,0.45)", marginTop: 5 }}>
               Keeps each account's months separate, and matches this statement to that account's alert emails.
             </div>
+            {UPI_APPS.test(account) && (
+              <div role="note" style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.25)", fontSize: 12, color: "rgba(148,163,184,0.75)", lineHeight: 1.55 }}>
+                <strong style={{ color: "#fbbf24" }}>UPI app statement.</strong> Its payments also appear in the statement of the bank account they were paid from.
+                Import either this or that bank's statement for the same months — not both — or UPI spending is counted twice.
+              </div>
+            )}
           </div>
 
           {/* Bank format toggle */}
@@ -337,7 +346,7 @@ export default function ImportsPage({ onImported, compact = false }) {
               >
                 Single Amount Column
                 <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, color: !debitCreditMode ? "rgba(167,139,250,0.7)" : "rgba(148,163,184,0.35)" }}>
-                  Zerodha, Groww — one column with +/− values
+                  One amount column — signed, or with a Debit/Credit column (PhonePe)
                 </div>
               </button>
               <button
@@ -399,6 +408,16 @@ export default function ImportsPage({ onImported, compact = false }) {
                 <label style={lbl}>Amount Column *</label>
                 <select style={inp} value={mapping.amount} onChange={e => setMapping(m => ({ ...m, amount: e.target.value }))}>
                   <option value="">-- Which column has the amount? --</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+            )}
+
+            {!debitCreditMode && (
+              <div>
+                <label style={lbl}>Debit / Credit Column</label>
+                <select style={inp} value={mapping.direction} onChange={e => setMapping(m => ({ ...m, direction: e.target.value }))}>
+                  <option value="">-- Only if amounts have no +/− sign --</option>
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     parseDelimited, sniffDelimiter, findHeaderRow, parseStatement, parseGrid,
-    guessMapping, parseAmount, normalizeDate, buildImportRows, summarize, guessAccountLabel,
+    guessMapping, parseAmount, normalizeDate, buildImportRows, summarize, guessAccountLabel, directionOf,
 } from "./statementParser";
 
 // Shaped like a real net-banking export: account preamble, CRLF line endings,
@@ -147,6 +147,9 @@ describe("normalizeDate", () => {
         ["01-SEP-26", "2026-09-01"],
         ["1 September 2026", "2026-09-01"],
         ["01/09/2026 14:32", "2026-09-01"],
+        ["Jun 24, 2026", "2026-06-24"],          // PhonePe, month first
+        ["Sep 1 2026", "2026-09-01"],
+        ["Sept. 1, 2026 05:05 PM", "2026-09-01"],
     ])("reads %s as %s (day first)", (input, expected) => {
         expect(normalizeDate(input)).toBe(expected);
     });
@@ -238,6 +241,58 @@ describe("guessAccountLabel", () => {
     it("returns what it can, or nothing", () => {
         expect(guessAccountLabel([["Axis Bank"]], "")).toBe("Axis");
         expect(guessAccountLabel([], "export.csv")).toBe("");
+    });
+});
+
+// PhonePe's statement: unsigned "INR" amounts, direction in a "Type" column,
+// month-first dates, and long payee names that spill into the Type column
+describe("UPI app statements (PhonePe)", () => {
+    const grid = [
+        ["Date", "Transaction Details", "Type", "Amount"],
+        ["Jun 24, 2026", "Received from ******1317", "Credit", "INR 1000.00"],
+        ["05:05 PM", "Transaction ID : T2606241705189563531737", "", ""],
+        ["Jun 24, 2026", "Paid to Apple Services", "Debit", "INR 39.00"],
+        ["Jul 3, 2026", "Paid to NEW TIRUPATI BOOK CENTRE AND", "STATIONERS Debit", "INR 85.00"],
+        ["This", "is a system generated statement. For any queries", "at https://support.phonepe.com", ""],
+    ];
+
+    it("finds the Type column and signs amounts from it", () => {
+        const parsed = parseGrid(grid);
+        const { mapping, debitCreditMode } = guessMapping(parsed.headers);
+        expect(debitCreditMode).toBe(false);
+        expect(mapping).toMatchObject({ date: "Date", amount: "Amount", direction: "Type" });
+
+        const { rows, skipped } = buildImportRows(parsed.rows, mapping, { debitCreditMode });
+        expect(rows.map(r => r.amount)).toEqual([1000, -39, -85]);
+        expect(rows[0].date).toBe("2026-06-24");
+        // footer is not a transaction, so it isn't reported as skipped
+        expect(skipped).toBe(0);
+    });
+
+    it("gives a payee name that spilled into the Type column back to the merchant", () => {
+        const parsed = parseGrid(grid);
+        const { mapping } = guessMapping(parsed.headers);
+        const { rows } = buildImportRows(parsed.rows, mapping);
+        expect(rows[2].merchant).toBe("Paid to NEW TIRUPATI BOOK CENTRE AND STATIONERS");
+    });
+
+    it("reads the direction word, even after spilled text", () => {
+        expect(directionOf("Debit")).toBe(-1);
+        expect(directionOf("CR")).toBe(1);
+        expect(directionOf("Dr.")).toBe(-1);
+        expect(directionOf("STATIONERS Debit")).toBe(-1);
+        expect(directionOf("REHMAN Credit")).toBe(1);
+        expect(directionOf("")).toBeNull();
+        expect(directionOf("Pending")).toBeNull();
+    });
+
+    it("does not look for a direction column when there are debit and credit columns", () => {
+        expect(guessMapping(["Date", "Type", "Debit", "Credit"]).mapping.direction).toBe("");
+    });
+
+    it("labels the account by the app", () => {
+        expect(guessAccountLabel([], "PhonePe_Transaction_Statement.pdf")).toBe("PhonePe");
+        expect(guessAccountLabel([], "paytm_statement.csv")).toBe("Paytm");
     });
 });
 

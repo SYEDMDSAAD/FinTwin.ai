@@ -198,3 +198,29 @@ describe("ImportsPage — PDF and Excel statements", () => {
   });
 });
 
+describe("ImportsPage — UPI app statements", () => {
+  let mock;
+  beforeEach(() => { mock = new MockAdapter(API); });
+  afterEach(() => { mock.restore(); });
+
+  it("warns that a UPI app statement overlaps the bank statement", async () => {
+    const csv = "Date,Transaction Details,Type,Amount\nJun 24, 2026,Paid to Apple Services,Debit,INR 39.00\n";
+    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+    fireEvent.change(container.querySelector("#csv-upload"), {
+      target: { files: [new File([csv.replace("Jun 24, 2026", '"Jun 24, 2026"')], "PhonePe_Transaction_Statement.csv", { type: "text/csv" })] },
+    });
+
+    expect(await screen.findByRole("note")).toHaveTextContent(/counted twice/);
+    expect(screen.getByLabelText("ACCOUNT")).toHaveValue("PhonePe");
+  });
+
+  it("shows no such warning for a bank statement", async () => {
+    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+    fireEvent.change(container.querySelector("#csv-upload"), {
+      target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
+    });
+    await screen.findByText(/skipped 1 header lines/);
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+});
+

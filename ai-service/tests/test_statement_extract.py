@@ -290,6 +290,51 @@ def test_narrow_cells_rejoin_mid_word_wraps_without_gluing_words():
     assert narrations == [t[1] for t in TXNS]
 
 
+def upi_app_pdf() -> bytes:
+    """PhonePe's layout: month-first dates, the time on the line below, a
+    Type column, and an amount that sometimes wraps ("INR" / "12345.00")."""
+    cols = [(10, 30, "L"), (42, 90, "L"), (134, 22, "L"), (158, 40, "L")]
+    txns = [
+        ("Jun 24, 2026", "05:05 PM", "Received from ******1317", "Credit", "INR 1000.00", None),
+        ("Jun 24, 2026", "05:12 PM", "Paid to Apple Services", "Debit", "INR 39.00", None),
+        ("Jul 02, 2026", "11:40 AM", "Received from ******4411", "Credit", "INR", "25000.00"),
+        ("Jul 03, 2026", "09:15 PM", "Paid - Mobile Recharge", "Debit", "INR 33.00", None),
+    ]
+    pdf = FPDF()
+    pdf.set_auto_page_break(False)
+    pdf.add_page()
+    pdf.set_font("helvetica", size=8)
+    y = 20
+    for (x, w, a), text in zip(cols, ["Date", "Transaction Details", "Type", "Amount"]):
+        pdf.set_xy(x, y); pdf.cell(w, 4, text, align=a)
+    y += 8
+    for date_, time_, details, typ, amount, wrapped in txns:
+        for (x, w, a), text in zip(cols, [date_, details, typ, amount]):
+            pdf.set_xy(x, y); pdf.cell(w, 4, text, align=a)
+        y += 4
+        for (x, w, a), text in zip(cols, [time_, "Transaction ID : T2606241705189563531737", "", wrapped or ""]):
+            if text:
+                pdf.set_xy(x, y); pdf.cell(w, 4, text, align=a)
+        y += 4
+        pdf.set_xy(cols[1][0], y); pdf.cell(cols[1][1], 4, "UTR No : 450474129626")
+        y += 8
+    pdf.set_xy(10, 280)
+    pdf.cell(0, 4, "This is a system generated statement. For any queries contact us at https://support.phonepe.com")
+    return bytes(pdf.output())
+
+
+def test_upi_app_layout_keeps_every_transaction_and_its_amount():
+    grid = extract(upi_app_pdf()).grid
+    rows = [r for r in grid if r[0][:3] in ("Jun", "Jul")]
+
+    assert [r[0] for r in rows] == ["Jun 24, 2026", "Jun 24, 2026", "Jul 02, 2026", "Jul 03, 2026"]
+    assert [r[2] for r in rows] == ["Credit", "Debit", "Credit", "Debit"]
+    # the wrapped amount is rejoined — not lost as a row with no date
+    assert rows[2][3] == "INR 25000.00"
+    # the time and Transaction ID lines are not folded into the payee
+    assert rows[1][1] == "Paid to Apple Services"
+
+
 def test_password_protected_pdf_asks_then_opens():
     data = encrypted_pdf("SAAD0109")
 
