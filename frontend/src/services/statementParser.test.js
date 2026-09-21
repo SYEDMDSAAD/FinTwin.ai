@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     parseDelimited, sniffDelimiter, findHeaderRow, parseStatement, parseGrid,
-    guessMapping, parseAmount, normalizeDate, buildImportRows, summarize,
+    guessMapping, parseAmount, normalizeDate, buildImportRows, summarize, guessAccountLabel,
 } from "./statementParser";
 
 // Shaped like a real net-banking export: account preamble, CRLF line endings,
@@ -78,7 +78,7 @@ describe("parseGrid", () => {
     });
 
     it("returns an empty table for an empty grid", () => {
-        expect(parseGrid([])).toEqual({ headers: [], rows: [], preambleLines: 0 });
+        expect(parseGrid([])).toEqual({ headers: [], rows: [], preambleLines: 0, preamble: [] });
         expect(parseGrid(undefined).rows).toEqual([]);
     });
 });
@@ -215,3 +215,29 @@ describe("summarize", () => {
         ])).toEqual({ count: 3, out: 500, in: 1000, from: "2026-09-01", to: "2026-09-09" });
     });
 });
+
+describe("guessAccountLabel", () => {
+    it("reads the bank and last digits from the statement header", () => {
+        const { preamble } = parseStatement(SBI_LIKE.replace("Account Name :,MD SAAD", "State Bank of India,"));
+        expect(guessAccountLabel(preamble, "statement.csv")).toBe("SBI ··1234");
+    });
+
+    it("uses the file name when the header doesn't name the bank", () => {
+        expect(guessAccountLabel([["Account No :", "50100XXXXXX5678"]], "HDFC_Acct_Statement_Sep.pdf"))
+            .toBe("HDFC ··5678");
+    });
+
+    it("keeps ICICI's three-digit mask", () => {
+        expect(guessAccountLabel([["ICICI Bank"], ["Account Number", "XXXXXXXX345"]], "")).toBe("ICICI ··345");
+    });
+
+    it("tells SBI Card from SBI", () => {
+        expect(guessAccountLabel([["SBI Card statement"], ["Card No", "XXXX XXXX XXXX 9012"]], "")).toBe("SBI Card ··9012");
+    });
+
+    it("returns what it can, or nothing", () => {
+        expect(guessAccountLabel([["Axis Bank"]], "")).toBe("Axis");
+        expect(guessAccountLabel([], "export.csv")).toBe("");
+    });
+});
+

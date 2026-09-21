@@ -46,4 +46,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByCreatedAtAfter(LocalDateTime date);
 
     Optional<User> findByPasswordResetToken(String hashedToken);
+
+    Optional<User> findByIngestToken(String ingestToken);
 }

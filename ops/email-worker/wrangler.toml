@@ -1,0 +1,9 @@
+name = "fintwin-email"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# Set these with:
+#   npx wrangler secret put INBOUND_EMAIL_SECRET   (same value as the backend's)
+#   and FINTWIN_WEBHOOK_URL below, or as a secret too
+[vars]
+FINTWIN_WEBHOOK_URL = "https://your-domain.example/api/v1/inbound/email"

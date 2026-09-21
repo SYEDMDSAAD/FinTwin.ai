@@ -43,13 +43,20 @@ public class Transaction {
     @Column(length = 400)
     private String category;
 
-    // "MANUAL", "BANK" (AA sync), "CARD" (AA card sync or card statement),
-    // "STATEMENT" (uploaded bank statement) — null treated as MANUAL for legacy rows
+    // "MANUAL", "BANK" (AA sync), "CARD" (AA card sync, card statement or card
+    // alert email), "STATEMENT" (uploaded bank statement), "EMAIL" (bank-account
+    // alert email) — null treated as MANUAL for legacy rows
     private String source;
 
-    // Dedupe key: Setu txnId ("CARD:" prefix for cards) or a statement-row hash ("STMT:")
+    // Dedupe key: Setu txnId ("CARD:" prefix for cards), a statement-row hash
+    // ("STMT:"), or an alert email's Message-ID hash ("MAIL:")
     @Column(name = "external_id")
     private String externalId;
+
+    // The account as the user knows it, e.g. "HDFC ··1234" — masked, so stored
+    // plain. Drives per-account coverage; null for manual and legacy rows.
+    @Column(name = "account_ref", length = 64)
+    private String accountRef;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")

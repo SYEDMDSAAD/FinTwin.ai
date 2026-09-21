@@ -34,6 +34,12 @@ public class SecurityStartupValidator {
     @Value("${admin.key:}")
     private String adminKey;
 
+    @Value("${inbound.email.domain:}")
+    private String inboundEmailDomain;
+
+    @Value("${inbound.email.secret:}")
+    private String inboundEmailSecret;
+
     // When true (or when the active profile is "prod"), missing/default secrets
     // abort startup instead of merely warning. Defaults to false for local dev.
     @Value("${app.require-secure-config:false}")
@@ -58,6 +64,13 @@ public class SecurityStartupValidator {
         }
         if (adminKey == null || adminKey.isBlank()) {
             problems.add("ADMIN_KEY is not set. Admin bootstrap/migration endpoints are unusable until set.");
+        }
+        // Bank alert emails are optional; when switched on, the webhook secret is
+        // all that stands between the public endpoint and users' transactions
+        if (inboundEmailDomain != null && !inboundEmailDomain.isBlank()
+                && (inboundEmailSecret == null || inboundEmailSecret.length() < 32)) {
+            problems.add("INBOUND_EMAIL_SECRET must be at least 32 characters when INBOUND_EMAIL_DOMAIN is set. "
+                    + "Generate with: openssl rand -hex 32");
         }
 
         if (!problems.isEmpty()) {

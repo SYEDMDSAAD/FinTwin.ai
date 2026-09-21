@@ -9,6 +9,7 @@ import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.*;
 import com.fintwin.security.SecurityUtils;
+import com.fintwin.util.CoverageMath;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -189,6 +190,19 @@ public class NotificationService {
             notifications.add(new NotificationDTO("info",
                     highMerchantCount + " merchants each account for over ₹3,000 in the last 3 months. "
                     + "Audit your active subscriptions — cancelling even one unused service compounds over time."
+            ));
+        }
+
+        // ── 7. Statement nudges ───────────────────────────────────────────
+        // Without a bank link nothing arrives by itself: a month with no
+        // statement looks like a month with no spending unless someone says so
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        for (CoverageMath.AccountCoverage c : CoverageMath.coverage(transactions, today)) {
+            java.time.YearMonth month = c.nudgeFor(today);
+            if (month == null) continue;
+            notifications.add(new NotificationDTO("info",
+                    "Upload your " + CoverageMath.monthName(month, today) + " statement for " + c.account()
+                    + " to close the month — until then its spending isn't counted."
             ));
         }
 

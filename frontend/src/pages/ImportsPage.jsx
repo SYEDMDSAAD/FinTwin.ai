@@ -2,7 +2,9 @@ import { useState, useRef } from "react";
 import { Upload, FileText, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
-import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize } from "../services/statementParser";
+import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize, guessAccountLabel } from "../services/statementParser";
+import DataCoverage from "../components/DataCoverage";
+import EmailAlertsSetup from "../components/EmailAlertsSetup";
 
 const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 
@@ -46,6 +48,9 @@ export default function ImportsPage({ onImported }) {
   const [csvData, setCsvData] = useState(null);
   const [fileName, setFileName] = useState("");
   const [accountType, setAccountType] = useState("BANK");
+  // "HDFC ··1234": ties this statement to the account its alert emails come from
+  const [account, setAccount] = useState("");
+  const [coverageKey, setCoverageKey] = useState(0);
   const [debitCreditMode, setDebitCreditMode] = useState(false);
   const [flipSign, setFlipSign] = useState(false);
   const [mapping, setMapping] = useState(EMPTY_MAPPING);
@@ -67,6 +72,7 @@ export default function ImportsPage({ onImported }) {
     }
     const guess = guessMapping(parsed.headers);
     setFileName(name);
+    setAccount(guessAccountLabel(parsed.preamble, name));
     setCsvData(parsed);
     setMapping({ ...EMPTY_MAPPING, ...guess.mapping });
     setDebitCreditMode(guess.debitCreditMode);
@@ -134,10 +140,13 @@ export default function ImportsPage({ onImported }) {
   const doImport = async () => {
     setImporting(true);
     try {
-      const res = await API.post("/transactions/batch", built.rows, { params: { accountType } });
+      const params = account.trim() ? { accountType, account: account.trim() } : { accountType };
+      const res = await API.post("/transactions/batch", built.rows, { params });
       const imported = res.data?.imported ?? built.rows.length;
       const duplicates = res.data?.duplicates ?? 0;
-      setResult({ imported, duplicates, skipped: (res.data?.skipped ?? 0) + built.skipped });
+      const reconciled = res.data?.reconciled ?? 0;
+      setResult({ imported, duplicates, reconciled, skipped: (res.data?.skipped ?? 0) + built.skipped });
+      setCoverageKey(k => k + 1);
       toast.success(duplicates
         ? `Imported ${imported} transactions · ${duplicates} already imported earlier`
         : `Imported ${imported} transactions!`);
@@ -154,6 +163,7 @@ export default function ImportsPage({ onImported }) {
     setCsvData(null);
     setFileName("");
     setAccountType("BANK");
+    setAccount("");
     setDebitCreditMode(false);
     setFlipSign(false);
     setMapping(EMPTY_MAPPING);
@@ -179,6 +189,8 @@ export default function ImportsPage({ onImported }) {
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>Import Transactions</h2>
         </div>
       </div>
+
+      <DataCoverage refreshKey={coverageKey} />
 
       <StepIndicator step={step} />
 
@@ -284,6 +296,21 @@ export default function ImportsPage({ onImported }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label htmlFor="statement-account" style={lbl}>ACCOUNT</label>
+            <input
+              id="statement-account"
+              value={account}
+              maxLength={64}
+              placeholder={accountType === "CARD" ? "e.g. HDFC ··5678" : "e.g. HDFC ··1234"}
+              onChange={e => setAccount(e.target.value)}
+              style={inp}
+            />
+            <div style={{ fontSize: 11, color: "rgba(148,163,184,0.45)", marginTop: 5 }}>
+              Keeps each account's months separate, and matches this statement to that account's alert emails.
             </div>
           </div>
 
@@ -481,6 +508,7 @@ export default function ImportsPage({ onImported }) {
               <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", marginBottom: 20 }}>
                 {result.imported} transactions imported
                 {result.duplicates > 0 && <> · {result.duplicates} already imported earlier, skipped</>}
+                {result.reconciled > 0 && <> · {result.reconciled} already added from alert emails, now confirmed by the statement</>}
                 {result.skipped > 0 && <> · {result.skipped} rows could not be read</>}
               </div>
               <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
@@ -499,6 +527,8 @@ export default function ImportsPage({ onImported }) {
           )}
         </div>
       )}
+
+      <EmailAlertsSetup />
     </div>
   );
 }

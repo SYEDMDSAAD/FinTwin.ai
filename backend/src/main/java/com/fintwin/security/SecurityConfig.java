@@ -205,6 +205,11 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
+                                // Our inbound mail worker; authenticated by an HMAC
+                                // signature over the body, not a JWT
+                                .requestMatchers(HttpMethod.POST, "/api/v1/inbound/email")
+                                .permitAll()
+
                                 // Admin endpoints authenticate via X-Admin-Key header, not JWT
                                 .requestMatchers("/admin/**")
                                 .permitAll()

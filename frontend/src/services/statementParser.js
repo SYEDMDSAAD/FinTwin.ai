@@ -99,7 +99,7 @@ export function parseGrid(rawGrid) {
     const grid = (rawGrid || [])
         .map(r => r.map(c => (c === null || c === undefined ? "" : String(c).trim())))
         .filter(r => r.some(c => c !== ""));
-    if (grid.length === 0) return { headers: [], rows: [], preambleLines: 0 };
+    if (grid.length === 0) return { headers: [], rows: [], preambleLines: 0, preamble: [] };
 
     const headerIdx = findHeaderRow(grid);
     const headers = uniqueHeaders(grid[headerIdx]);
@@ -110,7 +110,7 @@ export function parseGrid(rawGrid) {
         .filter(r => r.filter(c => c !== "").length >= Math.min(3, headers.length))
         .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
 
-    return { headers, rows, preambleLines: headerIdx };
+    return { headers, rows, preambleLines: headerIdx, preamble: grid.slice(0, headerIdx) };
 }
 
 // Two columns can share a name ("Amount", "Amount"); a select keyed on the
@@ -275,3 +275,52 @@ export function summarize(importRows) {
     }
     return { count: importRows.length, out, in: inn, from, to };
 }
+
+// Bank names as they appear in statement headers and file names. Output uses
+// the same short names as the server's alert-email parser ("HDFC ··1234"), so
+// a statement and alerts for one account are grouped together.
+const BANKS = [
+    [/\bhdfc\b|hdfcbank/i, "HDFC"],
+    [/\bicici\b/i, "ICICI"],
+    [/\bsbi\s*card\b/i, "SBI Card"],
+    [/\bsbi\b|state bank of india/i, "SBI"],
+    [/\baxis\b/i, "Axis"],
+    [/\bkotak\b/i, "Kotak"],
+    [/\byes\s*bank\b/i, "Yes Bank"],
+    [/\bidfc\b/i, "IDFC FIRST"],
+    [/\bindusind\b/i, "IndusInd"],
+    [/\bfederal\b/i, "Federal"],
+    [/bank of baroda|\bbob\b/i, "Bank of Baroda"],
+    [/\bpnb\b|punjab national/i, "PNB"],
+    [/\bcanara\b/i, "Canara"],
+    [/union bank/i, "Union Bank"],
+    [/\bau\s*(small finance)?\s*bank\b/i, "AU"],
+    [/\brbl\b/i, "RBL"],
+];
+
+/**
+ * A label for the account a statement belongs to — "HDFC ··1234" — from the
+ * lines above its table and the file name. Either part may be missing; the
+ * user can edit the result.
+ */
+export function guessAccountLabel(preamble = [], fileName = "") {
+    const lines = preamble.map(r => r.filter(Boolean).join(" "));
+    const text = [...lines, fileName.replace(/[_.-]+/g, " ")].join("\n");
+
+    const bank = BANKS.find(([re]) => re.test(text))?.[1] ?? "";
+
+    // The account number follows its label; its trailing digits are what banks
+    // leave unmasked ("50100XXXXXX5678" → 5678, ICICI's "XXXXXXXX345" → 345)
+    let last = "";
+    for (const line of lines) {
+        const m = line.match(/(?:a\/?c|acct|account|card)(?:\s*(?:no\.?|number|num))?\s*[:#.]?\s*([\dxX*•][\dxX*•\s-]{2,30})/i);
+        const digits = m?.[1].replace(/[\s-]/g, "").match(/(\d{3,})$/)?.[1];
+        if (digits) { last = digits.slice(-4); break; }
+    }
+    if (!last) {
+        const masked = text.match(/[xX*•]{2,}(\d{3,6})\b/);
+        if (masked) last = masked[1].slice(-4);
+    }
+    return [bank, last && `··${last}`].filter(Boolean).join(" ");
+}
+

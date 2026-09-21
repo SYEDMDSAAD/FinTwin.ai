@@ -171,6 +171,15 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- DKIM verification of forwarded bank alert emails: proves an alert
+             was signed by the bank's own mail servers, not typed by whoever
+             learned a user's forwarding address. Brings dnsjava + mime4j. -->
+        <dependency>
+            <groupId>org.apache.james.jdkim</groupId>
+            <artifactId>apache-jdkim-library</artifactId>
+            <version>0.5</version>
+        </dependency>
+
         <!-- Health/info/metrics endpoints for container orchestration (k8s liveness + readiness) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -336,6 +336,8 @@ public class TransactionService {
      * @param accountType "BANK" (default) or "CARD". Card rows are stored with
      *                    source CARD, which switches on the bill-payment
      *                    double-count guard exactly as an AA card sync does.
+     * @param account     the account as the user names it ("HDFC ··1234"); stored
+     *                    on every row so coverage can be shown per account
      */
     @Caching(evict = {
         @CacheEvict(value = "user-insights",
@@ -350,7 +352,7 @@ public class TransactionService {
             description = "Statement transaction import"
     )
     @Transactional
-    public ImportResult importBatch(List<Map<String, Object>> rows, String accountType) {
+    public ImportResult importBatch(List<Map<String, Object>> rows, String accountType, String account) {
 
         String email = SecurityUtils.getCurrentUserEmail();
 
@@ -358,11 +360,25 @@ public class TransactionService {
                 .findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        return importRows(user, rows, ACCOUNT_CARD.equalsIgnoreCase(accountType));
+        return importRows(user, rows, ACCOUNT_CARD.equalsIgnoreCase(accountType), cleanAccountRef(account));
     }
 
-    /** Outcome of one import, so the UI can say "12 already imported". */
-    public record ImportResult(int imported, int duplicates, int skipped) {}
+    /**
+     * Outcome of one import, so the UI can say "12 already imported".
+     * {@code reconciled} counts rows that were already on record from alert
+     * emails: the statement row took them over rather than adding a second copy.
+     */
+    public record ImportResult(int imported, int duplicates, int skipped, int reconciled) {
+        public ImportResult(int imported, int duplicates, int skipped) {
+            this(imported, duplicates, skipped, 0);
+        }
+    }
+
+    private static String cleanAccountRef(String account) {
+        if (account == null || account.isBlank()) return null;
+        String a = account.trim().replaceAll("\\s+", " ");
+        return a.length() > 64 ? a.substring(0, 64) : a;
+    }
 
     public static final String ACCOUNT_BANK = "BANK";
     public static final String ACCOUNT_CARD = "CARD";
@@ -373,6 +389,10 @@ public class TransactionService {
             Set.of("", "other", "others", "uncategorized", "uncategorised", "misc");
 
     private ImportResult importRows(User user, List<Map<String, Object>> rows, boolean isCard) {
+        return importRows(user, rows, isCard, null);
+    }
+
+    private ImportResult importRows(User user, List<Map<String, Object>> rows, boolean isCard, String accountRef) {
 
         Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
         Set<String> existingIds = new HashSet<>(repository.findExternalIdsByUser(user));
@@ -380,8 +400,17 @@ public class TransactionService {
 
         Map<String, Integer> siblingCounts = new HashMap<>();
         List<Transaction> toSave = new ArrayList<>();
+        List<Transaction> takenOver = new ArrayList<>();
         int duplicates = 0;
         int skipped = 0;
+
+        // Transactions that arrived from alert emails and no statement has
+        // claimed yet. A statement row for the same money replaces them.
+        List<Transaction> fromAlerts = new ArrayList<>(repository.findByUser(user).stream()
+                .filter(t -> t.getExternalId() != null
+                        && t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX))
+                .filter(t -> t.getAmount() != null && t.getDate() != null)
+                .toList());
 
         for (Map<String, Object> row : rows) {
             try {
@@ -422,6 +451,21 @@ public class TransactionService {
                     continue;
                 }
 
+                Optional<Transaction> alert = matchAlert(fromAlerts, date, amount, isCard, accountRef);
+                if (alert.isPresent()) {
+                    // Same money the alert email already recorded: the statement
+                    // row becomes its identity (so re-imports dedupe against it),
+                    // and the name and category the user may have fixed are kept
+                    Transaction t = alert.get();
+                    fromAlerts.remove(t);
+                    t.setExternalId(externalId);
+                    t.setSource(isCard ? ACCOUNT_CARD : "STATEMENT");
+                    t.setDate(date);
+                    if (accountRef != null) t.setAccountRef(accountRef);
+                    takenOver.add(t);
+                    continue;
+                }
+
                 Transaction t = new Transaction();
                 t.setDate(date);
                 t.setMerchant(merchant);
@@ -430,6 +474,7 @@ public class TransactionService {
                                              isCard, cardDataPresent, learnedRules));
                 t.setSource(isCard ? ACCOUNT_CARD : "STATEMENT");
                 t.setExternalId(externalId);
+                t.setAccountRef(accountRef);
                 t.setUser(user);
                 toSave.add(t);
 
@@ -437,6 +482,10 @@ public class TransactionService {
                 log.warn("Skipping malformed import row: {}", e.getMessage());
                 skipped++;
             }
+        }
+
+        if (!takenOver.isEmpty()) {
+            repository.saveAll(takenOver);
         }
 
         if (!toSave.isEmpty()) {
@@ -458,7 +507,34 @@ public class TransactionService {
             profileService.saveScoreSnapshot(user);
         }
 
-        return new ImportResult(toSave.size(), duplicates, skipped);
+        return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size());
+    }
+
+    /**
+     * The alert-email transaction a statement row describes: same amount, a
+     * day either side (alerts carry the transaction date, statements sometimes
+     * the posting date), same side of the card/bank line, and not tied to a
+     * different account.
+     */
+    static Optional<Transaction> matchAlert(List<Transaction> fromAlerts, LocalDate date, double amount,
+                                            boolean isCard, String accountRef) {
+        return fromAlerts.stream()
+                .filter(t -> Math.abs(t.getAmount() - amount) < 0.005)
+                .filter(t -> Math.abs(t.getDate().toEpochDay() - date.toEpochDay()) <= 1)
+                .filter(t -> ACCOUNT_CARD.equals(t.getSource()) == isCard)
+                .filter(t -> accountRef == null || t.getAccountRef() == null
+                        || sameAccount(t.getAccountRef(), accountRef))
+                .min(java.util.Comparator.comparingLong(
+                        t -> Math.abs(t.getDate().toEpochDay() - date.toEpochDay())));
+    }
+
+    // "HDFC ··1234" from an alert and "HDFC Savings ··1234" typed by the user
+    // are the same account: compare the masked digits when both have them
+    private static boolean sameAccount(String a, String b) {
+        String da = a.replaceAll("\\D", "");
+        String db = b.replaceAll("\\D", "");
+        if (!da.isEmpty() && !db.isEmpty()) return da.endsWith(db) || db.endsWith(da);
+        return a.equalsIgnoreCase(b);
     }
 
     /**
@@ -468,20 +544,8 @@ public class TransactionService {
     private String importCategory(Object provided, String narration, double amount,
                                   boolean isCard, boolean cardDataPresent,
                                   Map<String, String> learnedRules) {
-        boolean isCredit = amount > 0;
-
-        if (isCard && isCredit) {
-            // A card credit is the user repaying the bill (not spending, not
-            // income) or money coming back from a merchant.
-            return TransactionMath.isRefundLike(narration)
-                    ? "Other"
-                    : TransactionMath.CARD_PAYMENT_CATEGORY;
-        }
-        if (!isCard && !isCredit && cardDataPresent
-                && TransactionMath.matchesCardPayment(narration)) {
-            // Bank-side leg of a bill payment whose card purchases are on record.
-            return TransactionMath.CARD_PAYMENT_CATEGORY;
-        }
+        String forced = TransactionMath.forcedImportCategory(narration, amount, isCard, cardDataPresent);
+        if (forced != null) return forced;
 
         if (provided != null
                 && !PLACEHOLDER_CATEGORIES.contains(provided.toString().trim().toLowerCase())) {

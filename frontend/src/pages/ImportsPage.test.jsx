@@ -30,7 +30,7 @@ describe("ImportsPage — statement import", () => {
     const { container } = render(<ImportsPage onImported={vi.fn()} />);
     const input = container.querySelector("#csv-upload");
     fireEvent.change(input, {
-      target: { files: [new File([STATEMENT], "sept.csv", { type: "text/csv" })] },
+      target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
     });
 
     // Columns are guessed, so preview is available without touching a select
@@ -56,7 +56,8 @@ describe("ImportsPage — statement import", () => {
     await screen.findByText("Import Complete!");
 
     const req = mock.history.post[0];
-    expect(req.params).toEqual({ accountType: "BANK" });
+    // the account label is guessed from the file name and the statement header
+    expect(req.params).toEqual({ accountType: "BANK", account: "HDFC ··1234" });
     expect(JSON.parse(req.data)).toEqual([
       { date: "2026-09-01", merchant: "UPI/SWIGGY", amount: -1250, balance: 24550 },
       { date: "2026-09-02", merchant: "NEFT CR ACME PAYROLL", amount: 120000, balance: 144550 },
@@ -69,7 +70,7 @@ describe("ImportsPage — statement import", () => {
 
     fireEvent.click(screen.getByText("Import 2 Transactions"));
     await waitFor(() => expect(mock.history.post).toHaveLength(1));
-    expect(mock.history.post[0].params).toEqual({ accountType: "CARD" });
+    expect(mock.history.post[0].params).toEqual({ accountType: "CARD", account: "HDFC ··1234" });
     expect(await screen.findByText(/1 already imported earlier, skipped/)).toBeInTheDocument();
   });
 });
@@ -81,6 +82,56 @@ const GRID = [
   ["01/09/26", "UPI-SWIGGY-SWIGGY8@YBL", "1,250.00", "", "24,550.00"],
   ["02/09/26", "NEFT CR-ACME PAYROLL", "", "1,20,000.00", "1,44,550.00"],
 ];
+
+describe("ImportsPage — accounts and alert emails", () => {
+  let mock;
+  beforeEach(() => { mock = new MockAdapter(API); });
+  afterEach(() => { mock.restore(); });
+
+  async function preview() {
+    const utils = render(<ImportsPage onImported={vi.fn()} />);
+    fireEvent.change(utils.container.querySelector("#csv-upload"), {
+      target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
+    });
+    await screen.findByText(/skipped 1 header lines/);
+    return utils;
+  }
+
+  it("lets the user rename the account before importing", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2 });
+    await preview();
+
+    const field = screen.getByLabelText("ACCOUNT");
+    expect(field).toHaveValue("HDFC ··1234");
+    fireEvent.change(field, { target: { value: "HDFC Salary ··1234" } });
+    fireEvent.click(screen.getByText(/Preview →/));
+    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(mock.history.post[0].params.account).toBe("HDFC Salary ··1234");
+  });
+
+  it("says when statement rows confirmed transactions already added from alert emails", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 1, duplicates: 0, skipped: 0, reconciled: 1 });
+    await preview();
+    fireEvent.click(screen.getByText(/Preview →/));
+    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+
+    expect(await screen.findByText(/1 already added from alert emails/)).toBeInTheDocument();
+  });
+
+  it("refreshes the coverage panel after an import", async () => {
+    mock.onGet("/data-coverage").reply(200, []);
+    mock.onPost("/transactions/batch").reply(200, { imported: 2 });
+    await preview();
+    await waitFor(() => expect(mock.history.get.filter(r => r.url === "/data-coverage")).toHaveLength(1));
+
+    fireEvent.click(screen.getByText(/Preview →/));
+    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+
+    await waitFor(() => expect(mock.history.get.filter(r => r.url === "/data-coverage")).toHaveLength(2));
+  });
+});
 
 describe("ImportsPage — PDF and Excel statements", () => {
   let mock;

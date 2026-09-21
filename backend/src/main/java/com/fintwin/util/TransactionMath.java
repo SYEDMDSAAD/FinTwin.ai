@@ -85,9 +85,10 @@ public final class TransactionMath {
 
     /**
      * Sources whose debits can be the bank-side leg of a card bill payment:
-     * AA-synced bank accounts and uploaded bank statements.
+     * AA-synced bank accounts, uploaded bank statements, and bank-account
+     * alert emails.
      */
-    private static final java.util.Set<String> BANK_SIDE_SOURCES = java.util.Set.of("BANK", "STATEMENT");
+    private static final java.util.Set<String> BANK_SIDE_SOURCES = java.util.Set.of("BANK", "STATEMENT", "EMAIL");
 
     /**
      * Restamps bank-side debits that are credit-card bill payments, and returns
@@ -105,6 +106,27 @@ public final class TransactionMath {
                 .filter(t -> matchesCardPayment(t.getMerchant()))
                 .peek(t -> t.setCategory(CARD_PAYMENT_CATEGORY))
                 .toList();
+    }
+
+    /**
+     * The category card bookkeeping forces on an incoming transaction, or null
+     * when ordinary categorisation should decide. Shared by statement imports
+     * and alert emails so the same money lands in the same place either way.
+     *
+     * A card credit is the user repaying the bill (neither spending nor
+     * income) or money coming back from a merchant; a bank-side debit that
+     * pays a card bill is excluded once that card's purchases are on record.
+     */
+    public static String forcedImportCategory(String narration, double amount,
+                                              boolean isCard, boolean cardDataPresent) {
+        boolean isCredit = amount > 0;
+        if (isCard && isCredit) {
+            return isRefundLike(narration) ? "Other" : CARD_PAYMENT_CATEGORY;
+        }
+        if (!isCard && !isCredit && cardDataPresent && matchesCardPayment(narration)) {
+            return CARD_PAYMENT_CATEGORY;
+        }
+        return null;
     }
 
     private static boolean containsAny(String text, String[] markers) {

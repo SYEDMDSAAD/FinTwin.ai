@@ -74,12 +74,14 @@ public class TransactionController {
     @PostMapping("/batch")
     public ResponseEntity<Map<String, Object>> importBatch(
             @RequestBody List<Map<String, Object>> rows,
-            @RequestParam(defaultValue = TransactionService.ACCOUNT_BANK) String accountType) {
-        TransactionService.ImportResult result = service.importBatch(rows, accountType);
+            @RequestParam(defaultValue = TransactionService.ACCOUNT_BANK) String accountType,
+            @RequestParam(required = false) String account) {
+        TransactionService.ImportResult result = service.importBatch(rows, accountType, account);
         return ResponseEntity.ok(Map.of(
                 "imported",   result.imported(),
                 "duplicates", result.duplicates(),
                 "skipped",    result.skipped(),
+                "reconciled", result.reconciled(),
                 "success",    true));
     }
 

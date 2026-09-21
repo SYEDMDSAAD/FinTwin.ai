@@ -66,6 +66,17 @@ public class User {
     @Column(name = "last_recap_seen_at")
     private LocalDateTime lastRecapSeenAt;
 
+    // Secret local part of the user's alert-forwarding address (u-<token>@...)
+    @Column(name = "ingest_token", length = 40, unique = true)
+    private String ingestToken;
+
+    // Gmail's forwarding confirmation code, mailed to that address
+    @Column(name = "forwarding_code", length = 32)
+    private String forwardingCode;
+
+    @Column(name = "forwarding_code_at")
+    private LocalDateTime forwardingCodeAt;
+
     // GDPR Article 7 — timestamp of explicit user consent at registration
     @Column(name = "consent_given_at")
     private LocalDateTime consentGivenAt;
@@ -219,6 +230,15 @@ public class User {
     public void setLastRecapSeenAt(LocalDateTime lastRecapSeenAt) {
         this.lastRecapSeenAt = lastRecapSeenAt;
     }
+
+    public String getIngestToken() { return ingestToken; }
+    public void setIngestToken(String ingestToken) { this.ingestToken = ingestToken; }
+
+    public String getForwardingCode() { return forwardingCode; }
+    public void setForwardingCode(String forwardingCode) { this.forwardingCode = forwardingCode; }
+
+    public LocalDateTime getForwardingCodeAt() { return forwardingCodeAt; }
+    public void setForwardingCodeAt(LocalDateTime forwardingCodeAt) { this.forwardingCodeAt = forwardingCodeAt; }
 
     public LocalDateTime getConsentGivenAt() {
         return consentGivenAt;

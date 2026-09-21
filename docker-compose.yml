@@ -88,6 +88,8 @@ services:
       SETU_REDIRECT_URL:         ${SETU_REDIRECT_URL:-}
       SETU_PRODUCT_INSTANCE_ID:  ${SETU_PRODUCT_INSTANCE_ID:-}
       SETU_WEBHOOK_SECRET:       ${SETU_WEBHOOK_SECRET:-}
+      INBOUND_EMAIL_DOMAIN:      ${INBOUND_EMAIL_DOMAIN:-}
+      INBOUND_EMAIL_SECRET:      ${INBOUND_EMAIL_SECRET:-}
     # Not exposed directly — Nginx proxies /api/* to this service
 
   # ── Identity Service — auth, tokens, 2FA, account management ──────────────

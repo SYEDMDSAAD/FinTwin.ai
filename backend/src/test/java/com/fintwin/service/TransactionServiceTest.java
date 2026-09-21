@@ -240,7 +240,7 @@ class TransactionServiceTest {
                 Map.of("merchant", "Swiggy", "amount", -500.0),
                 Map.of("date", "not-a-date", "merchant", "Uber", "amount", -300.0),
                 Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0)
-        ), "BANK");
+        ), "BANK", null);
 
         assertThat(result.imported()).isEqualTo(1);
         assertThat(result.skipped()).isEqualTo(2);
@@ -253,7 +253,7 @@ class TransactionServiceTest {
         TransactionService.ImportResult result = service.importBatch(List.of(
                 Map.of("date", "2026-01-05", "merchant", "Netflix", "amount", -649.0),
                 Map.of("date", "05/01/2026", "merchant", "Swiggy", "amount", -500.0)
-        ), "BANK");
+        ), "BANK", null);
 
         assertThat(result.imported()).isEqualTo(2);
     }
@@ -284,7 +284,7 @@ class TransactionServiceTest {
         // the service took as a real category — every statement landed there.
         Map<String, Object> r = row("2026-09-01", "UPI/SWIGGY", -450.0);
         r.put("category", "Others");
-        service.importBatch(List.of(r), "BANK");
+        service.importBatch(List.of(r), "BANK", null);
 
         assertThat(savedRows().get(0).getCategory()).isEqualTo("Food");
     }
@@ -295,7 +295,7 @@ class TransactionServiceTest {
 
         Map<String, Object> r = row("2026-09-01", "Zerodha fund transfer", -5000.0);
         r.put("category", "Investments");
-        service.importBatch(List.of(r), "BANK");
+        service.importBatch(List.of(r), "BANK", null);
 
         assertThat(savedRows().get(0).getCategory()).isEqualTo("Investments");
     }
@@ -307,7 +307,7 @@ class TransactionServiceTest {
         service.importBatch(List.of(
                 row("2026-09-01", "RENT SEPT", "25,000.00 Dr"),
                 row("2026-09-01", "NEFT CR ACME PAYROLL", "1,20,000.00 Cr")
-        ), "BANK");
+        ), "BANK", null);
 
         List<Transaction> saved = savedRows();
         assertThat(saved).extracting(Transaction::getAmount).containsExactly(-25_000.0, 120_000.0);
@@ -317,7 +317,7 @@ class TransactionServiceTest {
     void importBatch_tagsBankStatementRowsWithAStableExternalId() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
-        service.importBatch(List.of(row("2026-09-01", "UPI/NETFLIX", -649.0)), "BANK");
+        service.importBatch(List.of(row("2026-09-01", "UPI/NETFLIX", -649.0)), "BANK", null);
 
         Transaction t = savedRows().get(0);
         assertThat(t.getSource()).isEqualTo("STATEMENT");
@@ -335,7 +335,7 @@ class TransactionServiceTest {
         TransactionService.ImportResult result = service.importBatch(List.of(
                 row("2026-09-01", "UPI/NETFLIX", -649.0),
                 row("2026-09-02", "UPI/SWIGGY", -300.0)
-        ), "BANK");
+        ), "BANK", null);
 
         assertThat(result.imported()).isEqualTo(1);
         assertThat(result.duplicates()).isEqualTo(1);
@@ -349,7 +349,7 @@ class TransactionServiceTest {
         TransactionService.ImportResult result = service.importBatch(List.of(
                 row("2026-09-01", "UPI/CHAI POINT", -20.0),
                 row("2026-09-01", "UPI/CHAI POINT", -20.0)
-        ), "BANK");
+        ), "BANK", null);
 
         assertThat(result.imported()).isEqualTo(2);
         assertThat(result.duplicates()).isZero();
@@ -360,7 +360,7 @@ class TransactionServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
 
         // No card purchases on record: the bill is the only trace of that spending
-        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK");
+        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK", null);
 
         assertThat(savedRows().get(0).getCategory()).isNotEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
     }
@@ -370,7 +370,7 @@ class TransactionServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(repository.countByUserAndSource(user, "CARD")).thenReturn(40L);
 
-        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK");
+        service.importBatch(List.of(row("2026-09-05", "CREDIT CARD PAYMENT HDFC", -12_000.0)), "BANK", null);
 
         assertThat(savedRows().get(0).getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
     }
@@ -384,7 +384,7 @@ class TransactionServiceTest {
                 row("2026-09-03", "AMAZON PAY INDIA", "2,499.00 Dr"),
                 row("2026-09-10", "PAYMENT RECEIVED - THANK YOU", "12,000.00 Cr"),
                 row("2026-09-12", "REFUND AMAZON PAY INDIA", "499.00 Cr")
-        ), "CARD");
+        ), "CARD", null);
 
         List<Transaction> saved = savedRows();
         assertThat(saved).extracting(Transaction::getSource).containsOnly("CARD");
@@ -402,10 +402,80 @@ class TransactionServiceTest {
         oldBill.setSource("STATEMENT");
         when(repository.findByUser(user)).thenReturn(List.of(oldBill));
 
-        service.importBatch(List.of(row("2026-09-03", "AMAZON PAY INDIA", "2,499.00 Dr")), "CARD");
+        service.importBatch(List.of(row("2026-09-03", "AMAZON PAY INDIA", "2,499.00 Dr")), "CARD", null);
 
         // Otherwise the bill and the purchases it paid for both count as spending
         assertThat(oldBill.getCategory()).isEqualTo(TransactionMath.CARD_PAYMENT_CATEGORY);
         verify(repository).saveAll(List.of(oldBill));
     }
+
+    // ── importBatch — statements take over alert-email transactions ──────────
+
+    private static Transaction fromAlertEmail(double amount, String date, String accountRef) {
+        Transaction t = new Transaction();
+        t.setAmount(amount);
+        t.setDate(java.time.LocalDate.parse(date));
+        t.setMerchant("NETFLIX");
+        t.setCategory("Entertainment");
+        t.setSource(InboundEmailService.SOURCE_EMAIL);
+        t.setExternalId(InboundEmailService.EXTERNAL_ID_PREFIX + "abc");
+        t.setAccountRef(accountRef);
+        return t;
+    }
+
+    @Test
+    void importBatch_statementRowTakesOverTheAlertEmailInsteadOfDoublingIt() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction alert = fromAlertEmail(-649.0, "2026-09-21", "HDFC ··1234");
+        when(repository.findByUser(user)).thenReturn(List.of(alert));
+
+        // posted a day later, as statements often are, under the user's own label
+        TransactionService.ImportResult result = service.importBatch(
+                List.of(row("2026-09-22", "UPI/DR/412345/NETFLIX", -649.0)), "BANK", "HDFC Savings ··1234");
+
+        assertThat(result.imported()).isZero();
+        assertThat(result.reconciled()).isEqualTo(1);
+        assertThat(alert.getExternalId()).startsWith(StatementImport.EXTERNAL_ID_PREFIX);
+        assertThat(alert.getSource()).isEqualTo("STATEMENT");
+        assertThat(alert.getDate()).isEqualTo(java.time.LocalDate.of(2026, 9, 22));
+        // what the user saw (and may have corrected) stays
+        assertThat(alert.getMerchant()).isEqualTo("NETFLIX");
+        assertThat(alert.getCategory()).isEqualTo("Entertainment");
+        verify(repository).saveAll(List.of(alert));
+    }
+
+    @Test
+    void importBatch_anAlertFromADifferentAccountIsNotTakenOver() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(repository.findByUser(user)).thenReturn(List.of(fromAlertEmail(-649.0, "2026-09-21", "HDFC ··1234")));
+
+        TransactionService.ImportResult result = service.importBatch(
+                List.of(row("2026-09-21", "NETFLIX", -649.0)), "BANK", "ICICI ··9876");
+
+        assertThat(result.reconciled()).isZero();
+        assertThat(result.imported()).isEqualTo(1);
+    }
+
+    @Test
+    void importBatch_aBankRowNeverTakesOverACardAlert() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction cardAlert = fromAlertEmail(-649.0, "2026-09-21", null);
+        cardAlert.setSource("CARD");
+        when(repository.findByUser(user)).thenReturn(List.of(cardAlert));
+
+        TransactionService.ImportResult result = service.importBatch(
+                List.of(row("2026-09-21", "NETFLIX", -649.0)), "BANK", null);
+
+        assertThat(result.reconciled()).isZero();
+    }
+
+    @Test
+    void importBatch_storesTheAccountLabelOnEveryRow() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        service.importBatch(List.of(row("2026-09-01", "UPI/SWIGGY", -450.0)), "BANK", "  HDFC   ··1234 ");
+
+        assertThat(savedRows().get(0).getAccountRef()).isEqualTo("HDFC ··1234");
+    }
 }
+
