@@ -10,5 +10,7 @@ import java.util.Optional;
 public interface InvestmentRepository extends JpaRepository<Investment, Long> {
     List<Investment> findByUser(User user);
 
+    void deleteByUser(User user);
+
     // SQL lookups by name/tickerCode removed — both fields are AES-256/GCM encrypted
 }

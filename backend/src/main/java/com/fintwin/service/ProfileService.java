@@ -31,6 +31,9 @@ public class ProfileService {
 
     @Autowired private AssetRepository assetRepository;
     @Autowired private LiabilityRepository liabilityRepository;
+    @Autowired private InvestmentRepository investmentRepository;
+    @Autowired private CryptoConnectionRepository cryptoConnectionRepository;
+    @Autowired private NotificationRepository notificationRepository;
 
     // @Lazy breaks the instantiation cycle:
     // ProfileService ← BudgetService ← FinancialScoreService ← (this field)
@@ -158,16 +161,7 @@ public class ProfileService {
                         new NotFoundException("User not found")
                 );
 
-        // explicit delete order to respect FK constraints
-        chatHistoryRepository.deleteByUser(user);
-        transactionRepository.deleteByUser(user);
-        goalRepository.deleteByUser(user);
-        budgetRepository.deleteByUser(user);
-        assetRepository.deleteByUser(user);
-        liabilityRepository.deleteByUser(user);
-        financialScoreHistoryRepository.deleteByUser(user);
-        bankConnectionRepository.deleteByUser(user);
-        userRepository.delete(user);
+        purgeUser(user);
 
         return "Account deleted successfully";
     }
@@ -202,12 +196,29 @@ public class ProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
+        purgeUser(user);
+    }
+
+    /**
+     * Deletes a user and everything they own. Shared by self-service account
+     * deletion and admin deletion so the two can't drift apart.
+     *
+     * Every table whose foreign key to users has no ON DELETE CASCADE must be
+     * cleared here first, or the final delete fails the constraint — as it did
+     * for any user holding an investment. The cascading ones (insurance
+     * policies, dismissed anomalies, learned categories, refresh tokens, alert
+     * email events) go with the user row.
+     */
+    private void purgeUser(User user) {
         chatHistoryRepository.deleteByUser(user);
         transactionRepository.deleteByUser(user);
         goalRepository.deleteByUser(user);
         budgetRepository.deleteByUser(user);
         assetRepository.deleteByUser(user);
         liabilityRepository.deleteByUser(user);
+        investmentRepository.deleteByUser(user);
+        cryptoConnectionRepository.deleteByUser(user);
+        notificationRepository.deleteByUser(user);
         financialScoreHistoryRepository.deleteByUser(user);
         bankConnectionRepository.deleteByUser(user);
         userRepository.delete(user);

@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface CryptoConnectionRepository extends JpaRepository<CryptoConnection, Long> {
     List<CryptoConnection> findByUser(User user);
+
+    void deleteByUser(User user);
 }
