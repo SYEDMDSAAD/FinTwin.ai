@@ -95,7 +95,7 @@ export default function EmailAlertsSetup() {
             <div style={{ ...LABEL, marginBottom: 6 }}>YOUR FORWARDING ADDRESS</div>
             <CopyRow value={state.address} copied={copied === "address"} onCopy={() => copy(state.address, "address")} label="Copy address" />
 
-            <ol style={{ margin: "16px 0 0", paddingLeft: 18, display: "grid", gap: 12, fontSize: 13, color: "rgba(226,232,240,0.85)", lineHeight: 1.55 }}>
+            <ol style={{ margin: "16px 0 0", paddingLeft: 18, display: "grid", gap: 12, fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55 }}>
                 <li>
                     In Gmail, open <strong>Settings → See all settings → Forwarding and POP/IMAP</strong>, choose
                     <strong> Add a forwarding address</strong>, and paste the address above.
@@ -197,5 +197,5 @@ function CopyRow({ value, copied, onCopy, label, big, small }) {
 
 const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: 20, marginTop: 20 };
 const LABEL = { fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" };
-const MUTED = { fontSize: 12, color: "rgba(148,163,184,0.65)", lineHeight: 1.55, margin: 0 };
+const MUTED = { fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55, margin: 0 };
 const LINK_BUTTON = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "#a78bfa", fontSize: 12, fontWeight: 600, fontFamily: "inherit" };

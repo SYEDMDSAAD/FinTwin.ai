@@ -874,7 +874,7 @@ export default function OnboardingPage() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
                 <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Add your transactions</h1>
                 <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 24px", lineHeight: 1.7 }}>
-                  FinTwin is in beta. Choose how to bring your data in — you can add more any time from <strong style={{ color: "rgba(226,232,240,0.8)" }}>Imports</strong>.
+                  FinTwin is in beta. Choose how to bring your data in — you can add more any time from <strong style={{ color: "var(--text-primary)" }}>Imports</strong>.
                 </p>
 
                 {/* Option 1 — statements (recommended) */}
@@ -889,13 +889,13 @@ export default function OnboardingPage() {
                     </div>
                     <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", whiteSpace: "nowrap" }}>RECOMMENDED</span>
                   </div>
-                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.75)", margin: "0 0 12px", lineHeight: 1.65 }}>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 12px", lineHeight: 1.65 }}>
                     Download your statement from net banking — PDF, Excel or CSV — and upload it here. Add <strong style={{ color: "#fff" }}>at least 2–3 months</strong> so FinTwin can see your patterns, recurring payments and spending pace.
                     These are your real transactions, so this is the best way to test the app.
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 16 }}>
                     {["✓ Your real spending", "✓ Any bank or credit card", "✓ Password-protected PDFs work"].map(t => (
-                      <span key={t} style={{ fontSize: 12, color: "rgba(148,163,184,0.65)" }}>{t}</span>
+                      <span key={t} style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t}</span>
                     ))}
                   </div>
                   <button
@@ -918,7 +918,7 @@ export default function OnboardingPage() {
                     </div>
                     <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", whiteSpace: "nowrap" }}>DEMO ONLY</span>
                   </div>
-                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.75)", margin: "0 0 4px", lineHeight: 1.65 }}>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 4px", lineHeight: 1.65 }}>
                     This is a <strong style={{ color: "#fbbf24" }}>demo sandbox — not real transactions</strong>. It links to Setu's test banks, which return sample data, not your own accounts or money.
                   </p>
                   <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 14px", lineHeight: 1.6 }}>
@@ -930,7 +930,8 @@ export default function OnboardingPage() {
                       onClick={() => setSetuOpen(true)}
                       style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.06)", color: "#fbbf24", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
                     >
-                      Use the sandbox
+                      {/* in a span: light mode darkens amber text, but not on buttons */}
+                      <span style={{ color: "#fbbf24" }}>Use the sandbox</span>
                     </button>
                   ) : (
                     <>
