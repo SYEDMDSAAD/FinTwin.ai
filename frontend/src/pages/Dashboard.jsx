@@ -1,5 +1,5 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
-import { Brain } from "lucide-react";
+import { Brain, Sparkles } from "lucide-react";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
@@ -1869,6 +1869,16 @@ function Dashboard() {
                             setExpenseText={setExpenseText}
                             addExpense={addExpense}
                         />
+
+                        <div role="note" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "-8px 0 20px", padding: "12px 16px", borderRadius: 12, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                            <Sparkles size={15} color="#a78bfa" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
+                            <span style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                                Day-to-day transactions are messy — a shop name or a UPI ID doesn't always say what you bought.
+                                FinTwin puts each one in its most probable category, but it won't always be right. If you spot a
+                                transaction in the wrong category, change it: FinTwin remembers your choice for that merchant, and
+                                it helps us improve.
+                            </span>
+                        </div>
 
                         {/* Outside the loading swap so it never unmounts and refetches */}
                         <SortOther

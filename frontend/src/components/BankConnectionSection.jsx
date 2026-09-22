@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Link2, Unlink, RefreshCw, CheckCircle2, Clock, AlertCircle, X, Smartphone } from "lucide-react";
+import { Building2, Link2, Unlink, RefreshCw, CheckCircle2, Clock, AlertCircle, X, Smartphone, FlaskConical } from "lucide-react";
 import { toast } from "react-hot-toast";
 import GlassCard from "./GlassCard";
 import API from "../services/api";
@@ -186,10 +186,23 @@ function BankConnectionSection({ onSynced }) {
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <p className="text-sm font-semibold text-white mb-1">Connect your bank account</p>
-                        <p className="text-xs text-zinc-500 max-w-md">
-                            Powered by RBI's Account Aggregator framework. You authorise data sharing — we never see your credentials. Transactions sync automatically in real time.
+                        <p className="text-sm font-semibold text-white mb-1 flex items-center gap-2 flex-wrap">
+                            Connect your bank account
+                            <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", color: "#f59e0b" }}>
+                                DEMO SANDBOX
+                            </span>
                         </p>
+                        <p className="text-xs text-zinc-500 max-w-md">
+                            Powered by RBI's Account Aggregator framework. You authorise data sharing — we never see your credentials.
+                        </p>
+                        <div role="note" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 10, maxWidth: 520, padding: "10px 12px", borderRadius: 10, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}>
+                            <FlaskConical size={14} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
+                            <span style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>
+                                This is a <strong style={{ color: "var(--text-primary)" }}>demo sandbox</strong>, not your real bank. It adds
+                                random sample transactions — use it only if you want to try the app out. For your actual
+                                spending, import your bank or UPI statements instead.
+                            </span>
+                        </div>
                     </div>
                     <button
                         onClick={openModal}
