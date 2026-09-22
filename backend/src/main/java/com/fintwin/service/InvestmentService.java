@@ -136,15 +136,26 @@ public class InvestmentService {
             String raw = t.getMerchant() != null ? t.getMerchant() : "";
             String n   = raw.toLowerCase();
 
+            // The user's own category is better evidence than any keyword: a
+            // payment they filed under Investments is one, whatever the
+            // narration looks like.
+            boolean userSaysInvestment = "Investments".equalsIgnoreCase(t.getCategory());
             String type = detectType(n);
-            if (type == null) continue;
+            if (type == null && !userSaysInvestment) continue;
 
-            String name = extractName(raw, n, type);
+            String name = type != null ? extractName(raw, n, type)
+                    : com.fintwin.util.MerchantCategorizer.payeeOf(raw);
+            if (name.isBlank()) continue;
+            if (type == null) type = "Other";          // the user can link it to a fund or stock
             double amount = Math.abs(t.getAmount());
             LocalDate date = t.getDate();
 
-            DetectedEntry entry = grouped.computeIfAbsent(name, k -> new DetectedEntry(type, isDebit ? date : null));
+            final String entryType = type;
+            DetectedEntry entry = grouped.computeIfAbsent(name, k -> new DetectedEntry(entryType, isDebit ? date : null));
+            // A keyword-known type beats the fallback when both appear under one payee
+            if ("Other".equals(entry.type) && !"Other".equals(entryType)) entry.type = entryType;
             entry.totalAmount += isDebit ? amount : -amount;
+            if (isDebit) entry.payments++;
             // Purchase date tracks the first outgoing payment, not redemptions.
             if (isDebit && date != null && (entry.earliestDate == null || date.isBefore(entry.earliestDate))) {
                 entry.earliestDate = date;
@@ -169,7 +180,9 @@ public class InvestmentService {
             inv.setInvestedAmount(Math.round(d.totalAmount * 100.0) / 100.0);
             inv.setCurrentValue(Math.round(d.totalAmount * 100.0) / 100.0); // default same as invested
             inv.setPurchaseDate(d.earliestDate);
-            results.add(InvestmentDTO.from(inv));
+            InvestmentDTO dto = InvestmentDTO.from(inv);
+            dto.setPayments(d.payments);
+            results.add(dto);
         }
 
         return results;
@@ -436,6 +449,7 @@ public class InvestmentService {
     private static class DetectedEntry {
         String    type;
         double    totalAmount;
+        int       payments;
         LocalDate earliestDate;
 
         DetectedEntry(String type, LocalDate date) {

@@ -18,6 +18,8 @@ public class InvestmentDTO {
     private Double interestRate;
     private String ipoStatus;
     private Long ipoListingId;
+    // Auto-detect only: how many payments a suggestion is made of
+    private Integer payments;
 
     public static InvestmentDTO from(com.fintwin.model.Investment inv) {
         InvestmentDTO dto = new InvestmentDTO();
@@ -58,5 +60,7 @@ public class InvestmentDTO {
     public String getNotes()        { return notes; }
     public String getTickerCode()   { return tickerCode; }
     public Double getUnits()        { return units; }
+    public Integer getPayments()    { return payments; }
+    public void setPayments(Integer v) { this.payments = v; }
     public Double getInterestRate() { return interestRate; }
 }

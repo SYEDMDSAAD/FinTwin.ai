@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { IPO_STATUSES } from "../constants/investments";
 import LinkHoldingModal from "./LinkHoldingModal";
+import InvestmentSuggestions from "./InvestmentSuggestions";
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight, Link2 } from "lucide-react";
 
 const INVESTMENT_TYPES = [
@@ -348,6 +349,8 @@ export default function PortfolioTab() {
                     color={pnlPositive ? "text-green-400" : "text-red-400"}
                 />
             </div>
+
+            <InvestmentSuggestions onAdded={load} />
 
             {unlinked.map(h => (
                 <div key={`unlinked-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "14px 18px", marginBottom: 18, borderRadius: 14, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.25)" }}>
