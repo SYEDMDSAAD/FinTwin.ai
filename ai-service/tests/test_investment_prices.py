@@ -122,3 +122,19 @@ def test_real_estate_returns_no_price():
 def test_stock_without_units_returns_no_price():
     result = refresh_prices([{"id": 4, "type": "Stocks", "tickerCode": "TCS", "units": None}])
     assert result[0]["currentValue"] is None
+
+
+# ── IPO holdings ──────────────────────────────────────────────────────────────
+
+def test_ipo_before_listing_is_worth_what_was_paid():
+    from investments.price_service import refresh_prices
+    [r] = refresh_prices([{"id": 1, "type": "IPO", "investedAmount": 15000, "units": None, "tickerCode": None}])
+    assert r["currentValue"] == 15000
+
+
+def test_listed_ipo_uses_the_live_price(monkeypatch):
+    from investments import price_service
+    monkeypatch.setattr(price_service, "_stock_price", lambda t: 130.0)
+    [r] = price_service.refresh_prices([{"id": 1, "type": "IPO", "investedAmount": 14800,
+                                         "units": 148, "tickerCode": "NEWCO"}])
+    assert r["currentValue"] == 19240.0

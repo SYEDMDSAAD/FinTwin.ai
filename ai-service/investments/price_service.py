@@ -61,6 +61,15 @@ def _gold_inr_per_gram() -> float:
 
 
 def _mf_nav(scheme_code: str) -> Optional[float]:
+    # AMFI's own daily file first: official, and one cached request covers
+    # every scheme. mfapi.in only as a fallback — it can stall for 25 s.
+    from market.data import latest_nav
+    try:
+        nav = latest_nav(scheme_code)
+        if nav:
+            return nav
+    except Exception:
+        pass
     try:
         r = requests.get(f"{MFAPI_BASE}/{scheme_code}", timeout=10)
         r.raise_for_status()
@@ -141,6 +150,16 @@ def refresh_prices(investments: List[Dict]) -> List[Dict]:
                 price = _stock_price(str(ticker))
                 if price:
                     current_value = round(price * float(units), 2)
+
+        elif inv_type == "IPO":
+            # Once listed (NSE symbol + shares allotted) it's a stock at the
+            # live price; before that it's worth what was paid or blocked.
+            if ticker and units:
+                price = _stock_price(str(ticker))
+                if price:
+                    current_value = round(price * float(units), 2)
+            if current_value is None:
+                current_value = invested
 
         elif inv_type == "Gold":
             if units:
