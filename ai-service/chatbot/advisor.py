@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 import os
 import time
@@ -40,13 +41,48 @@ Retry after a few seconds. Check that Ollama is running (ollama serve).
 Temporary AI service interruption."""
 
 
+_PORTFOLIO_CAVEAT = (
+    "\n\n_Based on the holdings recorded in FinTwin. This is not financial advice — "
+    "past returns don't predict future ones, so check with a SEBI-registered adviser "
+    "before buying or selling._"
+)
+
+
+_ASKS_TRADE = re.compile(
+    r"\b(should|shall|can|must)\s+i\s+(buy|sell|exit|invest|redeem|hold|switch)\b"
+    r"|\b(buy|sell|exit)\s+(more|some|my|all|it|them|the)\b"
+    r"|\bwhich\s+(stock|share|fund|mutual fund|ipo)s?\s+(should|to|can)\b"
+    r"|\bgood\s+time\s+to\s+(buy|sell|invest)\b",
+    re.IGNORECASE,
+)
+
+
+def _portfolio_rules(question: str) -> str:
+    rules = (
+        "Answer from the portfolio data above only. A holding is losing money only "
+        "if it is listed in 'atLoss', and gaining only if it is in 'inProfit'. Quote "
+        "'summary' and 'perHolding' figures exactly. Keep the holding types as given. "
+        "Do not tell the user to buy, sell, exit or move money between holdings."
+    )
+    if _ASKS_TRADE.search(question or ""):
+        rules += (
+            " The user is asking whether to buy or sell. Do not answer yes or no and do "
+            "not recommend any trade. Say what the holding has done so far using the "
+            "data, name the factors they could weigh (how long they plan to hold, how "
+            "much of the portfolio it already is, their risk appetite), and say the "
+            "decision is theirs."
+        )
+    return rules
+
+
 def _system_prompt(mode: str, intent: str, base_context: str) -> str:
     return f"""You are FinTwin AI, an elite AI financial advisor for Indian users.
 
 CRITICAL RULES:
 - ALWAYS use ₹ (Indian Rupee) for ALL currency amounts. Never use $ or USD.
 - You have TOOLS that fetch the user's real data (transactions, budgets, goals,
-  net worth). When a question needs specific data, CALL THE TOOL — never guess.
+  net worth, investment portfolio). When a question needs specific data, CALL
+  THE TOOL — never guess.
 - NEVER invent transactions, amounts, or dates. If the data returned does not
   contain what the user asked for, say exactly that.
 - Earlier replies in this conversation may be OUTDATED OR WRONG. Never copy
@@ -68,6 +104,15 @@ TOOL HINTS:
 - Biggest spends → get_transactions with type='expense', sort='amount'.
 - A category filter must be a spending category the user actually uses —
   never pass category='Income'.
+- Investments, returns, profit/loss, mutual funds, stocks, "how is my
+  portfolio doing" → get_portfolio. About ONE kind ("my mutual fund", "my
+  stocks") → pass type, e.g. type='Mutual Fund'. Answer by quoting its
+  'summary' and 'perHolding' sentences word for word; use 'inProfit' and
+  'atLoss' for which holdings gain or lose. Never call a holding a different
+  type than the one given. If it has a 'note', pass that on to the user.
+- Never predict future returns or tell the user to buy or sell a specific
+  stock or fund — explain what their data shows and remind them it is not
+  financial advice.
 - If a tool returns an empty list or an error, tell the user plainly what
   you could not find — do not fill the gap with generic advice.
 
@@ -149,6 +194,22 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
 
     tools_attempted = 0
     tools_succeeded = 0
+    used_portfolio = False
+    portfolio_summary = ""
+
+    def finish(text: str) -> str:
+        # The headline figure must survive the model: if its answer leaves out
+        # the portfolio's current value, lead with the precomputed summary.
+        if portfolio_summary and text not in (_FALLBACK, _DATA_UNAVAILABLE):
+            m = re.search(r"now worth (₹[\d,.]+)", portfolio_summary)
+            if m and m.group(1).rstrip(".") not in text:
+                text = portfolio_summary + "\n\n" + text
+        # Said in code, not left to the prompt: a 3B model drops the caveat
+        # and will happily tell someone to sell a stock.
+        if used_portfolio and text not in (_FALLBACK, _DATA_UNAVAILABLE) \
+                and "not financial advice" not in text.lower():
+            text += _PORTFOLIO_CAVEAT
+        return text
     deadline = time.monotonic() + _CHAT_BUDGET_SECONDS
 
     def budgeted_chat(tools):
@@ -170,7 +231,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                 # anyway — that answer is fabricated. Refuse honestly instead.
                 if tools_attempted and not tools_succeeded:
                     return _DATA_UNAVAILABLE
-                return (reply.get("content") or "").strip() or _FALLBACK
+                return finish((reply.get("content") or "").strip() or _FALLBACK)
 
             messages.append(reply)
             for call in tool_calls:
@@ -185,16 +246,24 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                 logger.info("Copilot tool call (round %d): %s(%s)", round_no + 1, name, args)
                 result = execute_tool(name, args, user_id)
                 tools_attempted += 1
+                used_portfolio |= name == "get_portfolio"
                 if not _tool_result_is_error(result):
                     tools_succeeded += 1
                 messages.append({"role": "tool", "content": result})
+                if name == "get_portfolio":
+                    try:
+                        portfolio_summary = json.loads(result).get("summary") or portfolio_summary
+                    except (ValueError, AttributeError):
+                        pass
+                    # Next to the data, where a small model actually heeds it.
+                    messages.append({"role": "system", "content": _portfolio_rules(message)})
 
         if tools_attempted and not tools_succeeded:
             return _DATA_UNAVAILABLE
 
         # Tool budget exhausted — force a final answer from what was gathered.
         final = budgeted_chat(None)
-        return (final.get("content") or "").strip() or _FALLBACK
+        return finish((final.get("content") or "").strip() or _FALLBACK)
 
     except _OutOfTime:
         # Answer now. Falling back to the single-shot path here (as any other

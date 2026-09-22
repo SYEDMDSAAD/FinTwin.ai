@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 # Ollama/OpenAI-style tool schemas. Kept to four focused tools — small
 # models pick the right tool far more reliably from a short list.
+# Holding types as the portfolio stores them.
+PORTFOLIO_TYPES = ["Stocks", "Mutual Fund", "Fixed Deposit", "PPF", "NPS", "Gold",
+                   "Crypto", "Bonds", "IPO", "Other"]
+
 TOOLS = [
     {
         "type": "function",
@@ -105,11 +109,45 @@ TOOLS = [
         "function": {
             "name": "get_net_worth",
             "description": (
-                "Fetch assets, liabilities (loans with EMI and interest rate), investment "
-                "holdings, insurance policies, and net worth. Use for questions about "
-                "loans, EMIs, investments, insurance, or overall wealth."
+                "Fetch assets, liabilities (loans with EMI and interest rate), insurance "
+                "policies, and the overall net worth. Use for questions about loans, EMIs, "
+                "insurance, or overall wealth. For anything about investments, use "
+                "get_portfolio instead."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_portfolio",
+            "description": (
+                "Fetch the user's investment portfolio: every holding (stocks, mutual "
+                "funds, FDs, PPF, gold, crypto, IPOs) with amount invested, current value, "
+                "gain and return %, units, purchase date, plus portfolio totals, allocation "
+                "by type, and the best and worst performer. Use for any question about "
+                "investments, returns, profit/loss, mutual funds, stocks, SIPs or "
+                "diversification. All sums and percentages are precomputed — quote them, "
+                "never recalculate; 'summary' and 'perHolding' are ready-made sentences to "
+                "quote. Each holding's 'valuation' says whether its value is a market "
+                "price, an estimate, or a figure the user typed in; say so when it is not "
+                "a market price."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": PORTFOLIO_TYPES,
+                        "description": (
+                            "Only when the question is about ONE kind of investment "
+                            "('my mutual funds', 'my stocks', 'my FD'). Omit for the "
+                            "whole portfolio."
+                        ),
+                    },
+                },
+                "required": [],
+            },
         },
     },
 ]
@@ -139,9 +177,13 @@ def execute_tool(name: str, args: dict, user_id: int) -> str:
             result = backend_api.get(f"/{user_id}/goals")
         elif name == "get_net_worth":
             result = backend_api.get(f"/{user_id}/networth")
+        elif name == "get_portfolio":
+            params = {"type": args["type"]} if args.get("type") in PORTFOLIO_TYPES else None
+            result = backend_api.get(f"/{user_id}/portfolio", params)
         else:
             return json.dumps({"error": f"Unknown tool '{name}'"})
-        return json.dumps(result, default=str)
+        # ensure_ascii=False: escaped "\u20b9" was copied into answers verbatim
+        return json.dumps(result, default=str, ensure_ascii=False)
     except (RuntimeError, ValueError, TypeError) as e:
         logger.warning("Tool %s failed: %s", name, e)
         return json.dumps({"error": str(e)})

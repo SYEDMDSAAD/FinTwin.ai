@@ -342,6 +342,126 @@ public class InternalAIController {
         return ResponseEntity.ok(body);
     }
 
+    // ── Portfolio: holdings with gains worked out, allocation, best/worst ────
+
+    @GetMapping("/{userId}/portfolio")
+    public ResponseEntity<?> portfolio(
+            @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @PathVariable Long userId,
+            @RequestParam(required = false) String type
+    ) {
+        ResponseEntity<?> denied = requireKey(key);
+        if (denied != null) return denied;
+        User user = userRepo.findById(userId).orElse(null);
+        if (user == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(portfolioBody(investmentRepo.findByUser(user), type));
+    }
+
+    private static final java.util.Set<String> ESTIMATED_TYPES = java.util.Set.of("Fixed Deposit", "PPF", "NPS", "Bonds");
+
+    /**
+     * Every figure the copilot might quote, computed here: a 3B model adding
+     * up holdings or working out percentages gets them wrong. Each holding
+     * also says how its value was arrived at, so the model doesn't present an
+     * estimate or a figure the user typed in as a live market price.
+     */
+    static Map<String, Object> portfolioBody(List<Investment> everything, String onlyType) {
+        boolean filtered = onlyType != null && !onlyType.isBlank();
+        List<Investment> all = !filtered ? everything : everything.stream()
+                .filter(i -> onlyType.trim().equalsIgnoreCase(i.getType() == null || i.getType().isBlank() ? "Other" : i.getType()))
+                .toList();
+        double totalInvested = 0, totalCurrent = 0;
+        Map<String, Double> byType = new LinkedHashMap<>();
+        List<Map<String, Object>> holdings = new ArrayList<>();
+        int unlinked = 0;
+
+        for (Investment inv : all) {
+            double invested = inv.getInvestedAmount() != null ? inv.getInvestedAmount() : 0;
+            double current  = inv.getCurrentValue()   != null ? inv.getCurrentValue()   : invested;
+            String type = inv.getType() != null && !inv.getType().isBlank() ? inv.getType() : "Other";
+            boolean hasTicker = inv.getTickerCode() != null && !inv.getTickerCode().isBlank();
+            totalInvested += invested;
+            totalCurrent  += current;
+            byType.merge(type, current, Double::sum);
+
+            String valuation;
+            if ("IPO".equals(type) && !"LISTED".equals(inv.getIpoStatus()))
+                valuation = "not listed yet — valued at the amount applied";
+            else if (ESTIMATED_TYPES.contains(type))
+                valuation = "estimated from the interest rate, not a market price";
+            else if (hasTicker && inv.getUnits() != null)
+                valuation = "market price at the last portfolio refresh";
+            else {
+                valuation = "as entered by the user — not linked to a market price";
+                if ("Other".equals(type) && !hasTicker) unlinked++;
+            }
+
+            double gain = current - invested;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", inv.getName() != null ? inv.getName() : "");
+            row.put("type", type);
+            if (hasTicker)                     row.put("symbol", inv.getTickerCode());
+            if (inv.getUnits() != null)        row.put("units", inv.getUnits());
+            if (inv.getPurchaseDate() != null) row.put("purchaseDate", inv.getPurchaseDate().toString());
+            if (inv.getIpoStatus() != null)    row.put("ipoStatus", inv.getIpoStatus());
+            row.put("investedFormatted",     inr(invested));
+            row.put("currentValueFormatted", inr(current));
+            row.put("gainFormatted",         (gain > 0 ? "+" : "") + inr(gain));
+            row.put("gainPercent",           pct(gain, invested));
+            row.put("valuation",             valuation);
+            holdings.add(row);
+        }
+
+        holdings.sort(Comparator.comparingDouble(h -> -((Number) h.get("gainPercent")).doubleValue()));
+
+        final double currentTotal = totalCurrent;
+        List<String> allocation = byType.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                // One string per type: a small model reading separate fields
+                // has pinned one type's percentage on another.
+                .map(e -> e.getKey() + ": " + (currentTotal > 0 ? Math.round(e.getValue() / currentTotal * 1000) / 10.0 : 0)
+                        + "% (" + inr(e.getValue()) + ")")
+                .toList();
+
+        double totalGain = totalCurrent - totalInvested;
+        String scope = filtered ? onlyType.trim() + " holdings" : "Portfolio";
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (filtered) body.put("filteredTo", onlyType.trim());
+        // Ready-made sentences: quoting beats a small model composing figures.
+        body.put("summary", all.isEmpty() ? "" : scope + " (" + all.size() + (all.size() == 1 ? " holding" : " holdings") + "): invested " + inr(totalInvested)
+                + ", now worth " + inr(totalCurrent) + " — " + (totalGain >= 0 ? "a gain of " : "a loss of ")
+                + inr(Math.abs(totalGain)) + " (" + (totalGain > 0 ? "+" : "") + pct(totalGain, totalInvested) + "%).");
+        body.put("perHolding", holdings.stream().map(h -> h.get("name") + " (" + h.get("type") + "): invested "
+                + h.get("investedFormatted") + ", now " + h.get("currentValueFormatted") + ", "
+                + h.get("gainFormatted") + " (" + h.get("gainPercent") + "%)").toList());
+        body.put("inProfit", holdings.stream().filter(h -> ((Number) h.get("gainPercent")).doubleValue() > 0).map(h -> h.get("name")).toList());
+        body.put("atLoss",   holdings.stream().filter(h -> ((Number) h.get("gainPercent")).doubleValue() < 0).map(h -> h.get("name")).toList());
+        body.put("holdingCount",          all.size());
+        body.put("totalInvestedFormatted", inr(totalInvested));
+        body.put("currentValueFormatted", inr(totalCurrent));
+        body.put("totalGainFormatted",    (totalGain > 0 ? "+" : "") + inr(totalGain));
+        body.put("totalGainPercent",      pct(totalGain, totalInvested));
+        body.put("allocation",            allocation);
+        if (holdings.size() > 1) {
+            body.put("bestPerformer",  holdings.get(0).get("name") + " (" + holdings.get(0).get("gainPercent") + "%)");
+            Map<String, Object> worst = holdings.get(holdings.size() - 1);
+            body.put("worstPerformer", worst.get("name") + " (" + worst.get("gainPercent") + "%)");
+        }
+        body.put("holdings", holdings);                   // best return first
+        if (unlinked > 0)
+            body.put("note", unlinked + " holding(s) are a lump sum not linked to any stock or fund, so their value "
+                    + "never changes. The user can link them on the Investments page to see what they're worth today.");
+        if (all.isEmpty())
+            body.put("note", filtered
+                    ? "The user has no " + onlyType.trim() + " holdings recorded in FinTwin."
+                    : "The user has no investments recorded in FinTwin. They can add them on the Investments page.");
+        return body;
+    }
+
+    private static double pct(double gain, double base) {
+        return base > 0 ? Math.round(gain / base * 10000) / 100.0 : 0;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<?> requireKey(String key) {
@@ -362,7 +482,7 @@ public class InternalAIController {
     // ship display-ready Indian-grouped amounts (lakh/crore) so they can
     // quote verbatim. Built by hand: JDK NumberFormat/DecimalFormat both
     // emit western grouping for en-IN.
-    private String inr(double v) {
+    static String inr(double v) {
         long paise  = Math.round(Math.abs(v) * 100);
         String digits = Long.toString(paise / 100);
         long frac   = paise % 100;
