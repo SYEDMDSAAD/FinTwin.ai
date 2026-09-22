@@ -716,7 +716,7 @@ public class BankConnectionService {
         return t;
     }
 
-    private Categorized deriveCategory(String narration, String type,
+    Categorized deriveCategory(String narration, String type,
                                   Map<String, String> learnedRules,
                                   boolean isCard, boolean cardSyncActive) {
         boolean isCredit = "CREDIT".equalsIgnoreCase(type);
@@ -729,8 +729,8 @@ public class BankConnectionService {
             if (isCredit && !com.fintwin.util.TransactionMath.isRefundLike(narration)) {
                 return new Categorized(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY, Categorized.FORCED);
             }
-            // A card credit is never income, whatever the narration says — the
-            // keyword rules below would read "CREDIT"/"inward" as salary.
+            // A card credit is never income, whatever the narration says — a
+            // refund reading "CASHBACK BONUS" would otherwise match Income.
             if (isCredit) return new Categorized("Other", Categorized.FORCED);
         } else if (cardSyncActive && !isCredit
                    && com.fintwin.util.TransactionMath.matchesCardPayment(narration)) {
@@ -740,47 +740,13 @@ public class BankConnectionService {
             return new Categorized(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY, Categorized.FORCED);
         }
 
-        if (narration == null) return Categorized.other();
-        String n = narration.toLowerCase();
-
-        // The user's own corrections always win over keyword heuristics
-        if (learnedRules != null && !learnedRules.isEmpty()) {
-            String normalized = categoryService.normalizeMerchant(narration);
-            String exact = learnedRules.get(normalized);
-            if (exact != null) return new Categorized(exact, Categorized.LEARNED);
-            for (Map.Entry<String, String> rule : learnedRules.entrySet()) {
-                if (normalized.contains(rule.getKey())) return new Categorized(rule.getValue(), Categorized.LEARNED);
-            }
-        }
-
-        if (n.contains("swiggy") || n.contains("zomato") || n.contains("food"))
-            return new Categorized("Food", Categorized.BANK_KEYWORD);
-        if (n.contains("uber") || n.contains("ola") || n.contains("rapido") || n.contains("metro"))
-            return new Categorized("Transport", Categorized.BANK_KEYWORD);
-        if (n.contains("netflix") || n.contains("hotstar") || n.contains("spotify") || n.contains("youtube"))
-            return new Categorized("Entertainment", Categorized.BANK_KEYWORD);
-        if (n.contains("amazon") || n.contains("flipkart") || n.contains("myntra"))
-            return new Categorized("Shopping", Categorized.BANK_KEYWORD);
-        if (n.contains("electricity") || n.contains("water") || n.contains("gas") || n.contains("bill") || n.contains("recharge"))
-            return new Categorized("Utilities", Categorized.BANK_KEYWORD);
-        // Guarded on isCredit: a debit is never income, whatever it is called.
-        // "CREDIT CARD ANNUAL FEE" is a charge, not salary — and on the bank side
-        // a debit narration mentioning "credit" was landing as income too.
-        if (isCredit && (n.contains("salary") || n.contains("credit")
-                         || n.contains("neft cr") || n.contains("inward")))
-            return new Categorized("Income", Categorized.BANK_KEYWORD);
-        if (n.contains("rent") || n.contains("maintenance"))
-            return new Categorized("Housing", Categorized.BANK_KEYWORD);
-        if (n.contains("hospital") || n.contains("pharmacy") || n.contains("medical") || n.contains("apollo") || n.contains("medplus"))
-            return new Categorized("Health", Categorized.BANK_KEYWORD);
-        if (n.contains("emi") || n.contains("loan"))
-            return new Categorized("EMI", Categorized.BANK_KEYWORD);
-        if ("CREDIT".equalsIgnoreCase(type))
-            return new Categorized("Income", Categorized.BANK_KEYWORD);
-
-        // Brands, shop-type words and payments to people — the same payee
-        // rules statements and alert emails use
-        return categoryService.classify(narration, Map.of());
+        // Everything else goes through the same rules as statements and alert
+        // emails (the user's saved rules first), so a payment is categorised
+        // the same way whichever channel brought it in. This path used to run
+        // its own keyword list first: substring matches ("ola" in "Kolar",
+        // "bill" anywhere), categories nothing else produced (Utilities,
+        // Housing) and every unrecognised credit labelled Income.
+        return categoryService.classify(narration, learnedRules, isCredit ? 1.0 : -1.0);
     }
 
     // ── Card bill payment reclassification ────────────────────────────────────

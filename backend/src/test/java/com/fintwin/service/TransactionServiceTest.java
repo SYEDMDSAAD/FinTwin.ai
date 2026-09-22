@@ -63,6 +63,12 @@ class TransactionServiceTest {
                     return c == null ? com.fintwin.util.Categorized.other()
                             : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
                 });
+        org.mockito.Mockito.lenient().when(categoryService.classify(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.<Double>any()))
+                .thenAnswer(inv -> {
+                    String c = categoryService.categorize(inv.getArgument(0), inv.getArgument(1));
+                    return c == null ? com.fintwin.util.Categorized.other()
+                            : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
+                });
 
         user = new User();
         ReflectionTestUtils.setField(user, "id", 1L);

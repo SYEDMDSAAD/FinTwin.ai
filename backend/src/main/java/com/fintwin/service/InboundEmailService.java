@@ -301,7 +301,7 @@ public class InboundEmailService {
         String forced = TransactionMath.forcedImportCategory(merchant, alert.amount(), alert.card(), cardDataPresent);
         com.fintwin.util.Categorized category = forced != null
                 ? new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED)
-                : categories.classify(merchant, categories.learnedRulesFor(user));
+                : categories.classify(merchant, categories.learnedRulesFor(user), alert.amount());
 
         Transaction t = new Transaction();
         t.setUser(user);

@@ -24,7 +24,10 @@ public record Categorized(String category, String source) {
     public static final String FORCED = "FORCED";
     /** A category column in the imported file. */
     public static final String PROVIDED = "PROVIDED";
-    /** The bank-sync keyword list (BankConnectionService). */
+    /**
+     * The bank sync's old keyword list — no longer produced (the bank sync uses
+     * the shared rules now), kept for rows it categorised before that.
+     */
     public static final String BANK_KEYWORD = "BANK_KEYWORD";
     /** The local model's suggestion for a payee the rules left in Other, accepted or changed by the user. */
     public static final String LLM = "LLM";

@@ -39,6 +39,20 @@ public String categorize(String merchant, Map<String, String> learnedRules) {
     return classify(merchant, learnedRules).category();
 }
 
+/**
+ * {@link #classify(String, Map)} knowing which way the money moved: money
+ * going out is never Income, whatever the narration says — "BONUS POINTS
+ * REDEMPTION FEE" or a "SALARY ADVANCE" repayment is a charge.
+ * {@code amount} null = direction unknown.
+ */
+public Categorized classify(String merchant, Map<String, String> learnedRules, Double amount) {
+    Categorized c = classify(merchant, learnedRules);
+    if (amount != null && amount < 0 && "Income".equalsIgnoreCase(c.category())) {
+        return Categorized.other();
+    }
+    return c;
+}
+
 /** The category and which rule chose it; "Other"/NONE when nothing did. */
 public Categorized classify(String merchant, Map<String, String> learnedRules) {
 

@@ -222,7 +222,8 @@ public class TransactionService {
 
         transaction.applyPrediction(categoryService.classify(
                 transaction.getMerchant(),
-                categoryService.learnedRulesFor(user)
+                categoryService.learnedRulesFor(user),
+                transaction.getAmount()
         ));
 
         transaction.setUser(user);
@@ -553,7 +554,7 @@ public class TransactionService {
             return new com.fintwin.util.Categorized(provided.toString().trim(), com.fintwin.util.Categorized.PROVIDED);
         }
 
-        return categoryService.classify(narration, learnedRules);
+        return categoryService.classify(narration, learnedRules, amount);
     }
 
     // =========================
@@ -596,7 +597,7 @@ public class TransactionService {
                     t.getMerchant(), t.getAmount(), ACCOUNT_CARD.equals(t.getSource()), cardData);
             com.fintwin.util.Categorized c = forced != null
                     ? new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED)
-                    : categoryService.classify(t.getMerchant(), learned);
+                    : categoryService.classify(t.getMerchant(), learned, t.getAmount());
             if (!UNSORTED.contains(c.category().toLowerCase())) {
                 t.applyPrediction(c);
                 changed.add(t);
@@ -849,7 +850,7 @@ public class TransactionService {
             transaction.setDate(java.time.LocalDate.now());
 
             transaction.applyPrediction(categoryService.classify(
-                    merchant, categoryService.learnedRulesFor(user)));
+                    merchant, categoryService.learnedRulesFor(user), transaction.getAmount()));
 
             transaction.setUser(user);
 

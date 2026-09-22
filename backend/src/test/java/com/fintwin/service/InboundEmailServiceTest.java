@@ -88,6 +88,12 @@ class InboundEmailServiceTest {
                     return c == null ? com.fintwin.util.Categorized.other()
                             : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
                 });
+        org.mockito.Mockito.lenient().when(categories.classify(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.<Double>any()))
+                .thenAnswer(inv -> {
+                    String c = categories.categorize(inv.getArgument(0), inv.getArgument(1));
+                    return c == null ? com.fintwin.util.Categorized.other()
+                            : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
+                });
 
         // "DNS": every domain publishes the bank key, except attacker.example
         DkimCheck dkim = new DkimCheck(() -> new DKIMVerifier((method, selector, token) -> List.of(
