@@ -45,7 +45,7 @@ public class StatementExtractService {
 
     private static final Logger log = LoggerFactory.getLogger(StatementExtractService.class);
 
-    static final long MAX_BYTES = 10L * 1024 * 1024;
+    static final long MAX_BYTES = 25L * 1024 * 1024;
 
     // The AI service decides the real type from the file's bytes; the name is
     // only a first filter against obviously wrong uploads.
@@ -55,7 +55,7 @@ public class StatementExtractService {
     private final String aiServiceUrl;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public StatementExtractService(@Qualifier("aiRestTemplate") RestTemplate aiRestTemplate,
+    public StatementExtractService(@Qualifier("aiStatementRestTemplate") RestTemplate aiRestTemplate,
                                    @Value("${ai.service.url}") String aiServiceUrl) {
         this.aiRestTemplate = aiRestTemplate;
         this.aiServiceUrl = aiServiceUrl;
@@ -67,7 +67,7 @@ public class StatementExtractService {
             throw new BadRequestException("Choose a statement file to upload.");
         }
         if (file.getSize() > MAX_BYTES) {
-            throw new BadRequestException("File too large. Maximum statement size is 10 MB.");
+            throw new BadRequestException("File too large. Maximum statement size is 25 MB.");
         }
         String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
         String ext = name.contains(".")

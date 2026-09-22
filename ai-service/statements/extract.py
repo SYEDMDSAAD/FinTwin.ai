@@ -13,6 +13,7 @@ of one call.
 """
 from __future__ import annotations
 
+import bisect
 import csv
 import io
 import re
@@ -20,9 +21,9 @@ import statistics
 from dataclasses import dataclass
 from datetime import date, datetime
 
-MAX_BYTES = 10 * 1024 * 1024
-MAX_PAGES = 60
-MAX_ROWS = 10_000
+MAX_BYTES = 25 * 1024 * 1024   # a 2-year statement PDF runs to ~10–20 MB
+MAX_PAGES = 400          # ~2 years of a busy UPI app statement
+MAX_ROWS = 50_000
 MAX_COLS = 30
 
 
@@ -47,7 +48,7 @@ def extract(data: bytes, password: str | None = None) -> Extracted:
     if not data:
         raise StatementError("empty", "The file is empty.")
     if len(data) > MAX_BYTES:
-        raise StatementError("too_large", "The file is larger than 10 MB.")
+        raise StatementError("too_large", f"The file is larger than {MAX_BYTES // (1024 * 1024)} MB.")
 
     kind = sniff(data)
     if kind == "pdf":
@@ -161,10 +162,15 @@ def _extract_pdf(data: bytes, password: str | None) -> Extracted:
 
 def _ruled_rows(page) -> list[list[str]]:
     """Rows from tables drawn with ruling lines, when the page has a real one."""
+    tables = page.find_tables()
+    if not tables:
+        return []
+    by_cell = _chars_by_cell(page, tables)
     rows: list[list[str]] = []
-    for table in page.find_tables():
-        lines = [[_cell_lines(page, bbox) if bbox else [] for bbox in row.cells]
-                 for row in table.rows]
+    for ti, table in enumerate(tables):
+        lines = [[_cell_lines(by_cell.get((ti, ri, ci), [])) if bbox else []
+                  for ci, bbox in enumerate(row.cells)]
+                 for ri, row in enumerate(table.rows)]
         width = max((len(r) for r in lines), default=0)
         # How far right each column's text reaches: the wrap width for it
         reach = [max((ln[1] for r in lines if i < len(r) for ln in r[i]), default=0.0)
@@ -175,12 +181,46 @@ def _ruled_rows(page) -> list[list[str]]:
     return rows
 
 
-def _cell_lines(page, bbox) -> list[tuple[str, float, float]]:
+def _chars_by_cell(page, tables) -> dict[tuple[int, int, int], list[dict]]:
+    """
+    Every character on the page, sorted into the table cell its centre falls
+    in — one pass over the page. Cropping the page once per cell instead
+    re-filtered every character for every cell: ~190 ms a page, which put a
+    long statement past the backend's wait.
+    """
+    rows = []                                     # (top, bottom, [(x0, x1, key)])
+    for ti, table in enumerate(tables):
+        for ri, row in enumerate(table.rows):
+            cells = sorted((bbox[0], bbox[2], (ti, ri, ci))
+                           for ci, bbox in enumerate(row.cells) if bbox)
+            if cells:
+                rows.append((row.bbox[1], row.bbox[3], cells))
+    rows.sort(key=lambda r: r[0])
+    tops = [r[0] for r in rows]
+
+    out: dict[tuple[int, int, int], list[dict]] = {}
+    for ch in page.chars:                         # page order, as a crop would keep it
+        cy = (ch["top"] + ch["bottom"]) / 2
+        cx = (ch["x0"] + ch["x1"]) / 2
+        i = bisect.bisect_right(tops, cy) - 1
+        while i >= 0 and rows[i][0] <= cy:
+            top, bottom, cells = rows[i]
+            if cy <= bottom:
+                for x0, x1, key in cells:
+                    if x0 <= cx <= x1:
+                        out.setdefault(key, []).append(ch)
+                        break
+                break
+            i -= 1
+    return out
+
+
+def _cell_lines(chars: list[dict]) -> list[tuple[str, float, float]]:
     """A ruled cell's text lines as (text, right edge, character width)."""
-    try:
-        lines = page.crop(bbox).extract_text_lines(return_chars=True)
-    except ValueError:            # bbox outside the page
+    if not chars:
         return []
+    from pdfplumber.utils.text import chars_to_textmap
+    lines = chars_to_textmap(chars).extract_text_lines(strip=True, return_chars=True)
     return [(ln["text"], ln["x1"], _char_width(ln)) for ln in lines]
 
 
@@ -413,7 +453,7 @@ def _extract_xlsx(data: bytes) -> list[list[str]]:
             rows = []
             for r in ws.iter_rows(values_only=True):
                 rows.append([_cell(v) for v in r[:MAX_COLS]])
-                if len(rows) >= MAX_ROWS:
+                if len(rows) > MAX_ROWS:
                     break
             sheets.append(rows)
         return max(sheets, key=_filled_rows, default=[])
@@ -430,7 +470,7 @@ def _extract_xls(data: bytes) -> list[list[str]]:
     sheets = []
     for sheet in book.sheets():
         rows = []
-        for r in range(min(sheet.nrows, MAX_ROWS)):
+        for r in range(min(sheet.nrows, MAX_ROWS + 1)):
             row = []
             for c in range(min(sheet.ncols, MAX_COLS)):
                 cell = sheet.cell(r, c)
@@ -459,7 +499,7 @@ def _extract_html(data: bytes) -> list[list[str]]:
     for table in doc.iter("table"):
         rows = [[_cell(td.text_content()) for td in tr.xpath("./td|./th")][:MAX_COLS]
                 for tr in table.iter("tr")]
-        tables.append(rows[:MAX_ROWS])
+        tables.append(rows[:MAX_ROWS + 1])
     if not tables:
         raise StatementError("no_table", "No transaction table was found in this file.")
     return max(tables, key=_filled_rows)
@@ -474,7 +514,7 @@ def _extract_text(data: bytes) -> list[list[str]]:
     except csv.Error:
         dialect = csv.excel
     rows = list(csv.reader(io.StringIO(text), dialect))
-    return [[_cell(v) for v in r[:MAX_COLS]] for r in rows[:MAX_ROWS]]
+    return [[_cell(v) for v in r[:MAX_COLS]] for r in rows[:MAX_ROWS + 1]]
 
 
 # ── Shared helpers ──────────────────────────────────────────────────────────
@@ -509,8 +549,15 @@ def _filled_rows(rows: list[list[str]]) -> int:
 def _clean(grid: list[list[str]]) -> list[list[str]]:
     """Drops empty rows and trailing empty columns."""
     rows = [[_cell(c) for c in r][:MAX_COLS] for r in grid if any(_cell(c) for c in r)]
+    if len(rows) > MAX_ROWS:
+        # Never cut a statement short quietly: the missing months would just
+        # look like months with no spending
+        raise StatementError(
+            "too_many_rows",
+            f"This statement has more than {MAX_ROWS:,} lines. Download a shorter date range "
+            "and import it in parts — rows already imported are skipped.")
     width = max((max((i + 1 for i, c in enumerate(r) if c), default=0) for r in rows), default=0)
-    return [(r + [""] * width)[:width] for r in rows[:MAX_ROWS]]
+    return [(r + [""] * width)[:width] for r in rows]
 
 
 def _drop_repeated_headers(grid: list[list[str]]) -> list[list[str]]:

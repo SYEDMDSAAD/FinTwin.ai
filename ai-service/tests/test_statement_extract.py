@@ -14,7 +14,7 @@ from fpdf import FPDF
 from fpdf.enums import EncryptionMethod
 
 import app as app_module
-from statements.extract import StatementError, extract, sniff
+from statements.extract import MAX_BYTES, StatementError, extract, sniff
 
 HEADER = ["Date", "Narration", "Chq./Ref.No.", "Value Dt", "Withdrawal Amt.", "Deposit Amt.", "Closing Balance"]
 TXNS = [
@@ -385,7 +385,7 @@ def test_tab_text_saved_as_xls_is_read_as_a_table():
 
 
 def test_rejects_empty_oversized_and_unknown_files():
-    for data, code in [(b"", "empty"), (b"x" * (10 * 1024 * 1024 + 1), "too_large"),
+    for data, code in [(b"", "empty"), (b"x" * (MAX_BYTES + 1), "too_large"),
                        (bytes(range(256)) * 4, "unsupported")]:
         with pytest.raises(StatementError) as err:
             extract(data)
@@ -421,3 +421,32 @@ def test_route_reports_password_errors_with_a_code():
     r = client.post("/statements/extract", headers=KEY,
                     files={"file": ("s.pdf", data)}, data={"password": "pw"})
     assert r.status_code == 200
+
+
+def test_a_statement_too_long_to_read_is_refused_not_cut_short(monkeypatch):
+    import statements.extract as ex
+    monkeypatch.setattr(ex, "MAX_ROWS", 3)
+    csv_text = "Date,Details,Amount\n" + "\n".join(f"0{i}/09/2026,Shop {i},-{i}00" for i in range(1, 6))
+    with pytest.raises(StatementError) as e:
+        extract(csv_text.encode(), None)
+    assert e.value.code == "too_many_rows"
+    assert "import it in parts" in e.value.message
+
+
+def test_ruled_cells_are_read_from_one_pass_over_the_page():
+    fpdf = pytest.importorskip("fpdf")
+    pdf = fpdf.FPDF()
+    pdf.set_font("Helvetica", size=8)
+    for _ in range(3):
+        pdf.add_page()
+        for row in [("Date", "Details", "Debit", "Balance"),
+                    ("01/09/2026", "UPI/SWIGGY/ORDER", "250.00", "9750.00"),
+                    ("02/09/2026", "UPI/ZEPTO/ORDER", "499.00", "9251.00")]:
+            for text, w in zip(row, (25, 70, 25, 25)):
+                pdf.cell(w, 7, text, border=1)
+            pdf.ln()
+    grid = extract(bytes(pdf.output()), None).grid
+    # the header repeats on every page and is kept once; each cell holds only its own text
+    assert grid[0] == ["Date", "Details", "Debit", "Balance"]
+    assert grid[1:] == [["01/09/2026", "UPI/SWIGGY/ORDER", "250.00", "9750.00"],
+                        ["02/09/2026", "UPI/ZEPTO/ORDER", "499.00", "9251.00"]] * 3

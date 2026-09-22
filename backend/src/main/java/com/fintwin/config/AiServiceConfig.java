@@ -37,7 +37,18 @@ public class AiServiceConfig {
         return build(readTimeoutMs);
     }
 
-    private RestTemplate build(int readTimeoutMs) {
+    /**
+     * Reading a statement PDF gets its own budget too: a 2-year UPI app
+     * statement is ~300 pages, and table-ruled pages take ~0.1 s each to read.
+     * Kept under the 100 s that nginx and Cloudflare give a proxied request.
+     */
+    @Bean("aiStatementRestTemplate")
+    public RestTemplate aiStatementRestTemplate(
+            @Value("${ai.service.statement-read-timeout-ms:90000}") int readTimeoutMs) {
+        return build(readTimeoutMs);
+    }
+
+        private RestTemplate build(int readTimeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000);
         factory.setReadTimeout(readTimeoutMs);
