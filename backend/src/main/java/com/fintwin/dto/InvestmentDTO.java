@@ -18,8 +18,10 @@ public class InvestmentDTO {
     private Double interestRate;
     private String ipoStatus;
     private Long ipoListingId;
-    // Auto-detect only: how many payments a suggestion is made of
+    // Auto-detect only: how many payments a suggestion is made of, and each
+    // of them — payments to one payee can be one investment or several
     private Integer payments;
+    private java.util.List<java.util.Map<String, Object>> breakdown;
 
     public static InvestmentDTO from(com.fintwin.model.Investment inv) {
         InvestmentDTO dto = new InvestmentDTO();
@@ -62,5 +64,7 @@ public class InvestmentDTO {
     public Double getUnits()        { return units; }
     public Integer getPayments()    { return payments; }
     public void setPayments(Integer v) { this.payments = v; }
+    public java.util.List<java.util.Map<String, Object>> getBreakdown() { return breakdown; }
+    public void setBreakdown(java.util.List<java.util.Map<String, Object>> v) { this.breakdown = v; }
     public Double getInterestRate() { return interestRate; }
 }

@@ -58,5 +58,11 @@ class InvestmentDetectIntegrationTest extends AbstractIntegrationTest {
             assertThat((String) m.get("name")).contains("Zerodha");
         });
         assertThat(found).noneSatisfy(m -> assertThat((String) m.get("name")).contains("SWIGGY"));
+
+        // Each payment comes through on its own: two payments to one payee can be
+        // two different investments, and only the user can say which
+        assertThat((List<Map>) suggestion.get("breakdown")).containsExactly(
+                Map.of("date", today.minusMonths(2).toString(), "amount", 3000.0),
+                Map.of("date", today.minusMonths(1).toString(), "amount", 2000.0));
     }
 }

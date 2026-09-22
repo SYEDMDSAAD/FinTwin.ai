@@ -155,7 +155,17 @@ public class InvestmentService {
             // A keyword-known type beats the fallback when both appear under one payee
             if ("Other".equals(entry.type) && !"Other".equals(entryType)) entry.type = entryType;
             entry.totalAmount += isDebit ? amount : -amount;
-            if (isDebit) entry.payments++;
+            if (isDebit) {
+                entry.payments++;
+                // Kept one by one: seven payments to a broker can be seven
+                // different stocks, and only the user knows which
+                if (entry.breakdown.size() < MAX_BREAKDOWN && date != null) {
+                    Map<String, Object> payment = new LinkedHashMap<>();
+                    payment.put("date", date.toString());
+                    payment.put("amount", Math.round(amount * 100.0) / 100.0);
+                    entry.breakdown.add(payment);
+                }
+            }
             // Purchase date tracks the first outgoing payment, not redemptions.
             if (isDebit && date != null && (entry.earliestDate == null || date.isBefore(entry.earliestDate))) {
                 entry.earliestDate = date;
@@ -182,6 +192,8 @@ public class InvestmentService {
             inv.setPurchaseDate(d.earliestDate);
             InvestmentDTO dto = InvestmentDTO.from(inv);
             dto.setPayments(d.payments);
+            d.breakdown.sort(Comparator.comparing(m -> (String) m.get("date")));
+            dto.setBreakdown(d.breakdown);
             results.add(dto);
         }
 
@@ -446,11 +458,15 @@ public class InvestmentService {
         return userRepo.findByEmail(SecurityUtils.getCurrentUserEmail()).orElseThrow();
     }
 
+    /** More payments than this to one payee and listing them stops being useful. */
+    private static final int MAX_BREAKDOWN = 100;
+
     private static class DetectedEntry {
         String    type;
         double    totalAmount;
         int       payments;
         LocalDate earliestDate;
+        final List<Map<String, Object>> breakdown = new ArrayList<>();
 
         DetectedEntry(String type, LocalDate date) {
             this.type         = type;
