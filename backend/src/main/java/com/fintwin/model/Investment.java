@@ -63,6 +63,14 @@ public class Investment {
     @Column(length = 1400)
     private String notes;
 
+    // IPO holdings only: APPLIED → ALLOTTED | NOT_ALLOTTED → LISTED
+    @Column(name = "ipo_status", length = 20)
+    private String ipoStatus;
+
+    // IPO holdings only: the catalog entry this application is for, if any
+    @Column(name = "ipo_listing_id")
+    private Long ipoListingId;
+
     // getters & setters
 
     public Long getId() { return id; }
@@ -95,6 +103,10 @@ public class Investment {
     public void setNotes(String notes) { this.notes = notes; }
 
     public String getTickerCode() { return tickerCode; }
+    public String getIpoStatus() { return ipoStatus; }
+    public void setIpoStatus(String ipoStatus) { this.ipoStatus = ipoStatus; }
+    public Long getIpoListingId() { return ipoListingId; }
+    public void setIpoListingId(Long ipoListingId) { this.ipoListingId = ipoListingId; }
     public void setTickerCode(String tickerCode) { this.tickerCode = tickerCode; }
 
     public Double getUnits() { return units; }

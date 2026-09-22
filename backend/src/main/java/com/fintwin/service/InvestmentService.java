@@ -183,6 +183,7 @@ public class InvestmentService {
         // Prevent mass-assignment via a client-supplied id (would merge, not insert).
         investment.setId(null);
         investment.setUser(currentUser());
+        applyIpoRules(investment);
         return InvestmentDTO.from(repo.save(investment));
     }
 
@@ -207,8 +208,46 @@ public class InvestmentService {
         inv.setUnits(updated.getUnits());
         inv.setInterestRate(updated.getInterestRate());
         inv.setNotes(updated.getNotes());
+        inv.setIpoStatus(updated.getIpoStatus());
+        inv.setIpoListingId(updated.getIpoListingId());
+        applyIpoRules(inv);
 
         return InvestmentDTO.from(repo.save(inv));
+    }
+
+    public static final String IPO = "IPO";
+    static final java.util.Set<String> IPO_STATUSES = java.util.Set.of("APPLIED", "ALLOTTED", "NOT_ALLOTTED", "LISTED");
+
+    /**
+     * An IPO application's money is blocked (APPLIED), becomes shares
+     * (ALLOTTED, then LISTED with a live price), or comes back (NOT_ALLOTTED).
+     * A refunded application must stop counting towards net worth.
+     */
+    static void applyIpoRules(Investment inv) {
+        if (!IPO.equalsIgnoreCase(inv.getType())) {
+            inv.setIpoStatus(null);
+            inv.setIpoListingId(null);
+            return;
+        }
+        inv.setType(IPO);
+        String status = inv.getIpoStatus() == null ? "APPLIED" : inv.getIpoStatus().trim().toUpperCase();
+        if (!IPO_STATUSES.contains(status)) {
+            throw new com.fintwin.exception.BadRequestException(
+                    "IPO status must be one of " + IPO_STATUSES);
+        }
+        inv.setIpoStatus(status);
+        if (inv.getTickerCode() != null) {
+            String t = inv.getTickerCode().trim().toUpperCase();
+            inv.setTickerCode(t.isEmpty() ? null : t);
+        }
+        if ("NOT_ALLOTTED".equals(status)) {
+            inv.setInvestedAmount(0.0);
+            inv.setCurrentValue(0.0);
+            inv.setUnits(null);
+        } else if (!"LISTED".equals(status) || inv.getTickerCode() == null) {
+            // Not trading yet: worth exactly what was paid or blocked
+            inv.setCurrentValue(inv.getInvestedAmount());
+        }
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")

@@ -16,6 +16,8 @@ public class InvestmentDTO {
     private String tickerCode;
     private Double units;
     private Double interestRate;
+    private String ipoStatus;
+    private Long ipoListingId;
 
     public static InvestmentDTO from(com.fintwin.model.Investment inv) {
         InvestmentDTO dto = new InvestmentDTO();
@@ -29,6 +31,8 @@ public class InvestmentDTO {
         dto.tickerCode    = inv.getTickerCode();
         dto.units         = inv.getUnits();
         dto.interestRate  = inv.getInterestRate();
+        dto.ipoStatus     = inv.getIpoStatus();
+        dto.ipoListingId  = inv.getIpoListingId();
 
         double invested = inv.getInvestedAmount() != null ? inv.getInvestedAmount() : 0;
         double current  = inv.getCurrentValue()   != null ? inv.getCurrentValue()   : invested;
@@ -41,6 +45,8 @@ public class InvestmentDTO {
     }
 
     // getters
+    public String getIpoStatus()    { return ipoStatus; }
+    public Long getIpoListingId()   { return ipoListingId; }
     public Long getId()             { return id; }
     public String getName()         { return name; }
     public String getType()         { return type; }
