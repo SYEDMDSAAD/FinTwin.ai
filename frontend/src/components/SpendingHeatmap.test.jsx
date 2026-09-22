@@ -49,6 +49,23 @@ describe("SpendingHeatmap", () => {
         expect(screen.queryByText("Salary")).not.toBeInTheDocument();
     });
 
+    it("lists a category's transactions oldest first", async () => {
+        mock.onGet("/transactions/category-totals").reply(200, TOTALS);
+        mock.onGet("/transactions").reply(200, [
+            { id: 1, merchant: "Paid to ZOMATO", category: "Food", date: "2026-03-02", amount: -300 },
+            { id: 2, merchant: "Paid to SWIGGY", category: "Food", date: "2024-07-15", amount: -420 },
+            { id: 3, merchant: "Paid to CHAAYOS", category: "Food", date: "2025-11-30", amount: -150 },
+        ]);
+        const user = userEvent.setup();
+        render(<SpendingHeatmap />);
+
+        await user.click(await screen.findByRole("button", { name: /Food/ }));
+        await screen.findByText("3 transactions");
+
+        const shown = screen.getAllByText(/^Paid to (ZOMATO|SWIGGY|CHAAYOS)$/).map(el => el.textContent);
+        expect(shown.slice(0, 3)).toEqual(["Paid to SWIGGY", "Paid to CHAAYOS", "Paid to ZOMATO"]);
+    });
+
     it("re-adds the totals after a category is corrected", async () => {
         mock.onGet("/transactions/category-totals").reply(200, TOTALS);
         mock.onGet("/transactions").reply(200, [{ id: 7, merchant: "Paid to BLINKIT", category: "Food", date: "2025-02-11", amount: -420 }]);

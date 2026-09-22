@@ -74,7 +74,7 @@ function SpendingHeatmap({ onCategoryChanged }) {
                 if (!alive) return;
                 setSelectedTxns((Array.isArray(r.data) ? r.data : [])
                     .filter(t => t.amount < 0)
-                    .sort((a, b) => String(b.date).localeCompare(String(a.date))));
+                    .sort((a, b) => String(a.date).localeCompare(String(b.date))));   // oldest first
             })
             .catch(() => { if (alive) setError("Could not load those transactions. Try again."); })
             .finally(() => { if (alive) setLoadingTxns(false); });
