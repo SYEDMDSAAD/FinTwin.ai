@@ -78,6 +78,12 @@ public class InvestmentController {
         return ResponseEntity.ok(service.update(id, investment));
     }
 
+    /** Replace a holding made of several payments with one holding per payment. */
+    @PostMapping("/{id}/split")
+    public java.util.List<com.fintwin.dto.InvestmentDTO> split(@PathVariable Long id) {
+        return service.split(id);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);

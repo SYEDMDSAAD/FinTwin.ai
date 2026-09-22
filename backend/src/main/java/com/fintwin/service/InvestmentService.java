@@ -2,6 +2,7 @@ package com.fintwin.service;
 
 import com.fintwin.audit.Audited;
 import com.fintwin.exception.ForbiddenException;
+import com.fintwin.exception.BadRequestException;
 import com.fintwin.exception.NotFoundException;
 import com.fintwin.dto.InvestmentDTO;
 import com.fintwin.dto.PortfolioSummaryDTO;
@@ -22,6 +23,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -342,6 +344,56 @@ public class InvestmentService {
         PortfolioSummaryDTO summary = getSummary();
         summary.setPricesUpdated(pricesUpdated);
         return summary;
+    }
+
+    /**
+     * Replaces a holding made of several payments with one holding per
+     * payment. A lump sum can only ever be linked to one stock or fund, so a
+     * holding built from seven payments to one payee locks six of them to a
+     * guess. Matching is by the payee the holding was named after.
+     */
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
+    @Audited(action = "WRITE", resource = "portfolio", description = "Holding split into its payments")
+    @Transactional
+    public List<InvestmentDTO> split(Long id) {
+        User user = currentUser();
+        Investment inv = repo.findById(id).orElseThrow(() -> new NotFoundException("Not found"));
+        if (!inv.getUser().getId().equals(user.getId())) throw new ForbiddenException("Unauthorized");
+
+        String wanted = normalise(inv.getName());
+        List<Transaction> payments = txnRepo.findByUser(user).stream()
+                .filter(t -> t.getAmount() != null && t.getAmount() < 0 && t.getDate() != null)
+                .filter(t -> {
+                    String payee = com.fintwin.util.MerchantCategorizer.payeeOf(
+                            t.getMerchant() == null ? "" : t.getMerchant());
+                    String type = detectType(t.getMerchant() == null ? "" : t.getMerchant().toLowerCase());
+                    String name = type != null ? extractName(t.getMerchant(), t.getMerchant().toLowerCase(), type) : payee;
+                    return wanted.equals(normalise(name));
+                })
+                .sorted(Comparator.comparing(Transaction::getDate))
+                .toList();
+
+        if (payments.size() < 2) {
+            throw new BadRequestException("This holding is a single payment — there is nothing to split.");
+        }
+
+        List<InvestmentDTO> created = new ArrayList<>();
+        for (Transaction t : payments) {
+            Investment one = new Investment();
+            one.setUser(user);
+            one.setName(inv.getName() + " · " + t.getDate());
+            one.setType(inv.getType());
+            one.setInvestedAmount(Math.abs(t.getAmount()));
+            one.setCurrentValue(Math.abs(t.getAmount()));
+            one.setPurchaseDate(t.getDate());
+            created.add(InvestmentDTO.from(repo.save(one)));
+        }
+        repo.delete(inv);
+        return created;
+    }
+
+    private static String normalise(String name) {
+        return name == null ? "" : name.trim().toLowerCase().replaceAll("\\s+", " ");
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
