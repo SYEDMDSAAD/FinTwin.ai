@@ -21,7 +21,6 @@ import Sidebar from "../components/Sidebar";
 
 import Header from "../components/Header";
 
-import DailyRecap from "../components/DailyRecap";
 
 import AnalyticsCards from "../components/AnalyticsCards";
 
@@ -88,6 +87,7 @@ import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
 import ServicesPage from "./ServicesPage";
+import AboutPage from "./AboutPage";
 
 function Dashboard() {
 
@@ -144,8 +144,10 @@ function Dashboard() {
         setActiveSection] =
         useState(() => {
             const saved = localStorage.getItem("activeSection");
-            // Discover was briefly its own section; it now lives in Investments
-            return saved === "Discover" ? "Investments" : saved || "Today";
+            // Discover moved into Investments; Today became About App
+            if (saved === "Discover") return "Investments";
+            if (!saved || saved === "Today") return "About App";
+            return saved;
         });
 
     const [, startTransition] = useTransition();
@@ -1691,11 +1693,11 @@ function Dashboard() {
                 )}
 
                 {/* =========================
-                    Today — the daily front door
+                    About App — the landing section
                 ========================= */}
 
-                {activeSection === "Today" && (
-                    <DailyRecap />
+                {activeSection === "About App" && (
+                    <AboutPage navigateTo={navigateTo} />
                 )}
 
                 

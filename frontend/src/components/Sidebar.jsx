@@ -15,16 +15,16 @@ import {
     ShieldCheck,
     Shield,
     FileInput,
-    Sparkles,
+    Info,
 } from "lucide-react";
 
 const NAV_GROUPS = [
     {
         label: "OVERVIEW",
         items: [
-            // First, and the default landing section: the everyday-spending
-            // question people actually have daily, ahead of the monthly ones.
-            { name: "Today",        icon: <Sparkles size={17} /> },
+            // First, and the default landing section: what the app is and
+            // what's behind every other item here.
+            { name: "About App",    icon: <Info size={17} /> },
             { name: "Dashboard",    icon: <LayoutDashboard size={17} /> },
             { name: "Analytics",    icon: <BarChart3 size={17} /> },
             { name: "Transactions", icon: <Wallet size={17} /> },

@@ -1,13 +1,14 @@
 import {
     ArrowLeft,
     BarChart3, Brain, MessageSquare, Zap, Target, ShieldCheck,
-    Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings,
+    Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings, Info,
 } from "lucide-react";
 
 const GROUPS = [
     {
         label: "OVERVIEW",
         items: [
+            { name: "About App", icon: Info,      desc: "What FinTwin does & beta notes" },
             { name: "Analytics", icon: BarChart3, desc: "Spending trends & breakdowns" },
         ],
     },
