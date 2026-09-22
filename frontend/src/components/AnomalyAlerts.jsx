@@ -140,12 +140,31 @@ function AnomalyCard({ anomaly, onDismiss }) {
   );
 }
 
-function AnomalyAlerts({ anomalies: initialAnomalies }) {
-  const [anomalies, setAnomalies] = useState(initialAnomalies || []);
+// What a dismissal covers: the backend stores "not an anomaly" per type and
+// merchant, so every card of that pattern goes at once.
+const patternOf = (a) => (a.type ?? a.anomaly_type ?? "") + "|" + (a.merchant || "");
 
-  const handleDismiss = (dismissed) => {
-    const key = dismissed.type + "|" + (dismissed.merchant || "");
-    setAnomalies(prev => prev.filter(a => (a.type + "|" + (a.merchant || "")) !== key));
+// A card's identity is the anomaly it shows, never its position in the list:
+// with index keys, removing card #1 handed its "Dismissing…" state to the
+// card that moved into its slot, which then looked stuck.
+function withStableKeys(list) {
+  const seen = new Map();
+  return list.map(a => {
+    const base = [patternOf(a), a.category ?? "", a.amount ?? "", a.reason ?? ""].join("|");
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    return { anomaly: a, key: n === 1 ? base : `${base}#${n}` };
+  });
+}
+
+function AnomalyAlerts({ anomalies: incoming }) {
+  // Derived from props on every render, so anomalies that load (or reload)
+  // after this mounts still show; only the user's dismissals are local.
+  const [dismissed, setDismissed] = useState(() => new Set());
+  const anomalies = (incoming || []).filter(a => !dismissed.has(patternOf(a)));
+
+  const handleDismiss = (a) => {
+    setDismissed(prev => new Set(prev).add(patternOf(a)));
   };
 
   if (!anomalies?.length) {
@@ -206,8 +225,8 @@ function AnomalyAlerts({ anomalies: initialAnomalies }) {
 
       {/* Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14 }}>
-        {anomalies.map((anomaly, i) => (
-          <AnomalyCard key={i} anomaly={anomaly} onDismiss={handleDismiss} />
+        {withStableKeys(anomalies).map(({ anomaly, key }) => (
+          <AnomalyCard key={key} anomaly={anomaly} onDismiss={handleDismiss} />
         ))}
       </div>
 
