@@ -20,9 +20,27 @@ public class AiServiceConfig {
      */
     @Bean("aiRestTemplate")
     public RestTemplate aiRestTemplate() {
+        return build(20_000);
+    }
+
+    /**
+     * The copilot alone gets a longer read budget. A tool-using answer is
+     * several model calls in a row (up to three data lookups, then the reply);
+     * on a CPU with qwen2.5:3b real questions took 17–24 s at the AI service
+     * alone, so the shared 20 s budget failed ordinary chats with "Read timed
+     * out". The AI service caps its own work below this (CHAT_BUDGET_SECONDS),
+     * so it answers — or says it ran out of time — before we give up.
+     */
+    @Bean("aiChatRestTemplate")
+    public RestTemplate aiChatRestTemplate(
+            @Value("${ai.service.chat-read-timeout-ms:90000}") int readTimeoutMs) {
+        return build(readTimeoutMs);
+    }
+
+    private RestTemplate build(int readTimeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000);
-        factory.setReadTimeout(20_000);
+        factory.setReadTimeout(readTimeoutMs);
 
         RestTemplate rt = new RestTemplate(factory);
         rt.getInterceptors().add((request, body, execution) -> {

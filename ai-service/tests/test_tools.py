@@ -136,6 +136,61 @@ def test_ollama_down_returns_canned_fallback(mock_chat):
     reply = generate_financial_advice("hello", _BASE_DATA, "Savings Advisor")
     assert "temporary" in reply.lower() or "Temporary" in reply
 
+# ── Time budget: a copilot answer must finish before the backend gives up ────
+
+import requests  # noqa: E402
+
+from chatbot import advisor  # noqa: E402
+
+
+@patch("chatbot.advisor.ask")
+@patch("chatbot.advisor.chat", side_effect=requests.exceptions.ReadTimeout("slow model"))
+def test_slow_model_gets_an_honest_answer_not_a_second_long_call(mock_chat, mock_ask):
+    reply = generate_financial_advice("where can I save?", _BASE_DATA, "Savings Advisor")
+
+    assert reply == advisor._OUT_OF_TIME
+    # falling back to the single-shot path would start another long model call
+    mock_ask.assert_not_called()
+
+
+@patch("chatbot.advisor.execute_tool", return_value=json.dumps({"total": 100}))
+@patch("chatbot.advisor.chat")
+def test_each_call_gets_only_what_is_left_of_the_budget(mock_chat, mock_exec, monkeypatch):
+    clock = iter([0.0, 0.0, 30.0, 30.0])        # budget start, call 1, call 2, ...
+    monkeypatch.setattr(advisor.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(advisor, "_CHAT_BUDGET_SECONDS", 80.0)
+    mock_chat.side_effect = [
+        {"content": "", "tool_calls": [{"function": {"name": "get_monthly_summary", "arguments": {}}}]},
+        {"content": "You spent ₹100."},
+    ]
+
+    generate_financial_advice("how much did I spend?", _BASE_DATA, "Savings Advisor")
+
+    timeouts = [c.kwargs["timeout"] for c in mock_chat.call_args_list]
+    assert timeouts == [80.0, 50.0]
+
+
+@patch("chatbot.advisor.execute_tool", return_value=json.dumps({"total": 100}))
+@patch("chatbot.advisor.chat")
+def test_no_new_model_call_once_the_budget_is_nearly_spent(mock_chat, mock_exec, monkeypatch):
+    clock = iter([0.0, 0.0, 77.0])              # 3 s left before the second call
+    monkeypatch.setattr(advisor.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(advisor, "_CHAT_BUDGET_SECONDS", 80.0)
+    mock_chat.side_effect = [
+        {"content": "", "tool_calls": [{"function": {"name": "get_monthly_summary", "arguments": {}}}]},
+    ]
+
+    reply = generate_financial_advice("how much did I spend?", _BASE_DATA, "Savings Advisor")
+
+    assert reply == advisor._OUT_OF_TIME
+    assert mock_chat.call_count == 1
+
+
+def test_budget_stays_under_the_backends_chat_timeout():
+    # backend: ai.service.chat-read-timeout-ms=90000
+    assert advisor._CHAT_BUDGET_SECONDS < 90
+
+
 # ── History self-poisoning guard ──────────────────────────────────────────────
 
 def test_history_drops_exchanges_matching_current_question():

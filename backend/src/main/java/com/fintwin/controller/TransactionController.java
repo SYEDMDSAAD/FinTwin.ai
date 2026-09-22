@@ -22,6 +22,8 @@ import java.util.HashMap;
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TransactionController.class);
+
     @Autowired
     private TransactionService service;
 
@@ -143,6 +145,13 @@ public class TransactionController {
         return TransactionDTO.from(service.uploadScreenshot(file));
     }
 
+    private static boolean isTimeout(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.SocketTimeoutException) return true;
+        }
+        return false;
+    }
+
     @PostMapping("/chat")
     public ResponseEntity<Map<String, Object>> chat(
             @Valid @RequestBody ChatRequestDTO body
@@ -153,8 +162,12 @@ public class TransactionController {
             response.put("success", true);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "reply", "FinTwin AI unavailable."));
+            // Was swallowed silently, which made a slow model look like an outage
+            log.warn("Copilot chat failed: {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            boolean slow = isTimeout(e);
+            return ResponseEntity.status(slow ? 504 : 503).body(Map.of("success", false, "reply", slow
+                    ? "The copilot took too long to answer this one. Try asking again, or ask something narrower."
+                    : "FinTwin AI is unavailable right now. Please try again in a moment."));
         }
     }
 

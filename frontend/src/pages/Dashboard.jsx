@@ -1305,24 +1305,19 @@ function Dashboard() {
                 "AI generated response!"
             );
 
-        } catch {
+        } catch (err) {
 
+            // The backend says why: too slow this time (504) vs unavailable
+            const reason = err?.response?.data?.reply;
+            const slow = err?.response?.status === 504;
 
-
-            toast.error(
-                "AI failed to respond."
-            );
+            toast.error(slow ? "The copilot took too long." : "AI failed to respond.");
 
             setMessages((prev) => [
-
                 ...prev,
-
                 {
-
                     role: "assistant",
-
-                    content:
-                        "FinTwin AI is temporarily unavailable."
+                    content: reason || "FinTwin AI is temporarily unavailable."
                 }
             ]);
 

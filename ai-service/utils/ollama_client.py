@@ -11,6 +11,9 @@ OLLAMA_CHAT_URL = os.environ.get(
     "OLLAMA_CHAT_URL", OLLAMA_URL.replace("/api/generate", "/api/chat")
 )
 MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+# Keep the model in memory between requests. Ollama's default unloads it after
+# 5 idle minutes, and reloading a 3B model adds seconds to the next answer.
+KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
 _MAX_RETRIES = 3
 _RETRY_DELAY = 2.0
 
@@ -41,6 +44,7 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
         "model": MODEL,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": KEEP_ALIVE,
         "options": {"num_ctx": num_ctx, "num_predict": max_tokens, "temperature": 0.3},
     }
     last_exc: Exception | None = None
@@ -63,16 +67,21 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
 
 
 def chat(messages: list[dict], tools: list[dict] | None = None,
-         max_tokens: int = 512) -> dict:
+         max_tokens: int = 512, timeout: float = 120.0) -> dict:
     """
     Conversation turn via Ollama's /api/chat, optionally offering tools.
     Returns the assistant message dict — may contain 'tool_calls' when the
     model wants data instead of answering directly.
+
+    `timeout` is the read budget for this one call; callers making several
+    calls in a row pass what is left of their overall budget. A read timeout
+    raises requests.exceptions.ReadTimeout and is not retried.
     """
     payload = {
         "model": MODEL,
         "messages": messages,
         "stream": False,
+        "keep_alive": KEEP_ALIVE,
         # Low temperature: Ollama's default (~0.8) makes a 3B model skip tool
         # calls and invent data on some samples — factual/tool turns need
         # near-greedy decoding.
@@ -84,7 +93,7 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
     last_exc: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
-            response = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=120)
+            response = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=(3.05, timeout))
             response.raise_for_status()
             return response.json()["message"]
         except requests.exceptions.ConnectionError as e:

@@ -24,8 +24,9 @@ public class OllamaAIProvider implements AIProvider {
     @Value("${ai.service.url}")
     private String aiServiceUrl;
 
+    // The copilot's own client: a longer read budget than other AI calls
     @Autowired
-    @Qualifier("aiRestTemplate")
+    @Qualifier("aiChatRestTemplate")
     private RestTemplate aiRestTemplate;
 
     @Override

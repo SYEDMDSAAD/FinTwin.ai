@@ -1,5 +1,9 @@
 import json
 import logging
+import os
+import time
+
+import requests
 
 from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
@@ -9,6 +13,18 @@ from utils.ollama_client import ask, chat
 logger = logging.getLogger(__name__)
 
 _MAX_TOOL_ROUNDS = 3
+
+# Wall-clock budget for one copilot answer, across every model call it makes.
+# Must stay below the backend's chat read timeout (90 s by default), so the
+# user gets an answer or an honest "took too long" rather than a dropped call.
+_CHAT_BUDGET_SECONDS = float(os.environ.get("CHAT_BUDGET_SECONDS", "80"))
+# Not worth starting a model call with less than this left
+_MIN_CALL_SECONDS = 6.0
+
+_OUT_OF_TIME = (
+    "That one took longer than I can spend on a single answer. Try asking again, "
+    "or ask something narrower — for example \"How much did I spend on food in August?\""
+)
 
 _FALLBACK = """\
 **Summary**
@@ -133,41 +149,62 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
 
     tools_attempted = 0
     tools_succeeded = 0
+    deadline = time.monotonic() + _CHAT_BUDGET_SECONDS
 
-    for round_no in range(_MAX_TOOL_ROUNDS):
-        reply = chat(messages, tools=TOOLS)
-        tool_calls = reply.get("tool_calls") or []
+    def budgeted_chat(tools):
+        remaining = deadline - time.monotonic()
+        if remaining < _MIN_CALL_SECONDS:
+            raise _OutOfTime()
+        try:
+            return chat(messages, tools=tools, timeout=remaining)
+        except requests.exceptions.ReadTimeout:
+            raise _OutOfTime() from None
 
-        if not tool_calls:
-            # A small model asked for data, got only errors, and answered
-            # anyway — that answer is fabricated. Refuse honestly instead.
-            if tools_attempted and not tools_succeeded:
-                return _DATA_UNAVAILABLE
-            return (reply.get("content") or "").strip() or _FALLBACK
+    try:
+        for round_no in range(_MAX_TOOL_ROUNDS):
+            reply = budgeted_chat(TOOLS)
+            tool_calls = reply.get("tool_calls") or []
 
-        messages.append(reply)
-        for call in tool_calls:
-            fn = call.get("function", {})
-            name = fn.get("name", "")
-            args = fn.get("arguments") or {}
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except ValueError:
-                    args = {}
-            logger.info("Copilot tool call (round %d): %s(%s)", round_no + 1, name, args)
-            result = execute_tool(name, args, user_id)
-            tools_attempted += 1
-            if not _tool_result_is_error(result):
-                tools_succeeded += 1
-            messages.append({"role": "tool", "content": result})
+            if not tool_calls:
+                # A small model asked for data, got only errors, and answered
+                # anyway — that answer is fabricated. Refuse honestly instead.
+                if tools_attempted and not tools_succeeded:
+                    return _DATA_UNAVAILABLE
+                return (reply.get("content") or "").strip() or _FALLBACK
 
-    if tools_attempted and not tools_succeeded:
-        return _DATA_UNAVAILABLE
+            messages.append(reply)
+            for call in tool_calls:
+                fn = call.get("function", {})
+                name = fn.get("name", "")
+                args = fn.get("arguments") or {}
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except ValueError:
+                        args = {}
+                logger.info("Copilot tool call (round %d): %s(%s)", round_no + 1, name, args)
+                result = execute_tool(name, args, user_id)
+                tools_attempted += 1
+                if not _tool_result_is_error(result):
+                    tools_succeeded += 1
+                messages.append({"role": "tool", "content": result})
 
-    # Tool budget exhausted — force a final answer from what was gathered.
-    final = chat(messages, tools=None)
-    return (final.get("content") or "").strip() or _FALLBACK
+        if tools_attempted and not tools_succeeded:
+            return _DATA_UNAVAILABLE
+
+        # Tool budget exhausted — force a final answer from what was gathered.
+        final = budgeted_chat(None)
+        return (final.get("content") or "").strip() or _FALLBACK
+
+    except _OutOfTime:
+        # Answer now. Falling back to the single-shot path here (as any other
+        # error does) would start yet another long model call.
+        logger.warning("Copilot answer exceeded its %.0f s budget", _CHAT_BUDGET_SECONDS)
+        return _OUT_OF_TIME
+
+
+class _OutOfTime(Exception):
+    """The answer's time budget ran out."""
 
 
 def _legacy_single_shot(message: str, financial_data: dict, mode: str, intent: str) -> str:
