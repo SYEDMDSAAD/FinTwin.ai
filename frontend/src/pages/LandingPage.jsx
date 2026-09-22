@@ -164,15 +164,6 @@ ${GFONTS}
 .price-feat { display: flex; align-items: center; gap: 12px; font-size: 14px; color: rgba(226,232,240,0.85); }
 .price-feat-check { width: 20px; height: 20px; border-radius: 50%; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
 
-/* ── Social proof ───────────────── */
-.testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
-.testimonial-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 28px; }
-.testimonial-stars { display: flex; gap: 3px; margin-bottom: 14px; font-size: 14px; }
-.testimonial-text { font-size: 14px; line-height: 1.7; color: rgba(226,232,240,0.8); margin-bottom: 20px; font-style: italic; }
-.testimonial-author { display: flex; align-items: center; gap: 10px; }
-.testimonial-avatar { width: 36px; height: 36px; border-radius: 50%; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.testimonial-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
-.testimonial-role { font-size: 11px; color: rgba(100,116,139,0.7); margin-top: 2px; font-family: 'DM Mono', monospace; }
 
 /* ── Final CTA ──────────────────── */
 .cta-wrap { position: relative; overflow: hidden; }
@@ -233,7 +224,6 @@ ${GFONTS}
   .feat-grid { grid-template-columns: 1fr; }
   .feat-grid-3 { grid-template-columns: 1fr; }
   .sec-grid { grid-template-columns: 1fr; }
-  .testimonial-grid { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
   .lnav-links { display: none; }
   .lnav-ham { display: flex; }
@@ -997,59 +987,6 @@ export default function LandingPage() {
               </p>
             </div>
           </Reveal>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════
-          SOCIAL PROOF
-          TODO: Replace placeholder content with real user testimonials
-          before public launch. Do not use these quotes as real reviews.
-      ════════════════════════════════════════════════════════ */}
-      <section aria-labelledby="social-heading">
-        <div className="section" style={{ paddingTop: 0 }}>
-          <Reveal>
-            <div className="section-tag">Early users</div>
-            <h2 className="section-h2" id="social-heading">
-              What people are saying.
-            </h2>
-            <p className="section-sub" style={{ color: "rgba(100,116,139,0.5)", fontSize: 13, fontFamily: "'DM Mono', monospace", marginTop: 8 }}>
-              {/* TODO: Replace with verified user testimonials before launch */}
-              ✦ Placeholder quotes — replace with real user testimonials before shipping.
-            </p>
-          </Reveal>
-
-          <div className="testimonial-grid">
-            {[
-              {
-                quote: "I always knew I was spending too much on food but could never prove it to myself. FinTwin showed me ₹8,400 in three weeks. That number hit different.",
-                name: "Arjun Mehta", role: "Software engineer, Bangalore", stars: 5, initials: "AM", color: "#a78bfa",
-              },
-              {
-                quote: "The fact that my bank data isn't going to some American AI company matters to me. RBI AA + self-hosted AI — I actually trust this thing with my real numbers.",
-                name: "Priya Nair", role: "Finance analyst, Mumbai", stars: 5, initials: "PN", color: "#22d3ee",
-              },
-              {
-                quote: "I asked the Copilot if I could afford a MacBook Pro. It told me yes but said wait 6 weeks and here's why. That's the kind of AI I wanted.",
-                name: "Karan Singh", role: "Freelancer, Delhi", stars: 5, initials: "KS", color: "#4ade80",
-              },
-            ].map((t, i) => (
-              <Reveal key={i} delay={i + 1}>
-                <div className="testimonial-card">
-                  <div className="testimonial-stars" aria-label={`${t.stars} stars`}>
-                    {"★".repeat(t.stars).split("").map((s, j) => <span key={j} style={{ color: "#fbbf24" }}>{s}</span>)}
-                  </div>
-                  <p className="testimonial-text">"{t.quote}"</p>
-                  <div className="testimonial-author">
-                    <div className="testimonial-avatar" style={{ background: `${t.color}18`, color: t.color }} aria-hidden="true">{t.initials}</div>
-                    <div>
-                      <div className="testimonial-name">{t.name}</div>
-                      <div className="testimonial-role">{t.role}</div>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
         </div>
       </section>
 
