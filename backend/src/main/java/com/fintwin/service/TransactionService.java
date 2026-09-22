@@ -616,13 +616,13 @@ public class TransactionService {
         User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        Map<String, Object[]> groups = new LinkedHashMap<>();   // key → {name, count, total, sampleId}
+        Map<String, Object[]> groups = new LinkedHashMap<>();   // key → {name, count, total, sampleId, merchant}
         for (Transaction t : repository.findByUser(user)) {
             if (!unsorted(t) || t.getAmount() == null || t.getAmount() >= 0) continue;
             String key = categoryService.normalizeMerchant(t.getMerchant());
             Object[] g = groups.computeIfAbsent(key, k -> new Object[] {
                     com.fintwin.util.MerchantCategorizer.payeeOf(
-                            t.getMerchant() == null ? "Unknown" : t.getMerchant()), 0, 0.0, t.getId()});
+                            t.getMerchant() == null ? "Unknown" : t.getMerchant()), 0, 0.0, t.getId(), t.getMerchant()});
             g[1] = (int) g[1] + 1;
             g[2] = (double) g[2] - t.getAmount();
         }
@@ -635,6 +635,8 @@ public class TransactionService {
                     m.put("count", g[1]);
                     m.put("total", Math.round((double) g[2] * 100) / 100.0);
                     m.put("sampleId", g[3]);
+                    // exact merchant text, so the page can update matching rows in place
+                    m.put("merchant", g[4]);
                     return m;
                 })
                 .toList();

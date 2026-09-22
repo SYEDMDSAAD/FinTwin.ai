@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Tags } from "lucide-react";
+import { Tags, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
@@ -9,13 +9,22 @@ import { EDIT_CATEGORIES } from "../constants/categories";
 // categorisation rules over old rows, then lists what's still unplaced by
 // payee, biggest first — one choice sorts every payment to that payee and is
 // remembered for the future.
+//
+// Collapsed by default so it doesn't push the transactions down. Choosing a
+// category updates the page in place (onSorted) — never a reload.
 
 const CHOICES = EDIT_CATEGORIES.filter(c => c !== "Other");
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
 
-export default function SortOther({ onChanged }) {
+/**
+ * @param onSorted      ({ id, category, applyToSimilar, merchant }) — patch the
+ *                      page's transactions in place after one payee is sorted
+ * @param onBulkChanged () — refresh quietly after the rules re-sorted old rows
+ */
+export default function SortOther({ onSorted, onBulkChanged }) {
     const [groups, setGroups] = useState(null);
     const [busy, setBusy] = useState(null);
+    const [open, setOpen] = useState(false);
     const [expanded, setExpanded] = useState(false);
 
     const load = useCallback(() => API.get("/transactions/unsorted-payees", { params: { limit: 30 } })
@@ -26,7 +35,7 @@ export default function SortOther({ onChanged }) {
         let alive = true;
         // Rows imported before the rules improved get sorted without a re-import
         API.post("/transactions/recategorize")
-            .then(res => { if (alive && res.data?.updated > 0 && onChanged) onChanged(); })
+            .then(res => { if (alive && res.data?.updated > 0 && onBulkChanged) onBulkChanged(); })
             .catch(() => {})
             .finally(() => { if (alive) load(); });
         return () => { alive = false; };
@@ -41,7 +50,7 @@ export default function SortOther({ onChanged }) {
             toast.success(group.count > 1
                 ? `${group.count} payments to ${group.payee} → ${category}, and future ones too`
                 : `${group.payee} → ${category}, and future payments too`);
-            if (onChanged) onChanged();
+            if (onSorted) onSorted({ id: group.sampleId, category, applyToSimilar: true, merchant: group.merchant });
         } catch {
             toast.error("Couldn't update that payee. Try again.");
         } finally {
@@ -56,13 +65,26 @@ export default function SortOther({ onChanged }) {
     const shown = expanded ? groups : groups.slice(0, 6);
 
     return (
-        <section aria-label="Sort out Other" style={{ background: "var(--bg-card)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 16, padding: 18, margin: "16px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <section aria-label="Sort out Other" style={{ background: "var(--bg-card)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 16, padding: open ? 18 : "12px 18px", margin: "16px 0" }}>
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                aria-expanded={open}
+                aria-controls="sort-other-list"
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+            >
                 <Tags size={16} color="#fbbf24" aria-hidden />
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
                     {inr(total)} in {count} {count === 1 ? "payment is" : "payments is"} still "Other"
-                </h3>
-            </div>
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+                    {open ? "Hide" : `Sort ${groups.length} ${groups.length === 1 ? "payee" : "payees"}`}
+                </span>
+                <ChevronDown size={16} color="var(--text-secondary)" aria-hidden
+                             style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+            </button>
+
+            {open && <div id="sort-other-list" style={{ marginTop: 10 }}>
             <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
                 Pick a category for each payee. It applies to all their payments and to future ones, so your budgets and trends stay accurate.
             </p>
@@ -94,6 +116,7 @@ export default function SortOther({ onChanged }) {
                     {expanded ? "Show fewer" : `Show all ${groups.length} payees`}
                 </button>
             )}
+            </div>}
         </section>
     );
 }

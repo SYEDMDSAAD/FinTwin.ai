@@ -522,7 +522,8 @@ class TransactionServiceTest {
         List<Map<String, Object>> groups = service.unsortedPayees(30);
 
         assertThat(groups).extracting(g -> g.get("payee")).containsExactly("OTT commerce", "SARA ENTERPRISES");
-        assertThat(groups.get(1)).containsEntry("count", 2).containsEntry("total", 400.0).containsEntry("sampleId", 1L);
+        assertThat(groups.get(1)).containsEntry("count", 2).containsEntry("total", 400.0).containsEntry("sampleId", 1L)
+                .containsEntry("merchant", "Paid to SARA ENTERPRISES");
     }
 }
 

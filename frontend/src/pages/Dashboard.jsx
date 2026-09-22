@@ -307,6 +307,17 @@ function Dashboard() {
         }
     };
 
+    // Refresh without the loading skeleton — for background changes (the
+    // categoriser re-sorting old rows) that shouldn't blank the table
+    const refreshTransactionsQuietly = async () => {
+        try {
+            const response = await API.get("/transactions");
+            setTransactions(response.data);
+        } catch {
+            // the visible data is still valid; next full load will catch up
+        }
+    };
+
     // =========================
     // Category change — patch state in place (mirrors the backend's update)
     // instead of refetching, so the table doesn't flash a loading skeleton.
@@ -1858,19 +1869,22 @@ function Dashboard() {
                             addExpense={addExpense}
                         />
 
+                        {/* Outside the loading swap so it never unmounts and refetches */}
+                        <SortOther
+                            onSorted={handleCategoryChanged}
+                            onBulkChanged={refreshTransactionsQuietly}
+                        />
+
                         {loading ? (
 
                             <TransactionSkeleton />
 
                         ) : (
 
-                            <>
-                                <SortOther onChanged={fetchTransactions} />
-                                <EnhancedTransactionsTable
-                                    transactions={transactions}
-                                    onChanged={handleCategoryChanged}
-                                />
-                            </>
+                            <EnhancedTransactionsTable
+                                transactions={transactions}
+                                onChanged={handleCategoryChanged}
+                            />
 
                         )}
                     </>
