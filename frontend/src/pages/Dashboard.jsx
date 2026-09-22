@@ -291,14 +291,20 @@ function Dashboard() {
     // Fetch Transactions
     // =========================
 
-    const fetchTransactions = async () => {
+    // How far back the Transactions page asks for. The dashboard's own figures
+    // are monthly, so 3 months is the default; the whole history is a click away.
+    const [txMonths, setTxMonths] = useState(
+        () => Number(localStorage.getItem("txMonths")) || 3);
+    useEffect(() => { localStorage.setItem("txMonths", String(txMonths)); }, [txMonths]);
+
+    const fetchTransactions = async (months = txMonths) => {
 
         try {
 
             setLoading(true);
 
             const response =
-                await API.get("/transactions");
+                await API.get("/transactions", { params: { months } });
 
             setTransactions(response.data);
 
@@ -317,7 +323,7 @@ function Dashboard() {
     // categoriser re-sorting old rows) that shouldn't blank the table
     const refreshTransactionsQuietly = async () => {
         try {
-            const response = await API.get("/transactions");
+            const response = await API.get("/transactions", { params: { months: txMonths } });
             setTransactions(response.data);
         } catch {
             // the visible data is still valid; next full load will catch up
@@ -1895,6 +1901,8 @@ function Dashboard() {
                             <EnhancedTransactionsTable
                                 transactions={transactions}
                                 onChanged={handleCategoryChanged}
+                                months={txMonths}
+                                onMonthsChange={(m) => { setTxMonths(m); fetchTransactions(m); }}
                             />
 
                         )}

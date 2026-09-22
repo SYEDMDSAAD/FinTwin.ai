@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Hexagon, X, Check } from "lucide-react";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
@@ -13,7 +13,18 @@ function cleanMerchant(name) {
     return name;
 }
 
-function SpendingHeatmap({ transactions, onCategoryChanged }) {
+// Months of history the grid covers. The heatmap is the one place that looks
+// at everything imported — the rest of the app works on recent months — so the
+// totals are summed on the server instead of shipping years of rows here.
+const ALL_TIME = 0;
+
+const monthLabel = (iso) => {
+    if (!iso) return null;
+    const d = new Date(`${iso}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+};
+
+function SpendingHeatmap({ onCategoryChanged }) {
 
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [applySimilar, setApplySimilar] = useState(true);
@@ -23,29 +34,21 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
     const [customRow, setCustomRow] = useState(null);
 
     // =========================
-    // Category Totals
+    // Category Totals — every transaction the user has imported
     // =========================
 
-    const categoryTotals = {};
+    const [summary, setSummary] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    transactions.forEach((t) => {
+    const loadTotals = useCallback(() =>
+        API.get("/transactions/category-totals", { params: { months: ALL_TIME } })
+            .then(r => setSummary(r.data))
+            .catch(() => setError("Could not load your spending. Try again."))
+            .finally(() => setLoading(false)), []);
+    useEffect(() => { loadTotals(); }, [loadTotals]);
 
-        // Only expenses
-
-        if (t.amount < 0) {
-
-            // Ignore invalid category
-
-            const category =
-                t.category || "Other";
-
-            categoryTotals[category] =
-
-                (categoryTotals[category] || 0)
-
-                + Math.abs(t.amount);
-        }
-    });
+    const categoryTotals = useMemo(() => Object.fromEntries(
+        (summary?.categories || []).map(c => [c.category, c.total])), [summary]);
 
     // =========================
     // Max Value
@@ -58,18 +61,30 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
         1
     );
 
-    // Transactions inside the clicked category (same period filter as the grid)
-    const selectedTxns = useMemo(() => {
-        if (!selectedCategory) return [];
-        return transactions
-            .filter(t => t.amount < 0 && (t.category || "Other") === selectedCategory)
-            .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    }, [transactions, selectedCategory]);
+    // The clicked category's transactions, fetched when it's opened: over years
+    // of history one category is still small, all of them together is not.
+    const [selectedTxns, setSelectedTxns] = useState([]);
+    const [loadingTxns, setLoadingTxns] = useState(false);
+
+    useEffect(() => {
+        if (!selectedCategory) return undefined;     // cleared in the click handler
+        let alive = true;
+        API.get("/transactions", { params: { months: ALL_TIME, category: selectedCategory } })
+            .then(r => {
+                if (!alive) return;
+                setSelectedTxns((Array.isArray(r.data) ? r.data : [])
+                    .filter(t => t.amount < 0)
+                    .sort((a, b) => String(b.date).localeCompare(String(a.date))));
+            })
+            .catch(() => { if (alive) setError("Could not load those transactions. Try again."); })
+            .finally(() => { if (alive) setLoadingTxns(false); });
+        return () => { alive = false; };
+    }, [selectedCategory]);
 
     const editOptions = useMemo(() => {
-        const present = new Set(transactions.map(t => t.category).filter(Boolean));
+        const present = new Set(Object.keys(categoryTotals));
         return [...new Set([...EDIT_CATEGORIES, ...present])];
-    }, [transactions]);
+    }, [categoryTotals]);
 
     const saveCategory = async (t, category) => {
         if (!category || category === t.category) return;
@@ -82,6 +97,9 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
                 remember: true,
             });
             setCustomRow(null);
+            // The row just left this category, and the totals moved with it
+            setSelectedTxns(rows => rows.filter(r => r.id !== t.id));
+            loadTotals();
             onCategoryChanged?.({
                 id: t.id,
                 category,
@@ -172,7 +190,9 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
                         text-zinc-500
                     "
                 >
-                    Expense intensity by category
+                    {summary?.from
+                        ? `${monthLabel(summary.from)} – ${monthLabel(summary.to)} · ${summary.transactions.toLocaleString("en-IN")} transactions`
+                        : "Expense intensity by category"}
                 </div>
 
             </div>
@@ -180,8 +200,18 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
             {/* Hint */}
 
             <p className="text-xs text-zinc-500 mb-6">
-                Click a category to view or update its transactions for the selected period.
+                Everything you've imported, not just recent months. Click a category to see or fix its transactions.
             </p>
+
+            {loading && (
+                <p className="text-xs text-zinc-500 mb-4" role="status">Adding up your spending…</p>
+            )}
+            {error && !selectedCategory && (
+                <p className="text-xs text-red-400 mb-4" role="alert">{error}</p>
+            )}
+            {!loading && Object.keys(categoryTotals).length === 0 && (
+                <p className="text-xs text-zinc-500 mb-4">No spending recorded yet.</p>
+            )}
 
             {/* Heatmap Grid */}
 
@@ -216,6 +246,8 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
                                 type="button"
                                 onClick={() => {
                                     setSelectedCategory(selected ? null : category);
+                                    setSelectedTxns([]);
+                                    setLoadingTxns(!selected);
                                     setCustomRow(null);
                                     setError("");
                                 }}
@@ -330,11 +362,13 @@ function SpendingHeatmap({ transactions, onCategoryChanged }) {
                                 {selectedCategory}
                             </span>
                             <span className="text-xs text-zinc-500">
-                                {selectedTxns.length} transaction{selectedTxns.length === 1 ? "" : "s"} in selected period
+                                {loadingTxns
+                                    ? "Loading…"
+                                    : `${selectedTxns.length} transaction${selectedTxns.length === 1 ? "" : "s"}`}
                             </span>
                             <button
                                 type="button"
-                                onClick={() => setSelectedCategory(null)}
+                                onClick={() => { setSelectedCategory(null); setSelectedTxns([]); }}
                                 className="ml-auto p-1 rounded-md text-zinc-500 hover:text-white hover:bg-white/10"
                                 title="Close"
                             >

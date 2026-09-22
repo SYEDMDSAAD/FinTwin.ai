@@ -169,17 +169,77 @@ public class TransactionService {
             description = "Retrieve all transactions"
     )
     public List<Transaction> getAllTransactions() {
+        return getTransactions(DEFAULT_MONTHS, null);
+    }
 
-        String email = SecurityUtils.getCurrentUserEmail();
+    /** The newest full months the page asks for; 0 = everything the user has imported. */
+    public static final int DEFAULT_MONTHS = 3;
+    public static final int MAX_MONTHS = 600;
 
+    /**
+     * @param months how many calendar months back to include, counting this
+     *               one; 0 (or more than {@link #MAX_MONTHS}) means all of it
+     * @param category only this category, when given — the heatmap sorting out
+     *                 one category doesn't need every other row with it
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    @Audited(action = "READ", resource = "transactions", description = "Retrieve transactions")
+    public List<Transaction> getTransactions(int months, String category) {
         User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(() ->
-                        new NotFoundException("User not found")
-                );
+                .findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
-        LocalDate cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1);
-        return repository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
+        List<Transaction> rows;
+        if (months <= 0 || months > MAX_MONTHS) {
+            rows = repository.findByUser(user);
+        } else {
+            LocalDate cutoff = LocalDate.now().minusMonths(months - 1L).withDayOfMonth(1);
+            rows = repository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
+        }
+        if (category == null || category.isBlank()) return rows;
+        String wanted = category.trim();
+        return rows.stream().filter(t -> wanted.equalsIgnoreCase(t.getCategory())).toList();
+    }
+
+    /**
+     * What the user has spent per category over a window, summed here rather
+     * than by sending every row to the browser: the spending heatmap covers
+     * the user's whole history, which can be years of transactions.
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    public Map<String, Object> categoryTotals(int months) {
+        List<Transaction> rows = getTransactions(months, null);
+        Map<String, double[]> totals = new LinkedHashMap<>();        // category → [spent, count]
+        LocalDate first = null, last = null;
+        for (Transaction t : rows) {
+            if (t.getDate() != null) {
+                if (first == null || t.getDate().isBefore(first)) first = t.getDate();
+                if (last == null || t.getDate().isAfter(last)) last = t.getDate();
+            }
+            if (t.getAmount() == null || t.getAmount() >= 0 || TransactionMath.isSelfTransfer(t)) continue;
+            double[] c = totals.computeIfAbsent(
+                    t.getCategory() == null || t.getCategory().isBlank() ? "Other" : t.getCategory(),
+                    k -> new double[2]);
+            c[0] += Math.abs(t.getAmount());
+            c[1]++;
+        }
+
+        List<Map<String, Object>> categories = totals.entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue()[0], a.getValue()[0]))
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("category", e.getKey());
+                    m.put("total", Math.round(e.getValue()[0] * 100) / 100.0);
+                    m.put("count", (int) e.getValue()[1]);
+                    return m;
+                }).toList();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("categories", categories);
+        out.put("transactions", rows.size());
+        out.put("from", first);
+        out.put("to", last);
+        return out;
     }
 
     // =========================

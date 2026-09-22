@@ -42,11 +42,24 @@ public class TransactionController {
         return ResponseEntity.ok("CSV Uploaded Successfully");
     }
 
+    /**
+     * @param months how far back to go (default 3, 0 = everything imported)
+     * @param category only this category, when given
+     */
     @GetMapping
-    public List<TransactionDTO> getTransactions() {
-        return service.getAllTransactions().stream()
+    public List<TransactionDTO> getTransactions(
+            @RequestParam(defaultValue = "" + TransactionService.DEFAULT_MONTHS) int months,
+            @RequestParam(required = false) String category) {
+        return service.getTransactions(months, category).stream()
                 .map(TransactionDTO::from)
                 .toList();
+    }
+
+    /** Spending per category over a window; 0 months = the user's whole history. */
+    @GetMapping("/category-totals")
+    public Map<String, Object> categoryTotals(
+            @RequestParam(defaultValue = "" + TransactionService.DEFAULT_MONTHS) int months) {
+        return service.categoryTotals(months);
     }
 
     @PostMapping("/expense")

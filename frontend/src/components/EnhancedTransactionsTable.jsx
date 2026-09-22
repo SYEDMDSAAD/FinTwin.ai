@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, Fragment } from "react";
+import { useState, useMemo, useEffect, memo, Fragment } from "react";
 import { Download, SlidersHorizontal, X, Search, Check, Pencil } from "lucide-react";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
@@ -105,7 +105,15 @@ const inputStyle = {
 };
 const selectStyle = { ...inputStyle };
 
-const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ transactions = [], onChanged }) {
+// How far back to ask the server for. "Everything" can be years of rows, so
+// the list renders a chunk at a time — 10,000 rows in the DOM at once locks
+// the page up for seconds.
+const RANGES = [[3, "3 months"], [6, "6 months"], [12, "1 year"], [24, "2 years"], [0, "Everything"]];
+const CHUNK = 300;
+
+const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
+  transactions = [], onChanged, months, onMonthsChange, chunkSize = CHUNK,
+}) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -283,7 +291,12 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
     </div>
   );
 
-  const grouped = useMemo(() => groupByMonth(groupByDate(filtered)), [filtered]);
+  // Reset the rendered chunk whenever what's being shown changes
+  const [shown, setShown] = useState(chunkSize);
+  useEffect(() => { setShown(chunkSize); }, [chunkSize, transactions, search, category, type, dateFrom, dateTo, minAmt, maxAmt]);
+
+  const visible = filtered.length > shown ? filtered.slice(0, shown) : filtered;
+  const grouped = useMemo(() => groupByMonth(groupByDate(visible)), [visible]);
   const totalIncome  = filtered.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
   const totalExpense = filtered.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
 
@@ -325,6 +338,17 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
           <span style={{ fontSize: 11, fontWeight: 600, color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "4px 10px" }}>
             -₹{totalExpense.toLocaleString("en-IN", {maximumFractionDigits: 0})}
           </span>
+
+          {onMonthsChange && (
+            <select
+              aria-label="How far back to show"
+              value={months}
+              onChange={e => onMonthsChange(Number(e.target.value))}
+              style={{ padding: "7px 10px", borderRadius: 10, background: "var(--bg-input)", border: "1px solid var(--border-card)", color: "var(--text-primary)", fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+            >
+              {RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          )}
 
           <button
             onClick={() => setFiltersOpen(o => !o)}
@@ -565,11 +589,25 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({ tran
             ))}
           </div>
         ))}
+
+        {filtered.length > shown && (
+          <div style={{ padding: "14px 24px", textAlign: "center" }}>
+            <button
+              onClick={() => setShown(n => n + chunkSize)}
+              style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Show more ({filtered.length - shown} older)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <div style={{ padding: "12px 24px", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, color: "var(--text-dimmer)" }}>{filtered.length} of {transactions.length} transactions</span>
+        <span style={{ fontSize: 11, color: "var(--text-dimmer)" }}>
+          Showing {Math.min(shown, filtered.length)} of {filtered.length}
+          {filtered.length !== transactions.length && ` (filtered from ${transactions.length})`}
+        </span>
         <button
           onClick={() => exportCSV(filtered)}
           style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}

@@ -558,7 +558,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
 
           {/* Spending Heatmap */}
           <div style={{ marginTop: 24 }}>
-            <SpendingHeatmap transactions={currentTxns} onCategoryChanged={onCategoryChanged} />
+            <SpendingHeatmap onCategoryChanged={onCategoryChanged} />
           </div>
 
           {/* Recurring Expenses */}
