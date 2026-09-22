@@ -229,4 +229,11 @@ class SpendingRecapTest {
         t.setDate(date);
         return t;
     }
+
+    @Test
+    void paymentsToPeopleReadAsSuch() {
+        assertThat(SpendingRecap.categoryPhrase("People")).isEqualTo("payments to people");
+        assertThat(SpendingRecap.categoryPhrase("Food")).isEqualTo("food");
+    }
 }
+

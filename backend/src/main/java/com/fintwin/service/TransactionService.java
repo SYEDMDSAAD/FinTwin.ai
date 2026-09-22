@@ -557,6 +557,90 @@ public class TransactionService {
     }
 
     // =========================
+    // RE-SORT "OTHER" + GROUP WHAT'S LEFT
+    // =========================
+
+    private static final Set<String> UNSORTED = Set.of("other", "others", "uncategorized", "uncategorised");
+
+    private static boolean unsorted(Transaction t) {
+        return t.getCategory() == null || UNSORTED.contains(t.getCategory().trim().toLowerCase());
+    }
+
+    /**
+     * Runs the current rules — the user's learned ones first — over every
+     * transaction still in "Other". Rows imported before the rules improved
+     * get sorted without being imported again. A category the user chose
+     * (anything but Other) is never touched.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public Map<String, Object> recategorizeUnsorted() {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Map<String, String> learned = categoryService.learnedRulesFor(user);
+        boolean cardData = repository.countByUserAndSource(user, ACCOUNT_CARD) > 0;
+        List<Transaction> changed = new ArrayList<>();
+        int remaining = 0;
+
+        for (Transaction t : repository.findByUser(user)) {
+            if (!unsorted(t) || t.getAmount() == null) continue;
+            String category = TransactionMath.forcedImportCategory(
+                    t.getMerchant(), t.getAmount(), ACCOUNT_CARD.equals(t.getSource()), cardData);
+            if (category == null) category = categoryService.categorize(t.getMerchant(), learned);
+            if (category != null && !UNSORTED.contains(category.toLowerCase())) {
+                t.setCategory(category);
+                changed.add(t);
+            } else {
+                remaining++;
+            }
+        }
+        if (!changed.isEmpty()) repository.saveAll(changed);
+        return Map.of("updated", changed.size(), "remaining", remaining);
+    }
+
+    /**
+     * What's still in "Other", grouped by payee and biggest spend first — so
+     * the user can sort most of the money with a handful of choices. Each
+     * group carries one transaction id: recategorising it with
+     * applyToSimilar sorts the whole group and remembers the payee.
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    public List<Map<String, Object>> unsortedPayees(int limit) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Map<String, Object[]> groups = new LinkedHashMap<>();   // key → {name, count, total, sampleId}
+        for (Transaction t : repository.findByUser(user)) {
+            if (!unsorted(t) || t.getAmount() == null || t.getAmount() >= 0) continue;
+            String key = categoryService.normalizeMerchant(t.getMerchant());
+            Object[] g = groups.computeIfAbsent(key, k -> new Object[] {
+                    com.fintwin.util.MerchantCategorizer.payeeOf(
+                            t.getMerchant() == null ? "Unknown" : t.getMerchant()), 0, 0.0, t.getId()});
+            g[1] = (int) g[1] + 1;
+            g[2] = (double) g[2] - t.getAmount();
+        }
+        return groups.values().stream()
+                .sorted((a, b) -> Double.compare((double) b[2], (double) a[2]))
+                .limit(Math.max(1, Math.min(limit, 100)))
+                .map(g -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("payee", g[0]);
+                    m.put("count", g[1]);
+                    m.put("total", Math.round((double) g[2] * 100) / 100.0);
+                    m.put("sampleId", g[3]);
+                    return m;
+                })
+                .toList();
+    }
+
+    // =========================
     // UPDATE CATEGORY (manual recategorization)
     // Learns a per-user merchant→category rule so future transactions
     // from the same payee auto-categorize; optionally fixes history too.

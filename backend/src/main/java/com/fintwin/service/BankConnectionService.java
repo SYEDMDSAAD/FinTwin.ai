@@ -777,7 +777,9 @@ public class BankConnectionService {
         if ("CREDIT".equalsIgnoreCase(type))
             return "Income";
 
-        return "Other";
+        // Brands, shop-type words and payments to people — the same payee
+        // rules statements and alert emails use
+        return categoryService.categorize(narration, Map.of());
     }
 
     // ── Card bill payment reclassification ────────────────────────────────────

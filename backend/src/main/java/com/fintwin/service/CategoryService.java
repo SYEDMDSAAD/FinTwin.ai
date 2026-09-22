@@ -14,41 +14,12 @@ import java.util.Map;
 @Service
 public class CategoryService {
 
-private static final Map<String, String> RULES = Map.ofEntries(
-
-        Map.entry("swiggy", "Food"),
-        Map.entry("zomato", "Food"),
-        Map.entry("dominos", "Food"),
-        Map.entry("mcdonald", "Food"),
-        Map.entry("kfc", "Food"),
-
-        Map.entry("uber", "Travel"),
-        Map.entry("ola", "Travel"),
-        Map.entry("rapido", "Travel"),
-
-        Map.entry("amazon", "Shopping"),
-        Map.entry("flipkart", "Shopping"),
-        Map.entry("myntra", "Shopping"),
-        Map.entry("ajio", "Shopping"),
-        Map.entry("shopping", "Shopping"),
-
-        Map.entry("electricity", "Bills"),
-        Map.entry("bill", "Bills"),
-        Map.entry("recharge", "Bills"),
-        Map.entry("airtel", "Bills"),
-        Map.entry("jio", "Bills"),
-
-        Map.entry("salary", "Income"),
-        Map.entry("bonus", "Income"),
-        Map.entry("freelance", "Income"),
-
-        // Money moving between the user's own accounts — excluded from
-        // income/expense aggregates (see TransactionMath.isSelfTransfer)
-        Map.entry("self transfer", "Transfer"),
-        Map.entry("self-transfer", "Transfer"),
-        Map.entry("own account", "Transfer"),
-        Map.entry("transfer to self", "Transfer")
-);
+// Money moving between the user's own accounts — excluded from income/expense
+// aggregates (see TransactionMath.isSelfTransfer). Checked before the payee
+// rules so "Transfer to self" is never read as a payment to a person.
+private static final String[] SELF_TRANSFER = {
+        "self transfer", "self-transfer", "own account", "transfer to self"
+};
 
 @Autowired
 private UserMerchantCategoryRepository learnedRepo;
@@ -82,17 +53,15 @@ public String categorize(String merchant, Map<String, String> learnedRules) {
         }
     }
 
-    for (Map.Entry<String, String> rule :
-            RULES.entrySet()) {
-
-        if (value.contains(rule.getKey())) {
-
-            return rule.getValue();
-        }
+    for (String marker : SELF_TRANSFER) {
+        if (value.contains(marker)) return "Transfer";
     }
 
-    return "Other";
+    // Brands, shop-type words, and payments to people
+    return com.fintwin.util.MerchantCategorizer.categorize(merchant).orElse("Other");
 }
+
+
 
 /** Learned rules for a user: normalized merchant pattern → category. */
 public Map<String, String> learnedRulesFor(User user) {

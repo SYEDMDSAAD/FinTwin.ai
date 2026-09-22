@@ -107,6 +107,18 @@ public class TransactionController {
                 service.addManualTransaction(date, merchant, amount, category));
     }
 
+    /** Re-run the categorisation rules over everything still in "Other". */
+    @PostMapping("/recategorize")
+    public Map<String, Object> recategorize() {
+        return service.recategorizeUnsorted();
+    }
+
+    /** "Other" spending grouped by payee, biggest first, for sorting in bulk. */
+    @GetMapping("/unsorted-payees")
+    public List<Map<String, Object>> unsortedPayees(@RequestParam(defaultValue = "30") int limit) {
+        return service.unsortedPayees(limit);
+    }
+
     @PatchMapping("/{id}/category")
     public ResponseEntity<Map<String, Object>> updateCategory(
             @PathVariable Long id,

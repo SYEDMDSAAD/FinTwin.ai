@@ -113,11 +113,18 @@ public final class SpendingRecap {
         // "most of it" is a lie when the top slice is a fifth of the total.
         if (share >= 40) {
             lines.add("Most of it — " + money(top.getValue()) + " — went on "
-                      + top.getKey().toLowerCase() + ".");
+                      + categoryPhrase(top.getKey()) + ".");
         } else {
-            lines.add("Your biggest category was " + top.getKey().toLowerCase()
+            lines.add("Your biggest category was " + categoryPhrase(top.getKey())
                       + " at " + money(top.getValue()) + ".");
         }
+    }
+
+    // "went on people" reads oddly; name what the money was
+    static String categoryPhrase(String category) {
+        return MerchantCategorizer.PEOPLE.equalsIgnoreCase(category)
+                ? "payments to people"
+                : category.toLowerCase();
     }
 
     private static void addLargestCharge(List<String> lines, List<Transaction> charges) {

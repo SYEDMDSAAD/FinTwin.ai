@@ -30,8 +30,13 @@ class CategoryServiceTest {
     @Test
     void categorize_matchesGlobalKeywordRules() {
         assertThat(service.categorize("Swiggy Order 123")).isEqualTo("Food");
-        assertThat(service.categorize("UBER TRIP BLR")).isEqualTo("Travel");
-        assertThat(service.categorize("Some Random Person")).isEqualTo("Other");
+        // Rides are Transport; Travel is trips (flights, trains, hotels)
+        assertThat(service.categorize("UBER TRIP BLR")).isEqualTo("Transport");
+        // Paying a person is its own category, counted as spending
+        assertThat(service.categorize("Some Random Person")).isEqualTo("People");
+        assertThat(service.categorize("SARA ENTERPRISES")).isEqualTo("Other");
+        // own-account moves stay Transfer, excluded from spending
+        assertThat(service.categorize("Transfer to self")).isEqualTo("Transfer");
         assertThat(service.categorize(null)).isEqualTo("Other");
     }
 

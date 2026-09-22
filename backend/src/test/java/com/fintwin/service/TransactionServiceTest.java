@@ -477,5 +477,52 @@ class TransactionServiceTest {
 
         assertThat(savedRows().get(0).getAccountRef()).isEqualTo("HDFC ··1234");
     }
+
+    // ── re-sorting "Other" ───────────────────────────────────────────────────
+
+    private static Transaction txn(long id, String merchant, double amount, String category) {
+        Transaction t = new Transaction();
+        ReflectionTestUtils.setField(t, "id", id);
+        t.setMerchant(merchant);
+        t.setAmount(amount);
+        t.setCategory(category);
+        t.setSource("STATEMENT");
+        return t;
+    }
+
+    @Test
+    void recategorizeUnsorted_sortsOtherButNeverTouchesAUsersChoice() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction bakery = txn(1, "Paid to Noor bakery", -60, "Other");
+        Transaction chosen = txn(2, "Paid to Noor bakery", -60, "Groceries");   // user set this
+        Transaction unknown = txn(3, "Paid to SARA ENTERPRISES", -320, "Other");
+        when(repository.findByUser(user)).thenReturn(List.of(bakery, chosen, unknown));
+        when(categoryService.categorize(eq("Paid to Noor bakery"), any())).thenReturn("Food");
+        when(categoryService.categorize(eq("Paid to SARA ENTERPRISES"), any())).thenReturn("Other");
+
+        Map<String, Object> result = service.recategorizeUnsorted();
+
+        assertThat(result).containsEntry("updated", 1).containsEntry("remaining", 1);
+        assertThat(bakery.getCategory()).isEqualTo("Food");
+        assertThat(chosen.getCategory()).isEqualTo("Groceries");
+        verify(repository).saveAll(List.of(bakery));
+    }
+
+    @Test
+    void unsortedPayees_groupsWhatIsLeftBiggestSpendFirst() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(categoryService.normalizeMerchant(any())).thenAnswer(i -> ((String) i.getArgument(0)).toLowerCase());
+        when(repository.findByUser(user)).thenReturn(List.of(
+                txn(1, "Paid to SARA ENTERPRISES", -320, "Other"),
+                txn(2, "Paid to SARA ENTERPRISES", -80, "Other"),
+                txn(3, "Paid to OTT commerce", -999, "Other"),
+                txn(4, "Paid to Noor bakery", -60, "Food"),         // sorted already
+                txn(5, "Received from ******1317", 500, "Other")));  // money in: not spending
+
+        List<Map<String, Object>> groups = service.unsortedPayees(30);
+
+        assertThat(groups).extracting(g -> g.get("payee")).containsExactly("OTT commerce", "SARA ENTERPRISES");
+        assertThat(groups.get(1)).containsEntry("count", 2).containsEntry("total", 400.0).containsEntry("sampleId", 1L);
+    }
 }
 

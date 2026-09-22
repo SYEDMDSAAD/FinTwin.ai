@@ -83,6 +83,7 @@ from "./SpendingCoachPage";
 import BottomNav from "../components/BottomNav";
 import CreditScoreCard from "../components/CreditScoreCard";
 import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
+import SortOther from "../components/SortOther";
 import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
@@ -1863,10 +1864,13 @@ function Dashboard() {
 
                         ) : (
 
-                            <EnhancedTransactionsTable
-                                transactions={transactions}
-                                onChanged={handleCategoryChanged}
-                            />
+                            <>
+                                <SortOther onChanged={fetchTransactions} />
+                                <EnhancedTransactionsTable
+                                    transactions={transactions}
+                                    onChanged={handleCategoryChanged}
+                                />
+                            </>
 
                         )}
                     </>
