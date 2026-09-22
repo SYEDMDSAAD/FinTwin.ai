@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Tags, ChevronDown } from "lucide-react";
+import { Tags, ChevronDown, Sparkles, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
@@ -15,6 +15,8 @@ import { EDIT_CATEGORIES } from "../constants/categories";
 
 const CHOICES = EDIT_CATEGORIES.filter(c => c !== "Other");
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
+// Same normalisation as the backend's CategoryService.normalizeMerchant
+const norm = m => String(m || "").toLowerCase().trim().replace(/\s+/g, " ");
 
 /**
  * @param onSorted      ({ id, category, applyToSimilar, merchant }) — patch the
@@ -26,6 +28,22 @@ export default function SortOther({ onSorted, onBulkChanged }) {
     const [busy, setBusy] = useState(null);
     const [open, setOpen] = useState(false);
     const [expanded, setExpanded] = useState(false);
+    // The local model's guesses, fetched the first time the panel opens
+    const [suggestions, setSuggestions] = useState(null);   // null = not asked yet
+    const [suggesting, setSuggesting] = useState(false);
+
+    const askForSuggestions = useCallback(() => {
+        setSuggesting(true);
+        API.get("/transactions/unsorted-payees/suggestions", { params: { limit: 30 } })
+            .then(res => setSuggestions(res.data?.suggestions || {}))
+            .catch(() => setSuggestions({}))
+            .finally(() => setSuggesting(false));
+    }, []);
+
+    const toggleOpen = () => {
+        setOpen(o => !o);
+        if (!open && suggestions === null && !suggesting) askForSuggestions();
+    };
 
     const load = useCallback(() => API.get("/transactions/unsorted-payees", { params: { limit: 30 } })
         .then(res => setGroups(Array.isArray(res.data) ? res.data : []))
@@ -43,9 +61,11 @@ export default function SortOther({ onSorted, onBulkChanged }) {
 
     const sort = async (group, category) => {
         setBusy(group.sampleId);
+        const suggested = suggestions?.[norm(group.merchant)];
         try {
+            // Sending what was suggested records whether the model got it right
             await API.patch(`/transactions/${group.sampleId}/category`,
-                { category, applyToSimilar: true, remember: true });
+                { category, applyToSimilar: true, remember: true, ...(suggested ? { suggested } : {}) });
             setGroups(gs => gs.filter(g => g.sampleId !== group.sampleId));
             toast.success(group.count > 1
                 ? `${group.count} payments to ${group.payee} → ${category}, and future ones too`
@@ -68,7 +88,7 @@ export default function SortOther({ onSorted, onBulkChanged }) {
         <section aria-label="Sort out Other" style={{ background: "var(--bg-card)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 16, padding: open ? 18 : "12px 18px", margin: "16px 0" }}>
             <button
                 type="button"
-                onClick={() => setOpen(o => !o)}
+                onClick={toggleOpen}
                 aria-expanded={open}
                 aria-controls="sort-other-list"
                 style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
@@ -87,6 +107,7 @@ export default function SortOther({ onSorted, onBulkChanged }) {
             {open && <div id="sort-other-list" style={{ marginTop: 10 }}>
             <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
                 Pick a category for each payee. It applies to all their payments and to future ones, so your budgets and trends stay accurate.
+                {suggesting && <span role="status"> Getting suggestions…</span>}
             </p>
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
                 {shown.map(g => (
@@ -97,6 +118,19 @@ export default function SortOther({ onSorted, onBulkChanged }) {
                                 {g.count} {g.count === 1 ? "payment" : "payments"} · {inr(g.total)}
                             </div>
                         </div>
+                        {suggestions?.[norm(g.merchant)] && (
+                            <button
+                                type="button"
+                                disabled={busy === g.sampleId}
+                                onClick={() => sort(g, suggestions[norm(g.merchant)])}
+                                aria-label={`Accept ${suggestions[norm(g.merchant)]} for ${g.payee}`}
+                                title="FinTwin's guess from the payee's name — check it before accepting"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 10, border: "1px solid rgba(167,139,250,0.4)", background: "rgba(167,139,250,0.12)", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600 }}>
+                                <Sparkles size={12} color="#a78bfa" aria-hidden />
+                                <span style={{ color: "var(--text-primary)" }}>{suggestions[norm(g.merchant)]}</span>
+                                <Check size={13} color="#a78bfa" aria-hidden />
+                            </button>
+                        )}
                         <select
                             aria-label={`Category for ${g.payee}`}
                             defaultValue=""
@@ -104,7 +138,7 @@ export default function SortOther({ onSorted, onBulkChanged }) {
                             onChange={e => e.target.value && sort(g, e.target.value)}
                             style={{ flex: "0 0 160px", padding: "7px 10px", borderRadius: 10, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 12, fontFamily: "inherit" }}
                         >
-                            <option value="">Choose category…</option>
+                            <option value="">{suggestions?.[norm(g.merchant)] ? "Something else…" : "Choose category…"}</option>
                             {CHOICES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </li>

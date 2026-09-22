@@ -26,6 +26,8 @@ public record Categorized(String category, String source) {
     public static final String PROVIDED = "PROVIDED";
     /** The bank-sync keyword list (BankConnectionService). */
     public static final String BANK_KEYWORD = "BANK_KEYWORD";
+    /** The local model's suggestion for a payee the rules left in Other, accepted or changed by the user. */
+    public static final String LLM = "LLM";
 
     // ── Not predictions ───────────────────────────────────────────────────────
     /** The user picked the category when adding the transaction. */

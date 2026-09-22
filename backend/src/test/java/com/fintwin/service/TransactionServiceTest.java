@@ -47,6 +47,7 @@ class TransactionServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ProfileService profileService;
     @Mock private RestTemplate aiRestTemplate;
+    @Mock private CategorySuggestionService suggestionService;
 
     @InjectMocks private TransactionService service;
 
@@ -171,6 +172,56 @@ class TransactionServiceTest {
         assertThat(result.get("similarUpdated")).isEqualTo(0);
         verify(categoryService).rememberRule(user, "SHARMA GENERAL STORE", "Groceries");
         verify(repository).save(txn);
+    }
+
+    @Test
+    void updateCategory_acceptingTheShownSuggestionRecordsItAsAConfirmedLlmPrediction() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn     = ownedTxn(5L, "Paid to DECATHLON SPORTS", "Other");
+        Transaction similar = ownedTxn(6L, "paid to decathlon sports", "Other");
+        txn.applyPrediction(com.fintwin.util.Categorized.other());
+        similar.applyPrediction(com.fintwin.util.Categorized.other());
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+        when(repository.findByUser(user)).thenReturn(List.of(txn, similar));
+        when(categoryService.normalizeMerchant(anyString())).thenAnswer(
+                inv -> inv.getArgument(0, String.class).toLowerCase().trim());
+        when(suggestionService.shown("Paid to DECATHLON SPORTS")).thenReturn(Optional.of("Shopping"));
+
+        service.updateCategory(5L, "Shopping", true, true, "Shopping");
+
+        assertThat(txn.getCategorySource()).isEqualTo(com.fintwin.util.Categorized.LLM);
+        assertThat(txn.getPredictedCategory()).isEqualTo("Shopping");
+        assertThat(txn.getCategoryReview()).isEqualTo(com.fintwin.util.Categorized.CONFIRMED);
+        assertThat(similar.getCategorySource()).isEqualTo(com.fintwin.util.Categorized.LLM);
+        assertThat(similar.getCategoryReview()).isEqualTo(com.fintwin.util.Categorized.APPLIED);
+    }
+
+    @Test
+    void updateCategory_changingTheSuggestionIsACorrectionOfTheModel() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn = ownedTxn(5L, "Paid to Urban Company", "Other");
+        txn.applyPrediction(com.fintwin.util.Categorized.other());
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+        when(suggestionService.shown("Paid to Urban Company")).thenReturn(Optional.of("Groceries"));
+
+        service.updateCategory(5L, "Housing", false, true, "Groceries");
+
+        assertThat(txn.getPredictedCategory()).isEqualTo("Groceries");
+        assertThat(txn.getCategoryReview()).isEqualTo(com.fintwin.util.Categorized.CORRECTED);
+    }
+
+    @Test
+    void updateCategory_ignoresASuggestionThatWasNeverShown() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction txn = ownedTxn(5L, "Paid to SARA ENTERPRISES", "Other");
+        txn.applyPrediction(com.fintwin.util.Categorized.other());
+        when(repository.findById(5L)).thenReturn(Optional.of(txn));
+        when(suggestionService.shown("Paid to SARA ENTERPRISES")).thenReturn(Optional.empty());
+
+        service.updateCategory(5L, "Groceries", false, true, "Groceries");
+
+        assertThat(txn.getCategorySource()).isEqualTo(com.fintwin.util.Categorized.NONE);
+        assertThat(txn.getPredictedCategory()).isEqualTo("Other");
     }
 
     @Test

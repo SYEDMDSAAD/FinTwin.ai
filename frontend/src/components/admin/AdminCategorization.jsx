@@ -20,6 +20,7 @@ const METHOD_LABELS = {
     FORCED: "Card bookkeeping",
     PROVIDED: "Category in the file",
     BANK_KEYWORD: "Bank-sync keyword",
+    LLM: "AI suggestion (qwen2.5:3b)",
     USER: "Chosen by the user",
     LEGACY: "Before tracking began",
     UNRECORDED: "Not recorded (older rows)",

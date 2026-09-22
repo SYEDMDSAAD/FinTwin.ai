@@ -121,7 +121,13 @@ public class TransactionController {
         return service.unsortedPayees(limit);
     }
 
-    @PatchMapping("/{id}/category")
+    /** The local model's category suggestions for the payees still in Other. */
+    @GetMapping("/unsorted-payees/suggestions")
+    public Map<String, Object> unsortedPayeeSuggestions(@RequestParam(defaultValue = "30") int limit) {
+        return service.unsortedPayeeSuggestions(limit);
+    }
+
+        @PatchMapping("/{id}/category")
     public ResponseEntity<Map<String, Object>> updateCategory(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body
@@ -132,8 +138,11 @@ public class TransactionController {
         // "remember" defaults to true — the learned rule is the whole point
         boolean remember = !Boolean.FALSE.equals(body.get("remember"));
 
+        // The model's suggestion the user was shown, when they acted on one
+        String suggested = body.get("suggested") instanceof String s ? s : null;
+
         return ResponseEntity.ok(
-                service.updateCategory(id, category, applyToSimilar, remember));
+                service.updateCategory(id, category, applyToSimilar, remember, suggested));
     }
 
     @PostMapping("/upload-screenshot")

@@ -59,7 +59,7 @@ describe("SortOther", () => {
       id: 12, category: "Shopping", applyToSimilar: true, merchant: "Paid to SARA ENTERPRISES",
     }));
     expect(onBulkChanged).not.toHaveBeenCalled();
-    expect(mock.history.get).toHaveLength(1);        // the list wasn't refetched
+    expect(mock.history.get.filter(r => r.url === "/transactions/unsorted-payees")).toHaveLength(1);   // the list wasn't refetched
     expect(screen.queryByText("SARA ENTERPRISES")).not.toBeInTheDocument();
     expect(screen.getByText("OTT commerce solutions")).toBeInTheDocument();   // panel stays open
     expect(JSON.parse(mock.history.patch[0].data)).toEqual({ category: "Shopping", applyToSimilar: true, remember: true });
@@ -83,5 +83,66 @@ describe("SortOther", () => {
     const { container } = render(<SortOther onBulkChanged={vi.fn()} />);
     await waitFor(() => expect(mock.history.get).toHaveLength(1));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  describe("suggestions", () => {
+    beforeEach(() => {
+      mock.onPost("/transactions/recategorize").reply(200, { updated: 0 });
+      mock.onGet("/transactions/unsorted-payees").reply(200, GROUPS);
+    });
+
+    it("are only asked for once the panel is opened", async () => {
+      mock.onGet("/transactions/unsorted-payees/suggestions").reply(200, { suggestions: {}, complete: true });
+      render(<SortOther />);
+      await screen.findByText(/still "Other"/);
+      expect(mock.history.get.some(r => r.url.endsWith("/suggestions"))).toBe(false);
+
+      openPanel();
+      await waitFor(() => expect(mock.history.get.some(r => r.url.endsWith("/suggestions"))).toBe(true));
+    });
+
+    it("accepting one sorts the payee and says it was the suggestion", async () => {
+      mock.onGet("/transactions/unsorted-payees/suggestions")
+          .reply(200, { suggestions: { "paid to ott commerce solutions": "Entertainment" }, complete: true });
+      mock.onPatch("/transactions/11/category").reply(200, {});
+      const onSorted = vi.fn();
+      render(<SortOther onSorted={onSorted} />);
+      await screen.findByText(/still "Other"/);
+      openPanel();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Accept Entertainment for OTT commerce solutions" }));
+
+      await waitFor(() => expect(onSorted).toHaveBeenCalled());
+      expect(JSON.parse(mock.history.patch[0].data)).toEqual({
+        category: "Entertainment", applyToSimilar: true, remember: true, suggested: "Entertainment",
+      });
+      // no suggestion for SARA: just the usual picker
+      expect(screen.queryByRole("button", { name: /Accept .* for SARA ENTERPRISES/ })).not.toBeInTheDocument();
+    });
+
+    it("choosing something else still tells the backend what was suggested", async () => {
+      mock.onGet("/transactions/unsorted-payees/suggestions")
+          .reply(200, { suggestions: { "paid to ott commerce solutions": "Entertainment" }, complete: true });
+      mock.onPatch("/transactions/11/category").reply(200, {});
+      render(<SortOther />);
+      await screen.findByText(/still "Other"/);
+      openPanel();
+      await screen.findByRole("button", { name: /Accept Entertainment/ });
+
+      fireEvent.change(screen.getByLabelText("Category for OTT commerce solutions"), { target: { value: "Shopping" } });
+
+      await waitFor(() => expect(mock.history.patch).toHaveLength(1));
+      expect(JSON.parse(mock.history.patch[0].data)).toMatchObject({ category: "Shopping", suggested: "Entertainment" });
+    });
+
+    it("the panel works as before when suggestions are unavailable", async () => {
+      mock.onGet("/transactions/unsorted-payees/suggestions").reply(503);
+      render(<SortOther />);
+      await screen.findByText(/still "Other"/);
+      openPanel();
+      await waitFor(() => expect(screen.queryByText(/Getting suggestions/)).not.toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Category for SARA ENTERPRISES")).toBeInTheDocument();
+    });
   });
 });

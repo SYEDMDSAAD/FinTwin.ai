@@ -19,7 +19,7 @@ _RETRY_DELAY = 2.0
 
 
 def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
-        num_ctx: int = 2048) -> str:
+        num_ctx: int = 2048, temperature: float = 0.3, json_mode: bool = False) -> str:
     """One-shot generation.
 
     `timeout` is the read budget in seconds and must be set below whatever
@@ -33,6 +33,8 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
     possible failure mode — so callers with long prompts must size it, not
     hope. The estimate below is chars/3, deliberately pessimistic for
     figure-dense text.
+
+    `json_mode` makes Ollama constrain the output to valid JSON.
     """
     if len(prompt) / 3 + max_tokens > num_ctx:
         logger.warning(
@@ -45,8 +47,10 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
         "prompt": prompt,
         "stream": False,
         "keep_alive": KEEP_ALIVE,
-        "options": {"num_ctx": num_ctx, "num_predict": max_tokens, "temperature": 0.3},
+        "options": {"num_ctx": num_ctx, "num_predict": max_tokens, "temperature": temperature},
     }
+    if json_mode:
+        payload["format"] = "json"
     last_exc: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:

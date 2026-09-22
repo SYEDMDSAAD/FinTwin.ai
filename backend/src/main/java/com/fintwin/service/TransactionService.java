@@ -54,6 +54,9 @@ public class TransactionService {
     private CategoryService categoryService;
 
     @Autowired
+    private CategorySuggestionService suggestionService;
+
+    @Autowired
     private ExpenseParserService parserService;
 
     @Autowired
@@ -642,6 +645,19 @@ public class TransactionService {
                 .toList();
     }
 
+    /**
+     * The local model's suggestion for each payee still in Other (the same
+     * payees {@link #unsortedPayees} lists), keyed by normalised merchant.
+     * Suggestions only: nothing is recategorised until the user accepts one.
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    public Map<String, Object> unsortedPayeeSuggestions(int limit) {
+        List<String> merchants = unsortedPayees(limit).stream()
+                .map(g -> (String) g.get("merchant")).toList();
+        CategorySuggestionService.Suggestions s = suggestionService.suggest(merchants);
+        return Map.of("suggestions", s.byMerchant(), "complete", s.complete());
+    }
+
     // =========================
     // UPDATE CATEGORY (manual recategorization)
     // Learns a per-user merchant→category rule so future transactions
@@ -663,6 +679,25 @@ public class TransactionService {
     @Transactional
     public Map<String, Object> updateCategory(
             Long id, String category, boolean applyToSimilar, boolean remember) {
+        return updateCategory(id, category, applyToSimilar, remember, null);
+    }
+
+    /**
+     * {@code suggested}: the model's suggestion the user was shown for this
+     * payee, if any. When it matches what was actually shown, it becomes the
+     * prediction the user's choice is recorded against (source LLM) — so the
+     * model's accuracy can be measured like any rule's.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public Map<String, Object> updateCategory(
+            Long id, String category, boolean applyToSimilar, boolean remember, String suggested) {
 
         if (category == null || category.isBlank()) {
             throw new IllegalArgumentException("Category must not be empty");
@@ -680,6 +715,10 @@ public class TransactionService {
                         && t.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new NotFoundException("Transaction not found"));
 
+        String llm = suggested == null || suggested.isBlank() ? null
+                : suggestionService.shown(txn.getMerchant())
+                        .filter(s -> s.equalsIgnoreCase(suggested.trim())).orElse(null);
+        if (llm != null) markLlmPrediction(txn, llm);
         txn.recordReview(category, false);
         repository.save(txn);
 
@@ -697,6 +736,7 @@ public class TransactionService {
                     if (category.equals(t.getCategory())) continue;
                     if (categoryService.normalizeMerchant(t.getMerchant())
                             .equals(pattern)) {
+                        if (llm != null) markLlmPrediction(t, llm);
                         t.recordReview(category, true);
                         toUpdate.add(t);
                     }
@@ -712,6 +752,13 @@ public class TransactionService {
                 "transaction", com.fintwin.dto.TransactionDTO.from(txn),
                 "similarUpdated", similarUpdated
         );
+    }
+
+    /** The model's suggestion becomes the prediction for a row the rules left in Other. */
+    private static void markLlmPrediction(Transaction t, String suggestion) {
+        if (t.getCategoryReview() != null || !unsorted(t)) return;
+        t.setPredictedCategory(suggestion);
+        t.setCategorySource(com.fintwin.util.Categorized.LLM);
     }
 
     // =========================

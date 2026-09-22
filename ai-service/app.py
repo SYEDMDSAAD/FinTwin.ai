@@ -14,6 +14,7 @@ from report_routes import router as report_router
 from investments.routes import router as investment_router
 from spending_coach.routes import router as coach_router
 from statements.routes import router as statements_router
+from categories.routes import router as categories_router
 from market.routes import router as market_router
 
 _INTERNAL_KEY = os.environ.get("AI_INTERNAL_KEY", "")
@@ -87,3 +88,4 @@ app.include_router(investment_router)
 app.include_router(coach_router)
 app.include_router(statements_router, tags=["Statements"])
 app.include_router(market_router, tags=["Discover"])
+app.include_router(categories_router, tags=["Categories"])
