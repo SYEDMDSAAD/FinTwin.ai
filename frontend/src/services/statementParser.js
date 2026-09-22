@@ -136,19 +136,28 @@ export function guessMapping(headers) {
         || find(headers, /date/i, /value/i)
         || find(headers, /date/i);
     const merchant = find(headers, /narration|description|particulars|details|remarks|merchant|payee/i);
-    const debit = find(headers, /debit|withdrawal|\bdr\b/i);
-    const credit = find(headers, /credit|deposit|\bcr\b/i);
+    // "Credit/debit instrument" is the masked card a payment came from and
+    // "Transaction Type" says which way it went — neither holds money, and
+    // both used to be read as the debit and credit amount columns, which left
+    // nothing to import.
+    const NOT_MONEY = /instrument|account|\ba\/c\b|card|type|mode|method|status|remark|ref|\bid\b|utr|detail|description|narration|particular|name|bank/i;
+    const debitCol = find(headers, /debit|withdrawal|\bdr\b/i, NOT_MONEY);
+    const creditCol = find(headers, /credit|deposit|\bcr\b/i, NOT_MONEY);
+    // One column can't be both sides of the ledger
+    const separate = Boolean(debitCol && creditCol && debitCol !== creditCol);
+    const debit = separate ? debitCol : "";
+    const credit = separate ? creditCol : "";
     const balance = find(headers, /balance/i);
     const amount = find(headers, /amount/i, /balance/i);
     const category = find(headers, /category/i);
     // A column saying which way each amount went: PhonePe's "Type" (Credit /
     // Debit), "Dr/Cr", "Transaction Type". Only used with a single amount column.
-    const direction = debit && credit ? ""
+    const direction = separate ? ""
         : find(headers, /^(type|txn type|transaction type|dr\s*\/\s*cr|cr\s*\/\s*dr|debit\s*\/\s*credit|credit\s*\/\s*debit)$/i);
 
     return {
         mapping: { date, merchant, amount, debit, credit, balance, category, direction },
-        debitCreditMode: Boolean(debit && credit),
+        debitCreditMode: separate,
     };
 }
 

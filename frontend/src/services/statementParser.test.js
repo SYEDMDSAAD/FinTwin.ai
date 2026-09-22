@@ -99,10 +99,57 @@ describe("guessMapping", () => {
             .toBe("Transaction Date");
     });
 
+    // A PhonePe app export: one Amount column, the direction in its own
+    // column, and a masked card column whose name contains both "credit" and
+    // "debit" — which used to be read as both amount columns, so nothing imported
+    it("reads a PhonePe export and ignores the card column", () => {
+        const headers = ["Date", "Time", "Transaction Details", "Transaction ID", "UTR",
+                         "Transaction Type", "Credit/debit instrument", "Amount"];
+        const { mapping, debitCreditMode } = guessMapping(headers);
+
+        expect(debitCreditMode).toBe(false);
+        expect(mapping).toMatchObject({
+            date: "Date", merchant: "Transaction Details",
+            amount: "Amount", direction: "Transaction Type", debit: "", credit: "",
+        });
+    });
+
+    it("never reads one column as both debit and credit", () => {
+        const { mapping, debitCreditMode } = guessMapping(["Date", "Details", "Debit/Credit", "Amount"]);
+        expect(debitCreditMode).toBe(false);
+        expect(mapping.debit).toBe("");
+        expect(mapping.credit).toBe("");
+    });
+
     it("maps a single amount column and never uses balance as the amount", () => {
         const { mapping, debitCreditMode } = guessMapping(["Date", "Narration", "Balance Amount", "Amount"]);
         expect(debitCreditMode).toBe(false);
         expect(mapping.amount).toBe("Amount");
+    });
+});
+
+describe("a PhonePe statement end to end", () => {
+    const PHONEPE = [
+        "Transaction Statement for +910000000000",
+        "Duration,26 Mar 2026 - 22 Sep 2026",
+        "",
+        "Date,Time,Transaction Details,Transaction ID,UTR,Transaction Type,Credit/debit instrument,Amount",
+        "2026-03-26,\t22:53,Received from A Friend,T26032622535583,605941438936,Credit,XXXXXX7677,1001.00",
+        "2026-03-27,\t14:26,Paid to Apple Services,HDFDF120FD8998,102985243032,Debit,XXXXXX7677,99.00",
+        "2026-03-28,\t09:02,Paid to SHOP NAME,T28032609025512,102985243999,Debit,XXXXXX7677,\"1,180.00\"",
+    ].join("\r\n");
+
+    it("imports every row with the right sign", () => {
+        const parsed = parseStatement(PHONEPE);
+        const { mapping, debitCreditMode } = guessMapping(parsed.headers);
+        const built = buildImportRows(parsed.rows, mapping, { debitCreditMode, flipSign: false });
+
+        expect(built.skipped).toBe(0);
+        expect(built.rows).toEqual([
+            { date: "2026-03-26", merchant: "Received from A Friend", amount: 1001 },
+            { date: "2026-03-27", merchant: "Paid to Apple Services", amount: -99 },
+            { date: "2026-03-28", merchant: "Paid to SHOP NAME", amount: -1180 },
+        ]);
     });
 });
 
