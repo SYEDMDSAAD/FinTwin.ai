@@ -59,6 +59,9 @@ export default function ImportsPage({ onImported, compact = false }) {
   const [debitCreditMode, setDebitCreditMode] = useState(false);
   const [flipSign, setFlipSign] = useState(false);
   const [mapping, setMapping] = useState(EMPTY_MAPPING);
+  // The page's own guess and where the file came from — reported after an
+  // import so formats that need fixing by hand show up for the team
+  const [detected, setDetected] = useState(null);
   const [built, setBuilt] = useState({ rows: [], skipped: 0 });
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
@@ -70,7 +73,7 @@ export default function ImportsPage({ onImported, compact = false }) {
   const [passwordError, setPasswordError] = useState("");
   const fileRef = useRef();
 
-  const startMapping = (parsed, name) => {
+  const startMapping = (parsed, name, source = null) => {
     if (parsed.rows.length === 0) {
       toast.error("No transactions found in this file");
       return;
@@ -81,6 +84,11 @@ export default function ImportsPage({ onImported, compact = false }) {
     setCsvData(parsed);
     setMapping({ ...EMPTY_MAPPING, ...guess.mapping });
     setDebitCreditMode(guess.debitCreditMode);
+    setDetected({
+      mapping: { ...EMPTY_MAPPING, ...guess.mapping, debitCreditMode: !!guess.debitCreditMode, flipSign: false },
+      fileType: (name.split(".").pop() || "").toLowerCase(),
+      format: source,
+    });
     setStep(1);
   };
 
@@ -94,7 +102,7 @@ export default function ImportsPage({ onImported, compact = false }) {
       setLockedFile(null);
       setPassword("");
       setPasswordError("");
-      startMapping(parseGrid(res.data?.grid), file.name);
+      startMapping(parseGrid(res.data?.grid), file.name, res.data?.format || null);
     } catch (err) {
       const code = err?.response?.data?.code;
       const message = err?.response?.data?.error || "This file could not be read.";
@@ -152,6 +160,7 @@ export default function ImportsPage({ onImported, compact = false }) {
       const reconciled = res.data?.reconciled ?? 0;
       setResult({ imported, duplicates, reconciled, skipped: (res.data?.skipped ?? 0) + built.skipped });
       setCoverageKey(k => k + 1);
+      reportMapping(imported);
       toast.success(duplicates
         ? `Imported ${imported} transactions · ${duplicates} already imported earlier`
         : `Imported ${imported} transactions!`);
@@ -166,6 +175,22 @@ export default function ImportsPage({ onImported, compact = false }) {
     }
   };
 
+  // Header row + guessed vs used columns only; never transaction rows.
+  // Best effort: a failure here must not look like a failed import.
+  const reportMapping = (rows) => {
+    if (!detected || !csvData?.headers?.length) return;
+    const used = { ...mapping, debitCreditMode, flipSign };
+    const clean = (m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== "" && v != null));
+    API.post("/imports/mapping-feedback", {
+      headers: csvData.headers,
+      detected: clean(detected.mapping),
+      final: clean(used),
+      fileType: detected.fileType,
+      detectedFormat: detected.format,
+      rows,
+    }).catch(() => {});
+  };
+
   const reset = () => {
     setStep(0);
     setCsvData(null);
@@ -175,6 +200,7 @@ export default function ImportsPage({ onImported, compact = false }) {
     setDebitCreditMode(false);
     setFlipSign(false);
     setMapping(EMPTY_MAPPING);
+    setDetected(null);
     setBuilt({ rows: [], skipped: 0 });
     setResult(null);
     setLockedFile(null);

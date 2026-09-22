@@ -57,4 +57,26 @@ describe("AnomalyAlerts", () => {
     await waitFor(() => expect(screen.getByText("Not an anomaly").closest("button")).toBeEnabled());
     expect(screen.getByText("4x your usual Swiggy order")).toBeInTheDocument();
   });
+
+  it("\"Yes, that was odd\" records the alert's figures and keeps the card", async () => {
+    mock.onPost("/anomalies/confirm").reply(204);
+    render(<AnomalyAlerts anomalies={[{ ...A[0], avgAmount: 300, multiplier: 4 }]} />);
+
+    fireEvent.click(screen.getByText("Yes, that was odd"));
+
+    expect(await screen.findByText("You marked this as unusual")).toBeInTheDocument();
+    expect(screen.getByText("4x your usual Swiggy order")).toBeInTheDocument();
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({
+      type: "merchant_spike", merchant: "SWIGGY", category: "Food",
+      amount: 1200, avgAmount: 300, multiplier: 4, severity: "high",
+    });
+  });
+
+  it("dismissing sends the same figures", async () => {
+    mock.onPost("/anomalies/dismiss").reply(204);
+    render(<AnomalyAlerts anomalies={[A[1]]} />);
+    fireEvent.click(screen.getByText("Not an anomaly"));
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(JSON.parse(mock.history.post[0].data)).toMatchObject({ type: "large_transaction", amount: 9000, severity: "medium" });
+  });
 });

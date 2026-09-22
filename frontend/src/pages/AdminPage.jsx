@@ -15,6 +15,9 @@ import AdminIpos from "../components/admin/AdminIpos";
 import AdminFeedback from "../components/admin/AdminFeedback";
 import AdminCategorization from "../components/admin/AdminCategorization";
 import AdminCopilotFeedback from "../components/admin/AdminCopilotFeedback";
+import AdminAnomalyFeedback from "../components/admin/AdminAnomalyFeedback";
+import AdminImportFormats from "../components/admin/AdminImportFormats";
+import AdminTrainingExport from "../components/admin/AdminTrainingExport";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1585,7 +1588,7 @@ export default function AdminPage() {
             {tab === "security"   && <SecuritySection/>}
             {tab === "tickets"    && <TicketsSection/>}
             {tab === "feedback"   && <AdminFeedback/>}
-            {tab === "categories" && <><AdminCopilotFeedback/><AdminCategorization/></>}
+            {tab === "categories" && <><AdminCopilotFeedback/><AdminAnomalyFeedback/><AdminImportFormats/><AdminCategorization/><div style={{ height: 28 }}/><AdminTrainingExport/></>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

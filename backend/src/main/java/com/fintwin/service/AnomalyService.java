@@ -7,6 +7,8 @@ import com.fintwin.model.DismissedAnomalyPattern;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.DismissedAnomalyRepository;
+import com.fintwin.repository.AnomalyFeedbackRepository;
+import com.fintwin.model.AnomalyFeedback;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
@@ -23,13 +25,93 @@ public class AnomalyService {
     private final TransactionRepository      transactionRepository;
     private final UserRepository             userRepository;
     private final DismissedAnomalyRepository dismissedRepository;
+    private final AnomalyFeedbackRepository  feedbackRepository;
 
     public AnomalyService(TransactionRepository transactionRepository,
                           UserRepository userRepository,
-                          DismissedAnomalyRepository dismissedRepository) {
+                          DismissedAnomalyRepository dismissedRepository,
+                          AnomalyFeedbackRepository feedbackRepository) {
         this.transactionRepository = transactionRepository;
         this.userRepository        = userRepository;
         this.dismissedRepository   = dismissedRepository;
+        this.feedbackRepository    = feedbackRepository;
+    }
+
+    /** "Yes, that was odd": the alert was right. Recorded only — the alert isn't suppressed. */
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    public void confirmAnomaly(DismissAnomalyRequest req) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail()).orElseThrow();
+        recordVerdict(user, req, AnomalyFeedback.CONFIRMED);
+    }
+
+    /**
+     * The user's verdict on one alert, with the figures that raised it — so
+     * false alarms can be counted per kind of alert and, with consent, used
+     * to tune the thresholds. The latest verdict on the same alert wins.
+     */
+    private void recordVerdict(User user, DismissAnomalyRequest req, String verdict) {
+        String key = patternKey(user.getId(), req.getType(), req.getMerchant(), req.getAmount());
+        AnomalyFeedback f = feedbackRepository.findByUserAndPatternKey(user, key).orElseGet(AnomalyFeedback::new);
+        f.setUser(user);
+        f.setPatternKey(key);
+        f.setVerdict(verdict);
+        f.setAnomalyType(trim(req.getType(), 40));
+        f.setMerchant(req.getMerchant());
+        f.setCategory(trim(req.getCategory(), 100));
+        f.setAmount(req.getAmount() == null ? null : java.math.BigDecimal.valueOf(req.getAmount()));
+        f.setAvgAmount(req.getAvgAmount() == null ? null : java.math.BigDecimal.valueOf(req.getAvgAmount()));
+        f.setMultiplier(req.getMultiplier());
+        f.setSeverity(trim(req.getSeverity(), 10));
+        f.setCreatedAt(java.time.LocalDateTime.now());
+        feedbackRepository.save(f);
+    }
+
+    static String patternKey(Long userId, String type, String merchant, Double amount) {
+        String raw = userId + "|" + (type == null ? "" : type) + "|"
+                + (merchant == null ? "" : merchant.trim().toLowerCase()) + "|"
+                + (amount == null ? "" : Math.round(amount * 100));
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(h);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String trim(String s, int max) {
+        return s == null ? null : s.length() > max ? s.substring(0, max) : s;
+    }
+
+    /** Admin: per kind of alert, how often users confirmed it versus called it a false alarm. */
+    public Map<String, Object> feedbackStats() {
+        return feedbackStats(feedbackRepository.countVerdicts());
+    }
+
+    static Map<String, Object> feedbackStats(List<Object[]> rows) {
+        Map<String, long[]> byType = new TreeMap<>();      // type → [confirmed, not anomaly]
+        long confirmed = 0, falseAlarms = 0;
+        for (Object[] r : rows) {
+            String type = r[0] == null ? "unknown" : (String) r[0];
+            long n = ((Number) r[3]).longValue();
+            long[] c = byType.computeIfAbsent(type, k -> new long[2]);
+            if (AnomalyFeedback.CONFIRMED.equals(r[2])) { c[0] += n; confirmed += n; }
+            else { c[1] += n; falseAlarms += n; }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("confirmed", confirmed);
+        out.put("falseAlarms", falseAlarms);
+        out.put("falseAlarmRate", confirmed + falseAlarms == 0 ? null
+                : Math.round(falseAlarms * 1000.0 / (confirmed + falseAlarms)) / 10.0);
+        out.put("byType", byType.entrySet().stream().map(e -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("type", e.getKey());
+            m.put("confirmed", e.getValue()[0]);
+            m.put("falseAlarms", e.getValue()[1]);
+            m.put("falseAlarmRate", Math.round(e.getValue()[1] * 1000.0 / (e.getValue()[0] + e.getValue()[1])) / 10.0);
+            return m;
+        }).toList());
+        return out;
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
@@ -38,6 +120,7 @@ public class AnomalyService {
         User user = userRepository.findByEmail(email).orElseThrow();
         String merchant = req.getMerchant() != null ? req.getMerchant() : "";
         String type     = req.getType()     != null ? req.getType()     : "";
+        recordVerdict(user, req, AnomalyFeedback.NOT_ANOMALY);
         if (dismissedRepository.existsByUserAndAnomalyTypeAndMerchant(user, type, merchant)) return;
         DismissedAnomalyPattern p = new DismissedAnomalyPattern();
         p.setUser(user);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import GlassCard from "./GlassCard";
-import { AlertTriangle, ShieldCheck, TrendingUp, Zap, BarChart2, Calendar, ThumbsDown } from "lucide-react";
+import { AlertTriangle, ShieldCheck, TrendingUp, Zap, BarChart2, Calendar, ThumbsDown, ThumbsUp, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
 
@@ -19,24 +19,43 @@ const TYPE_META = {
   burst:             { icon: <Calendar size={14} />,     label: "Spending Burst" },
 };
 
+// What the backend records with a verdict: the figures that raised the alert,
+// so false alarms can be measured per kind of alert.
+const verdictBody = (a) => ({
+  type: a.type, merchant: a.merchant, category: a.category,
+  amount: a.amount, avgAmount: a.avgAmount, multiplier: a.multiplier, severity: a.severity,
+});
+
 function AnomalyCard({ anomaly, onDismiss }) {
   const [dismissing, setDismissing] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const sev  = SEVERITY[anomaly.severity] || SEVERITY.low;
   const meta = TYPE_META[anomaly.type] || TYPE_META[anomaly.anomaly_type] || { icon: <AlertTriangle size={14} />, label: "Anomaly" };
 
   const handleDismiss = async () => {
     setDismissing(true);
     try {
-      await API.post("/anomalies/dismiss", {
-        type: anomaly.type,
-        merchant: anomaly.merchant,
-        category: anomaly.category,
-      });
+      await API.post("/anomalies/dismiss", verdictBody(anomaly));
       toast.success("Marked as not an anomaly");
       onDismiss(anomaly);
     } catch {
       toast.error("Failed to dismiss");
       setDismissing(false);
+    }
+  };
+
+  // "Yes, that was odd": the alert was right. It stays on screen.
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      await API.post("/anomalies/confirm", verdictBody(anomaly));
+      setConfirmed(true);
+      toast.success("Thanks — worth checking that charge");
+    } catch {
+      toast.error("Couldn't save that. Try again.");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -117,8 +136,28 @@ function AnomalyCard({ anomaly, onDismiss }) {
         </div>
       )}
 
-      {/* Dismiss button */}
-      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+      {/* Verdict buttons */}
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+        {confirmed ? (
+          <span role="status" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: sev.color }}>
+            <Check size={12} aria-hidden /> You marked this as unusual
+          </span>
+        ) : (
+          <button
+            onClick={handleConfirm}
+            disabled={confirming || dismissing}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "5px 12px", borderRadius: 8, cursor: "pointer",
+              background: sev.color + "14", border: `1px solid ${sev.color}40`,
+              color: sev.color, fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+              opacity: confirming ? 0.5 : 1,
+            }}
+          >
+            <ThumbsUp size={11} />
+            {confirming ? "Saving…" : "Yes, that was odd"}
+          </button>
+        )}
         <button
           onClick={handleDismiss}
           disabled={dismissing}

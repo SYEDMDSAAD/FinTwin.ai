@@ -64,12 +64,37 @@ describe("ImportsPage — statement import", () => {
     ]);
   });
 
+  it("after an import, reports the header row and the columns guessed versus used — no rows", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
+    mock.onPost("/imports/mapping-feedback").reply(200, { changed: false });
+    await uploadAndPreview();
+
+    fireEvent.click(screen.getByText("Import 2 Transactions"));
+    await screen.findByText("Import Complete!");
+
+    await waitFor(() => expect(mock.history.post.some(r => r.url === "/imports/mapping-feedback")).toBe(true));
+    const body = JSON.parse(mock.history.post.find(r => r.url === "/imports/mapping-feedback").data);
+    expect(body.headers).toEqual(["Txn Date", "Description", "Debit", "Credit", "Balance"]);
+    expect(body.detected).toEqual(body.final);          // the guess was used as-is
+    expect(body.final).toMatchObject({ date: "Txn Date", debit: "Debit", credit: "Credit", debitCreditMode: true });
+    expect(body).toMatchObject({ fileType: "csv", rows: 2 });
+    expect(JSON.stringify(body)).not.toContain("SWIGGY");
+  });
+
+  it("an import still succeeds if reporting the mapping fails", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2 });
+    mock.onPost("/imports/mapping-feedback").reply(500);
+    await uploadAndPreview();
+    fireEvent.click(screen.getByText("Import 2 Transactions"));
+    expect(await screen.findByText("Import Complete!")).toBeInTheDocument();
+  });
+
   it("marks card statements and reports rows that were already imported", async () => {
     mock.onPost("/transactions/batch").reply(200, { imported: 1, duplicates: 1, skipped: 0 });
     await uploadAndPreview({ card: true });
 
     fireEvent.click(screen.getByText("Import 2 Transactions"));
-    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    await waitFor(() => expect(mock.history.post.filter(r => r.url === "/transactions/batch")).toHaveLength(1));
     expect(mock.history.post[0].params).toEqual({ accountType: "CARD", account: "HDFC ··1234" });
     expect(await screen.findByText(/1 already imported earlier, skipped/)).toBeInTheDocument();
   });
@@ -107,7 +132,7 @@ describe("ImportsPage — accounts and alert emails", () => {
     fireEvent.click(screen.getByText(/Preview →/));
     fireEvent.click(await screen.findByText("Import 2 Transactions"));
 
-    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    await waitFor(() => expect(mock.history.post.filter(r => r.url === "/transactions/batch")).toHaveLength(1));
     expect(mock.history.post[0].params.account).toBe("HDFC Salary ··1234");
   });
 

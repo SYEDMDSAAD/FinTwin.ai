@@ -11,10 +11,19 @@ public class CategoryLabelController {
 
     private final CategoryLabelService service;
     private final com.fintwin.service.ChatService chatService;
+    private final com.fintwin.service.AnomalyService anomalyService;
 
-    public CategoryLabelController(CategoryLabelService service, com.fintwin.service.ChatService chatService) {
+    public CategoryLabelController(CategoryLabelService service, com.fintwin.service.ChatService chatService,
+                                   com.fintwin.service.AnomalyService anomalyService) {
         this.service = service;
         this.chatService = chatService;
+        this.anomalyService = anomalyService;
+    }
+
+    /** Admin: confirmed alerts versus false alarms, per kind of anomaly alert. */
+    @GetMapping("/api/v1/admin/anomalies/feedback-stats")
+    public Map<String, Object> anomalyFeedback() {
+        return anomalyService.feedbackStats();
     }
 
     /** Admin: how users rate copilot answers, by the path that produced them. */

@@ -24,7 +24,14 @@ public class AnomalyController {
         return anomalyService.detectAnomalies();
     }
 
-    @PostMapping("/dismiss")
+    /** "Yes, that was odd" — recorded as a confirmed alert; the alert stays. */
+    @PostMapping("/confirm")
+    public ResponseEntity<Void> confirm(@RequestBody DismissAnomalyRequest req) {
+        anomalyService.confirmAnomaly(req);
+        return ResponseEntity.noContent().build();
+    }
+
+        @PostMapping("/dismiss")
     public ResponseEntity<Void> dismiss(@RequestBody DismissAnomalyRequest req) {
         anomalyService.dismissAnomaly(req);
         return ResponseEntity.noContent().build();

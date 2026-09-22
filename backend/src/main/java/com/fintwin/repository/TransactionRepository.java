@@ -23,6 +23,11 @@ public interface TransactionRepository
 
     long countByUser(User user);
 
+    /** Transactions with a recorded categorisation, from users who opted in to training. */
+    @Query("SELECT t FROM Transaction t JOIN FETCH t.user u WHERE u.trainingConsentAt IS NOT NULL "
+         + "AND t.categorySource IS NOT NULL ORDER BY t.id")
+    List<Transaction> findConsentedLabelled();
+
     /**
      * Categorisation labels counted by channel, method (categorySource)
      * and what the user did (categoryReview), with whether the owner has opted

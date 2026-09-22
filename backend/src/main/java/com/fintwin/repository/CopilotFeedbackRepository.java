@@ -24,4 +24,7 @@ public interface CopilotFeedbackRepository extends JpaRepository<CopilotFeedback
     @Query("SELECT f FROM CopilotFeedback f WHERE f.rating < 0 AND f.user.trainingConsentAt IS NOT NULL "
          + "ORDER BY f.createdAt DESC")
     List<CopilotFeedback> findConsentedDownvotes(org.springframework.data.domain.Pageable page);
+
+    @Query("SELECT f FROM CopilotFeedback f JOIN FETCH f.user u WHERE u.trainingConsentAt IS NOT NULL ORDER BY f.id")
+    List<CopilotFeedback> findConsented();
 }

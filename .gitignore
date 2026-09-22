@@ -49,3 +49,4 @@ dist-ssr/
 *.deb
 *.rpm
 .pytest_cache/
+training-export-*/
