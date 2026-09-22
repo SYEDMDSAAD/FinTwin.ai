@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Sun, Moon } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+import { toLight } from "./landingLightCss";
 
 /* ─── Google Fonts ─────────────────────────────────────────────── */
 const GFONTS = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');`;
@@ -257,7 +260,15 @@ ${GFONTS}
 
 /* ── Focus visible ───────────────── */
 .land button:focus-visible, .land a:focus-visible { outline: 2px solid #a78bfa; outline-offset: 3px; border-radius: 8px; }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.12); color: rgba(226,232,240,0.85); cursor: pointer; transition: all 0.2s; }
+.theme-toggle:hover { border-color: rgba(167,139,250,0.45); color: #a78bfa; }
+.inset-panel { background: rgba(0,0,0,0.22); }
+.cta-bg { background: linear-gradient(180deg, #060810 0%, #0a0614 50%, #060810 100%); }
 `;
+
+// The same stylesheet for light mode, derived colour by colour (landingLightCss.js)
+const LIGHT_CSS = toLight(CSS);
+
 
 /* ─── Transaction data ─────────────────────────────────────────── */
 const TRANSACTIONS = [
@@ -443,6 +454,7 @@ function Reveal({ children, delay = 0, className = "" }) {
 ═══════════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isLoggedIn = !!localStorage.getItem("token");
@@ -464,15 +476,18 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="land">
-      <style>{CSS}</style>
+    <div className={`land${isDark ? "" : " light"}`}>
+      <style>{isDark ? CSS : LIGHT_CSS}</style>
 
       {/* ── Mobile menu ──────────────────────────────────────── */}
       <div className={`mob-menu${menuOpen ? " open" : ""}`} role="dialog" aria-label="Navigation menu">
         <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Features">Features</button>
         <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Security">Security</button>
         <button className="mob-link" onClick={() => scrollTo("pricing")} aria-label="Go to Pricing">Pricing</button>
-        <div style={{ width: "100%", height: 1, background: "rgba(255,255,255,0.08)", margin: "8px 0" }} />
+        <button className="theme-toggle" onClick={toggleTheme} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+          {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+        </button>
+        <div style={{ width: "100%", height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.1)", margin: "8px 0" }} />
         {isLoggedIn ? (
           <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/dashboard"); }}>Open Dashboard</button>
         ) : (
@@ -497,6 +512,9 @@ export default function LandingPage() {
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("pricing")}>Pricing</button>
           </div>
           <div className="lnav-right">
+            <button className="theme-toggle" onClick={toggleTheme} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"} title={isDark ? "Light mode" : "Dark mode"}>
+              {isDark ? <Sun size={17} aria-hidden /> : <Moon size={17} aria-hidden />}
+            </button>
             {isLoggedIn ? (
               <button className="btn-primary" onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">Open Dashboard</button>
             ) : (
@@ -805,7 +823,7 @@ export default function LandingPage() {
                 <div className="feat-card-desc">
                   EPF, mutual funds, FDs, gold, real estate — one net worth number updated daily. Linked via RBI AA for bank data, manual entry for the rest.
                 </div>
-                <div style={{ marginTop: 16, padding: 14, background: "rgba(0,0,0,0.25)", borderRadius: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="inset-panel" style={{ marginTop: 16, padding: 14, borderRadius: 12, display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "rgba(100,116,139,0.7)" }}>Total net worth</span>
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "#4ade80" }}>₹18.4L</span>
@@ -817,7 +835,7 @@ export default function LandingPage() {
                     { label: "Bank Balance",  val: "₹1.8L",  chg: "—",      c: "#a78bfa"  },
                   ].map(a => (
                     <div key={a.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "rgba(148,163,184,0.65)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "rgba(148,163,184,0.7)", display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: a.c, display: "inline-block" }} aria-hidden="true" />
                         {a.label}
                       </span>
@@ -839,7 +857,7 @@ export default function LandingPage() {
                 <div className="feat-card-desc">
                   Based on your history and scheduled payments, FinTwin projects your month-end balance before you get there — so you can act before it's too late.
                 </div>
-                <div style={{ marginTop: 16, padding: "14px 14px 6px", background: "rgba(0,0,0,0.2)", borderRadius: 12 }}>
+                <div className="inset-panel" style={{ marginTop: 16, padding: "14px 14px 6px", borderRadius: 12 }}>
                   <div style={{ fontSize: 11, color: "rgba(100,116,139,0.6)", marginBottom: 10, fontFamily: "'DM Mono', monospace" }}>June balance projection</div>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
                     {[
@@ -1038,7 +1056,7 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           FINAL CTA
       ════════════════════════════════════════════════════════ */}
-      <div className="cta-wrap" style={{ background: "linear-gradient(180deg, #060810 0%, #0a0614 50%, #060810 100%)", position: "relative", overflow: "hidden" }}>
+      <div className="cta-wrap cta-bg" style={{ position: "relative", overflow: "hidden" }}>
         <div className="glow-blob" style={{ width: 700, height: 700, background: "rgba(124,58,237,0.1)", top: "50%", left: "50%", transform: "translate(-50%,-50%)", animation: "none" }} aria-hidden="true" />
         <div className="cta-inner">
           <Reveal>
