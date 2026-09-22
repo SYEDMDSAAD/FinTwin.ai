@@ -3,6 +3,7 @@ import { Tags, ChevronDown, Sparkles, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
+import { normalizeMerchant as norm } from "../utils/merchant";
 
 // "Other" is where analysis goes to die: a budget, a trend or a recap can't
 // say anything about money it can't place. This panel first re-runs the
@@ -15,8 +16,7 @@ import { EDIT_CATEGORIES } from "../constants/categories";
 
 const CHOICES = EDIT_CATEGORIES.filter(c => c !== "Other");
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
-// Same normalisation as the backend's CategoryService.normalizeMerchant
-const norm = m => String(m || "").toLowerCase().trim().replace(/\s+/g, " ");
+
 
 /**
  * @param onSorted      ({ id, category, applyToSimilar, merchant }) — patch the

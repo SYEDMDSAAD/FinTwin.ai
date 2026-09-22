@@ -85,6 +85,30 @@ describe("SpendingHeatmap", () => {
         expect(mock.history.get.filter(r => r.url === "/transactions/category-totals")).toHaveLength(2);
     });
 
+    it("clears every payment to the same payee when one is fixed for all", async () => {
+        mock.onGet("/transactions/category-totals").reply(200, TOTALS);
+        mock.onGet("/transactions").reply(200, [
+            { id: 1, merchant: "Paid to ******6162", category: "People", date: "2024-10-30", amount: -22611 },
+            { id: 2, merchant: "Paid to  ******6162 ", category: "People", date: "2026-01-09", amount: -14984 },
+            { id: 3, merchant: "Paid to SWIGGY", category: "People", date: "2025-01-10", amount: -900 },
+        ]);
+        mock.onPatch("/transactions/1/category").reply(200, {});
+        const user = userEvent.setup();
+        render(<SpendingHeatmap />);
+
+        await user.click(await screen.findByRole("button", { name: /Food/ }));
+        await screen.findByText("3 transactions");
+
+        // "Also fix past transactions from the same payee" is on by default
+        const pickers = await screen.findAllByRole("button", { name: "People" });
+        await user.click(pickers.at(-3));
+        await user.click(await screen.findByText("Groceries"));
+
+        await screen.findByText("1 transaction");
+        expect(screen.queryAllByText(/6162/)).toHaveLength(0);     // both went with it
+        expect(screen.getByText("Paid to SWIGGY")).toBeInTheDocument();
+    });
+
     it("says so when the totals can't be loaded", async () => {
         mock.onGet("/transactions/category-totals").reply(500);
         render(<SpendingHeatmap />);

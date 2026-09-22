@@ -3,6 +3,7 @@ import { Hexagon, X, Check } from "lucide-react";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
 import CategoryDropdown from "./CategoryDropdown";
+import { normalizeMerchant } from "../utils/merchant";
 
 // Bank narrations look like "FT/DE/826585036398/Samiha R" — show the
 // payee part when present (same rule as the transactions table).
@@ -98,8 +99,11 @@ function SpendingHeatmap({ onCategoryChanged }) {
                 remember: true,
             });
             setCustomRow(null);
-            // The row just left this category, and the totals moved with it
-            setSelectedTxns(rows => rows.filter(r => r.id !== t.id));
+            // The row just left this category — and with "apply to similar",
+            // so did every other payment to the same payee
+            const payee = normalizeMerchant(t.merchant);
+            setSelectedTxns(rows => rows.filter(r => r.id !== t.id
+                && !(applySimilar && normalizeMerchant(r.merchant) === payee)));
             loadTotals();
             onCategoryChanged?.({
                 id: t.id,

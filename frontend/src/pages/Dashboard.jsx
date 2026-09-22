@@ -1,5 +1,6 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
 import { Brain, Sparkles } from "lucide-react";
+import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
@@ -335,14 +336,11 @@ function Dashboard() {
     // instead of refetching, so the table doesn't flash a loading skeleton.
     // =========================
 
-    const normMerchant = (m) =>
-        (m || "").toLowerCase().trim().replace(/\s+/g, " ");
-
     const handleCategoryChanged = ({ id, category, applyToSimilar, merchant }) => {
-        const pattern = normMerchant(merchant);
+        const pattern = normalizeMerchant(merchant);
         setTransactions(prev => prev.map(t => {
             if (t.id === id) return { ...t, category };
-            if (applyToSimilar && normMerchant(t.merchant) === pattern)
+            if (applyToSimilar && normalizeMerchant(t.merchant) === pattern)
                 return { ...t, category };
             return t;
         }));
