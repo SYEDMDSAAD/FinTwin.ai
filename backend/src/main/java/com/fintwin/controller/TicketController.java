@@ -39,6 +39,13 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.listAll(status));
     }
 
+    // ── Admin: beta feedback, grouped by user ─────────────────────────────────
+
+    @GetMapping("/api/v1/admin/feedback")
+    public ResponseEntity<?> feedback() {
+        return ResponseEntity.ok(ticketService.feedbackReport());
+    }
+
     // ── Admin: mark in-progress ───────────────────────────────────────────────
 
     @PutMapping("/api/v1/admin/tickets/{id}/in-progress")

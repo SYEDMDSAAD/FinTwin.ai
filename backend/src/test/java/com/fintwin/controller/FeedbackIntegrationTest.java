@@ -48,4 +48,25 @@ class FeedbackIntegrationTest extends AbstractIntegrationTest {
         assertThat(restTemplate.exchange(baseUrl() + "/api/v1/feedback", HttpMethod.POST,
                 json(authHeaders(token), Map.of("improve", "x")), String.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
+
+    @Test
+    void adminsSeeFeedbackGroupedByUserAndUsersCannot() {
+        String alice = seedUserAndGetToken("fb-alice@example.com", "Test@1234");
+        String admin = seedAdminAndGetToken("fb-admin@example.com", "Test@1234");
+        for (int rating : new int[]{3, 5})
+            restTemplate.exchange(baseUrl() + "/api/v1/feedback", HttpMethod.POST,
+                    json(authHeaders(alice), Map.of("rating", rating, "useful", List.of("Budgeting"), "broken", "Chart " + rating)), Map.class);
+
+        assertThat(restTemplate.exchange(baseUrl() + "/api/v1/admin/feedback", HttpMethod.GET,
+                json(authHeaders(alice), null), String.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        Map report = restTemplate.exchange(baseUrl() + "/api/v1/admin/feedback", HttpMethod.GET,
+                json(authHeaders(admin), null), Map.class).getBody();
+        Map row = ((List<Map>) report.get("users")).stream()
+                .filter(u -> "fb-alice@example.com".equals(u.get("email"))).findFirst().orElseThrow();
+        assertThat(row.get("count")).isEqualTo(2);
+        assertThat(row.get("latestRating")).isEqualTo(5);
+        List<Map> entries = (List<Map>) row.get("feedback");
+        assertThat(entries.get(0)).containsEntry("broken", "Chart 5").containsEntry("useful", List.of("Budgeting"));
+    }
 }
