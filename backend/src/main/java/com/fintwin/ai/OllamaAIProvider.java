@@ -51,6 +51,9 @@ public class OllamaAIProvider implements AIProvider {
         financialData.put("budgetAlerts",        summary.getBudgetAlerts());
         financialData.put("subscriptions",       summary.getSubscriptions());
         financialData.put("conversationHistory", summary.getConversationHistory());
+        // What the figures cover, so the answer can say so instead of implying "now"
+        financialData.put("dataFrom",    summary.getDataFrom());
+        financialData.put("dataThrough", summary.getDataThrough());
 
         Map<String, Object> body = new HashMap<>();
         body.put("message",       message);

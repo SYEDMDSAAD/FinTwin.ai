@@ -102,7 +102,7 @@ public class InternalAIController {
 
         int cappedLimit  = Math.min(Math.max(limit, 1), 25);
         int cappedMonths = Math.min(Math.max(months, 1), 12);
-        LocalDate cutoff = LocalDate.now().minusMonths(cappedMonths - 1).withDayOfMonth(1);
+        LocalDate cutoff = txnRepo.recentCutoff(userId, cappedMonths);
         String wantedCategory = category != null && !category.isBlank()
                 ? category.trim().toLowerCase() : null;
 

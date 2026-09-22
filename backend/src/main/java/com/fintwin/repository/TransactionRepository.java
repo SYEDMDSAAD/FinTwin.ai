@@ -64,8 +64,24 @@ public interface TransactionRepository
         return findLatestThreeMonthsTransactions(userId, cutoff);
     }
 
+    @Query("SELECT MAX(t.date) FROM Transaction t WHERE t.user.id = :userId")
+    java.time.LocalDate latestTransactionDate(@Param("userId") Long userId);
+
+    /**
+     * Where a "recent months" window starts for this user. Anchored on their
+     * newest transaction, not on today: a statement imported months after the
+     * fact ends in the past, and a window hung off today's date would be empty
+     * — every figure zero, and the copilot asking the user for numbers it
+     * already has. A user whose data reaches today is unaffected.
+     */
+    default java.time.LocalDate recentCutoff(Long userId, int months) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate latest = latestTransactionDate(userId);
+        java.time.LocalDate anchor = latest == null || latest.isAfter(today) ? today : latest;
+        return anchor.minusMonths(Math.max(1, months) - 1L).withDayOfMonth(1);
+    }
+
     default List<Transaction> findLatestThreeMonthsTransactions(Long userId) {
-        java.time.LocalDate cutoff = java.time.LocalDate.now().minusMonths(2).withDayOfMonth(1);
-        return findLatestThreeMonthsTransactions(userId, cutoff);
+        return findLatestThreeMonthsTransactions(userId, recentCutoff(userId, 3));
     }
 }

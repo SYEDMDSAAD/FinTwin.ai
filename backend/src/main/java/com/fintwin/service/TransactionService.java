@@ -193,8 +193,10 @@ public class TransactionService {
         if (months <= 0 || months > MAX_MONTHS) {
             rows = repository.findByUser(user);
         } else {
-            LocalDate cutoff = LocalDate.now().minusMonths(months - 1L).withDayOfMonth(1);
-            rows = repository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
+            // Anchored on the user's newest transaction: a statement imported
+            // late ends in the past, and "last 3 months" from today is empty
+            rows = repository.findLatestThreeMonthsTransactions(
+                    user.getId(), repository.recentCutoff(user.getId(), months));
         }
         if (category == null || category.isBlank()) return rows;
         String wanted = category.trim();

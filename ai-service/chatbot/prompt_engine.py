@@ -60,6 +60,20 @@ Budget Alerts: {budget_alerts if budget_alerts else 'None'}
 Recurring Subscriptions: {subscriptions if subscriptions else 'None'}"""
 
 
+def _period_line(data: dict[str, Any]) -> str:
+    """
+    What the figures cover. Statements are often imported months after the
+    fact, so "this month" for the app can be months ago for the user — an
+    answer that doesn't say so reads as today's position.
+    """
+    through = data.get("dataThrough")
+    if not through:
+        return "\n(No transactions recorded yet.)"
+    return (f"\nFigures below cover {data.get('dataFrom') or '?'} to {through} — "
+            f"the newest transactions on record. Say the period when it matters; "
+            f"never present it as today's position.")
+
+
 def build_base_context(data: dict[str, Any]) -> str:
     """
     Compact snapshot for the tool-calling copilot. Only headline figures —
@@ -67,7 +81,7 @@ def build_base_context(data: dict[str, Any]) -> str:
     through tools, never pre-attached.
     """
     cat_lines = format_category_lines(data.get("categorySpending", {}))
-    return f"""User Financial Snapshot:
+    return f"""User Financial Snapshot:{_period_line(data)}
 Monthly Income (avg):   ₹{data.get('income', 0):,}
 Monthly Expenses (avg): ₹{data.get('expenses', 0):,}
 Monthly Savings (avg):  ₹{data.get('savings', 0):,}

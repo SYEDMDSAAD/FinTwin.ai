@@ -23,6 +23,9 @@ public class FinancialSummaryDTO {
     private List<String> budgetAlerts;
     private List<String> subscriptions;
     private List<Map<String, String>> conversationHistory;
+    // The period these figures actually cover — a statement imported late ends in the past
+    private String dataFrom;
+    private String dataThrough;
 
     private FinancialSummaryDTO() {}
 
@@ -46,10 +49,14 @@ public class FinancialSummaryDTO {
         public Builder budgetAlerts(List<String> v)                 { dto.budgetAlerts = v;          return this; }
         public Builder subscriptions(List<String> v)                { dto.subscriptions = v;         return this; }
         public Builder conversationHistory(List<Map<String,String>> v) { dto.conversationHistory = v; return this; }
+        public Builder dataFrom(String v)                           { dto.dataFrom = v;              return this; }
+        public Builder dataThrough(String v)                        { dto.dataThrough = v;           return this; }
 
         public FinancialSummaryDTO build() { return dto; }
     }
 
+    public String getDataFrom()                            { return dataFrom; }
+    public String getDataThrough()                         { return dataThrough; }
     public Long getUserId()                                { return userId; }
     public long getIncome()                                { return income; }
     public long getExpenses()                              { return expenses; }

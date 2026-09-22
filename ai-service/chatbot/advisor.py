@@ -9,7 +9,7 @@ import requests
 from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
-from chatbot import portfolio_answers
+from chatbot import affordability, portfolio_answers
 from utils.ollama_client import MODEL, ask, chat
 
 logger = logging.getLogger(__name__)
@@ -395,6 +395,14 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
     try:
         intent = classify_intent(message)
         trace["intent_class"] = intent
+
+        # "Can I afford X?" is answered from the user's own figures. A 3B model
+        # asks for income and expenses that are already in front of it.
+        if affordability.asks_about_affording(message):
+            answered = affordability.answer(message, financial_data)
+            if answered:
+                trace["path"] = "affordability_direct"
+                return answered
 
         if financial_data.get("userId") is not None:
             direct = _portfolio_direct(message, financial_data["userId"], trace)

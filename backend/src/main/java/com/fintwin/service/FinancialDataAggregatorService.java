@@ -32,9 +32,8 @@ public class FinancialDataAggregatorService {
     private ChatHistoryRepository chatHistoryRepository;
 
     public FinancialSummaryDTO aggregate(User user) {
-        LocalDate cutoff = LocalDate.now().minusMonths(2).withDayOfMonth(1);
         List<Transaction> transactions =
-                transactionRepository.findLatestThreeMonthsTransactions(user.getId(), cutoff);
+                transactionRepository.findLatestThreeMonthsTransactions(user.getId());
 
         // Monthly averages over the months actually present — the ai-service
         // labels these "Monthly Income/Expenses/Savings" in its prompts, so
@@ -91,6 +90,10 @@ public class FinancialDataAggregatorService {
                 .merchantSpending(merchantSpending)
                 .budgetAlerts(computeBudgetAlerts(user))
                 .subscriptions(subscriptions)
+                .dataFrom(transactions.stream().map(Transaction::getDate).filter(java.util.Objects::nonNull)
+                        .min(java.time.LocalDate::compareTo).map(Object::toString).orElse(null))
+                .dataThrough(transactions.stream().map(Transaction::getDate).filter(java.util.Objects::nonNull)
+                        .max(java.time.LocalDate::compareTo).map(Object::toString).orElse(null))
                 .conversationHistory(recentHistory(user))
                 .build();
     }
