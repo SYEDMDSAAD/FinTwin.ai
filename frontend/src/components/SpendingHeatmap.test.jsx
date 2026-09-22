@@ -49,7 +49,7 @@ describe("SpendingHeatmap", () => {
         expect(screen.queryByText("Salary")).not.toBeInTheDocument();
     });
 
-    it("lists a category's transactions oldest first", async () => {
+    it("lists a category's transactions biggest first", async () => {
         mock.onGet("/transactions/category-totals").reply(200, TOTALS);
         mock.onGet("/transactions").reply(200, [
             { id: 1, merchant: "Paid to ZOMATO", category: "Food", date: "2026-03-02", amount: -300 },
@@ -63,7 +63,7 @@ describe("SpendingHeatmap", () => {
         await screen.findByText("3 transactions");
 
         const shown = screen.getAllByText(/^Paid to (ZOMATO|SWIGGY|CHAAYOS)$/).map(el => el.textContent);
-        expect(shown.slice(0, 3)).toEqual(["Paid to SWIGGY", "Paid to CHAAYOS", "Paid to ZOMATO"]);
+        expect(shown.slice(0, 3)).toEqual(["Paid to SWIGGY", "Paid to ZOMATO", "Paid to CHAAYOS"]);   // 420, 300, 150
     });
 
     it("re-adds the totals after a category is corrected", async () => {

@@ -1,7 +1,9 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { ChevronLeft, ChevronRight, SlidersHorizontal, RotateCcw, BarChart3 } from "lucide-react";
 import SpendingHeatmap from "../components/SpendingHeatmap";
 import RecurringExpenses from "../components/RecurringExpenses";
+import API from "../services/api";
+import { monthsNeeded } from "./analyticsRange";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, LabelList,
@@ -24,7 +26,8 @@ const CATEGORIES = [
 
 const RECORD_TYPES = ["All", "Income", "Expense", "Transfer"];
 const RECORD_STATES = ["All", "Cleared", "Pending"];
-const PERIOD_OPTIONS = ["This month", "Last month", "This year", "Custom"];
+const PERIOD_OPTIONS = ["This month", "Last month", "This year", "Last 12 months", "All time", "Custom"];
+
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -45,6 +48,10 @@ function filterTransactions(transactions, filters, period, customStart, customEn
   } else if (period === "This year") {
     startDate = new Date(now.getFullYear(), 0, 1);
     endDate   = new Date(now.getFullYear(), 11, 31);
+  } else if (period === "Last 12 months") {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  } else if (period === "All time") {
+    startDate = null;                       // everything the user has imported
   } else if (period === "Custom" && customStart && customEnd) {
     startDate = new Date(customStart);
     endDate   = new Date(customEnd);
@@ -412,8 +419,33 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
 
   const now = new Date();
 
-  const currentTxns = useMemo(() => filterTransactions(transactions, filters, period, customStart, customEnd), [transactions, filters, period, customStart, customEnd]);
-  const previousTxns = useMemo(() => prevPeriodTransactions(transactions, period), [transactions, period]);
+  // The page loads the history its period needs, and keeps it: switching from
+  // "All time" back to "This month" doesn't fetch again.
+  const [rows, setRows] = useState(transactions);
+  const [loadedMonths, setLoadedMonths] = useState(null);   // null = only what the dashboard passed
+  const need = monthsNeeded(period, customStart);
+  // Derived, not state: it is true exactly while what's loaded is short of
+  // what the period needs
+  const loadingRange = loadedMonths !== 0 && (loadedMonths === null || need === 0 || need > loadedMonths);
+
+  const loadRange = useCallback((months) => {
+    API.get("/transactions", { params: { months } })
+      .then(r => {
+        setRows(Array.isArray(r.data) ? r.data : []);
+        setLoadedMonths(months);
+      })
+      .catch(() => setLoadedMonths(months));   // keep the dashboard's months on screen
+  }, []);
+
+  useEffect(() => {
+    if (loadingRange) loadRange(need);
+  }, [need, loadingRange, loadRange]);
+
+  // Until the first fetch lands, show what the dashboard already had
+  const source = loadedMonths === null ? transactions : rows;
+
+  const currentTxns = useMemo(() => filterTransactions(source, filters, period, customStart, customEnd), [source, filters, period, customStart, customEnd]);
+  const previousTxns = useMemo(() => prevPeriodTransactions(source, period), [source, period]);
 
   const periodLabel = (() => {
     if (period === "This month") return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
@@ -512,7 +544,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
               </div>
             )}
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
-              {currentTxns.length} transactions
+              {loadingRange ? "loading…" : `${currentTxns.length} transactions`}
             </span>
           </div>
 
@@ -553,7 +585,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
               />
             )}
             {activeTab === "Balance Trend"  && <BalanceTrendTab transactions={currentTxns} />}
-            {activeTab === "Cash Flow"      && <CashFlowTab transactions={transactions} />}
+            {activeTab === "Cash Flow"      && <CashFlowTab transactions={source} />}
           </div>
 
           {/* Spending Heatmap */}
