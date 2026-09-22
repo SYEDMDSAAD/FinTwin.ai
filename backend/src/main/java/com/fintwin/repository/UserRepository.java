@@ -20,6 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     }
 
     long countByEnabledTrue();
+    long countByTrainingConsentAtIsNotNull();
     long countByCreatedAtAfter(LocalDateTime date);
     long countByTwoFactorEnabledTrue();
     long countByOnboardingCompletedTrue();

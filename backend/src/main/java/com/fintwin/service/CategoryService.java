@@ -3,6 +3,7 @@ package com.fintwin.service;
 import com.fintwin.model.User;
 import com.fintwin.model.UserMerchantCategory;
 import com.fintwin.repository.UserMerchantCategoryRepository;
+import com.fintwin.util.Categorized;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,30 +36,35 @@ public String categorize(String merchant) {
  * hit the DB once, not once per row.
  */
 public String categorize(String merchant, Map<String, String> learnedRules) {
+    return classify(merchant, learnedRules).category();
+}
+
+/** The category and which rule chose it; "Other"/NONE when nothing did. */
+public Categorized classify(String merchant, Map<String, String> learnedRules) {
 
     if (merchant == null) {
-        return "Other";
+        return Categorized.other();
     }
 
     String value = normalizeMerchant(merchant);
 
     if (learnedRules != null && !learnedRules.isEmpty()) {
         String exact = learnedRules.get(value);
-        if (exact != null) return exact;
+        if (exact != null) return new Categorized(exact, Categorized.LEARNED);
 
         for (Map.Entry<String, String> rule : learnedRules.entrySet()) {
             if (value.contains(rule.getKey())) {
-                return rule.getValue();
+                return new Categorized(rule.getValue(), Categorized.LEARNED);
             }
         }
     }
 
     for (String marker : SELF_TRANSFER) {
-        if (value.contains(marker)) return "Transfer";
+        if (value.contains(marker)) return new Categorized("Transfer", Categorized.SELF_TRANSFER);
     }
 
     // Brands, shop-type words, and payments to people
-    return com.fintwin.util.MerchantCategorizer.categorize(merchant).orElse("Other");
+    return com.fintwin.util.MerchantCategorizer.classify(merchant).orElse(Categorized.other());
 }
 
 

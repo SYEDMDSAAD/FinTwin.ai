@@ -226,6 +226,7 @@ public class OnboardingService {
         t.setMerchant(merchant);
         t.setAmount(amount);
         t.setCategory(category);
+        t.setCategorySource(com.fintwin.util.Categorized.SEED);
         t.setSource("SEED");
         return t;
     }

@@ -23,6 +23,23 @@ public interface TransactionRepository
 
     long countByUser(User user);
 
+    /**
+     * Categorisation labels counted by channel, method (categorySource)
+     * and what the user did (categoryReview), with whether the owner has opted
+     * in to training. Rows: [channel, categorySource, categoryReview, consented, count].
+     */
+    // Channel "AA" = the Account Aggregator: bank rows, and card rows whose
+    // external id is a Setu txnId ("CARD:…"); card statements and alert
+    // emails share source CARD but carry STMT:/MAIL: ids.
+    @Query("SELECT CASE WHEN t.source = 'BANK' OR t.externalId LIKE 'CARD:%' THEN 'AA' ELSE t.source END, "
+         + "t.categorySource, t.categoryReview, "
+         + "CASE WHEN t.user.trainingConsentAt IS NULL THEN false ELSE true END, COUNT(t) "
+         + "FROM Transaction t GROUP BY "
+         + "CASE WHEN t.source = 'BANK' OR t.externalId LIKE 'CARD:%' THEN 'AA' ELSE t.source END, "
+         + "t.categorySource, t.categoryReview, "
+         + "CASE WHEN t.user.trainingConsentAt IS NULL THEN false ELSE true END")
+    List<Object[]> countCategoryLabels();
+
     long countByUserAndSource(User user, String source);
 
     void deleteByUser(User user);

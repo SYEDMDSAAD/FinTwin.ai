@@ -298,18 +298,17 @@ public class InboundEmailService {
                 : alert.card() ? bank + " card " + (alert.amount() < 0 ? "spend" : "credit")
                 : describeChannel(alert);
         boolean cardDataPresent = alert.card() || transactions.countByUserAndSource(user, "CARD") > 0;
-        String category = TransactionMath.forcedImportCategory(merchant, alert.amount(), alert.card(), cardDataPresent);
-        if (category == null) {
-            category = categories.categorize(merchant, categories.learnedRulesFor(user));
-            if (category == null) category = "Other";
-        }
+        String forced = TransactionMath.forcedImportCategory(merchant, alert.amount(), alert.card(), cardDataPresent);
+        com.fintwin.util.Categorized category = forced != null
+                ? new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED)
+                : categories.classify(merchant, categories.learnedRulesFor(user));
 
         Transaction t = new Transaction();
         t.setUser(user);
         t.setDate(alert.date());
         t.setMerchant(merchant);
         t.setAmount(alert.amount());
-        t.setCategory(category);
+        t.applyPrediction(category);
         t.setSource(alert.card() ? "CARD" : SOURCE_EMAIL);
         t.setExternalId(externalId);
         t.setAccountRef(accountRef);

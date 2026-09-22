@@ -159,6 +159,11 @@ public final class MerchantCategorizer {
      * rule) can place.
      */
     public static Optional<String> categorize(String merchant) {
+        return classify(merchant).map(Categorized::category);
+    }
+
+    /** Like {@link #categorize}, and says which rule decided it. */
+    public static Optional<Categorized> classify(String merchant) {
         if (merchant == null || merchant.isBlank()) return Optional.empty();
         String payee = payeeOf(merchant);
         String lower = payee.toLowerCase(Locale.ROOT);
@@ -167,11 +172,11 @@ public final class MerchantCategorizer {
         String words = " " + NON_WORD.matcher(spaced).replaceAll(" ").trim() + " ";
 
         Optional<String> known = firstPhrase(words, BRANDS);
-        if (known.isPresent()) return known;
+        if (known.isPresent()) return Optional.of(new Categorized(known.get(), Categorized.BRAND));
         known = firstPhrase(words, SHOP_WORDS);
-        if (known.isPresent()) return known;
+        if (known.isPresent()) return Optional.of(new Categorized(known.get(), Categorized.SHOP_WORD));
 
-        if (looksLikePerson(payee, merchant)) return Optional.of(PEOPLE);
+        if (looksLikePerson(payee, merchant)) return Optional.of(new Categorized(PEOPLE, Categorized.PERSON));
         return Optional.empty();
     }
 

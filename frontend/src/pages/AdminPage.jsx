@@ -10,9 +10,10 @@ import {
   ChevronRight, X, AlertTriangle, CheckCircle, XCircle,
   ArrowUpRight, Clock, Cpu, Database,
   ShieldAlert, MessageSquare, Ban, Send, AlertOctagon,
-  Unlock, BarChart2, Zap, Server, Wifi, MessageCircle, Rocket, MessageSquareHeart } from "lucide-react";
+  Unlock, BarChart2, Zap, Server, Wifi, MessageCircle, Rocket, MessageSquareHeart, Tags } from "lucide-react";
 import AdminIpos from "../components/admin/AdminIpos";
 import AdminFeedback from "../components/admin/AdminFeedback";
+import AdminCategorization from "../components/admin/AdminCategorization";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -96,6 +97,7 @@ const NAV = [
   { id: "security",    label: "Security",         icon: ShieldAlert },
   { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
   { id: "feedback",    label: "Beta Feedback",    icon: MessageSquareHeart },
+  { id: "categories",  label: "Categorisation",   icon: Tags },
   { id: "ipos",        label: "IPO Catalog",      icon: Rocket },
 ];
 
@@ -1582,6 +1584,7 @@ export default function AdminPage() {
             {tab === "security"   && <SecuritySection/>}
             {tab === "tickets"    && <TicketsSection/>}
             {tab === "feedback"   && <AdminFeedback/>}
+            {tab === "categories" && <AdminCategorization/>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

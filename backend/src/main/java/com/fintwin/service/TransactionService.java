@@ -217,13 +217,10 @@ public class TransactionService {
             transaction.setAmount(-transaction.getAmount());
         }
 
-        String category = categoryService.categorize(
+        transaction.applyPrediction(categoryService.classify(
                 transaction.getMerchant(),
                 categoryService.learnedRulesFor(user)
-        );
-        transaction.setCategory(
-                category != null ? category : "Other"
-        );
+        ));
 
         transaction.setUser(user);
 
@@ -280,7 +277,7 @@ public class TransactionService {
         Transaction transaction = parserService.parseExpense(text);
 
         transaction.setAmount(Math.abs(transaction.getAmount()));
-        transaction.setCategory("Income");
+        transaction.applyUserCategory("Income");
         transaction.setUser(user);
 
         Transaction saved = repository.save(transaction);
@@ -310,7 +307,8 @@ public class TransactionService {
         t.setDate(txDate != null ? txDate : LocalDate.now());
         t.setMerchant(merchant != null ? merchant : "Unknown");
         t.setAmount(amount != null ? amount : 0.0);
-        t.setCategory(category != null && !category.isBlank() ? category : "Other");
+        if (category != null && !category.isBlank()) t.applyUserCategory(category);
+        else t.applyPrediction(com.fintwin.util.Categorized.other());
         t.setSource("MANUAL");
         t.setUser(user);
 
@@ -470,7 +468,7 @@ public class TransactionService {
                 t.setDate(date);
                 t.setMerchant(merchant);
                 t.setAmount(amount);
-                t.setCategory(importCategory(row.get("category"), merchant, amount,
+                t.applyPrediction(importCategory(row.get("category"), merchant, amount,
                                              isCard, cardDataPresent, learnedRules));
                 t.setSource(isCard ? ACCOUNT_CARD : "STATEMENT");
                 t.setExternalId(externalId);
@@ -541,19 +539,18 @@ public class TransactionService {
      * Category for an imported row. Mirrors the AA ingest rules so a statement
      * and a bank sync of the same money land in the same place.
      */
-    private String importCategory(Object provided, String narration, double amount,
+    private com.fintwin.util.Categorized importCategory(Object provided, String narration, double amount,
                                   boolean isCard, boolean cardDataPresent,
                                   Map<String, String> learnedRules) {
         String forced = TransactionMath.forcedImportCategory(narration, amount, isCard, cardDataPresent);
-        if (forced != null) return forced;
+        if (forced != null) return new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED);
 
         if (provided != null
                 && !PLACEHOLDER_CATEGORIES.contains(provided.toString().trim().toLowerCase())) {
-            return provided.toString().trim();
+            return new com.fintwin.util.Categorized(provided.toString().trim(), com.fintwin.util.Categorized.PROVIDED);
         }
 
-        String derived = categoryService.categorize(narration, learnedRules);
-        return derived != null ? derived : "Other";
+        return categoryService.classify(narration, learnedRules);
     }
 
     // =========================
@@ -590,12 +587,15 @@ public class TransactionService {
         int remaining = 0;
 
         for (Transaction t : repository.findByUser(user)) {
-            if (!unsorted(t) || t.getAmount() == null) continue;
-            String category = TransactionMath.forcedImportCategory(
+            // A row the user put in Other themselves stays there
+            if (!unsorted(t) || t.getAmount() == null || t.getCategoryReview() != null) continue;
+            String forced = TransactionMath.forcedImportCategory(
                     t.getMerchant(), t.getAmount(), ACCOUNT_CARD.equals(t.getSource()), cardData);
-            if (category == null) category = categoryService.categorize(t.getMerchant(), learned);
-            if (category != null && !UNSORTED.contains(category.toLowerCase())) {
-                t.setCategory(category);
+            com.fintwin.util.Categorized c = forced != null
+                    ? new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED)
+                    : categoryService.classify(t.getMerchant(), learned);
+            if (!UNSORTED.contains(c.category().toLowerCase())) {
+                t.applyPrediction(c);
                 changed.add(t);
             } else {
                 remaining++;
@@ -680,7 +680,7 @@ public class TransactionService {
                         && t.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new NotFoundException("Transaction not found"));
 
-        txn.setCategory(category);
+        txn.recordReview(category, false);
         repository.save(txn);
 
         if (remember) {
@@ -697,7 +697,7 @@ public class TransactionService {
                     if (category.equals(t.getCategory())) continue;
                     if (categoryService.normalizeMerchant(t.getMerchant())
                             .equals(pattern)) {
-                        t.setCategory(category);
+                        t.recordReview(category, true);
                         toUpdate.add(t);
                     }
                 }
@@ -801,11 +801,8 @@ public class TransactionService {
             transaction.setAmount(-amount);
             transaction.setDate(java.time.LocalDate.now());
 
-            String category = categoryService.categorize(
-                    merchant, categoryService.learnedRulesFor(user));
-            transaction.setCategory(
-                    category != null ? category : "Other"
-            );
+            transaction.applyPrediction(categoryService.classify(
+                    merchant, categoryService.learnedRulesFor(user)));
 
             transaction.setUser(user);
 

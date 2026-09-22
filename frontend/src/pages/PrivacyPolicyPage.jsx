@@ -16,31 +16,35 @@ const sections = [
     body: "We use your data solely to provide FinTwin AI features: generating insights, budgets, anomaly detection, and AI recommendations. We do not sell your data to third parties or use it for advertising.",
   },
   {
-    title: "4. Data Security",
+    title: "4. Improving Categorisation (optional)",
+    body: "To measure how well FinTwin sorts your transactions, we record which method chose each category and whether you later changed or kept it. This stays in your account like the rest of your data. Only if you opt in (Settings → Account → Data & privacy) may your anonymised transaction descriptions — with people's names, phone numbers and UPI IDs removed — and the categories you chose be used to train FinTwin's categorisation. It is off unless you turn it on. You can turn it off at any time, and from then on your data is left out of any new training. We never sell this data or share it with third parties.",
+  },
+  {
+    title: "5. Data Security",
     body: "All sensitive fields (emails, financial amounts, notes) are encrypted at rest using AES-256 GCM encryption. Passwords are hashed with BCrypt. Data is transmitted over TLS 1.2+. We maintain audit logs for all sensitive operations as required by PCI-DSS.",
   },
   {
-    title: "5. Data Retention",
+    title: "6. Data Retention",
     body: "Your data is retained for as long as your account is active. You may request deletion at any time from Settings → Account → Delete Account. Upon deletion, your data is permanently removed within 30 days.",
   },
   {
-    title: "6. Your Rights",
+    title: "7. Your Rights",
     body: "You have the right to access, correct, export, or delete your personal data. To exercise these rights, use the in-app settings or contact us at support@fintwin.ai.",
   },
   {
-    title: "7. Account Aggregator",
+    title: "8. Account Aggregator",
     body: "Bank data is fetched via the RBI's Account Aggregator framework operated by Setu. FinTwin AI acts as a Financial Information User (FIU). You can revoke consent anytime from Settings → Connections.",
   },
   {
-    title: "8. Cookies",
+    title: "9. Cookies",
     body: "We use minimal essential cookies for authentication (JWT tokens). We do not use tracking or advertising cookies.",
   },
   {
-    title: "9. Changes to This Policy",
+    title: "10. Changes to This Policy",
     body: "We may update this policy from time to time. We will notify you of significant changes via email or in-app notification.",
   },
   {
-    title: "10. Contact",
+    title: "11. Contact",
     body: "For privacy questions or requests, contact us at support@fintwin.ai.",
   },
 ];

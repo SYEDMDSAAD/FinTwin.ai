@@ -104,7 +104,13 @@ public final class TransactionMath {
                 .filter(t -> t.getAmount() != null && t.getAmount() < 0)
                 .filter(t -> !isCardBillPayment(t))
                 .filter(t -> matchesCardPayment(t.getMerchant()))
-                .peek(t -> t.setCategory(CARD_PAYMENT_CATEGORY))
+                .peek(t -> {
+                    if (t.getCategoryReview() == null) {
+                        t.applyPrediction(new Categorized(CARD_PAYMENT_CATEGORY, Categorized.FORCED));
+                    } else {
+                        t.setCategory(CARD_PAYMENT_CATEGORY);
+                    }
+                })
                 .toList();
     }
 

@@ -54,6 +54,15 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
+        // The service calls classify(); these tests stub categorize(), so route
+        // one to the other (anything unstubbed is Other, as before).
+        org.mockito.Mockito.lenient().when(categoryService.classify(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> {
+                    String c = categoryService.categorize(inv.getArgument(0), inv.getArgument(1));
+                    return c == null ? com.fintwin.util.Categorized.other()
+                            : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
+                });
+
         user = new User();
         ReflectionTestUtils.setField(user, "id", 1L);
         user.setEmail("test@example.com");

@@ -71,10 +71,13 @@ function SectionLabel({ children }) {
   return <div className="sp-card-label">{children}</div>;
 }
 
-function Toggle({ on, onChange }) {
+function Toggle({ on, onChange, label }) {
   return (
     <button
       className="sp-toggle"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
       style={{ background: on ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.1)" }}
     >
@@ -287,9 +290,27 @@ export default function SettingsPage({ navigateTo }) {
   const [aiMode, setAiMode]               = useState(() => localStorage.getItem("aiMode") || "Savings Advisor");
   const [dailyInsights, setDailyInsights] = useState(() => localStorage.getItem("dailyInsights") !== "false");
 
+  // Opt-in to using anonymised transactions to improve categorisation; off by default
+  const [trainingConsent, setTrainingConsent] = useState(null);
+  const fetchTrainingConsent = async () => {
+    try { const r = await API.get("/profile/training-consent"); setTrainingConsent(r.data.given); } catch {}
+  };
+  const changeTrainingConsent = async (given) => {
+    const before = trainingConsent;
+    setTrainingConsent(given);
+    try {
+      const r = await API.put("/profile/training-consent", { given });
+      setTrainingConsent(r.data.given);
+      toast.success(given ? "Thanks — you're helping improve categorisation" : "Your data won't be used for training");
+    } catch {
+      setTrainingConsent(before);
+      toast.error("Couldn't save that. Try again.");
+    }
+  };
+
   useEffect(() => { fetchProfile(); }, []);
   useEffect(() => { if (activeTab === "connections") fetchConnections(); }, [activeTab]);
-  useEffect(() => { if (activeTab === "account") fetchTwoFAStatus(); }, [activeTab]);
+  useEffect(() => { if (activeTab === "account") { fetchTwoFAStatus(); fetchTrainingConsent(); } }, [activeTab]);
 
   const fetchProfile = async () => {
     try { const r = await API.get("/profile"); setProfile(r.data); } catch {}
@@ -599,6 +620,27 @@ export default function SettingsPage({ navigateTo }) {
                       <Database size={12} style={{ display: "inline", marginRight: 5 }} />
                       Clear cache
                     </button>
+                  </div>
+                </div>
+
+                <div className="sp-card">
+                  <SectionLabel>DATA &amp; PRIVACY</SectionLabel>
+                  <div className="sp-row">
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <Cpu size={16} color="#a78bfa" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Help improve categorisation</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.55, maxWidth: 520 }}>
+                          Let FinTwin use your transaction descriptions and the categories you pick to train better
+                          categorisation. People's names, phone numbers and UPI IDs are removed first. Off unless you
+                          turn it on; you can turn it off any time.{" "}
+                          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>Privacy policy</a>
+                        </div>
+                      </div>
+                    </div>
+                    {trainingConsent !== null && (
+                      <Toggle on={trainingConsent} onChange={changeTrainingConsent} label="Help improve categorisation" />
+                    )}
                   </div>
                 </div>
 

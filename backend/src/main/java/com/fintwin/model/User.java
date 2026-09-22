@@ -81,6 +81,12 @@ public class User {
     @Column(name = "consent_given_at")
     private LocalDateTime consentGivenAt;
 
+    // Opt-in, separate from the sign-up consent: anonymised transaction text
+    // and the categories the user chose may be used to improve FinTwin's
+    // categorisation. Null = not given (the default).
+    @Column(name = "training_consent_at")
+    private LocalDateTime trainingConsentAt;
+
     @Column(name = "email_verified")
     private Boolean emailVerified = false;
 
@@ -247,6 +253,9 @@ public class User {
     public void setConsentGivenAt(LocalDateTime consentGivenAt) {
         this.consentGivenAt = consentGivenAt;
     }
+
+    public LocalDateTime getTrainingConsentAt() { return trainingConsentAt; }
+    public void setTrainingConsentAt(LocalDateTime v) { this.trainingConsentAt = v; }
 
     public Boolean getEmailVerified() { return emailVerified; }
     public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }

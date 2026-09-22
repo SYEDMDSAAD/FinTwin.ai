@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.util.Categorized;
 import com.fintwin.audit.Audited;
 import com.fintwin.exception.ConflictException;
 import com.fintwin.exception.ForbiddenException;
@@ -708,14 +709,14 @@ public class BankConnectionService {
         t.setDate(date);
         t.setMerchant(narration != null ? narration : (isCard ? "Card Transaction" : "Bank Transaction"));
         t.setAmount(amount);
-        t.setCategory(deriveCategory(narration, type, learnedRules, isCard, cardSyncActive));
+        t.applyPrediction(deriveCategory(narration, type, learnedRules, isCard, cardSyncActive));
         t.setSource(isCard ? "CARD" : "BANK");
         t.setExternalId(externalId);
         existingExternalIds.add(externalId); // prevent duplicates within the same batch
         return t;
     }
 
-    private String deriveCategory(String narration, String type,
+    private Categorized deriveCategory(String narration, String type,
                                   Map<String, String> learnedRules,
                                   boolean isCard, boolean cardSyncActive) {
         boolean isCredit = "CREDIT".equalsIgnoreCase(type);
@@ -726,60 +727,60 @@ public class BankConnectionService {
             // bank-side debit and must not be counted twice; a refund or cashback
             // genuinely offsets that month's card spending and stays.
             if (isCredit && !com.fintwin.util.TransactionMath.isRefundLike(narration)) {
-                return com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY;
+                return new Categorized(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY, Categorized.FORCED);
             }
             // A card credit is never income, whatever the narration says — the
             // keyword rules below would read "CREDIT"/"inward" as salary.
-            if (isCredit) return "Other";
+            if (isCredit) return new Categorized("Other", Categorized.FORCED);
         } else if (cardSyncActive && !isCredit
                    && com.fintwin.util.TransactionMath.matchesCardPayment(narration)) {
             // Bank-side leg of the same bill payment. Guarded on cardSyncActive:
             // without the card's purchases in the database this debit is the only
             // record of that spending, and dropping it would understate expenses.
-            return com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY;
+            return new Categorized(com.fintwin.util.TransactionMath.CARD_PAYMENT_CATEGORY, Categorized.FORCED);
         }
 
-        if (narration == null) return "Other";
+        if (narration == null) return Categorized.other();
         String n = narration.toLowerCase();
 
         // The user's own corrections always win over keyword heuristics
         if (learnedRules != null && !learnedRules.isEmpty()) {
             String normalized = categoryService.normalizeMerchant(narration);
             String exact = learnedRules.get(normalized);
-            if (exact != null) return exact;
+            if (exact != null) return new Categorized(exact, Categorized.LEARNED);
             for (Map.Entry<String, String> rule : learnedRules.entrySet()) {
-                if (normalized.contains(rule.getKey())) return rule.getValue();
+                if (normalized.contains(rule.getKey())) return new Categorized(rule.getValue(), Categorized.LEARNED);
             }
         }
 
         if (n.contains("swiggy") || n.contains("zomato") || n.contains("food"))
-            return "Food";
+            return new Categorized("Food", Categorized.BANK_KEYWORD);
         if (n.contains("uber") || n.contains("ola") || n.contains("rapido") || n.contains("metro"))
-            return "Transport";
+            return new Categorized("Transport", Categorized.BANK_KEYWORD);
         if (n.contains("netflix") || n.contains("hotstar") || n.contains("spotify") || n.contains("youtube"))
-            return "Entertainment";
+            return new Categorized("Entertainment", Categorized.BANK_KEYWORD);
         if (n.contains("amazon") || n.contains("flipkart") || n.contains("myntra"))
-            return "Shopping";
+            return new Categorized("Shopping", Categorized.BANK_KEYWORD);
         if (n.contains("electricity") || n.contains("water") || n.contains("gas") || n.contains("bill") || n.contains("recharge"))
-            return "Utilities";
+            return new Categorized("Utilities", Categorized.BANK_KEYWORD);
         // Guarded on isCredit: a debit is never income, whatever it is called.
         // "CREDIT CARD ANNUAL FEE" is a charge, not salary — and on the bank side
         // a debit narration mentioning "credit" was landing as income too.
         if (isCredit && (n.contains("salary") || n.contains("credit")
                          || n.contains("neft cr") || n.contains("inward")))
-            return "Income";
+            return new Categorized("Income", Categorized.BANK_KEYWORD);
         if (n.contains("rent") || n.contains("maintenance"))
-            return "Housing";
+            return new Categorized("Housing", Categorized.BANK_KEYWORD);
         if (n.contains("hospital") || n.contains("pharmacy") || n.contains("medical") || n.contains("apollo") || n.contains("medplus"))
-            return "Health";
+            return new Categorized("Health", Categorized.BANK_KEYWORD);
         if (n.contains("emi") || n.contains("loan"))
-            return "EMI";
+            return new Categorized("EMI", Categorized.BANK_KEYWORD);
         if ("CREDIT".equalsIgnoreCase(type))
-            return "Income";
+            return new Categorized("Income", Categorized.BANK_KEYWORD);
 
         // Brands, shop-type words and payments to people — the same payee
         // rules statements and alert emails use
-        return categoryService.categorize(narration, Map.of());
+        return categoryService.classify(narration, Map.of());
     }
 
     // ── Card bill payment reclassification ────────────────────────────────────

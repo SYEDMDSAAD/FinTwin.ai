@@ -80,6 +80,15 @@ class InboundEmailServiceTest {
 
     @BeforeEach
     void setUp() {
+        // The service calls classify(); these tests stub categorize(), so route
+        // one to the other (anything unstubbed is Other, as before).
+        org.mockito.Mockito.lenient().when(categories.classify(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> {
+                    String c = categories.categorize(inv.getArgument(0), inv.getArgument(1));
+                    return c == null ? com.fintwin.util.Categorized.other()
+                            : new com.fintwin.util.Categorized(c, com.fintwin.util.Categorized.BRAND);
+                });
+
         // "DNS": every domain publishes the bank key, except attacker.example
         DkimCheck dkim = new DkimCheck(() -> new DKIMVerifier((method, selector, token) -> List.of(
                 "v=DKIM1; k=rsa; p=" + Base64.getEncoder().encodeToString(
