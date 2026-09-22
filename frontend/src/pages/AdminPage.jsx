@@ -10,8 +10,8 @@ import {
   ChevronRight, X, AlertTriangle, CheckCircle, XCircle,
   ArrowUpRight, Clock, Cpu, Database,
   ShieldAlert, MessageSquare, Ban, Send, AlertOctagon,
-  Unlock, BarChart2, Zap, Server, Wifi, MessageCircle
-} from "lucide-react";
+  Unlock, BarChart2, Zap, Server, Wifi, MessageCircle, Rocket } from "lucide-react";
+import AdminIpos from "../components/admin/AdminIpos";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -94,6 +94,7 @@ const NAV = [
   { id: "platform",    label: "Platform Health",  icon: Activity },
   { id: "security",    label: "Security",         icon: ShieldAlert },
   { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
+  { id: "ipos",        label: "IPO Catalog",      icon: Rocket },
 ];
 
 const fmt = (dt) =>
@@ -1577,6 +1578,7 @@ export default function AdminPage() {
             {tab === "platform"   && <PlatformSection/>}
             {tab === "security"   && <SecuritySection/>}
             {tab === "tickets"    && <TicketsSection/>}
+            {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>
 

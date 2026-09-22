@@ -14,14 +14,16 @@ let _nwCache = null;
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from "recharts";
+import { IPO_STATUSES } from "../constants/investments";
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight } from "lucide-react";
 
 const INVESTMENT_TYPES = [
-    "Stocks", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
+    "Stocks", "IPO", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
 ];
 
 const TYPE_COLORS = {
     "Stocks":       "#a78bfa",
+    "IPO":          "#e879f9",
     "Mutual Fund":  "#22d3ee",
     "Fixed Deposit":"#4ade80",
     "Gold":         "#fbbf24",
@@ -35,13 +37,15 @@ const TYPE_COLORS = {
 
 const EMPTY_FORM = {
     name: "", type: "Stocks", investedAmount: "", currentValue: "",
-    purchaseDate: "", tickerCode: "", units: "", interestRate: "", notes: ""
+    purchaseDate: "", tickerCode: "", units: "", interestRate: "", notes: "",
+    ipoStatus: "APPLIED", ipoListingId: null,
 };
 
 // What extra fields each type needs
 const TYPE_FIELDS = {
     "Mutual Fund":   { ticker: "AMFI Scheme Code",  units: "Units Held",   rate: false },
     "Stocks":        { ticker: "NSE Ticker (e.g. TCS)", units: "Shares",   rate: false },
+    "IPO":           { ticker: "NSE Symbol (once listed)", units: "Shares allotted", rate: false },
     "Gold":          { ticker: false,                units: "Grams",        rate: false },
     "Crypto":        { ticker: "Symbol (e.g. BTC)",  units: "Coins",       rate: false },
     "Fixed Deposit": { ticker: false,                units: false,          rate: "Interest Rate (%)" },
@@ -140,6 +144,8 @@ export default function PortfolioTab() {
             units:         h.units         ?? "",
             interestRate:  h.interestRate  ?? "",
             notes:         h.notes         || "",
+            ipoStatus:     h.ipoStatus     || "APPLIED",
+            ipoListingId:  h.ipoListingId  ?? null,
         });
         setShowModal(true);
     };
@@ -158,6 +164,8 @@ export default function PortfolioTab() {
                 units:          form.units        !== "" ? parseFloat(form.units) : null,
                 interestRate:   form.interestRate !== "" ? parseFloat(form.interestRate) : null,
                 notes:          form.notes        || null,
+                ipoStatus:      form.type === "IPO" ? form.ipoStatus : null,
+                ipoListingId:   form.type === "IPO" ? form.ipoListingId : null,
             };
             if (editId) {
                 await API.put(`/portfolio/${editId}`, payload);
@@ -407,7 +415,12 @@ export default function PortfolioTab() {
                                             <tr key={h.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
                                                 <td className="px-4 py-3">
                                                     <div className="font-medium text-white text-xs leading-tight">{h.name}</div>
-                                                    <div className="text-[10px] text-zinc-500 mt-0.5" style={{ color: TYPE_COLORS[h.type] || "#94a3b8" }}>{h.type}</div>
+                                                    <div className="text-[10px] text-zinc-500 mt-0.5" style={{ color: TYPE_COLORS[h.type] || "#94a3b8" }}>
+                                                        {h.type}
+                                                        {h.type === "IPO" && h.ipoStatus && (
+                                                            <> · {IPO_STATUSES.find(s => s.value === h.ipoStatus)?.label.split(" — ")[0] || h.ipoStatus}</>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-zinc-300 text-xs">₹{fmt(h.investedAmount)}</td>
                                                 <td className="px-4 py-3 text-right text-xs text-blue-400">
@@ -558,6 +571,23 @@ export default function PortfolioTab() {
                                 </select>
                             </div>
 
+                            {form.type === "IPO" && (
+                                <div>
+                                    <label htmlFor="ipo-status" className="text-xs text-zinc-400 mb-1 block">Application status</label>
+                                    <select
+                                        id="ipo-status"
+                                        className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        value={form.ipoStatus}
+                                        onChange={(e) => setForm({ ...form, ipoStatus: e.target.value })}
+                                    >
+                                        {IPO_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                    </select>
+                                    <p className="text-[10px] text-zinc-600 mt-1">
+                                        Amount = what was blocked or paid. Once listed, add the NSE symbol and shares to track the live price.
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs text-zinc-400 mb-1 block">Invested Amount (₹) *</label>
@@ -597,7 +627,7 @@ export default function PortfolioTab() {
                                     <label className="text-xs text-zinc-400 mb-1 block">{TYPE_FIELDS[form.type].ticker}</label>
                                     <input
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
-                                        placeholder={form.type === "Mutual Fund" ? "e.g. 120716" : "e.g. TCS"}
+                                        placeholder={form.type === "Mutual Fund" ? "e.g. 120716" : form.type === "IPO" ? "e.g. NEWCO — leave empty until it lists" : "e.g. TCS"}
                                         value={form.tickerCode}
                                         onChange={(e) => setForm({ ...form, tickerCode: e.target.value })}
                                     />

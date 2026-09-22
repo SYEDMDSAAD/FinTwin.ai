@@ -76,6 +76,7 @@ from "./NetWorthManagement";
 
 import InvestmentsPage
 from "./InvestmentsPage";
+import DiscoverPage from "../components/DiscoverPage";
 
 import SpendingCoachPage
 from "./SpendingCoachPage";
@@ -2155,6 +2156,9 @@ function Dashboard() {
 
                     )
                 }
+
+                {/* Discover: IPOs, mutual funds, stocks */}
+                {activeSection === "Discover" && <DiscoverPage />}
 
                 {/* =========================
                     Insurance
