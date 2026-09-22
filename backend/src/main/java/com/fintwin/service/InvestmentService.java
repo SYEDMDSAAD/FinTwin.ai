@@ -211,7 +211,11 @@ public class InvestmentService {
         investment.setId(null);
         investment.setUser(currentUser());
         applyIpoRules(investment);
-        return InvestmentDTO.from(repo.save(investment));
+        Investment saved = repo.save(investment);
+        String status = priceNow(saved);                 // a holding with a symbol is priced at once
+        InvestmentDTO dto = InvestmentDTO.from(saved);
+        dto.setPriceStatus(status);
+        return dto;
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
@@ -239,7 +243,11 @@ public class InvestmentService {
         inv.setIpoListingId(updated.getIpoListingId());
         applyIpoRules(inv);
 
-        return InvestmentDTO.from(repo.save(inv));
+        Investment saved = repo.save(inv);
+        String status = priceNow(saved);
+        InvestmentDTO dto = InvestmentDTO.from(saved);
+        dto.setPriceStatus(status);
+        return dto;
     }
 
     public static final String IPO = "IPO";
@@ -274,6 +282,54 @@ public class InvestmentService {
         } else if (!"LISTED".equals(status) || inv.getTickerCode() == null) {
             // Not trading yet: worth exactly what was paid or blocked
             inv.setCurrentValue(inv.getInvestedAmount());
+        }
+    }
+
+    /** Live price statuses reported back to the page after a save. */
+    public static final String PRICE_LIVE = "live";
+    public static final String PRICE_NOT_FOUND = "not_found";
+    public static final String PRICE_UNAVAILABLE = "unavailable";
+
+    /**
+     * Prices one holding straight after it is saved. Without this the value
+     * only moves when the user happens to press Refresh, and a symbol the
+     * market doesn't know (a typo, or a company that hasn't listed) looks
+     * exactly like a holding that simply hasn't moved.
+     *
+     * @return one of the PRICE_* statuses, or null when the holding has
+     *         nothing to price against
+     */
+    private String priceNow(Investment inv) {
+        boolean quotable = inv.getTickerCode() != null && !inv.getTickerCode().isBlank()
+                && inv.getUnits() != null && inv.getUnits() > 0;
+        if (!quotable) return null;
+        if ("IPO".equals(inv.getType()) && !"LISTED".equals(inv.getIpoStatus())) return null;
+
+        Map<String, Object> one = new LinkedHashMap<>();
+        one.put("id", inv.getId());
+        one.put("type", inv.getType());
+        one.put("tickerCode", inv.getTickerCode());
+        one.put("units", inv.getUnits());
+        one.put("investedAmount", inv.getInvestedAmount());
+        one.put("interestRate", inv.getInterestRate());
+        one.put("purchaseDate", inv.getPurchaseDate() != null ? inv.getPurchaseDate().toString() : null);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            ResponseEntity<List<Map<String, Object>>> resp = aiRestTemplate.exchange(
+                    aiServiceUrl + "/market/prices", HttpMethod.POST,
+                    new HttpEntity<>(List.of(one), headers), new ParameterizedTypeReference<>() {});
+
+            List<Map<String, Object>> updates = resp.getBody();
+            Object value = updates == null || updates.isEmpty() ? null : updates.get(0).get("currentValue");
+            if (value == null) return PRICE_NOT_FOUND;
+            inv.setCurrentValue(Double.valueOf(value.toString()));
+            repo.save(inv);
+            return PRICE_LIVE;
+        } catch (Exception e) {
+            log.warn("Could not price holding #{} on save: {}", inv.getId(), e.getMessage());
+            return PRICE_UNAVAILABLE;
         }
     }
 

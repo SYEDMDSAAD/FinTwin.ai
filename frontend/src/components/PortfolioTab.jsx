@@ -18,6 +18,7 @@ import {
 import { IPO_STATUSES } from "../constants/investments";
 import LinkHoldingModal from "./LinkHoldingModal";
 import InvestmentSuggestions from "./InvestmentSuggestions";
+import { useDebouncedSearch } from "./discover/useDebouncedSearch";
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight, Link2 } from "lucide-react";
 
 const INVESTMENT_TYPES = [
@@ -84,6 +85,10 @@ export default function PortfolioTab() {
     const [netWorth, setNetWorth] = useState(_nwCache);
     const [linking, setLinking] = useState(null);          // the holding being linked
     const [splitting, setSplitting] = useState(null);
+    // Typing a symbol searches the market, so the user picks one that exists
+    // rather than a name the exchange has never heard of ("SS RETAIL")
+    const symbolSearch = useDebouncedSearch(
+        form.type === "Mutual Fund" ? "/discover/funds" : "/discover/stocks");
 
     const load = async () => {
         try {
@@ -187,11 +192,21 @@ export default function PortfolioTab() {
                 ipoStatus:      form.type === "IPO" ? form.ipoStatus : null,
                 ipoListingId:   form.type === "IPO" ? form.ipoListingId : null,
             };
-            if (editId) {
-                await API.put(`/portfolio/${editId}`, payload);
-            } else {
-                await API.post("/portfolio", payload);
+            const res = editId
+                ? await API.put(`/portfolio/${editId}`, payload)
+                : await API.post("/portfolio", payload);
+
+            // The server prices a holding as soon as it has a symbol and units;
+            // a symbol the market doesn't know used to look like a flat price
+            const status = res.data?.priceStatus;
+            if (status === "live") {
+                toast.success(`Priced at ₹${fmt(res.data.currentValue)} — ${payload.tickerCode}`);
+            } else if (status === "not_found") {
+                toast.error(`No market price for "${payload.tickerCode}". Check the symbol — pick one from the suggestions as you type.`);
+            } else if (status === "unavailable") {
+                toast.error("Market data is unavailable right now — try Refresh in a moment.");
             }
+
             setShowModal(false);
             await load();
         } catch (err) {
@@ -680,10 +695,32 @@ export default function PortfolioTab() {
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
                                         placeholder={form.type === "Mutual Fund" ? "e.g. 120716" : form.type === "IPO" ? "e.g. NEWCO — leave empty until it lists" : "e.g. TCS"}
                                         value={form.tickerCode}
-                                        onChange={(e) => setForm({ ...form, tickerCode: e.target.value })}
+                                        onChange={(e) => { setForm({ ...form, tickerCode: e.target.value }); symbolSearch.setQuery(e.target.value); }}
                                     />
+                                    {symbolSearch.state === "done" && symbolSearch.results.length > 0 && (
+                                        <ul className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-zinc-900/95" style={{ listStyle: "none", margin: 0, padding: 4 }}>
+                                            {symbolSearch.results.slice(0, 6).map(r => {
+                                                const symbol = form.type === "Mutual Fund" ? r.code : r.symbol.replace(/\.NS$/, "");
+                                                return (
+                                                    <li key={symbol}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setForm(f => ({ ...f, tickerCode: symbol })); symbolSearch.setQuery(""); }}
+                                                            className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/10"
+                                                        >
+                                                            <span className="block text-xs text-white">{r.name}</span>
+                                                            <span className="block text-[10px] text-zinc-500">{symbol}{r.exchange ? ` · ${r.exchange}` : ""}</span>
+                                                        </button>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
                                     <p className="text-[10px] text-zinc-600 mt-1">
-                                        {form.type === "Mutual Fund" ? "Find your scheme code at mfapi.in" : "NSE ticker without .NS suffix"}
+                                        {symbolSearch.state === "done" && symbolSearch.results.length === 0
+                                            ? `Nothing on the exchange matches "${symbolSearch.query}" — check the spelling.`
+                                            : form.type === "Mutual Fund" ? "Start typing the fund's name and pick it from the list"
+                                            : "Start typing the company's name and pick it from the list"}
                                     </p>
                                 </div>
                             )}

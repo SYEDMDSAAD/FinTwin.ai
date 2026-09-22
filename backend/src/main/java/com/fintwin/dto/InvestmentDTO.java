@@ -22,6 +22,9 @@ public class InvestmentDTO {
     // of them — payments to one payee can be one investment or several
     private Integer payments;
     private java.util.List<java.util.Map<String, Object>> breakdown;
+    // After a save: "live" when a price came back, "not_found" when the market
+    // doesn't know the symbol, "unavailable" when the lookup itself failed
+    private String priceStatus;
 
     public static InvestmentDTO from(com.fintwin.model.Investment inv) {
         InvestmentDTO dto = new InvestmentDTO();
@@ -64,6 +67,8 @@ public class InvestmentDTO {
     public Double getUnits()        { return units; }
     public Integer getPayments()    { return payments; }
     public void setPayments(Integer v) { this.payments = v; }
+    public String getPriceStatus()  { return priceStatus; }
+    public void setPriceStatus(String v) { this.priceStatus = v; }
     public java.util.List<java.util.Map<String, Object>> getBreakdown() { return breakdown; }
     public void setBreakdown(java.util.List<java.util.Map<String, Object>> v) { this.breakdown = v; }
     public Double getInterestRate() { return interestRate; }
