@@ -1,5 +1,8 @@
+import { useState } from "react";
+import toast from "react-hot-toast";
+import API from "../services/api";
 import {
-    Sparkles, FlaskConical, LayoutDashboard, BarChart3, Wallet, Brain, MessageSquare, Zap,
+    Star, Send, CheckCircle2, Sparkles, FlaskConical, LayoutDashboard, BarChart3, Wallet, Brain, MessageSquare, Zap,
     Target, ShieldCheck, Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings,
     Lock, ArrowRight, MessageCircleWarning,
 } from "lucide-react";
@@ -120,7 +123,7 @@ export default function AboutPage({ navigateTo }) {
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, padding: "10px 12px", borderRadius: 12, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
                         <MessageCircleWarning size={14} color="#f59e0b" aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
                         <span style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-                            Found a bug or something confusing? Note what you did and what you expected, and let the FinTwin team know — it really helps.
+                            Found a bug or something confusing? Use the feedback form at the bottom of this page — it really helps.
                         </span>
                     </div>
                 </aside>
@@ -183,6 +186,118 @@ export default function AboutPage({ navigateTo }) {
                     </p>
                 </div>
             </div>
+
+            <FeedbackForm />
         </div>
+    );
+}
+
+const RATING_WORDS = ["", "Poor", "Needs work", "Okay", "Good", "Love it"];
+const FEATURES = GROUPS.flatMap(g => g.items.map(i => i.name));
+
+// Beta feedback, filed as a ticket in the admin's Support Tickets queue.
+function FeedbackForm() {
+    const [rating, setRating] = useState(0);
+    const [hover, setHover] = useState(0);
+    const [useful, setUseful] = useState([]);
+    const [improve, setImprove] = useState("");
+    const [broken, setBroken] = useState("");
+    const [sending, setSending] = useState(false);
+    const [sent, setSent] = useState(false);
+
+    const toggle = (name) =>
+        setUseful(u => u.includes(name) ? u.filter(x => x !== name) : [...u, name]);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        if (!rating) { toast.error("Pick a rating first"); return; }
+        setSending(true);
+        try {
+            await API.post("/feedback", { rating, useful, improve: improve.trim(), broken: broken.trim() });
+            setSent(true);
+        } catch (err) {
+            toast.error(err?.response?.data?.error || "Couldn't send your feedback. Try again.");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const box = { ...card, padding: 24, borderColor: "rgba(167,139,250,0.3)" };
+    const area = { display: "block", width: "100%", minHeight: 84, marginTop: 6, padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" };
+    const label = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" };
+
+    if (sent) {
+        return (
+            <section aria-label="Feedback" style={{ ...box, display: "flex", alignItems: "center", gap: 14 }}>
+                <CheckCircle2 size={28} color="#4ade80" aria-hidden style={{ flexShrink: 0 }} />
+                <div role="status">
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>Thank you — your feedback was sent</div>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
+                        Every response is read and goes straight into what we fix and build next.
+                    </p>
+                </div>
+            </section>
+        );
+    }
+
+    const shown = hover || rating;
+    return (
+        <section aria-labelledby="feedback-title" style={box}>
+            <h2 id="feedback-title" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--text-primary)" }}>Help us improve FinTwin</h2>
+            <p style={{ margin: "6px 0 20px", fontSize: 13, lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                Once you've had a good look around the app, tell us how it went. It takes a minute, and it's the most
+                useful thing you can do for us during the beta.
+            </p>
+
+            <form onSubmit={submit} style={{ display: "grid", gap: 20 }}>
+                <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
+                    <legend style={label}>How would you rate FinTwin overall? <span style={{ color: "#f87171" }}>*</span></legend>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }} onMouseLeave={() => setHover(0)}>
+                        {[1, 2, 3, 4, 5].map(n => (
+                            <button key={n} type="button" aria-label={`${n} star${n > 1 ? "s" : ""}`} aria-pressed={rating === n}
+                                    onClick={() => setRating(n)} onMouseEnter={() => setHover(n)}
+                                    style={{ background: "none", border: "none", padding: 2, cursor: "pointer" }}>
+                                <Star size={26} aria-hidden color={n <= shown ? "#fbbf24" : "var(--text-dim)"} fill={n <= shown ? "#fbbf24" : "none"} />
+                            </button>
+                        ))}
+                        {shown > 0 && <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>{RATING_WORDS[shown]}</span>}
+                    </div>
+                </fieldset>
+
+                <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
+                    <legend style={label}>Which features did you find most useful?</legend>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                        {FEATURES.map(name => {
+                            const on = useful.includes(name);
+                            return (
+                                <button key={name} type="button" aria-pressed={on} onClick={() => toggle(name)}
+                                        style={{ padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                                                 border: `1px solid ${on ? "rgba(167,139,250,0.6)" : "var(--border-card)"}`,
+                                                 background: on ? "rgba(167,139,250,0.16)" : "var(--bg-subtle)", color: "var(--text-primary)" }}>
+                                    {name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </fieldset>
+
+                <label style={label}>What should we improve or add?
+                    <textarea style={area} maxLength={2000} value={improve} onChange={e => setImprove(e.target.value)}
+                              placeholder="Anything that was confusing, missing, or could be better" />
+                </label>
+
+                <label style={label}>Did anything not work?
+                    <textarea style={area} maxLength={2000} value={broken} onChange={e => setBroken(e.target.value)}
+                              placeholder="What you did, what you expected, and what happened instead" />
+                </label>
+
+                <div>
+                    <button type="submit" disabled={sending}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: sending ? "default" : "pointer", fontFamily: "inherit", opacity: sending ? 0.7 : 1 }}>
+                        <Send size={15} aria-hidden /> {sending ? "Sending…" : "Send feedback"}
+                    </button>
+                </div>
+            </form>
+        </section>
     );
 }

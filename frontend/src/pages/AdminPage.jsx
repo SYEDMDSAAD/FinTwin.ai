@@ -960,6 +960,7 @@ const CAT_LABELS = {
   ACCOUNT_BLOCKED: "Account Blocked",
   BUG:             "Bug",
   BILLING:         "Billing",
+  FEEDBACK:        "Beta feedback",
   OTHER:           "Other",
 };
 
@@ -1013,7 +1014,7 @@ function TicketReplyModal({ ticket, onClose, onDone }) {
             <span className="badge b-cyan">{CAT_LABELS[ticket.category]||ticket.category}</span>
             {ticket.userName && <span className="badge b-user">{ticket.userName}</span>}
           </div>
-          <p style={{ fontSize:13, color:"#e2e8f0", lineHeight:1.7, margin:0 }}>{ticket.message}</p>
+          <p style={{ fontSize:13, color:"#e2e8f0", lineHeight:1.7, margin:0, whiteSpace:"pre-wrap" }}>{ticket.message}</p>
           <div style={{ fontSize:11, color:"rgba(148,163,184,0.35)", marginTop:8 }}>{fmt(ticket.createdAt)}</div>
         </div>
 
