@@ -70,6 +70,40 @@ public class DiscoverService {
         return getList("/discover/stocks/quotes", "symbols", String.join(",", symbols));
     }
 
+    // ── Prices for valuing a holding: on its purchase date, and today ─────────
+
+    /** Close on the date or the next trading day: {symbol, date, price}. */
+    public Map<String, Object> stockPriceOn(String symbol, java.time.LocalDate date) {
+        return getMap(UriComponentsBuilder.fromHttpUrl(aiUrl + "/discover/stocks/price-on")
+                .queryParam("symbol", symbol).queryParam("date", date).build().toUriString(),
+                "No price found for that stock around that date");
+    }
+
+    /** NAV on the date or the next business day: {code, date, nav}. */
+    public Map<String, Object> fundNavOn(String code, java.time.LocalDate date) {
+        return getMap(UriComponentsBuilder.fromHttpUrl(aiUrl + "/discover/funds/" + code + "/nav-on")
+                .queryParam("date", date).build().toUriString(),
+                "No NAV found for that fund around that date");
+    }
+
+    /** Today's NAV: {code, name, nav, date}. */
+    public Map<String, Object> fundLatest(String code) {
+        return getMap(aiUrl + "/discover/funds/" + code + "/latest", "Unknown scheme code");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getMap(String url, String notFound) {
+        try {
+            Map<String, Object> m = ai.getForObject(url, Map.class);
+            if (m == null) throw new com.fintwin.exception.NotFoundException(notFound);
+            return m;
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new com.fintwin.exception.NotFoundException(notFound);
+        } catch (RestClientException e) {
+            throw unavailable(e);
+        }
+    }
+
     private List<Map<String, Object>> getList(String path, String param, String value) {
         if (value == null || value.trim().length() < 2) return List.of();
         String url = UriComponentsBuilder.fromHttpUrl(aiUrl + path).queryParam(param, value.trim())

@@ -15,7 +15,8 @@ import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from "recharts";
 import { IPO_STATUSES } from "../constants/investments";
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight } from "lucide-react";
+import LinkHoldingModal from "./LinkHoldingModal";
+import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight, Link2 } from "lucide-react";
 
 const INVESTMENT_TYPES = [
     "Stocks", "IPO", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
@@ -79,6 +80,7 @@ export default function PortfolioTab() {
     const [refreshing, setRefreshing] = useState(false);
     const [refreshNote, setRefreshNote] = useState(null);
     const [netWorth, setNetWorth] = useState(_nwCache);
+    const [linking, setLinking] = useState(null);          // the holding being linked
 
     const load = async () => {
         try {
@@ -243,6 +245,9 @@ export default function PortfolioTab() {
     }
 
     const holdings = summary?.holdings || [];
+    // A lump sum with nothing behind it — typically the amount entered at
+    // onboarding. It can't be valued until the user says what it went into.
+    const unlinked = holdings.filter(h => h.type === "Other" && !h.tickerCode);
     const alloc    = summary?.allocationByType || {};
     const pieData  = Object.entries(alloc).map(([type, pct]) => ({ name: type, value: pct }));
 
@@ -343,6 +348,26 @@ export default function PortfolioTab() {
                     color={pnlPositive ? "text-green-400" : "text-red-400"}
                 />
             </div>
+
+            {unlinked.map(h => (
+                <div key={`unlinked-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "14px 18px", marginBottom: 18, borderRadius: 14, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.25)" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(167,139,250,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Link2 size={16} color="#a78bfa" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+                            ₹{fmt(h.investedAmount)} in “{h.name}” isn't linked to anything yet
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                            Tell us where you invested it and when, and we'll show what it's worth today.
+                        </div>
+                    </div>
+                    <button type="button" onClick={() => setLinking(h)}
+                            style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        Link it
+                    </button>
+                </div>
+            ))}
 
             {holdings.length === 0 ? (
                 /* Empty state */
@@ -698,6 +723,15 @@ export default function PortfolioTab() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {linking && (
+                <LinkHoldingModal
+                    holding={linking}
+                    onClose={() => setLinking(null)}
+                    onLinked={() => { setLinking(null); load(); }}
+                    onOther={(h) => { setLinking(null); openEdit(h); }}
+                />
             )}
         </div>
     );

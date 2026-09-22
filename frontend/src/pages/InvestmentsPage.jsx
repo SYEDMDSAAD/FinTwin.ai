@@ -2,12 +2,13 @@ import { useState } from "react";
 import API from "../services/api";
 import InvestmentRecommendationSection from "../components/InvestmentRecommendationSection";
 import PortfolioTab from "../components/PortfolioTab";
+import DiscoverPage from "../components/DiscoverPage";
 import SIPTracker from "../components/SIPTracker";
 import MutualFundsTab from "../components/MutualFundsTab";
 import USStocksTab from "../components/USStocksTab";
 import MarketTicker from "../components/MarketTicker";
 
-const TABS = ["My Portfolio", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];
+const TABS = ["My Portfolio", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];
 
 function InvestmentsPage() {
     const [activeTab, setActiveTab] = useState("My Portfolio");
@@ -60,6 +61,9 @@ function InvestmentsPage() {
 
             {/* Portfolio tab */}
             {activeTab === "My Portfolio" && <PortfolioTab />}
+
+            {/* Discover: IPOs, mutual funds and stocks you can invest in */}
+            {activeTab === "Discover" && <DiscoverPage />}
 
             {/* SIP Tracker tab */}
             {activeTab === "SIP Tracker" && (

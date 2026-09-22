@@ -124,3 +124,78 @@ def test_discover_routes_need_the_internal_key_and_answer(monkeypatch):
     assert r.json()["returns"] == {"1y": 12.3}
     assert client.get("/discover/funds/999999", headers=KEY).status_code == 404
     assert client.get("/discover/funds/abc", headers=KEY).status_code == 400
+
+
+# ── Prices on a past date ─────────────────────────────────────────────────────
+
+import pandas as pd  # noqa: E402
+
+
+def _history(rows):
+    idx = pd.to_datetime([d for d, _ in rows])
+    return pd.DataFrame({"Close": [p for _, p in rows]}, index=idx)
+
+
+def test_a_weekend_purchase_takes_the_next_trading_days_close():
+    ticker = MagicMock()
+    ticker.history.return_value = _history([("2026-03-13", 835.0), ("2026-03-16", 840.6), ("2026-03-17", 845.0)])
+    with patch("yfinance.Ticker", return_value=ticker) as t:
+        r = data.stock_price_on("hdfcbank", "2026-03-14")          # a Saturday
+    t.assert_called_with("HDFCBANK.NS")
+    assert r == {"symbol": "HDFCBANK.NS", "date": "2026-03-16", "price": 840.6}
+
+
+def test_today_before_the_close_uses_the_latest_trade():
+    ticker = MagicMock()
+    ticker.history.return_value = _history([("2026-09-21", 740.0)])
+    with patch("yfinance.Ticker", return_value=ticker):
+        assert data.stock_price_on("HDFCBANK.NS", "2026-09-22")["price"] == 740.0
+
+
+def test_no_price_history_means_no_answer():
+    ticker = MagicMock()
+    ticker.history.return_value = pd.DataFrame()
+    with patch("yfinance.Ticker", return_value=ticker):
+        assert data.stock_price_on("NOPE", "2026-01-01") is None
+
+
+def _mfapi(points):
+    resp = MagicMock()
+    resp.json.return_value = {"data": [{"date": d, "nav": n} for d, n in points]}
+    resp.raise_for_status.return_value = None
+    return resp
+
+
+def test_fund_units_are_allotted_at_the_next_business_days_nav():
+    with patch.object(data.requests, "get", return_value=_mfapi(
+            [("23-09-2025", "86.5"), ("22-09-2025", "86.2413"), ("19-09-2025", "85.9")])):
+        assert data.fund_nav_on("122640", "2025-09-20") == {"code": "122640", "date": "2025-09-22", "nav": 86.2413}
+
+
+def test_fund_nav_survives_one_stalled_attempt():
+    import requests
+    with patch.object(data.requests, "get", side_effect=[requests.exceptions.ReadTimeout(),
+                                                          _mfapi([("22-09-2025", "86.2413")])]):
+        assert data.fund_nav_on("122640", "2025-09-22")["nav"] == 86.2413
+
+
+def test_a_date_before_the_fund_existed_has_no_nav():
+    with patch.object(data.requests, "get", return_value=_mfapi([("22-09-2025", "86.2413")])):
+        assert data.fund_nav_on("122640", "2010-01-01") is None
+
+
+def test_price_on_routes_validate_the_date(monkeypatch):
+    assert client.get("/discover/stocks/price-on", params={"symbol": "X", "date": "22/09/2026"}, headers=KEY).status_code == 422
+    monkeypatch.setattr(data, "stock_price_on", lambda s, d: None)
+    assert client.get("/discover/stocks/price-on", params={"symbol": "X", "date": "2026-09-22"}, headers=KEY).status_code == 404
+
+
+def test_latest_nav_route_skips_return_history(monkeypatch):
+    _with_funds(monkeypatch)
+    called = []
+    monkeypatch.setattr(data, "fund_returns", lambda c: called.append(c) or {})
+    r = client.get("/discover/funds/122640/latest", headers=KEY)
+    assert r.json() == {"code": "122640", "name": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth",
+                        "nav": 88.4567, "date": "21-Sep-2026"}
+    assert called == []
+

@@ -232,3 +232,71 @@ def quotes(symbols: list[str]) -> list[dict]:
             logger.info("Quote unavailable for %s: %s", symbol, e)
             out.append({"symbol": symbol, "price": None, "previousClose": None, "changePct": None})
     return out
+
+
+# ── Prices on a past date ───────────────────────────────────────────────────
+# To value money that went in on a given day: units = amount / price that day.
+# Buys happen at the day's price if it traded, else the next trading day's —
+# weekends, holidays and after-hours orders all settle forward.
+
+_MAX_FORWARD_DAYS = 10
+
+
+def stock_price_on(symbol: str, on: str) -> dict | None:
+    """
+    Closing price on `on` (YYYY-MM-DD), or the next trading day's.
+
+    Yahoo's Close is adjusted for splits and bonus issues but not dividends:
+    shares bought before a 1:1 bonus are compared at the halved price, so the
+    unit count matches what the user holds today.
+    """
+    import yfinance as yf
+    sym = symbol.strip().upper()
+    if "." not in sym:
+        sym += ".NS"
+    day = datetime.strptime(on, "%Y-%m-%d")
+    try:
+        hist = yf.Ticker(sym).history(start=(day - timedelta(days=5)).strftime("%Y-%m-%d"),
+                                      end=(day + timedelta(days=_MAX_FORWARD_DAYS + 1)).strftime("%Y-%m-%d"),
+                                      auto_adjust=False)
+    except Exception as e:
+        logger.info("Price history unavailable for %s: %s", sym, e)
+        return None
+    if hist is None or hist.empty:
+        return None
+    rows = [(idx.date(), float(row["Close"])) for idx, row in hist.iterrows()]
+    after = [r for r in rows if r[0] >= day.date()]
+    # Nothing on or after (today, before the close): the latest trade before
+    pick = after[0] if after else rows[-1]
+    return {"symbol": sym, "date": pick[0].isoformat(), "price": round(pick[1], 4)}
+
+
+def fund_nav_on(code: str, on: str) -> dict | None:
+    """NAV on `on` (YYYY-MM-DD), or the next business day's — the NAV units are allotted at."""
+    day = datetime.strptime(on, "%Y-%m-%d")
+    history = None
+    for attempt in range(2):                      # mfapi.in sometimes stalls once
+        try:
+            r = requests.get(MFAPI_URL.format(code=code), timeout=_HISTORY_TIMEOUT)
+            r.raise_for_status()
+            history = r.json().get("data") or []
+            break
+        except Exception as e:
+            logger.info("NAV history attempt %d failed for %s: %s", attempt + 1, code, e)
+    if not history:
+        return None
+    points = []
+    for h in history:
+        try:
+            points.append((datetime.strptime(h["date"], "%d-%m-%Y"), float(h["nav"])))
+        except (KeyError, ValueError):
+            continue
+    if not points:
+        return None
+    points.sort()
+    after = [p for p in points if day <= p[0] <= day + timedelta(days=_MAX_FORWARD_DAYS)]
+    pick = after[0] if after else next((p for p in reversed(points) if p[0] <= day), None)
+    if pick is None:
+        return None                               # before the fund existed
+    return {"code": str(code), "date": pick[0].date().isoformat(), "nav": pick[1]}
+

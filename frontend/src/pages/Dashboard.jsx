@@ -76,7 +76,6 @@ from "./NetWorthManagement";
 
 import InvestmentsPage
 from "./InvestmentsPage";
-import DiscoverPage from "../components/DiscoverPage";
 
 import SpendingCoachPage
 from "./SpendingCoachPage";
@@ -143,7 +142,11 @@ function Dashboard() {
 
     const [activeSection,
         setActiveSection] =
-        useState(() => localStorage.getItem("activeSection") || "Today");
+        useState(() => {
+            const saved = localStorage.getItem("activeSection");
+            // Discover was briefly its own section; it now lives in Investments
+            return saved === "Discover" ? "Investments" : saved || "Today";
+        });
 
     const [, startTransition] = useTransition();
     const navigateTo = useCallback((section) => {
@@ -2156,9 +2159,6 @@ function Dashboard() {
 
                     )
                 }
-
-                {/* Discover: IPOs, mutual funds, stocks */}
-                {activeSection === "Discover" && <DiscoverPage />}
 
                 {/* =========================
                     Insurance
