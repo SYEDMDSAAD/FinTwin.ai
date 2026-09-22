@@ -248,7 +248,7 @@ def _portfolio_round(final_text):
 @patch("chatbot.advisor.chat")
 def test_portfolio_answers_always_carry_the_caveat(mock_chat, _exec):
     mock_chat.side_effect = _portfolio_round("Your portfolio is worth ₹29,018.16.")
-    reply = generate_financial_advice("how are my investments doing?", _BASE_DATA, "Investment Advisor")
+    reply = generate_financial_advice("how can I grow my investments?", _BASE_DATA, "Investment Advisor")
     assert reply.startswith("Your portfolio is worth ₹29,018.16.")      # figure present: no summary added
     assert "not financial advice" in reply
 
@@ -257,7 +257,7 @@ def test_portfolio_answers_always_carry_the_caveat(mock_chat, _exec):
 @patch("chatbot.advisor.chat")
 def test_an_answer_missing_the_headline_figure_leads_with_the_summary(mock_chat, _exec):
     mock_chat.side_effect = _portfolio_round("Your investments are doing fine overall.")
-    reply = generate_financial_advice("how are my investments doing?", _BASE_DATA, "Investment Advisor")
+    reply = generate_financial_advice("how can I grow my investments?", _BASE_DATA, "Investment Advisor")
     assert reply.startswith("Portfolio (2 holdings): invested ₹30,000, now worth ₹29,018.16")
 
 

@@ -9,6 +9,7 @@ import requests
 from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
+from chatbot import portfolio_answers
 from utils.ollama_client import ask, chat
 
 logger = logging.getLogger(__name__)
@@ -196,8 +197,16 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
     tools_succeeded = 0
     used_portfolio = False
     portfolio_summary = ""
+    portfolio_data: dict = {}
 
     def finish(text: str) -> str:
+        # The model's prose is checked against the figures it was given: a
+        # contradiction gets the answer rebuilt from the data, and buy/sell
+        # lines are cut. Before the caveat, which itself says "selling".
+        if portfolio_data and text not in (_FALLBACK, _DATA_UNAVAILABLE):
+            text, kept = portfolio_answers.check(text, portfolio_data, portfolio_answers.intent_of(message))
+            if not kept:
+                logger.warning("Copilot portfolio answer contradicted the data; answered from figures")
         # The headline figure must survive the model: if its answer leaves out
         # the portfolio's current value, lead with the precomputed summary.
         if portfolio_summary and text not in (_FALLBACK, _DATA_UNAVAILABLE):
@@ -252,7 +261,10 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                 messages.append({"role": "tool", "content": result})
                 if name == "get_portfolio":
                     try:
-                        portfolio_summary = json.loads(result).get("summary") or portfolio_summary
+                        parsed = json.loads(result)
+                        if "holdings" in parsed:
+                            portfolio_data = parsed
+                        portfolio_summary = parsed.get("summary") or portfolio_summary
                     except (ValueError, AttributeError):
                         pass
                     # Next to the data, where a small model actually heeds it.
@@ -328,11 +340,36 @@ Respond in this format:
     return ask(prompt)
 
 
+def _portfolio_direct(message: str, user_id) -> str | None:
+    """
+    Plain portfolio data questions answered from the backend's figures, no
+    model: a 3B model's prose has contradicted the very numbers it quoted.
+    None = not such a question (or no data), so the model path takes it.
+    """
+    routed = portfolio_answers.route(message)
+    if routed is None:
+        return None
+    intent, holding_type = routed
+    result = execute_tool("get_portfolio", {"type": holding_type} if holding_type else {}, user_id)
+    if _tool_result_is_error(result):
+        return None
+    try:
+        data = json.loads(result)
+    except ValueError:
+        return None
+    logger.info("Copilot portfolio question answered from figures: %s (%s)", intent, holding_type or "all")
+    answer = portfolio_answers.compose(intent, data)
+    return answer + _PORTFOLIO_CAVEAT if data.get("holdingCount") else answer
+
+
 def generate_financial_advice(message: str, financial_data: dict, mode: str) -> str:
     try:
         intent = classify_intent(message)
 
         if financial_data.get("userId") is not None:
+            direct = _portfolio_direct(message, financial_data["userId"])
+            if direct is not None:
+                return direct
             try:
                 return _chat_with_tools(message, financial_data, mode, intent)
             except RuntimeError:
