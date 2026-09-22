@@ -301,7 +301,7 @@ export default function SettingsPage({ navigateTo }) {
     try {
       const r = await API.put("/profile/training-consent", { given });
       setTrainingConsent(r.data.given);
-      toast.success(given ? "Thanks — you're helping improve categorisation" : "Your data won't be used for training");
+      toast.success(given ? "Thanks — you're helping improve FinTwin's AI" : "Your data won't be used to improve the AI");
     } catch {
       setTrainingConsent(before);
       toast.error("Couldn't save that. Try again.");
@@ -629,17 +629,18 @@ export default function SettingsPage({ navigateTo }) {
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                       <Cpu size={16} color="#a78bfa" style={{ flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Help improve categorisation</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Help improve FinTwin's AI</div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.55, maxWidth: 520 }}>
-                          Let FinTwin use your transaction descriptions and the categories you pick to train better
-                          categorisation. People's names, phone numbers and UPI IDs are removed first. Off unless you
-                          turn it on; you can turn it off any time.{" "}
+                          Let FinTwin use your transaction descriptions, the categories you pick, and the Copilot answers
+                          you rate 👍 or 👎 to improve its AI. Our team may read the answers you rate to fix what went wrong.
+                          People's names, phone numbers and UPI IDs are removed before any training. Off unless you turn
+                          it on; you can turn it off any time.{" "}
                           <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>Privacy policy</a>
                         </div>
                       </div>
                     </div>
                     {trainingConsent !== null && (
-                      <Toggle on={trainingConsent} onChange={changeTrainingConsent} label="Help improve categorisation" />
+                      <Toggle on={trainingConsent} onChange={changeTrainingConsent} label="Help improve FinTwin's AI" />
                     )}
                   </div>
                 </div>

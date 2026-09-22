@@ -16,6 +16,7 @@ import {
 
 import ReactMarkdown from "react-markdown";
 import { AI_MODE_IDS } from "../constants/aiModes";
+import AnswerRating from "./AnswerRating";
 
 function CopilotSection({
 
@@ -458,6 +459,14 @@ function CopilotSection({
                                     </div>
 
                                 </div>
+
+                                {msg.exchangeId && (
+                                    <AnswerRating
+                                        key={msg.exchangeId}
+                                        exchangeId={msg.exchangeId}
+                                        initial={msg.rating ?? null}
+                                    />
+                                )}
 
                                 {/* End-of-exchange divider — short centered
                                     dotted line so exchanges are easy to tell

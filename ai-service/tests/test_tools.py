@@ -287,3 +287,37 @@ def test_trade_questions_are_recognised():
         assert _ASKS_TRADE.search(q), q
     for q in ["How much have I made on my mutual fund?", "Which of my holdings is losing money?"]:
         assert not _ASKS_TRADE.search(q), q
+
+
+# ── Answer trace ──────────────────────────────────────────────────────────────
+
+@patch("chatbot.advisor.execute_tool", return_value=json.dumps({"budgets": []}))
+@patch("chatbot.advisor.chat")
+def test_trace_records_the_path_tools_and_outcome(mock_chat, _exec):
+    mock_chat.side_effect = [
+        {"content": "", "tool_calls": [{"function": {"name": "get_budgets", "arguments": {}}}]},
+        {"content": "You have no budgets yet."},
+    ]
+    trace = {}
+    generate_financial_advice("am I within budget?", _BASE_DATA, "Budget Coach", trace)
+    assert trace["path"] == "tools" and trace["outcome"] == "answered"
+    assert trace["tools"] == [{"name": "get_budgets", "args": {}, "ok": True}]
+    assert trace["model"] and isinstance(trace["duration_ms"], int)
+
+
+@patch("chatbot.advisor.chat", side_effect=RuntimeError("Ollama down"))
+def test_trace_says_when_the_fallback_answered(_chat):
+    trace = {}
+    reply = generate_financial_advice("hi", _BASE_DATA, "Savings Advisor", trace)
+    assert reply == advisor._FALLBACK and trace["path"] == "fallback"
+
+
+def test_chat_route_returns_the_trace():
+    from fastapi.testclient import TestClient
+    import app as app_module
+
+    with patch("chatbot.routes.generate_financial_advice",
+               side_effect=lambda m, d, mode, trace: trace.update({"path": "tools"}) or "ok"):
+        r = TestClient(app_module.app).post("/chat", json={"message": "hi", "mode": "Savings Advisor"},
+                                            headers={"x-internal-key": "test-internal-key"})
+    assert r.json() == {"success": True, "reply": "ok", "trace": {"path": "tools"}}

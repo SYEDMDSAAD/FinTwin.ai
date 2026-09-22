@@ -10,7 +10,7 @@ from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
 from chatbot import portfolio_answers
-from utils.ollama_client import ask, chat
+from utils.ollama_client import MODEL, ask, chat
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +182,11 @@ def _tool_result_is_error(result: str) -> bool:
         return True
 
 
-def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str) -> str:
+def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
+                     trace: dict | None = None) -> str:
     user_id = financial_data["userId"]
+    trace = trace if trace is not None else {}
+    trace["path"] = "tools"
 
     messages = [
         {"role": "system", "content": _system_prompt(
@@ -205,6 +208,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
         # lines are cut. Before the caveat, which itself says "selling".
         if portfolio_data and text not in (_FALLBACK, _DATA_UNAVAILABLE):
             text, kept = portfolio_answers.check(text, portfolio_data, portfolio_answers.intent_of(message))
+            trace["portfolio_check"] = "kept" if kept else "rebuilt"
             if not kept:
                 logger.warning("Copilot portfolio answer contradicted the data; answered from figures")
         # The headline figure must survive the model: if its answer leaves out
@@ -239,7 +243,9 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                 # A small model asked for data, got only errors, and answered
                 # anyway — that answer is fabricated. Refuse honestly instead.
                 if tools_attempted and not tools_succeeded:
+                    trace["outcome"] = "data_unavailable"
                     return _DATA_UNAVAILABLE
+                trace["outcome"] = "answered"
                 return finish((reply.get("content") or "").strip() or _FALLBACK)
 
             messages.append(reply)
@@ -255,6 +261,8 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                 logger.info("Copilot tool call (round %d): %s(%s)", round_no + 1, name, args)
                 result = execute_tool(name, args, user_id)
                 tools_attempted += 1
+                trace.setdefault("tools", []).append(
+                    {"name": name, "args": args, "ok": not _tool_result_is_error(result)})
                 used_portfolio |= name == "get_portfolio"
                 if not _tool_result_is_error(result):
                     tools_succeeded += 1
@@ -271,16 +279,19 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str)
                     messages.append({"role": "system", "content": _portfolio_rules(message)})
 
         if tools_attempted and not tools_succeeded:
+            trace["outcome"] = "data_unavailable"
             return _DATA_UNAVAILABLE
 
         # Tool budget exhausted — force a final answer from what was gathered.
         final = budgeted_chat(None)
+        trace["outcome"] = "answered_after_max_rounds"
         return finish((final.get("content") or "").strip() or _FALLBACK)
 
     except _OutOfTime:
         # Answer now. Falling back to the single-shot path here (as any other
         # error does) would start yet another long model call.
         logger.warning("Copilot answer exceeded its %.0f s budget", _CHAT_BUDGET_SECONDS)
+        trace["outcome"] = "out_of_time"
         return _OUT_OF_TIME
 
 
@@ -340,7 +351,7 @@ Respond in this format:
     return ask(prompt)
 
 
-def _portfolio_direct(message: str, user_id) -> str | None:
+def _portfolio_direct(message: str, user_id, trace: dict | None = None) -> str | None:
     """
     Plain portfolio data questions answered from the backend's figures, no
     model: a 3B model's prose has contradicted the very numbers it quoted.
@@ -358,32 +369,55 @@ def _portfolio_direct(message: str, user_id) -> str | None:
     except ValueError:
         return None
     logger.info("Copilot portfolio question answered from figures: %s (%s)", intent, holding_type or "all")
+    if trace is not None:
+        trace.update({"path": "portfolio_direct", "intent": intent, "holding_type": holding_type})
     answer = portfolio_answers.compose(intent, data)
     return answer + _PORTFOLIO_CAVEAT if data.get("holdingCount") else answer
 
 
-def generate_financial_advice(message: str, financial_data: dict, mode: str) -> str:
+def generate_financial_advice(message: str, financial_data: dict, mode: str,
+                              trace: dict | None = None) -> str:
+    """
+    The copilot's answer. `trace`, when given, is filled with how the answer
+    was produced — path, tools called, checks applied, timing — so answers
+    users rate can be told apart by what went wrong.
+    """
+    trace = trace if trace is not None else {}
+    started = time.perf_counter()     # not monotonic(): the answer budget runs on that clock
+    trace["model"] = MODEL
+    try:
+        return _advise(message, financial_data, mode, trace)
+    finally:
+        trace["duration_ms"] = int((time.perf_counter() - started) * 1000)
+
+
+def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
     try:
         intent = classify_intent(message)
+        trace["intent_class"] = intent
 
         if financial_data.get("userId") is not None:
-            direct = _portfolio_direct(message, financial_data["userId"])
+            direct = _portfolio_direct(message, financial_data["userId"], trace)
             if direct is not None:
                 return direct
             try:
-                return _chat_with_tools(message, financial_data, mode, intent)
+                return _chat_with_tools(message, financial_data, mode, intent, trace)
             except RuntimeError:
                 raise
             except Exception as e:
                 # Tool path must never take chat down — fall back to the
                 # prompt-stuffed flow on unexpected errors.
                 logger.exception("Tool-calling path failed, falling back: %s", e)
+                trace["tools_path_error"] = type(e).__name__
 
+        trace["path"] = "legacy"
         return _legacy_single_shot(message, financial_data, mode, intent)
 
     except RuntimeError as e:
         logger.error("Ollama unavailable in advisor: %s", e)
+        trace["path"] = "fallback"
         return _FALLBACK
     except Exception as e:
         logger.exception("Unexpected error in advisor: %s", e)
+        trace["path"] = "fallback"
         return _FALLBACK

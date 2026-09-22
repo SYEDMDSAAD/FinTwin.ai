@@ -20,12 +20,16 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 def chat_ai(data: ChatRequest):
     try:
+        trace: dict = {}
         reply = generate_financial_advice(
             data.message,
             data.financialData or {},
             data.mode,
+            trace,
         )
-        return {"success": True, "reply": reply}
+        # How the answer was produced — stored with it, so a rated answer
+        # can be traced to the path, tools and checks behind it
+        return {"success": True, "reply": reply, "trace": trace}
     except Exception as e:
         logger.exception("Chat endpoint error: %s", e)
         raise HTTPException(status_code=500, detail="AI service error. Please retry.")

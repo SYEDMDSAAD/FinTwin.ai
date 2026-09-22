@@ -20,7 +20,7 @@ describe("SettingsPage — training consent", () => {
         const { apiMock } = openAccount(false);
         await user.click(screen.getByRole("button", { name: /account/i }));
 
-        const toggle = await screen.findByRole("switch", { name: /help improve categorisation/i });
+        const toggle = await screen.findByRole("switch", { name: /help improve fintwin's ai/i });
         expect(toggle).toHaveAttribute("aria-checked", "false");
 
         await user.click(toggle);
@@ -33,7 +33,7 @@ describe("SettingsPage — training consent", () => {
         const { apiMock } = openAccount(true);
         await user.click(screen.getByRole("button", { name: /account/i }));
 
-        const toggle = await screen.findByRole("switch", { name: /help improve categorisation/i });
+        const toggle = await screen.findByRole("switch", { name: /help improve fintwin's ai/i });
         await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
         await user.click(toggle);
         await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));

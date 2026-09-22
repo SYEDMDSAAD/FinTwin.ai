@@ -40,6 +40,16 @@ public class ChatHistory {
 
     private LocalDateTime timestamp;
 
+    // How the answer was produced (AI service trace, JSON): path, tools, checks, timing
+    @Column(columnDefinition = "TEXT")
+    private String trace;
+
+    // 1 = helpful, -1 = not, null = not rated
+    private Short rating;
+
+    @Column(name = "rating_reason", length = 40)
+    private String ratingReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore

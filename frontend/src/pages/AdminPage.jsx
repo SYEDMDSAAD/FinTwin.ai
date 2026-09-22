@@ -14,6 +14,7 @@ import {
 import AdminIpos from "../components/admin/AdminIpos";
 import AdminFeedback from "../components/admin/AdminFeedback";
 import AdminCategorization from "../components/admin/AdminCategorization";
+import AdminCopilotFeedback from "../components/admin/AdminCopilotFeedback";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -97,7 +98,7 @@ const NAV = [
   { id: "security",    label: "Security",         icon: ShieldAlert },
   { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
   { id: "feedback",    label: "Beta Feedback",    icon: MessageSquareHeart },
-  { id: "categories",  label: "Categorisation",   icon: Tags },
+  { id: "categories",  label: "AI Quality",       icon: Tags },
   { id: "ipos",        label: "IPO Catalog",      icon: Rocket },
 ];
 
@@ -1584,7 +1585,7 @@ export default function AdminPage() {
             {tab === "security"   && <SecuritySection/>}
             {tab === "tickets"    && <TicketsSection/>}
             {tab === "feedback"   && <AdminFeedback/>}
-            {tab === "categories" && <AdminCategorization/>}
+            {tab === "categories" && <><AdminCopilotFeedback/><AdminCategorization/></>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

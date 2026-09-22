@@ -16,8 +16,8 @@ const sections = [
     body: "We use your data solely to provide FinTwin AI features: generating insights, budgets, anomaly detection, and AI recommendations. We do not sell your data to third parties or use it for advertising.",
   },
   {
-    title: "4. Improving Categorisation (optional)",
-    body: "To measure how well FinTwin sorts your transactions, we record which method chose each category and whether you later changed or kept it. This stays in your account like the rest of your data. Only if you opt in (Settings → Account → Data & privacy) may your anonymised transaction descriptions — with people's names, phone numbers and UPI IDs removed — and the categories you chose be used to train FinTwin's categorisation. It is off unless you turn it on. You can turn it off at any time, and from then on your data is left out of any new training. We never sell this data or share it with third parties.",
+    title: "4. Improving FinTwin's AI (optional)",
+    body: "To measure how well FinTwin's AI works, we record which method chose each transaction's category and whether you later changed or kept it, and how each AI Copilot answer was produced. When you rate a Copilot answer 👍 or 👎, that question and answer are kept with your rating, even after older chat messages are cleared automatically; deleting the message or clearing your chat deletes them too. All of this stays in your account like the rest of your data. Only if you opt in (Settings → Account → Data & privacy) may our team read the answers you rated to fix what went wrong, and may your transaction descriptions, the categories you chose and your rated answers be used to train FinTwin's AI — with people's names, phone numbers and UPI IDs removed first. It is off unless you turn it on. You can turn it off at any time, and from then on your data is left out of any new training. We never sell this data or share it with third parties.",
   },
   {
     title: "5. Data Security",

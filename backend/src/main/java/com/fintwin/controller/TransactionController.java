@@ -199,7 +199,17 @@ public class TransactionController {
         }
     }
 
-    @DeleteMapping("/chat/history/{id}")
+    /** 1 = helpful, -1 = not (optional reason), 0 = take the rating back. */
+    @PutMapping("/chat/history/{id}/rating")
+    public ResponseEntity<Map<String, Object>> rateChatAnswer(@PathVariable Long id,
+                                                              @RequestBody Map<String, Object> body) {
+        if (!(body.get("rating") instanceof Integer rating))
+            throw new com.fintwin.exception.BadRequestException("'rating' must be 1, -1 or 0");
+        String reason = body.get("reason") instanceof String r ? r : null;
+        return ResponseEntity.ok(chatService.rate(id, rating, reason));
+    }
+
+        @DeleteMapping("/chat/history/{id}")
     public ResponseEntity<?> deleteChatMessage(@PathVariable Long id) {
         chatService.deleteChatMessage(id);
         return ResponseEntity.ok(Map.of("success", true));

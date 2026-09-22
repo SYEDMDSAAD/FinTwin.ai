@@ -31,6 +31,12 @@ public class OllamaAIProvider implements AIProvider {
 
     @Override
     public String chat(String message, String mode, FinancialSummaryDTO summary) {
+        return chatWithTrace(message, mode, summary).reply();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public ChatResult chatWithTrace(String message, String mode, FinancialSummaryDTO summary) {
         Map<String, Object> financialData = new HashMap<>();
         financialData.put("userId",              summary.getUserId());
         financialData.put("income",              summary.getIncome());
@@ -56,9 +62,11 @@ public class OllamaAIProvider implements AIProvider {
 
         if (response == null || response.get("reply") == null) {
             log.warn("Ollama returned null/empty response");
-            return "FinTwin AI could not generate a response.";
+            return new ChatResult("FinTwin AI could not generate a response.", Map.of("path", "empty_response"));
         }
 
-        return response.get("reply").toString();
+        Object trace = response.get("trace");
+        return new ChatResult(response.get("reply").toString(),
+                trace instanceof Map<?, ?> t ? (Map<String, Object>) t : Map.of());
     }
 }
