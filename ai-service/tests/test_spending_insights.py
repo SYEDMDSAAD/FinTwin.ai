@@ -38,18 +38,28 @@ def test_parse_merchant_tolerates_empty_input():
 # ── channels and transfers in analyse() ──────────────────────────────────────
 
 def _statement():
-    """Three months of narration-style rows, as a real bank import arrives."""
-    tx = [{"amount": 90000, "category": "Income", "date": f"2026-{m}-01",
-           "merchant": f"FT/CR/8815097150{m}/Elakshi Ray/OGQW/94265795"}
-          for m in ("05", "06", "07")]
-    for m in ("05", "06", "07"):
-        tx.append({"amount": -20000, "category": "Rent", "date": f"2026-{m}-02",
-                   "merchant": f"FT/DE/1677015492{m}/Krish Yohannan/ECYG/18410061"})
-        for d in ("07", "14", "21"):
-            tx.append({"amount": -4000, "category": "Other", "date": f"2026-{m}-{d}",
-                       "merchant": f"ATM/DE/79396627{m}{d}/Self/DIMJ/20447298"})
-        tx.append({"amount": -1500, "category": "Other", "date": f"2026-{m}-09",
-                   "merchant": f"UPI/DE/8147743221{m}/Veer Walla/VBEJ/69553586"})
+    """
+    Three months of narration-style rows, as a real bank import arrives: two
+    complete months and the one in progress. The last month has to be the
+    real current month — hard-coding it meant the test passed only until that
+    month ended, and then counted a month the analysis treats as partial.
+    """
+    from datetime import date
+
+    complete = ("2026-05", "2026-06")
+    months = (*complete, date.today().strftime("%Y-%m"))
+    # Days 01–03 so the rows are never dated in the future, whatever today is
+    tx = [{"amount": 90000, "category": "Income", "date": f"{m}-01",
+           "merchant": "FT/CR/88150971501/Elakshi Ray/OGQW/94265795"}
+          for m in months]
+    for m in months:
+        tx.append({"amount": -20000, "category": "Rent", "date": f"{m}-02",
+                   "merchant": "FT/DE/16770154921/Krish Yohannan/ECYG/18410061"})
+        for d in ("01", "02", "03"):
+            tx.append({"amount": -4000, "category": "Other", "date": f"{m}-{d}",
+                       "merchant": f"ATM/DE/79396627{d}/Self/DIMJ/20447298"})
+        tx.append({"amount": -1500, "category": "Other", "date": f"{m}-03",
+                   "merchant": "UPI/DE/81477432211/Veer Walla/VBEJ/69553586"})
     return tx
 
 
@@ -57,7 +67,7 @@ def test_analyse_reports_the_payment_channel_mix():
     result = analyse(_statement())
     channels = {c["channel"]: c for c in result["channelTotals"]}
 
-    # July is the month we are in, so only May and June count towards a rate.
+    # Only the two complete months count towards a rate; this month is partial.
     assert channels["ATM cash"]["count"] == 6
     assert channels["ATM cash"]["monthlyTotal"] == 12000
     assert channels["Bank transfer"]["monthlyTotal"] == 20000
@@ -192,11 +202,16 @@ def test_leakage_survives_a_half_finished_final_month():
     from complete months only dragged the average below the floor, and the
     page showed ₹0 recoverable on three months of real spending.
     """
+    from datetime import date
+
     tx = []
-    for m, spend in (("05", 12000), ("06", 8000), ("07", 500)):
-        tx.append({"amount": 90000, "category": "Salary", "date": f"2026-{m}-01",
+    # The last entry is the month in progress — the real one, so this keeps
+    # testing a partial month after the calendar moves on
+    for m, spend in (("2026-05", 12000), ("2026-06", 8000),
+                     (date.today().strftime("%Y-%m"), 500)):
+        tx.append({"amount": 90000, "category": "Salary", "date": f"{m}-01",
                    "merchant": "Employer"})
-        tx.append({"amount": -spend, "category": "Food", "date": f"2026-{m}-05",
+        tx.append({"amount": -spend, "category": "Food", "date": f"{m}-01",
                    "merchant": "Swiggy"})
 
     evidence = analyse(tx)
