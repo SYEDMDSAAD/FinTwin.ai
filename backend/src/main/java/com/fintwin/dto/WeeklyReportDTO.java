@@ -1,176 +1,94 @@
 package com.fintwin.dto;
 
+import java.time.Instant;
+import java.util.List;
+
 public class WeeklyReportDTO {
 
     private String summary;
 
-    private String insights;
+    private List<ReportItemDTO> insights;
 
-    private String risks;
+    private List<ReportItemDTO> risks;
 
-    private String recommendations;
+    private List<ReportItemDTO> recommendations;
+
+    private List<ReportTrendDTO> trends;
 
     private int financialScore;
 
     private Double netWorth;
 
+    private Double savingsRate;
+
+    /** Trailing-average projection for next month, not a forecast model. */
     private Double predictedExpenses;
 
     private Double predictedSavings;
 
     private String spendingHealth;
 
-    private String riskProfile;
-
-    private String expectedReturn;
-
     private Double monthlyLeakage;
+
+    /**
+     * True when any section fell back to computed prose because the AI was
+     * unavailable or its figures failed grounding. The UI says so rather than
+     * presenting template text as analysis.
+     */
+    private boolean degraded;
+
+    /** When this report was generated, so the UI can show staleness honestly. */
+    private Instant generatedAt;
+
+    /** The months compared in {@link #trends}, e.g. "May vs April 2026". */
+    private String comparisonPeriod;
 
     // =========================
     // GETTERS & SETTERS
     // =========================
 
-    public String getSummary() {
+    public String getSummary()              { return summary; }
+    public void setSummary(String summary)  { this.summary = summary; }
 
-        return summary;
-    }
+    public List<ReportItemDTO> getInsights()             { return insights; }
+    public void setInsights(List<ReportItemDTO> items)   { this.insights = items; }
 
-    public void setSummary(
-            String summary
-    ) {
+    public List<ReportItemDTO> getRisks()                { return risks; }
+    public void setRisks(List<ReportItemDTO> items)      { this.risks = items; }
 
-        this.summary = summary;
-    }
+    public List<ReportItemDTO> getRecommendations()            { return recommendations; }
+    public void setRecommendations(List<ReportItemDTO> items)  { this.recommendations = items; }
 
-    public String getInsights() {
+    public List<ReportTrendDTO> getTrends()               { return trends; }
+    public void setTrends(List<ReportTrendDTO> trends)    { this.trends = trends; }
 
-        return insights;
-    }
+    public int getFinancialScore()                  { return financialScore; }
+    public void setFinancialScore(int score)        { this.financialScore = score; }
 
-    public void setInsights(
-            String insights
-    ) {
+    public Double getNetWorth()                 { return netWorth; }
+    public void setNetWorth(Double netWorth)    { this.netWorth = netWorth; }
 
-        this.insights = insights;
-    }
+    public Double getSavingsRate()                  { return savingsRate; }
+    public void setSavingsRate(Double savingsRate)  { this.savingsRate = savingsRate; }
 
-    public String getRisks() {
+    public Double getPredictedExpenses()            { return predictedExpenses; }
+    public void setPredictedExpenses(Double v)      { this.predictedExpenses = v; }
 
-        return risks;
-    }
+    public Double getPredictedSavings()             { return predictedSavings; }
+    public void setPredictedSavings(Double v)       { this.predictedSavings = v; }
 
-    public void setRisks(
-            String risks
-    ) {
+    public String getSpendingHealth()               { return spendingHealth; }
+    public void setSpendingHealth(String v)         { this.spendingHealth = v; }
 
-        this.risks = risks;
-    }
+    public Double getMonthlyLeakage()               { return monthlyLeakage; }
+    public void setMonthlyLeakage(Double v)         { this.monthlyLeakage = v; }
 
-    public String getRecommendations() {
+    public boolean isDegraded()                 { return degraded; }
+    public void setDegraded(boolean degraded)   { this.degraded = degraded; }
 
-        return recommendations;
-    }
+    public Instant getGeneratedAt()                 { return generatedAt; }
+    public void setGeneratedAt(Instant generatedAt) { this.generatedAt = generatedAt; }
 
-    public void setRecommendations(
-            String recommendations
-    ) {
-
-        this.recommendations = recommendations;
-    }
-
-    public int getFinancialScore() {
-
-        return financialScore;
-    }
-
-    public void setFinancialScore(
-            int financialScore
-    ) {
-
-        this.financialScore =
-            financialScore;
-    }
-
-    public Double getNetWorth() {
-
-        return netWorth;
-    }
-
-    public void setNetWorth(
-            Double netWorth
-    ) {
-
-        this.netWorth = netWorth;
-    }
-
-    public Double getPredictedExpenses() {
-
-        return predictedExpenses;
-    }
-
-    public void setPredictedExpenses(
-            Double predictedExpenses
-    ) {
-
-        this.predictedExpenses =
-            predictedExpenses;
-    }
-
-    public Double getPredictedSavings() {
-
-        return predictedSavings;
-    }
-
-    public void setPredictedSavings(
-            Double predictedSavings
-    ) {
-
-        this.predictedSavings =
-            predictedSavings;
-    }
-
-    public String getSpendingHealth() {
-
-        return spendingHealth;
-    }
-
-    public void setSpendingHealth(
-            String spendingHealth
-    ) {
-
-        this.spendingHealth =
-            spendingHealth;
-    }
-
-    public String getRiskProfile() {
-
-        return riskProfile;
-    }
-
-    public void setRiskProfile(
-            String riskProfile
-    ) {
-
-        this.riskProfile = riskProfile;
-    }
-
-    public String getExpectedReturn() {
-
-        return expectedReturn;
-    }
-
-    public void setExpectedReturn(
-            String expectedReturn
-    ) {
-
-        this.expectedReturn = expectedReturn;
-    }
-
-    public Double getMonthlyLeakage() {
-        return monthlyLeakage;
-    }
-
-    public void setMonthlyLeakage(Double monthlyLeakage) {
-        this.monthlyLeakage = monthlyLeakage;
-    }
+    public String getComparisonPeriod()             { return comparisonPeriod; }
+    public void setComparisonPeriod(String v)       { this.comparisonPeriod = v; }
 }
