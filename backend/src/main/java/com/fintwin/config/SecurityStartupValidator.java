@@ -34,6 +34,12 @@ public class SecurityStartupValidator {
     @Value("${admin.key:}")
     private String adminKey;
 
+    @Value("${mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
     @Value("${inbound.email.domain:}")
     private String inboundEmailDomain;
 
@@ -64,6 +70,12 @@ public class SecurityStartupValidator {
         }
         if (adminKey == null || adminKey.isBlank()) {
             problems.add("ADMIN_KEY is not set. Admin bootstrap/migration endpoints are unusable until set.");
+        }
+        // No mail provider means verification OTPs and reset links come back in
+        // the API response instead of an inbox — a dev convenience that would
+        // let anyone verify, or take over, an address they do not own.
+        if (!mailEnabled || mailUsername == null || mailUsername.isBlank()) {
+            problems.add("MAIL_ENABLED/MAIL_USERNAME are not set. Verification and password-reset mail cannot be delivered.");
         }
         // Bank alert emails are optional; when switched on, the webhook secret is
         // all that stands between the public endpoint and users' transactions

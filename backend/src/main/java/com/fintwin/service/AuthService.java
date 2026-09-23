@@ -137,8 +137,8 @@ public class AuthService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "Registration successful");
-        // Return OTP in response when email is not configured (dev/local mode only)
-        if (!emailService.isConfigured()) {
+        // Returned only in local dev, where there is no mail provider to send it
+        if (emailService.canRevealSecrets()) {
             result.put("devOtp", rawOtp);
             result.put("devNote", "Email not configured — use this OTP directly for testing");
         }
@@ -341,7 +341,7 @@ public class AuthService {
         emailService.sendPasswordResetLink(normalized, user.getFullName(), resetUrl);
 
         // Return reset URL only when email is not configured (dev/local mode)
-        return emailService.isConfigured() ? null : resetUrl;
+        return emailService.canRevealSecrets() ? resetUrl : null;
     }
 
     // =========================
@@ -414,7 +414,7 @@ public class AuthService {
         userRepository.save(user);
         emailService.sendVerificationOtp(normalized, user.getFullName(), rawOtp);
 
-        return emailService.isConfigured() ? null : rawOtp;
+        return emailService.canRevealSecrets() ? rawOtp : null;
     }
 
     // =========================
@@ -455,7 +455,7 @@ public class AuthService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "OTP sent to your phone number");
-        if (!smsService.isConfigured()) {
+        if (smsService.canRevealSecrets()) {
             result.put("devOtp", rawOtp);
             result.put("devNote", "SMS not configured — use this OTP directly for testing");
         }

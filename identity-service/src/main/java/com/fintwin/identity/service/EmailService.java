@@ -24,12 +24,26 @@ public class EmailService {
     @Value("${mail.enabled:false}")
     private boolean mailEnabled;
 
+    @Value("${app.require-secure-config:false}")
+    private boolean requireSecureConfig;
+
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
     public boolean isConfigured() {
         return mailEnabled && mailUsername != null && !mailUsername.isBlank();
+    }
+
+    // Whether a verification OTP or password-reset link may be handed back in
+    // the API response. That is a local-dev convenience: with no mail provider
+    // there is no other way to finish a signup or a reset. In a deployment that
+    // declares itself production it is a hole — the response would give the OTP
+    // or reset link to whoever typed the address, so anyone could verify, or
+    // take over, an account they do not own. There a missing mail config is a
+    // deployment mistake, and startup refuses it outright.
+    public boolean canRevealSecrets() {
+        return !isConfigured() && !requireSecureConfig;
     }
 
     public void sendVerificationOtp(String toEmail, String userName, String otp) {

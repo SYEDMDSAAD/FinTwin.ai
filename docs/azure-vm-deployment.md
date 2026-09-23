@@ -124,6 +124,12 @@ chmod 600 ~/fintwin/.env.prod
 Keep a copy of the two keys in a password manager. `JWT_SECRET` and
 `FINTWIN_ENCRYPTION_KEY` must match what the data was written with.
 
+Mail is **not optional in production.** With no provider configured, sign-up
+returns the verification OTP — and "forgot password" returns the reset link —
+in the API response itself, which is how local development works without a
+mailbox. Anyone could then verify, or take over, an address they do not own, so
+both Java services refuse to start in production with mail unset.
+
 ### 4. Your domain in nginx
 
 `nginx/nginx.conf` ships with `server_name fintwin.local`. Change it to your

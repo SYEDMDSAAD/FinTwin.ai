@@ -85,7 +85,7 @@ public class AuthService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "Registration successful");
-        if (!emailService.isConfigured()) {
+        if (emailService.canRevealSecrets()) {
             result.put("devOtp", rawOtp);
             result.put("devNote", "Email not configured — use this OTP directly for testing");
         }
@@ -274,7 +274,7 @@ public class AuthService {
 
         String resetUrl = appBaseUrl + "/reset-password?token=" + rawToken;
         emailService.sendPasswordResetLink(normalized, user.getFullName(), resetUrl);
-        return emailService.isConfigured() ? null : resetUrl;
+        return emailService.canRevealSecrets() ? resetUrl : null;
     }
 
     // ── Reset Password ────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ public class AuthService {
         user.setEmailVerificationExpiry(LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         emailService.sendVerificationOtp(normalized, user.getFullName(), rawOtp);
-        return emailService.isConfigured() ? null : rawOtp;
+        return emailService.canRevealSecrets() ? rawOtp : null;
     }
 
     // ── Get Me ────────────────────────────────────────────────────────────────

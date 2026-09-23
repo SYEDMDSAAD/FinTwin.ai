@@ -44,6 +44,9 @@ public class SmsService {
     @Value("${sms.provider.alert-template-id:}")
     private String alertTemplateId;
 
+    @Value("${app.require-secure-config:false}")
+    private boolean requireSecureConfig;
+
     @Autowired
     private FinTwinMetrics metrics;
 
@@ -51,6 +54,12 @@ public class SmsService {
 
     public boolean isConfigured() {
         return smsEnabled && apiKey != null && !apiKey.isBlank();
+    }
+
+    // Same rule as EmailService: an OTP only ever comes back in the response
+    // when there is no provider to send it and the deployment is not production.
+    public boolean canRevealSecrets() {
+        return !isConfigured() && !requireSecureConfig;
     }
 
     // ── OTP ──────────────────────────────────────────────────────────────────

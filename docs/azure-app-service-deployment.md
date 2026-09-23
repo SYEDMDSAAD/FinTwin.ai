@@ -51,6 +51,12 @@ slots, which is half the reason to be on App Service at all.
 Same `.env.prod` as the VM setup (see the VM runbook for how to generate the
 keys). It is read by the script below and never committed.
 
+Mail is **not optional in production.** With no provider configured, sign-up
+returns the verification OTP — and "forgot password" returns the reset link —
+in the API response itself, which is how local development works without a
+mailbox. Anyone could then verify, or take over, an address they do not own, so
+both Java services refuse to start in production with mail unset.
+
 ### 2. Create everything
 
 ```bash
@@ -158,7 +164,7 @@ migrations finish while the old version is still serving.
 | App won't start, no logs | Almost always the image pull: check `DOCKER_REGISTRY_SERVER_*` settings |
 | Copilot says it's unavailable | The model is still downloading, or `WEBSITES_ENABLE_APP_SERVICE_STORAGE` got turned off — check `az webapp log tail -n fintwin-ai` |
 | Copilot times out | The plan's CPU is shared across four apps. P1v3 gives 2 vCPU; answers take 30–60 s |
-| Backend exits at startup | `APP_REQUIRE_SECURE_CONFIG=true` refuses dev-default secrets — a required app setting is missing |
+| Backend or identity exits at startup | `APP_REQUIRE_SECURE_CONFIG=true` refuses dev-default secrets and a missing `MAIL_USERNAME`/`MAIL_PASSWORD` — the log names the setting |
 | Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage` — Ollama plus two JVMs is most of 8 GB |
 
 ---

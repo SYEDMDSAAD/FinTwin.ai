@@ -119,6 +119,14 @@ services:
       SETU_WEBHOOK_SECRET:       ${SETU_WEBHOOK_SECRET:-}
       INBOUND_EMAIL_DOMAIN:      ${INBOUND_EMAIL_DOMAIN:-}
       INBOUND_EMAIL_SECRET:      ${INBOUND_EMAIL_SECRET:-}
+      # The backend sends password-reset links and support-ticket replies, so it
+      # needs the same mailbox the identity service uses
+      MAIL_HOST:                 ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT:                 ${MAIL_PORT:-587}
+      MAIL_USERNAME:             ${MAIL_USERNAME:?MAIL_USERNAME is required}
+      MAIL_PASSWORD:             ${MAIL_PASSWORD:?MAIL_PASSWORD is required}
+      MAIL_ENABLED:              ${MAIL_ENABLED:-true}
+      ADMIN_KEY:                 ${ADMIN_KEY:?ADMIN_KEY is required — openssl rand -hex 32}
     deploy:
       resources:
         # -XX:MaxRAMPercentage=75 → ~768 MB heap inside a 1 GB container
@@ -144,11 +152,16 @@ services:
       APP_BASE_URL:           ${APP_BASE_URL:?APP_BASE_URL is required}
       GOOGLE_CLIENT_ID:       ${GOOGLE_CLIENT_ID:-}
       ADMIN_KEY:              ${ADMIN_KEY:-}
-      INTERNAL_KEY:           ${INTERNAL_KEY:-}
+      INTERNAL_KEY:           ${INTERNAL_KEY:?INTERNAL_KEY is required — the backend uses it for /api/token/introspect}
+      APP_REQUIRE_SECURE_CONFIG: "true"          # refuse to start on dev defaults
+      # Required, not optional: with no mail provider this service hands the
+      # verification OTP and the password-reset link back in the API response,
+      # so anyone could verify — or take over — an address they do not own.
+      # Startup refuses that combination now, which is why these are :? checks.
       MAIL_HOST:              ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT:              ${MAIL_PORT:-587}
-      MAIL_USERNAME:          ${MAIL_USERNAME:-}
-      MAIL_PASSWORD:          ${MAIL_PASSWORD:-}
+      MAIL_USERNAME:          ${MAIL_USERNAME:?MAIL_USERNAME is required — sign-up verification mail cannot be sent without it}
+      MAIL_PASSWORD:          ${MAIL_PASSWORD:?MAIL_PASSWORD is required — an app password, not the account password}
       MAIL_ENABLED:           ${MAIL_ENABLED:-true}
     deploy:
       resources:
