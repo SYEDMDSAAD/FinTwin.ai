@@ -369,7 +369,7 @@ function TxTheater() {
 
       <div className="tx-theater-footer">
         <span style={{ fontSize: 14 }}>🤖</span>
-        <span className="tx-ai-tag">phi3:mini · self-hosted · your data never leaves</span>
+        <span className="tx-ai-tag">qwen2.5 · self-hosted · your data never leaves</span>
       </div>
     </div>
   );
@@ -533,7 +533,7 @@ export default function LandingPage() {
           <div>
             <div className="hero-badge h-el-1" aria-label="Product highlights">
               <div className="hero-badge-dot" aria-hidden="true" />
-              Self-hosted AI · RBI Account Aggregator · AES-256
+              Self-hosted AI · Statement import · AES-256
             </div>
 
             <h1 className="hero-h1 h-el-2" id="hero-heading">
@@ -542,7 +542,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="hero-sub h-el-3">
-              FinTwin AI links your bank accounts via RBI consent, runs its AI on our own servers — not Google's — and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go.
+              FinTwin AI reads your bank and UPI statements, runs its AI on our own servers — not Google's — and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Bank linking through RBI's Account Aggregator is in testing.
             </p>
 
             <div className="hero-ctas h-el-4">
@@ -564,8 +564,8 @@ export default function LandingPage() {
 
             <div className="hero-stats h-el-5">
               <div>
-                <div className="hero-stat-val"><span className="rupee">₹</span>500Cr+</div>
-                <div className="hero-stat-label">Total tracked</div>
+                <div className="hero-stat-val">Beta</div>
+                <div className="hero-stat-label">Early access</div>
               </div>
               <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
               <div>
@@ -811,7 +811,7 @@ export default function LandingPage() {
                 <div className="feat-card-icon" style={{ background: "rgba(34,211,238,0.1)" }} aria-hidden="true">📈</div>
                 <div className="feat-card-title">Net worth & investment tracking</div>
                 <div className="feat-card-desc">
-                  EPF, mutual funds, FDs, gold, real estate — one net worth number updated daily. Linked via RBI AA for bank data, manual entry for the rest.
+                  EPF, mutual funds, FDs, gold, real estate — one net worth number updated daily, from your imported statements and what you add by hand.
                 </div>
                 <div className="inset-panel" style={{ marginTop: 16, padding: 14, borderRadius: 12, display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -960,7 +960,7 @@ export default function LandingPage() {
               <div className="price-features" role="list">
                 {[
                   "AI Copilot with 5 advisor personalities",
-                  "RBI Account Aggregator bank linking",
+                  "Bank & UPI statement import (PDF, Excel, CSV)",
                   "Auto-categorization & recurring expense detection",
                   "Financial score + goal planning",
                   "Anomaly detection & fraud alerts",
@@ -1002,7 +1002,7 @@ export default function LandingPage() {
               waiting to be <span className="gt-purple">understood.</span>
             </h2>
             <p className="cta-sub">
-              Join the people who stopped guessing and started knowing. Free, private, built for India.
+              Stop guessing and start knowing. Free, private, built for India.
             </p>
             <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
               {isLoggedIn ? (
@@ -1050,7 +1050,7 @@ export default function LandingPage() {
                 <span className="lnav-wordmark">FinTwin<span> AI</span></span>
               </div>
               <p className="footer-brand-desc">
-                AI-powered personal finance OS for India. Self-hosted AI, RBI AA bank linking, bank-level security. Know your money.
+                AI-powered personal finance OS for India. Self-hosted AI, statement import, bank-level security. Know your money.
               </p>
             </div>
 

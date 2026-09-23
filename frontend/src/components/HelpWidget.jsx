@@ -1,13 +1,35 @@
 import { useState } from "react";
-import { HelpCircle, X, Search, MessageCircle, Home, ChevronRight } from "lucide-react";
+import { HelpCircle, X, Search, MessageCircle, Home, ChevronRight, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
+import API from "../services/api";
 
-const QUICK_LINKS = [
-  "Understanding your Financial Score",
-  "How AI Forecasts Work",
-  "Connecting Bank Accounts FAQ",
-  "Managing Budgets",
-  "Setting Financial Goals",
+// Real answers, not links to articles that don't exist. Anything that changes
+// in the app (bank linking, the model) should change here too.
+const FAQ = [
+  {
+    q: "How is my Financial Score calculated?",
+    a: "From your savings rate, debt-to-income ratio, emergency-fund cover and net-worth trend. It is computed in one place on the server, so the dashboard, reports and Copilot always quote the same number.",
+  },
+  {
+    q: "Where do the AI answers and forecasts come from?",
+    a: "A qwen2.5 model running on FinTwin's own server. Your transactions are never sent to an outside AI provider. Forecasts extrapolate from your own history, so they sharpen once a few months are imported.",
+  },
+  {
+    q: "Can I connect my bank account?",
+    a: "Not yet for real accounts — bank linking through RBI's Account Aggregator is still in testing, and the Connect Bank button on Transactions is a demo sandbox. For your real data, import a PDF, Excel or CSV statement from Imports.",
+  },
+  {
+    q: "A transaction is in the wrong category. What do I do?",
+    a: "Change it. FinTwin learns the payee, so every other transaction with that same payee — past and future — moves with it. Corrections are the main thing making categorisation better during the beta.",
+  },
+  {
+    q: "How do budgets and goals work?",
+    a: "Budgets are monthly caps per category and reset each month. Goals are funded from what you actually save each month, in the priority order you set, so the dates shown are the ones your saving supports.",
+  },
+  {
+    q: "Is my financial data encrypted?",
+    a: "Amounts, payee names and personal fields are encrypted with AES-256-GCM before they reach the database, and passwords are stored as bcrypt hashes. You can delete your account and all its data from Settings.",
+  },
 ];
 
 const CSS = `
@@ -30,11 +52,65 @@ export default function HelpWidget() {
   const [activeTab, setActiveTab] = useState("home");
   const [search, setSearch]       = useState("");
   const [message, setMessage]     = useState("");
+  const [sending, setSending]     = useState(false);
+  const [openFaq, setOpenFaq]     = useState(null);
 
-  const name = localStorage.getItem("fullName") || "there";
+  const user  = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; } })();
+  const email = user.email || "";
+  const name  = user.fullName || localStorage.getItem("fullName") || "there";
 
-  const filteredLinks = QUICK_LINKS.filter(l =>
-    !search || l.toLowerCase().includes(search.toLowerCase())
+  const needle = search.trim().toLowerCase();
+  const filteredLinks = FAQ.filter(f =>
+    !needle || f.q.toLowerCase().includes(needle) || f.a.toLowerCase().includes(needle)
+  );
+
+  // The message goes to the same ticket queue the login page and the admin
+  // Support Tickets tab use — nothing here is a placeholder.
+  const send = async () => {
+    if (!message.trim()) { toast.error("Please write a message."); return; }
+    if (!email)          { toast.error("Please sign in again — we need your email to reply."); return; }
+    try {
+      setSending(true);
+      await API.post("/tickets", {
+        email,
+        name: user.fullName || "",
+        category: "OTHER",
+        message: message.trim(),
+      });
+      toast.success(`Sent. We'll reply to ${email}.`);
+      setMessage("");
+      setActiveTab("home");
+    } catch {
+      toast.error("Couldn't send that. Please try again in a moment.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const faqRow = (f) => (
+    <div key={f.q} style={{ display: "flex", flexDirection: "column" }}>
+      <div
+        className="help-link-row"
+        onClick={() => setOpenFaq(o => (o === f.q ? null : f.q))}
+        style={openFaq === f.q ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : undefined}
+      >
+        <span style={{ paddingRight: 8 }}>{f.q}</span>
+        {openFaq === f.q
+          ? <ChevronDown  size={14} color="#a78bfa" style={{ flexShrink: 0 }} />
+          : <ChevronRight size={14} color="rgba(148,163,184,0.4)" style={{ flexShrink: 0 }} />}
+      </div>
+      {openFaq === f.q && (
+        <p style={{
+          margin: 0, padding: "10px 12px 12px",
+          fontSize: 12, lineHeight: 1.55, color: "rgba(148,163,184,0.75)",
+          background: "rgba(167,139,250,0.05)",
+          border: "1px solid rgba(167,139,250,0.15)", borderTop: "none",
+          borderRadius: "0 0 10px 10px",
+        }}>
+          {f.a}
+        </p>
+      )}
+    </div>
   );
 
   return (
@@ -109,7 +185,7 @@ export default function HelpWidget() {
                 >
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Send us a message</div>
-                    <div style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>We typically reply within 24 hours</div>
+                    <div style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>A real person reads every message</div>
                   </div>
                   <ChevronRight size={16} color="#a78bfa" />
                 </div>
@@ -135,12 +211,7 @@ export default function HelpWidget() {
 
                 {/* Quick links */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {filteredLinks.map(link => (
-                    <div key={link} className="help-link-row">
-                      {link}
-                      <ChevronRight size={14} color="rgba(148,163,184,0.4)" />
-                    </div>
-                  ))}
+                  {filteredLinks.map(faqRow)}
                   {filteredLinks.length === 0 && (
                     <p style={{ fontSize: 12, color: "rgba(148,163,184,0.4)", textAlign: "center", padding: "12px 0" }}>
                       No results for "{search}"
@@ -162,7 +233,9 @@ export default function HelpWidget() {
                   Send us a message
                 </h3>
                 <p style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", margin: "0 0 14px" }}>
-                  We'll reply to your registered email.
+                  {email
+                    ? <>This opens a support ticket. We'll reply to <span style={{ color: "rgba(226,232,240,0.85)" }}>{email}</span>.</>
+                    : "Sign in again so we have an email to reply to."}
                 </p>
                 <textarea
                   value={message}
@@ -177,19 +250,17 @@ export default function HelpWidget() {
                   }}
                 />
                 <button
-                  onClick={() => {
-                    if (!message.trim()) { toast.error("Please write a message."); return; }
-                    toast.success("Message sent! We'll reply within 24 hours.");
-                    setMessage(""); setActiveTab("home");
-                  }}
+                  onClick={send}
+                  disabled={sending}
                   style={{
                     padding: "12px", borderRadius: 12, border: "none",
                     background: "linear-gradient(135deg,#a78bfa,#7c3aed)",
                     color: "#fff", fontSize: 13, fontWeight: 700,
-                    cursor: "pointer", fontFamily: "inherit",
+                    cursor: sending ? "default" : "pointer", fontFamily: "inherit",
+                    opacity: sending ? 0.6 : 1,
                   }}
                 >
-                  Send Message
+                  {sending ? "Sending..." : "Send Message"}
                 </button>
               </div>
             )}
@@ -200,12 +271,7 @@ export default function HelpWidget() {
                   Help Articles
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {QUICK_LINKS.map(link => (
-                    <div key={link} className="help-link-row">
-                      {link}
-                      <ChevronRight size={14} color="rgba(148,163,184,0.4)" />
-                    </div>
-                  ))}
+                  {FAQ.map(faqRow)}
                 </div>
               </div>
             )}
