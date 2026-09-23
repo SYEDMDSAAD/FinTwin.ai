@@ -333,3 +333,18 @@ the current version, so rotating a secret does not mean editing app settings.
   or the apps cannot read it.
 - **Cost is negligible** — a standard vault is about $0.03 per 10,000
   operations, and four apps starting read a handful each.
+
+
+│ Vault secret name │        Replaces        │  Used by  │
+├───────────────────┼────────────────────────┼───────────┤
+│ jwt-secret        │ JWT_SECRET             │ api, auth │
+├───────────────────┼────────────────────────┼───────────┤
+│ encryption-key    │ FINTWIN_ENCRYPTION_KEY │ api, auth │
+├───────────────────┼────────────────────────┼───────────┤
+│ db-password       │ DB_PASSWORD            │ api, auth │
+├───────────────────┼────────────────────────┼───────────┤
+│ ai-internal-key   │ AI_INTERNAL_KEY        │ api, ai   │
+├───────────────────┼────────────────────────┼───────────┤
+│ admin-key         │ ADMIN_KEY              │ api, auth │
+├───────────────────┼────────────────────────┼───────────┤
+│ mail-password     │ MAIL_PASSWORD          │ api, auth │
