@@ -232,3 +232,104 @@ STARTUP ABORTED: insecure configuration in a production profile.
    variable; Azure never sees it.
 3. **`BACKEND_HOST` written as `https://fintwin-api.azurewebsites.net`.** nginx
    wants the bare hostname — with the scheme, every `/api` call 502s.
+
+---
+
+## 11. Key Vault
+
+Optional, and worth doing: it takes the secret *values* out of the App Service
+settings blade, so the portal, `az webapp config appsettings list`, and anyone
+with Reader access see a reference instead of your database password. The app
+never sees the difference — App Service resolves the reference at startup and
+hands the value to the container as an ordinary environment variable.
+
+```bash
+FINTWIN_ENV_FILE=.env.prod scripts/azure-keyvault-setup.sh
+```
+
+That script does everything below. Read on if you would rather do it by hand,
+or want to know what it did.
+
+### What goes in the vault
+
+Six secrets. Vault names allow letters, digits and dashes only — no underscores
+— so they are not simply the variable names:
+
+| Vault secret | App setting it replaces | Which apps |
+|---|---|---|
+| `jwt-secret` | `JWT_SECRET` | api, auth |
+| `encryption-key` | `FINTWIN_ENCRYPTION_KEY` | api, auth |
+| `db-password` | `DB_PASSWORD` | api, auth |
+| `ai-internal-key` | `AI_INTERNAL_KEY` | api, ai |
+| `admin-key` | `ADMIN_KEY` | api, auth |
+| `mail-password` | `MAIL_PASSWORD` | api, auth |
+
+And these only if you switch those features on: `internal-key`,
+`setu-client-secret`, `setu-webhook-secret`, `inbound-email-secret`,
+`sms-api-key`.
+
+### What stays a plain app setting
+
+Everything else in sections 3–7 — ports, the `azurewebsites.net` URLs,
+`OLLAMA_MODEL`, `DDL_AUTO`, `APP_REQUIRE_SECURE_CONFIG`, `MAIL_HOST`,
+`MAIL_PORT`, `MAIL_FROM`, `DB_URL`, `DB_USERNAME`. None of it is secret, and a
+Key Vault reference is one more thing that can fail at startup.
+
+Three that must **not** move into the vault:
+
+- **`GOOGLE_CLIENT_ID`** — a public client id. It ships inside the JavaScript
+  bundle; hiding it in a vault would be theatre.
+- **`VITE_GOOGLE_CLIENT_ID`** — a GitHub build variable, baked into the bundle
+  before Azure is involved. Azure never reads it.
+- **`DOCKER_REGISTRY_SERVER_PASSWORD`** — used to *pull the image*, before the
+  app runs, so a reference may not have resolved yet. Leave it as a plain
+  setting, or avoid it entirely by making the GHCR packages public.
+
+### Doing it by hand
+
+```bash
+# 1. A vault using RBAC rather than the older access policies
+az keyvault create -g fintwin -n fintwin-kv -l centralindia \
+    --enable-rbac-authorization true
+
+VAULT_ID=$(az keyvault show -g fintwin -n fintwin-kv --query id -o tsv)
+
+# 2. Let yourself write secrets (creating a vault does not grant this)
+az role assignment create --role "Key Vault Secrets Officer" \
+    --assignee-object-id "$(az ad signed-in-user show --query id -o tsv)" \
+    --assignee-principal-type User --scope "$VAULT_ID"
+
+# 3. Store each secret
+az keyvault secret set --vault-name fintwin-kv -n jwt-secret --value "<value>"
+
+# 4. Give each app an identity that may read the vault
+az webapp identity assign -g fintwin -n fintwin-api
+az role assignment create --role "Key Vault Secrets User" \
+    --assignee-object-id "$(az webapp identity show -g fintwin -n fintwin-api --query principalId -o tsv)" \
+    --assignee-principal-type ServicePrincipal --scope "$VAULT_ID"
+
+# 5. Replace the setting with a reference
+az webapp config appsettings set -g fintwin -n fintwin-api --settings \
+    JWT_SECRET="@Microsoft.KeyVault(SecretUri=https://fintwin-kv.vault.azure.net/secrets/jwt-secret/)"
+```
+
+The trailing slash after the secret name matters: with it, the app always gets
+the current version, so rotating a secret does not mean editing app settings.
+
+### Things that bite
+
+- **Role assignments take a minute to propagate.** A 403 right after granting
+  access usually means "too soon", not "wrong role". The script sleeps for this.
+- **A broken reference fails at startup, not at deploy.** The settings blade
+  marks the reference red, and `az webapp log tail` shows the app exiting. Check
+  after the first run: `az webapp config appsettings list -g fintwin -n fintwin-api
+  --query "[?contains(value,'KeyVault')]" -o table`.
+- **Rotation needs a restart.** References resolve when the app starts (and
+  refresh within 24 hours). After changing a secret, restart the apps using it.
+- **`FINTWIN_ENCRYPTION_KEY` is not rotatable this way.** Existing rows are
+  encrypted with the old key; changing it makes them unreadable. Treat the vault
+  as the place it is kept, not a place it changes.
+- **If you put the vault behind a firewall**, allow trusted Microsoft services,
+  or the apps cannot read it.
+- **Cost is negligible** — a standard vault is about $0.03 per 10,000
+  operations, and four apps starting read a handful each.
