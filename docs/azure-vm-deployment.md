@@ -121,7 +121,8 @@ EOF
 chmod 600 ~/fintwin/.env.prod
 ```
 
-Keep a copy of the two keys in a password manager. `JWT_SECRET` and
+[azure-env-variables.md](azure-env-variables.md) explains what every one of
+these is for. Keep a copy of the two keys in a password manager. `JWT_SECRET` and
 `FINTWIN_ENCRYPTION_KEY` must match what the data was written with.
 
 Mail is **not optional in production.** With no provider configured, sign-up

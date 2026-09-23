@@ -152,7 +152,7 @@ services:
       APP_BASE_URL:           ${APP_BASE_URL:?APP_BASE_URL is required}
       GOOGLE_CLIENT_ID:       ${GOOGLE_CLIENT_ID:-}
       ADMIN_KEY:              ${ADMIN_KEY:-}
-      INTERNAL_KEY:           ${INTERNAL_KEY:?INTERNAL_KEY is required — the backend uses it for /api/token/introspect}
+      INTERNAL_KEY:           ${INTERNAL_KEY:-}   # only needed if something calls /api/token/introspect
       APP_REQUIRE_SECURE_CONFIG: "true"          # refuse to start on dev defaults
       # Required, not optional: with no mail provider this service hands the
       # verification OTP and the password-reset link back in the API response,

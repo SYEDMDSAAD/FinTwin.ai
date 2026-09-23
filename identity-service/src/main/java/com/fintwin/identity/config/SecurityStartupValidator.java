@@ -58,8 +58,11 @@ public class SecurityStartupValidator {
         if (encryptionKey == null || encryptionKey.isBlank()) {
             problems.add("FINTWIN_ENCRYPTION_KEY is not set. The dev fallback key is in use — stored emails are weakly protected.");
         }
+        // A warning, not a blocker: /api/token/introspect fails closed without
+        // this key, and nothing calls it today — the backend verifies JWTs with
+        // the shared JWT_SECRET instead.
         if (internalKey == null || internalKey.isBlank()) {
-            problems.add("INTERNAL_KEY is not set. /api/token/introspect cannot authenticate the backend.");
+            log.warn("[SECURITY] INTERNAL_KEY is not set — /api/token/introspect will reject every call.");
         }
         // Without a mail provider there is no way to deliver a verification OTP
         // or a reset link, and the API falls back to returning them in the

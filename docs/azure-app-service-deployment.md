@@ -50,6 +50,8 @@ slots, which is half the reason to be on App Service at all.
 
 Same `.env.prod` as the VM setup (see the VM runbook for how to generate the
 keys). It is read by the script below and never committed.
+[azure-env-variables.md](azure-env-variables.md) lists every variable each of
+the four apps needs, with the exact value to paste.
 
 Mail is **not optional in production.** With no provider configured, sign-up
 returns the verification OTP — and "forgot password" returns the reset link —
