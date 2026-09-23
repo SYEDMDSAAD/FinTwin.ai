@@ -32,7 +32,7 @@ pillow==12.3.0      # 11 HIGH CVEs (heap OOB write, decompression-bomb bypass) f
 pytesseract==0.3.13
 
 # ── Market data (were missing — required by investments/price_service.py) ────
-yfinance==1.4.1
+yfinance==1.5.1
 
 # ── Statement import: PDF / Excel → grid (statements/extract.py) ─────────────
 pdfplumber==0.11.10
