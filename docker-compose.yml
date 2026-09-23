@@ -50,11 +50,38 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     environment:
       AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
       REDIS_URL:        redis://redis:6379
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      OLLAMA_URL:      http://ollama:11434/api/generate
     # No `ports:` — only reachable by Spring Boot on the fintwin network
+
+  # ── Ollama — the local model the copilot, coach and reports run on ──────────
+  # Keeps the model in memory between requests; the volume keeps the download
+  # across restarts, so a redeploy doesn't re-fetch ~2 GB.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    networks: [fintwin]
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+    # No `ports:` — only the AI service talks to it
+
+  # Pulls the model once, then exits. Without this the first copilot question
+  # fails: Ollama only downloads a model when it is asked to.
+  ollama-pull:
+    image: ollama/ollama:latest
+    networks: [fintwin]
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}"]
+    restart: "no"
 
   # ── Spring Boot Backend ─────────────────────────────────────────────────────
   backend:
@@ -195,6 +222,7 @@ services:
       - production   # start with: docker compose --profile production up -d
 
 volumes:
+  ollama:          # model files — ~2 GB, keep across restarts
   pgdata:
   redisdata:
   prometheusdata:

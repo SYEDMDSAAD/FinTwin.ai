@@ -83,7 +83,7 @@ public class FinTwinMetrics {
 }
 ```
 
-Add Prometheus scrape config and Grafana deployment to `k8s/monitoring/`.
+Prometheus and Grafana run from `docker-compose.yml` locally; the single-VM production setup leaves them out to save memory (see docs/azure-vm-deployment.md).
 
 **b) Distributed Tracing (OpenTelemetry)**
 
@@ -769,7 +769,7 @@ Create:
 - `application-staging.properties` — staging DB, real Setu sandbox, SMS disabled
 - `application-prod.properties` — prod DB, full TLS, JSON logging, all services enabled
 
-Activate with: `SPRING_PROFILES_ACTIVE=prod` in Docker/k8s env.
+Activate with: `SPRING_PROFILES_ACTIVE=prod` in the container's environment.
 
 Each profile file overrides only what changes — the base file holds the structural config.
 
