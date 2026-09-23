@@ -38,7 +38,7 @@ yfinance==1.4.1
 pdfplumber==0.11.10
 pdfminer.six==20260107     # pdfplumber's text layer; opens AES-encrypted bank PDFs
 pypdfium2==5.13.0
-cryptography==48.0.0       # pdfminer.six: AES decryption for password-protected PDFs
+cryptography==50.0.1       # pdfminer.six: AES decryption for password-protected PDFs
 cffi==2.0.0
 pycparser==3.0
 charset-normalizer==3.4.7
