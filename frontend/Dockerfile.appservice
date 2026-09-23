@@ -1,0 +1,31 @@
+# The React app plus the front-door proxy, for Azure App Service.
+#
+# Build from the REPO ROOT, because it needs both the frontend and the nginx
+# config:
+#   docker build -f frontend/Dockerfile.appservice -t fintwin-frontend-as .
+#
+# Differs from frontend/Dockerfile only in the config it carries: the VM mounts
+# nginx/nginx.conf from the repo (and does its own TLS), while App Service has
+# no volumes — the config has to be in the image, with the two backend
+# hostnames filled in at start from the web app's settings.
+
+FROM node:26-alpine AS build
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# nginx's own entrypoint substitutes ${BACKEND_HOST}, ${IDENTITY_HOST} and
+# ${PORT} into anything in /etc/nginx/templates and writes it to conf.d.
+# Only real environment variables are substituted, so nginx's own $remote_addr
+# and $uri come through untouched.
+COPY nginx/nginx.appservice.conf.template /etc/nginx/templates/default.conf.template
+
+ENV PORT=8080 \
+    NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+
+EXPOSE 8080

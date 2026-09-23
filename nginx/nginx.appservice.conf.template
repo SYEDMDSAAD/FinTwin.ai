@@ -1,0 +1,103 @@
+# The front door on Azure App Service: serves the React app and proxies the
+# API to the other two web apps.
+#
+# Why a proxy at all, when each service already has its own URL: keeping one
+# origin means the browser sends no cross-origin requests, so CORS, cookies and
+# the frontend's relative "/api/..." paths all keep working unchanged. Pointing
+# the browser at three hostnames would mean changing the frontend, widening
+# CORS, and exposing the services directly.
+#
+# App Service terminates TLS in front of this, so there is no ssl_certificate
+# here — that is the one real difference from nginx.conf, which does its own TLS
+# on the VM.
+#
+# BACKEND_HOST and IDENTITY_HOST come from the web app's settings and are
+# substituted into this template at container start (nginx's envsubst entrypoint
+# reads /etc/nginx/templates/*.template).
+
+server {
+    listen ${PORT};
+    server_name _;
+
+    # Resolve the other web apps per request, not once at startup. nginx
+    # resolves a literal upstream name when it starts and then keeps that IP
+    # for good: the front door would refuse to start while a backend was still
+    # deploying, and would keep talking to a stale address after App Service
+    # moved it. Going through a variable defers the lookup to request time.
+    resolver 168.63.129.16 8.8.8.8 valid=30s ipv6=off;   # 168.63.129.16 = Azure DNS
+    set $backend_host  ${BACKEND_HOST};
+    set $identity_host ${IDENTITY_HOST};
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    server_tokens off;
+
+    add_header X-Content-Type-Options "nosniff"                         always;
+    add_header X-Frame-Options        "DENY"                            always;
+    add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy     "camera=(), microphone=(), geolocation=()" always;
+    add_header X-XSS-Protection       "0"                               always;
+
+    # Statement PDFs and receipt photos: matches the backend's 25 MB cap
+    client_max_body_size 27m;
+
+    # Health probe for App Service — answered here, not proxied, so the front
+    # door reports healthy even while a backend restarts
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Identity service — sign-up, login, 2FA, tokens, admin bootstrap
+    location ~ ^/api/(auth|2fa|token|admin)(/|$) {
+        proxy_pass         https://$identity_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $identity_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+    }
+
+    location /admin/ {
+        proxy_pass         https://$identity_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $identity_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+    }
+
+    # Everything else under /api goes to the main backend
+    location /api/ {
+        proxy_pass         https://$backend_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $backend_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+
+        # Copilot answers take up to 90 s and a long statement PDF about the
+        # same; App Service's own limit is 230 s, so this stays under it
+        proxy_read_timeout 100s;
+    }
+
+    # The backend's health endpoint, for checks from outside
+    location = /actuator/health {
+        proxy_pass         https://$backend_host/actuator/health;
+        proxy_set_header   Host $backend_host;
+        proxy_ssl_server_name on;
+        access_log off;
+    }
+
+    # React router — every other path is the app itself
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

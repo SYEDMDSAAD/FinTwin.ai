@@ -1,0 +1,41 @@
+# The AI service and Ollama in one image, for Azure App Service.
+#
+# App Service runs one container per web app — there is no second container to
+# put the model in, so the model server lives here and is started alongside
+# uvicorn. On the VM these are two containers (docker-compose.azure.yml); this
+# file exists only because App Service can't express that.
+#
+#   docker build -f Dockerfile.appservice -t fintwin-ai-ollama .
+#
+# The image is ~1 GB; the model (~2 GB) is NOT baked in. It downloads on first
+# start into /home/ollama, which App Service keeps across restarts and
+# redeploys when WEBSITES_ENABLE_APP_SERVICE_STORAGE=true.
+
+FROM python:3.12-slim
+
+# curl for the Ollama installer and the health check; ca-certificates for TLS
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+# Where Ollama keeps models: App Service persists /home, so a restart doesn't
+# re-download 2 GB
+ENV OLLAMA_MODELS=/home/ollama \
+    OLLAMA_HOST=127.0.0.1:11434 \
+    OLLAMA_URL=http://127.0.0.1:11434/api/generate \
+    OLLAMA_MODEL=qwen2.5:3b \
+    OLLAMA_KEEP_ALIVE=30m \
+    PORT=8000
+
+EXPOSE 8000
+
+COPY start-appservice.sh /usr/local/bin/start-appservice.sh
+RUN chmod +x /usr/local/bin/start-appservice.sh
+CMD ["/usr/local/bin/start-appservice.sh"]
