@@ -15,7 +15,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,16 +88,12 @@ public class ChatService {
                 : Map.of("reply", reply);
     }
 
-    @CircuitBreaker(name = "ai-service", fallbackMethod = "chatFallback")
+    // The circuit breaker lives on the provider (OllamaAIProvider.chatWithTrace):
+    // Spring applies @CircuitBreaker through the bean's proxy, which a call
+    // from inside this class would bypass. When it is open the call fails
+    // fast, and TransactionController turns that into its "unavailable" reply.
     AIProvider.ChatResult callAiProvider(String message, String mode, FinancialSummaryDTO summary) {
         return aiProvider.chatWithTrace(message, mode, summary);
-    }
-
-    @SuppressWarnings("unused")
-    AIProvider.ChatResult chatFallback(String message, String mode, FinancialSummaryDTO summary, Exception ex) {
-        log.warn("AI chat circuit open ({}), returning fallback", ex.getMessage());
-        return new AIProvider.ChatResult("FinTwin AI is temporarily unavailable. Please try again in a moment.",
-                Map.of("path", "unavailable", "error", ex.getClass().getSimpleName()));
     }
 
     // ── History ───────────────────────────────────────────────────────────────────

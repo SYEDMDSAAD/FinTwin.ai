@@ -72,6 +72,14 @@ def test_report_makes_a_single_llm_call(mock_ask):
     assert mock_ask.call_count == 1
 
 
+@patch("chatbot.report_generator.ask")
+def test_report_call_finishes_inside_the_backend_deadline(mock_ask):
+    """The backend waits 20 s; without a timeout ask() would wait 120 s."""
+    mock_ask.return_value = _model_reply()
+    generate_weekly_report(_data())
+    assert mock_ask.call_args.kwargs["timeout"] <= 15
+
+
 # ── Structured output ────────────────────────────────────────────────────────
 
 @patch("chatbot.report_generator.ask")

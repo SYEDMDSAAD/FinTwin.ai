@@ -31,6 +31,7 @@ def test_get_transactions_passes_filters(mock_get):
     mock_get.assert_called_once_with(
         "/8/transactions",
         {"sort": "amount", "type": "expense", "limit": 3, "months": 3, "category": "Other"},
+        None,
     )
     assert json.loads(out)["totalMatching"] == 1
 
@@ -46,6 +47,7 @@ def test_get_transactions_group_by_passes_through(mock_get):
     mock_get.assert_called_once_with(
         "/8/transactions",
         {"sort": "amount", "type": "income", "limit": 10, "months": 3, "groupBy": "merchant"},
+        None,
     )
 
 
@@ -65,6 +67,36 @@ def test_parameterless_tools_route_to_right_endpoints(mock_get):
     tools.execute_tool("get_portfolio", {}, user_id=8)
     called_paths = [c.args[0] for c in mock_get.call_args_list]
     assert called_paths == ["/8/budgets", "/8/goals", "/8/networth", "/8/portfolio"]
+
+
+@patch("chatbot.tools.backend_api.get")
+def test_every_tool_forwards_the_tool_token(mock_get):
+    """The backend refuses a tool call without the token it minted for this user."""
+    mock_get.return_value = {}
+    for name in ("get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio"):
+        tools.execute_tool(name, {}, user_id=8, tool_token="8.999.sig")
+    assert [c.args[2] for c in mock_get.call_args_list] == ["8.999.sig"] * 5
+
+
+@patch("chatbot.advisor.execute_tool")
+@patch("chatbot.advisor.chat")
+def test_copilot_uses_the_token_from_the_backend_request(mock_chat, mock_exec):
+    mock_chat.side_effect = [
+        {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "get_budgets", "arguments": {}}}]},
+        {"role": "assistant", "content": "All budgets are fine."},
+    ]
+    mock_exec.return_value = json.dumps({"budgets": []})
+    generate_financial_advice("am I within budget?", {**_BASE_DATA, "toolToken": "tok-1"}, "Budget Coach")
+    assert mock_exec.call_args.args[3] == "tok-1"
+
+
+@patch("chatbot.tools.backend_api.requests.get")
+def test_backend_client_sends_the_token_header(mock_requests_get):
+    mock_requests_get.return_value.json.return_value = {}
+    mock_requests_get.return_value.raise_for_status.return_value = None
+    from utils import backend_api
+    backend_api.get("/8/budgets", None, "tok-2")
+    assert mock_requests_get.call_args.kwargs["headers"]["X-Tool-Token"] == "tok-2"
 
 
 def test_unknown_tool_returns_error_json():
@@ -135,7 +167,10 @@ def test_tool_path_crash_falls_back_to_legacy(mock_chat, mock_ask):
 @patch("chatbot.advisor.chat", side_effect=RuntimeError("ollama down"))
 def test_ollama_down_returns_canned_fallback(mock_chat):
     reply = generate_financial_advice("hello", _BASE_DATA, "Savings Advisor")
-    assert "temporary" in reply.lower() or "Temporary" in reply
+    assert reply == advisor._FALLBACK
+    # Users are told what to do, never how to run the server
+    assert "try again" in reply.lower()
+    assert "ollama" not in reply.lower()
 
 # ── Time budget: a copilot answer must finish before the backend gives up ────
 
@@ -223,7 +258,7 @@ def test_get_portfolio_passes_a_known_type_and_drops_anything_else(mock_get):
     tools.execute_tool("get_portfolio", {"type": "Real Estate"}, user_id=8)
     tools.execute_tool("get_portfolio", {}, user_id=8)
     assert [c.args for c in mock_get.call_args_list] == [
-        ("/8/portfolio", {"type": "Mutual Fund"}), ("/8/portfolio", None), ("/8/portfolio", None)]
+        ("/8/portfolio", {"type": "Mutual Fund"}, None), ("/8/portfolio", None, None), ("/8/portfolio", None, None)]
 
 
 @patch("chatbot.tools.backend_api.get")

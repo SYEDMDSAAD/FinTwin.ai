@@ -139,7 +139,7 @@ public class InvestmentRecommendationService {
         List<Map<String, Object>> recs = new ArrayList<>();
         if (monthlySavings > 0) {
             recs.add(rec("Fixed Deposit", 50, monthlySavings * 0.50,
-                    "Guaranteed 6-7% returns while detailed analysis is unavailable."));
+                    "Predictable, low-risk returns while detailed analysis is unavailable."));
             recs.add(rec("Index Fund SIP", 30, monthlySavings * 0.30,
                     "Low-cost diversified equity exposure for long-term growth."));
             recs.add(rec("Emergency Fund", 20, monthlySavings * 0.20,
