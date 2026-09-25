@@ -17,7 +17,7 @@ this file, and nothing secret should ever be committed to this repo.**
 
 ## 1. Five secrets you generate once
 
-Run these four commands, paste each output into `.env.prod`, and keep a copy in
+Run these five commands, paste each output into `.env.prod`, and keep a copy in
 a password manager:
 
 ```bash
@@ -25,6 +25,7 @@ openssl rand -base64 48    # JWT_SECRET
 openssl rand -base64 32    # FINTWIN_ENCRYPTION_KEY
 openssl rand -base64 32    # AI_INTERNAL_KEY
 openssl rand -base64 32    # ADMIN_KEY
+openssl rand -hex 32       # METRICS_TOKEN
 ```
 
 | Name | What it does | If you lose it |
@@ -33,6 +34,7 @@ openssl rand -base64 32    # ADMIN_KEY
 | `FINTWIN_ENCRYPTION_KEY` | Encrypts names, emails, amounts and categories in the database | **Every stored value becomes unreadable. There is no recovery** |
 | `AI_INTERNAL_KEY` | The backend's password to the AI service. Same value in both apps | Copilot stops answering until both match again |
 | `ADMIN_KEY` | Unlocks the admin bootstrap endpoint | Regenerate freely |
+| `METRICS_TOKEN` | Lets Grafana Cloud read `/actuator/prometheus` and `/metrics`, which are otherwise closed. Same value in api, ai and Grafana Cloud's scrape jobs | Monitoring goes blank and the service-down alert fires. Regenerate and update all three |
 
 `JWT_SECRET` and `FINTWIN_ENCRYPTION_KEY` **must match what your data was
 written with.** Your Supabase database already holds data encrypted with the
@@ -82,6 +84,8 @@ or Google sign-in fails in production.
 | `FINTWIN_ENCRYPTION_KEY` | your generated/copied value |
 | `AI_INTERNAL_KEY` | your generated value |
 | `ADMIN_KEY` | your generated value |
+| `METRICS_TOKEN` | your generated value |
+| `GRAFANA_URL` | optional: your Grafana Cloud dashboard link, shown on the admin Monitoring tab |
 | `AI_SERVICE_URL` | `https://fintwin-ai.azurewebsites.net` **[URL]** |
 | `CORS_ALLOWED_ORIGINS` | `https://fintwin-web.azurewebsites.net` **[URL]** |
 | `MAIL_ENABLED` | `true` |
@@ -136,6 +140,7 @@ users actually open.
 | `OLLAMA_MODEL` | `qwen2.5:3b` |
 | `OLLAMA_KEEP_ALIVE` | `30m` |
 | `AI_INTERNAL_KEY` | **the same value as the backend** |
+| `METRICS_TOKEN` | **the same value as the backend** |
 | `BACKEND_URL` | `https://fintwin-api.azurewebsites.net` **[URL]** |
 | `ALLOWED_ORIGINS` | `https://fintwin-web.azurewebsites.net` **[URL]** |
 | `UVICORN_WORKERS` | `2` |
@@ -252,7 +257,7 @@ or want to know what it did.
 
 ### What goes in the vault
 
-Six secrets. Vault names allow letters, digits and dashes only — no underscores
+Seven secrets. Vault names allow letters, digits and dashes only — no underscores
 — so they are not simply the variable names:
 
 | Vault secret | App setting it replaces | Which apps |
@@ -263,6 +268,7 @@ Six secrets. Vault names allow letters, digits and dashes only — no underscore
 | `ai-internal-key` | `AI_INTERNAL_KEY` | api, ai |
 | `admin-key` | `ADMIN_KEY` | api, auth |
 | `mail-password` | `MAIL_PASSWORD` | api, auth |
+| `metrics-token` | `METRICS_TOKEN` | api, ai |
 
 And these only if you switch those features on: `internal-key`,
 `setu-client-secret`, `setu-webhook-secret`, `inbound-email-secret`,
@@ -348,3 +354,5 @@ the current version, so rotating a secret does not mean editing app settings.
 │ admin-key         │ ADMIN_KEY              │ api, auth │
 ├───────────────────┼────────────────────────┼───────────┤
 │ mail-password     │ MAIL_PASSWORD          │ api, auth │
+├───────────────────┼────────────────────────┼───────────┤
+│ metrics-token     │ METRICS_TOKEN          │ api, ai   │

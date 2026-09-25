@@ -78,6 +78,7 @@ services:
       ollama: { condition: service_started }
     environment:
       AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
+      METRICS_TOKEN:   ${METRICS_TOKEN:-}   # unset: /metrics stays closed
       REDIS_URL:       redis://redis:6379
       BACKEND_URL:     http://backend:8080
       OLLAMA_URL:      http://ollama:11434/api/generate
@@ -108,6 +109,8 @@ services:
       FINTWIN_ENCRYPTION_KEY:    ${FINTWIN_ENCRYPTION_KEY:?FINTWIN_ENCRYPTION_KEY is required}
       AI_SERVICE_URL:            http://ai-service:8000
       AI_INTERNAL_KEY:           ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
+      METRICS_TOKEN:             ${METRICS_TOKEN:-}
+      GRAFANA_URL:               ${GRAFANA_URL:-}
       REDIS_URL:                 redis://redis:6379
       CORS_ALLOWED_ORIGINS:      ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
       GOOGLE_CLIENT_ID:          ${GOOGLE_CLIENT_ID:-}

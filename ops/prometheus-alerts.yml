@@ -1,0 +1,81 @@
+# FinTwin alert rules. Local Prometheus loads this file (docker-compose.yml);
+# production creates the same rules in Grafana Cloud — see
+# docs/azure-app-service-deployment.md, "Monitoring". Keep the two in step.
+groups:
+  - name: fintwin-availability
+    rules:
+      - alert: FinTwinServiceDown
+        expr: up{job=~"fintwin-.*"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.job }} has not answered a metrics scrape for 5 minutes"
+          description: "The app is down, restarting, or METRICS_TOKEN no longer matches."
+
+      - alert: FinTwinAiCircuitOpen
+        expr: max(resilience4j_circuitbreaker_state{name="ai-service", state="open"}) == 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "The backend has stopped calling the AI service (circuit breaker open)"
+          description: "Users are getting fallback answers. Check the AI app's logs and whether the model finished downloading."
+
+  - name: fintwin-backend
+    rules:
+      - alert: FinTwinBackendErrors
+        expr: |
+          sum(rate(http_server_requests_seconds_count{application="fintwin-backend", status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count{application="fintwin-backend"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 5% of backend requests are failing with 5xx"
+
+      - alert: FinTwinBackendSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(
+            http_server_requests_seconds_bucket{application="fintwin-backend", uri!~".*(chat|statement|ai).*"}[10m]))) > 2
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "95% of ordinary backend requests take longer than 2 s"
+          description: "Copilot, statement and AI routes are excluded; they are slow by design."
+
+      - alert: FinTwinBackendHeapHigh
+        expr: |
+          sum(jvm_memory_used_bytes{application="fintwin-backend", area="heap"})
+            / sum(jvm_memory_max_bytes{application="fintwin-backend", area="heap"} > 0) > 0.9
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Backend heap above 90% for 10 minutes"
+
+  - name: fintwin-ai
+    rules:
+      - alert: FinTwinAiContextOverflowRisk
+        expr: |
+          1 - sum(increase(fintwin_ai_llm_context_fill_ratio_bucket{le="0.9"}[1h]))
+            / sum(increase(fintwin_ai_llm_context_fill_ratio_count[1h])) > 0.05
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "Over 5% of model calls fill more than 90% of the context window"
+          description: "Ollama silently drops the start of a prompt that overflows num_ctx. Check the AI Token Usage dashboard for the feature."
+
+      - alert: FinTwinAiGenerationSlow
+        expr: |
+          histogram_quantile(0.5, sum by (le) (rate(fintwin_ai_llm_tokens_per_second_bucket[15m]))) < 3
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "The model is generating under 3 tokens/s (median)"
+          description: "The plan's CPU is saturated; answers will hit the backend's timeouts."
+
+      - alert: FinTwinCoachFallingBack
+        expr: |
+          sum(increase(fintwin_ai_coach_generations_total{result!~"ai|no_data"}[1h]))
+            / sum(increase(fintwin_ai_coach_generations_total{result!="no_data"}[1h])) > 0.5
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "Most spending-coach messages are falling back instead of using the model"

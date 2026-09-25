@@ -37,5 +37,11 @@ done
     fi
 ) &
 
+# The uvicorn workers share metric values through this directory, so /metrics
+# reports their sum. Emptied on start: leftovers would add to the new totals.
+if [ -n "${PROMETHEUS_MULTIPROC_DIR:-}" ]; then
+    rm -rf "$PROMETHEUS_MULTIPROC_DIR" && mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+fi
+
 echo "[start] uvicorn on :${PORT}"
 exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --workers "${UVICORN_WORKERS:-2}"

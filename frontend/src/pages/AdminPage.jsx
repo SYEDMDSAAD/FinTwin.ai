@@ -1335,6 +1335,12 @@ function MonitoringSection() {
                    padding:"9px 14px" }}>
           <Zap size={12}/> {auto ? "Auto-refresh ON (30s)" : "Auto-refresh OFF"}
         </button>
+        {/^https:\/\//.test(data?.grafanaUrl || "") && (
+          <a className="ab ab-purple" href={data.grafanaUrl} target="_blank" rel="noopener noreferrer"
+             style={{ padding:"9px 14px", textDecoration:"none" }}>
+            <ArrowUpRight size={12}/> Grafana dashboards &amp; history
+          </a>
+        )}
         {lastAt && (
           <span style={{ fontSize:11, color:"rgba(148,163,184,0.35)", marginLeft:"auto" }}>
             Last updated: {lastAt.toLocaleTimeString("en-IN")}

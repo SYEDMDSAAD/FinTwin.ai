@@ -231,8 +231,9 @@ public class SecurityConfig {
                                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                                 .permitAll()
 
-                                // Liveness/readiness probes (k8s) and Prometheus scrape must be
-                                // reachable without a JWT. Other actuator endpoints stay secured.
+                                // Health probes and the Prometheus scrape must be reachable
+                                // without a JWT. The scrape carries METRICS_TOKEN instead,
+                                // checked by MetricsTokenFilter. Other actuator endpoints stay secured.
                                 .requestMatchers("/actuator/health/**", "/actuator/prometheus")
                                 .permitAll()
 

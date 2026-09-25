@@ -35,8 +35,10 @@ need() { [ -n "${!1:-}" ] || { echo "$1 is missing from $ENV_FILE"; exit 1; }; }
 # MAIL_* is required, not optional: without a mail provider the signup OTP and
 # the password-reset link come back in the API response, and both services now
 # refuse to start in production rather than do that.
+# METRICS_TOKEN guards /actuator/prometheus and /metrics: every app here has a
+# public URL, and Grafana Cloud scrapes them with this token (openssl rand -hex 32)
 for v in DB_URL DB_USERNAME DB_PASSWORD JWT_SECRET FINTWIN_ENCRYPTION_KEY AI_INTERNAL_KEY \
-         ADMIN_KEY MAIL_USERNAME MAIL_PASSWORD; do need "$v"; done
+         ADMIN_KEY MAIL_USERNAME MAIL_PASSWORD METRICS_TOKEN; do need "$v"; done
 
 echo "→ resource group $RG ($LOCATION)"
 az group create --name "$RG" --location "$LOCATION" --output none
@@ -78,6 +80,7 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
     JWT_SECRET="$JWT_SECRET" FINTWIN_ENCRYPTION_KEY="$FINTWIN_ENCRYPTION_KEY" \
     AI_INTERNAL_KEY="$AI_INTERNAL_KEY" \
     AI_SERVICE_URL="https://${APP_AI}.azurewebsites.net" \
+    METRICS_TOKEN="$METRICS_TOKEN" GRAFANA_URL="${GRAFANA_URL:-}" \
     REDIS_URL="${REDIS_URL:-}" \
     CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://${APP_WEB}.azurewebsites.net}" \
     GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
@@ -90,8 +93,10 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
     MAIL_ENABLED="${MAIL_ENABLED:-true}" MAIL_HOST="${MAIL_HOST:-smtp.gmail.com}" MAIL_PORT="${MAIL_PORT:-587}" \
     MAIL_USERNAME="$MAIL_USERNAME" MAIL_PASSWORD="$MAIL_PASSWORD" \
     > /dev/null
+# Liveness, not /actuator/health: the full health also checks mail and the
+# database, and a mail hiccup must not get the backend restarted
 az webapp config set --name "$APP_API" --resource-group "$RG" \
-    --health-check-path /actuator/health --output none
+    --health-check-path /actuator/health/liveness --output none
 
 echo "→ settings: identity"
 az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --settings \
@@ -105,6 +110,8 @@ az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --set
     MAIL_ENABLED="${MAIL_ENABLED:-true}" MAIL_HOST="${MAIL_HOST:-smtp.gmail.com}" MAIL_PORT="${MAIL_PORT:-587}" \
     MAIL_USERNAME="$MAIL_USERNAME" MAIL_PASSWORD="$MAIL_PASSWORD" \
     > /dev/null
+az webapp config set --name "$APP_AUTH" --resource-group "$RG" \
+    --health-check-path /actuator/health/liveness --output none
 
 echo "→ settings: ai + ollama"
 # /home is the only storage App Service keeps across restarts — the 2 GB model
@@ -117,7 +124,7 @@ az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --setti
     OLLAMA_MODELS=/home/ollama \
     OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:3b}" \
     OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-30m}" \
-    AI_INTERNAL_KEY="$AI_INTERNAL_KEY" \
+    AI_INTERNAL_KEY="$AI_INTERNAL_KEY" METRICS_TOKEN="$METRICS_TOKEN" \
     BACKEND_URL="https://${APP_API}.azurewebsites.net" \
     REDIS_URL="${REDIS_URL:-}" \
     UVICORN_WORKERS="${UVICORN_WORKERS:-2}" \
@@ -150,7 +157,10 @@ Created. Next:
      The first AI answer waits for a ~2 GB model download — watch it with
        az webapp log tail -g $RG -n $APP_AI
 
-  4. A custom domain and its free managed certificate:
+  4. Monitoring: point Grafana Cloud at the two metrics endpoints with
+     METRICS_TOKEN — docs/azure-app-service-deployment.md, "Monitoring".
+
+  5. A custom domain and its free managed certificate:
        az webapp config hostname add -g $RG --webapp-name $APP_WEB --hostname your-domain
        az webapp config ssl create   -g $RG --name $APP_WEB --hostname your-domain
      Then set CORS_ALLOWED_ORIGINS and APP_BASE_URL to that domain.

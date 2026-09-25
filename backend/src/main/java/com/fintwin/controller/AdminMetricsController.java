@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +26,9 @@ public class AdminMetricsController {
     @Autowired private AuditLogRepository auditLogRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private TransactionRepository transactionRepository;
+
+    // Where the Grafana dashboards live (GRAFANA_URL); the Monitoring tab links to it
+    @Value("${monitoring.grafana-url:}") private String grafanaUrl;
 
     @GetMapping("/live")
     public Map<String, Object> live() {
@@ -72,6 +76,8 @@ public class AdminMetricsController {
 
         // ── Circuit breaker ───────────────────────────────────────────────────
         m.put("circuitBreakerState", circuitBreakerState("ai-service"));
+
+        m.put("grafanaUrl", grafanaUrl.isBlank() ? null : grafanaUrl);
 
         return m;
     }

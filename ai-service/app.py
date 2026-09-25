@@ -49,16 +49,26 @@ app.add_middleware(
 )
 
 
-# /metrics is public the same way the Spring services' /actuator/prometheus
-# is: reachable only on the internal network, scraped by Prometheus, and
-# carrying operational counters rather than user data.
-_PUBLIC_PATHS = {"/", "/health", "/metrics"}
+_PUBLIC_PATHS = {"/", "/health"}
+
+# /metrics is scraped by Prometheus or Grafana Cloud, which send
+# "Authorization: Bearer <METRICS_TOKEN>" rather than the internal key. On App
+# Service this app has a public URL, so with no token set the endpoint is
+# closed (404), never open.
+_METRICS_TOKEN = os.environ.get("METRICS_TOKEN", "")
 
 @app.middleware("http")
 async def verify_internal_key(request: Request, call_next):
-    # Trailing slash normalised: the mounted /metrics app redirects to
-    # "/metrics/", and the redirected request passes through here again.
-    if (request.url.path.rstrip("/") or "/") in _PUBLIC_PATHS:
+    # Trailing slash normalised, so "/metrics/" is guarded like "/metrics"
+    path = request.url.path.rstrip("/") or "/"
+    if path in _PUBLIC_PATHS:
+        return await call_next(request)
+    if path == "/metrics":
+        if not _METRICS_TOKEN:
+            return Response("Not found", status_code=404)
+        given = request.headers.get("authorization", "")
+        if not hmac.compare_digest(given.encode(), f"Bearer {_METRICS_TOKEN}".encode()):
+            return Response("Unauthorized", status_code=401, headers={"WWW-Authenticate": "Bearer"})
         return await call_next(request)
     key = request.headers.get("x-internal-key", "")
     # Constant-time comparison to avoid leaking the key via response timing.
@@ -89,8 +99,23 @@ def health():
     return {"status": "ok", "service": "FinTwin AI"}
 
 
-from prometheus_client import make_asgi_app  # noqa: E402
-app.mount("/metrics", make_asgi_app())
+from prometheus_client import (  # noqa: E402
+    CONTENT_TYPE_LATEST, REGISTRY, CollectorRegistry, generate_latest, multiprocess,
+)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    # uvicorn runs several worker processes, each with its own counters. With
+    # PROMETHEUS_MULTIPROC_DIR set (the Dockerfiles do) every worker writes its
+    # values there and this sums them; without it, a scrape would read one
+    # worker at random and the totals would jump between scrapes.
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+    else:
+        registry = REGISTRY
+    return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
 
 app.include_router(chatbot_router, tags=["AI Chatbot"])
 app.include_router(goal_router, tags=["AI Goal Planner"])

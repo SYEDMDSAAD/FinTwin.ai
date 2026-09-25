@@ -84,6 +84,10 @@ public class SecurityConfig {
                     "/api/auth/2fa/login"
                 ).permitAll()
 
+                // Health probes, for App Service's health check. Status only:
+                // show-details defaults to never, so nothing internal leaks.
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+
                 // Bootstrap (X-Admin-Key) — no JWT needed
                 .requestMatchers("/admin/**").permitAll()
 

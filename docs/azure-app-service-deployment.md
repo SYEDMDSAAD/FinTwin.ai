@@ -134,6 +134,96 @@ The ~2 GB model is **not** in the image; it downloads on first start into
 
 ---
 
+## Monitoring
+
+Production monitoring is **Grafana Cloud's free tier, scraping the apps over
+HTTPS.** Nothing extra runs on the plan, so Ollama keeps its memory. You get
+the same dashboards as the local Prometheus and Grafana, 14 days of history,
+and email alerts.
+
+```
+fintwin-api  /actuator/prometheus ─┐   Bearer METRICS_TOKEN
+fintwin-ai   /metrics             ─┴──────────────────────── Grafana Cloud: dashboards + alerts
+```
+
+Prometheus itself can't run well here. Its database needs a local disk, App
+Service only keeps `/home`, and that is slow network storage.
+
+### What you see without Grafana
+
+The admin page works on its own, from the backend and the database:
+
+| Admin tab | Shows | History |
+|---|---|---|
+| **AI Usage** | Tokens per user and per AI feature, input and output, calls, tokens per day | Kept in the database (`ai_token_usage`), no limit |
+| **Monitoring** | Live backend numbers: logins, HTTP rate and errors, JVM heap, DB pool, AI circuit breaker | Only while the tab is open; resets on restart |
+
+Grafana adds the rest: history for everything, the AI service's own metrics
+(generation speed, context-window fill, guardrail fallbacks), and alerts.
+
+### The metrics endpoints are closed by default
+
+Every app here has a public URL, so `/actuator/prometheus` (backend) and
+`/metrics` (AI service) need `Authorization: Bearer <METRICS_TOKEN>`. Without
+`METRICS_TOKEN` set they answer 404. The setup script requires it; generate it
+with `openssl rand -hex 32`. The identity service exposes health only, no
+metrics.
+
+### Setting up Grafana Cloud (about 15 minutes, once)
+
+1. **Sign up** at grafana.com (free, no card) and create a stack in the region
+   nearest Central India.
+2. **Add two scrape jobs:** Connections → Add new connection → **Metrics
+   Endpoint**. Use exactly these job names, because the alert rules match
+   `job=~"fintwin-.*"`:
+
+   | Job name | Scrape URL | Auth |
+   |---|---|---|
+   | `fintwin-backend` | `https://fintwin-api.azurewebsites.net/actuator/prometheus` | Bearer, token = `METRICS_TOKEN` (without the word "Bearer") |
+   | `fintwin-ai-service` | `https://fintwin-ai.azurewebsites.net/metrics` | Bearer, same token |
+
+   Leave the scrape interval at 60 s, which the free tier is sized for. Use
+   **Test connection** on each: a 401 means the token doesn't match the app
+   setting.
+3. **Import the dashboards:** Dashboards → New → Import, then upload
+   `ops/grafana/dashboard-json/ai-tokens.json` and
+   `ops/grafana/dashboard-json/fintwin.json`. Pick the stack's Prometheus data
+   source (`grafanacloud-<stack>-prom`) when asked.
+4. **Load the alert rules** from `ops/prometheus-alerts.yml`, the same 8 rules
+   local Prometheus runs. With `mimirtool`, using the Prometheus URL, instance
+   ID and an access-policy token (`rules:write`) from the stack's Prometheus
+   details page:
+
+   ```bash
+   mimirtool rules load ops/prometheus-alerts.yml \
+     --address=https://<prometheus-host>.grafana.net/api/prom \
+     --id=<instance-id> --key=<access-policy-token>
+   ```
+
+   Without `mimirtool`, create each rule under Alerting → Alert rules → New
+   alert rule, copying its expression, `for` duration and summary.
+5. **Send alerts to you:** Alerting → Contact points, add your email, and make
+   it the default notification policy.
+6. **Link it from the admin page:** set `GRAFANA_URL` on `fintwin-api` to the
+   dashboard's URL. The Monitoring tab then shows a "Grafana dashboards &
+   history" button.
+
+### Limits to know
+
+- **Free tier:** 10,000 active series. Measured locally, the backend exports
+  about 280 series at start, and each endpoint and status that gets traffic
+  adds about 14 more (11 buckets, count, sum, max). That's roughly 4,000 at full use, plus about 250 from the
+  AI service. The backend uses 10 fixed latency buckets instead of a full
+  histogram (about 74 per endpoint) to stay well inside the limit.
+- **One instance per app.** A scrape reaches whichever instance the load
+  balancer picks. If you scale out to 2+ instances, each scrape sees only one of
+  them.
+- **The AI service sums its uvicorn workers** through
+  `PROMETHEUS_MULTIPROC_DIR` (set in the image). Without it, each scrape would
+  read one worker at random.
+
+---
+
 ## Day to day
 
 ```bash
@@ -168,6 +258,7 @@ migrations finish while the old version is still serving.
 | Copilot times out | The plan's CPU is shared across four apps. P1v3 gives 2 vCPU; answers take 30–60 s |
 | Backend or identity exits at startup | `APP_REQUIRE_SECURE_CONFIG=true` refuses dev-default secrets and a missing `MAIL_USERNAME`/`MAIL_PASSWORD` — the log names the setting |
 | Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage` — Ollama plus two JVMs is most of 8 GB |
+| Grafana shows no data / "service down" alert | `METRICS_TOKEN` differs between the app setting and the scrape job, or the app is restarting. `curl -H "Authorization: Bearer $METRICS_TOKEN" https://fintwin-api.azurewebsites.net/actuator/prometheus` should return text |
 
 ---
 

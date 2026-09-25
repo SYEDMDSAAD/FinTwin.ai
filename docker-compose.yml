@@ -57,6 +57,7 @@ services:
       REDIS_URL:        redis://redis:6379
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
       OLLAMA_URL:      http://ollama:11434/api/generate
+      METRICS_TOKEN:   ${METRICS_TOKEN:-local-dev-metrics-token}   # Prometheus sends it to /metrics
     # No `ports:` — only reachable by Spring Boot on the fintwin network
 
   # ── Ollama — the local model the copilot, coach and reports run on ──────────
@@ -105,6 +106,7 @@ services:
       FINTWIN_ENCRYPTION_KEY:    ${FINTWIN_ENCRYPTION_KEY:?FINTWIN_ENCRYPTION_KEY is required}
       AI_SERVICE_URL:            http://ai-service:8000
       AI_INTERNAL_KEY:           ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
+      METRICS_TOKEN:             ${METRICS_TOKEN:-local-dev-metrics-token}
       REDIS_URL:                 redis://redis:6379
       DB_POOL_MAX:               ${DB_POOL_MAX:-20}
       GOOGLE_CLIENT_ID:          ${GOOGLE_CLIENT_ID:-}
@@ -170,14 +172,23 @@ services:
     networks: [fintwin]
     ports:
       - "9090:9090"
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:-local-dev-metrics-token}
     volumes:
       - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus-alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheusdata:/prometheus
+    # Prometheus reads a bearer token from a file, not from the environment,
+    # so the token is written to one before it starts
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=15d"
-      - "--web.enable-lifecycle"
+      - >-
+        printf '%s' "$$METRICS_TOKEN" > /prometheus/metrics-token &&
+        exec /bin/prometheus
+        --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.path=/prometheus
+        --storage.tsdb.retention.time=15d
+        --web.enable-lifecycle
     depends_on:
       backend:
         condition: service_started
@@ -196,7 +207,8 @@ services:
       - grafanadata:/var/lib/grafana
       - ./ops/grafana/datasources:/etc/grafana/provisioning/datasources:ro
       - ./ops/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./k8s/monitoring/fintwin-dashboard.json:/var/lib/grafana/dashboards/fintwin.json:ro
+      # Dashboard JSON files, picked up by the provider in ops/grafana/dashboards
+      - ./ops/grafana/dashboard-json:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
 
