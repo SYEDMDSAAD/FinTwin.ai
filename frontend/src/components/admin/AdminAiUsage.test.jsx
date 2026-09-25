@@ -62,6 +62,15 @@ describe("AdminAiUsage", () => {
         expect(mock.history.get.at(-1).params).toEqual({ days: 7 });
     });
 
+    it("says 1 call, not 1 calls", async () => {
+        mock.onGet("/admin/ai-usage").reply(200, {
+            ...SUMMARY,
+            byFeature: [{ feature: "report", inputTokens: 700, outputTokens: 112, totalTokens: 812, calls: 1, users: 1 }],
+        });
+        render(<AdminAiUsage />);
+        expect(await screen.findByText("1 call · 1 user")).toBeInTheDocument();
+    });
+
     it("says so when nothing was used", async () => {
         mock.onGet("/admin/ai-usage").reply(200, {
             ...SUMMARY, totals: { inputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0, activeUsers: 0 },

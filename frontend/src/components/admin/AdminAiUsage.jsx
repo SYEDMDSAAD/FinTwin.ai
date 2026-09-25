@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import API from "../../services/api";
 
 // Model tokens used per user and per AI feature. The AI service reports each
@@ -11,18 +11,29 @@ import API from "../../services/api";
 const faint = "rgba(148,163,184,0.45)";
 const muted = "rgba(148,163,184,0.6)";
 
+// One fixed categorical slot per feature, never reassigned by rank, so a
+// feature keeps its colour in every view. Light and dark each get the step
+// that passes the colour-vision checks against that surface (validated with
+// the dataviz palette validator); "other" is neutral gray.
 const FEATURES = {
-    copilot:          { label: "Copilot",             color: "#a78bfa" },
-    advisor:          { label: "Advisor",             color: "#c084fc" },
-    coach:            { label: "Spending coach",      color: "#22d3ee" },
-    goal_plan:        { label: "Goal planner",        color: "#34d399" },
-    report:           { label: "Weekly report",       color: "#fbbf24" },
-    category_suggest: { label: "Category suggestions", color: "#fb923c" },
-    investments:      { label: "Investments",         color: "#60a5fa" },
-    other:            { label: "Other",               color: "#94a3b8" },
+    copilot:          { label: "Copilot",              light: "#2a78d6", dark: "#3987e5" },
+    coach:            { label: "Spending coach",       light: "#eb6834", dark: "#d95926" },
+    goal_plan:        { label: "Goal planner",         light: "#1baf7a", dark: "#199e70" },
+    report:           { label: "Weekly report",        light: "#eda100", dark: "#c98500" },
+    category_suggest: { label: "Category suggestions", light: "#e87ba4", dark: "#d55181" },
+    investments:      { label: "Investments",          light: "#008300", dark: "#008300" },
+    advisor:          { label: "Advisor",              light: "#4a3aa7", dark: "#9085e9" },
+    other:            { label: "Other",                light: "#8a8f98", dark: "#8a8f98" },
 };
+const FEATURE_VARS = `
+  .ai-usage { ${Object.entries(FEATURES).map(([f, c]) => `--f-${f}: ${c.dark};`).join(" ")} --f-unknown: #8a8f98; }
+  [data-theme="light"] .ai-usage { ${Object.entries(FEATURES).map(([f, c]) => `--f-${f}: ${c.light};`).join(" ")} }
+`;
 const featureLabel = (f) => FEATURES[f]?.label || f;
-const featureColor = (f) => FEATURES[f]?.color || "#94a3b8";
+const featureColor = (f) => `var(--f-${FEATURES[f] ? f : "unknown"})`;
+// The daily chart is one series (total tokens), so it takes a neutral ink
+// rather than a feature colour it could be confused with.
+const DAILY_BAR = "#64748b";
 
 const RANGES = [7, 30, 90];
 
@@ -38,7 +49,7 @@ const day = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", mon
 function SplitBar({ byFeature, total }) {
     const parts = Object.entries(byFeature || {}).sort((a, b) => b[1].totalTokens - a[1].totalTokens);
     return (
-        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "rgba(255,255,255,0.05)", minWidth: 120 }}
+        <div style={{ display: "flex", gap: 2, height: 8, borderRadius: 4, overflow: "hidden", minWidth: 120 }}
              role="img" aria-label={parts.map(([f, u]) => `${featureLabel(f)} ${exact(u.totalTokens)} tokens`).join(", ")}>
             {parts.map(([f, u]) => (
                 <div key={f} title={`${featureLabel(f)}: ${exact(u.totalTokens)} tokens`}
@@ -50,12 +61,12 @@ function SplitBar({ byFeature, total }) {
 
 const DailyTip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
     return (
-        <div style={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", fontSize: 12 }}>
+        <div style={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#e2e8f0" }}>
             <div style={{ color: muted, marginBottom: 4 }}>{day(label)}</div>
-            {payload.map(p => (
-                <div key={p.dataKey} style={{ color: p.color, fontWeight: 700 }}>{p.name}: {exact(p.value)}</div>
-            ))}
+            <div style={{ fontWeight: 700 }}>{exact(d.totalTokens)} tokens</div>
+            <div style={{ color: muted }}>{exact(d.inputTokens)} input · {exact(d.outputTokens)} output · {exact(d.calls)} {d.calls === 1 ? "call" : "calls"}</div>
         </div>
     );
 };
@@ -76,10 +87,12 @@ export default function AdminAiUsage() {
     const pickRange = (d) => { if (d !== days) { setLoading(true); setOpen(null); setDays(d); } };
 
     const t = data?.totals;
+    const daily = (data?.daily || []).map(d => ({ ...d, totalTokens: d.inputTokens + d.outputTokens }));
     const maxFeature = Math.max(1, ...(data?.byFeature || []).map(f => f.totalTokens));
 
     return (
-        <section aria-label="AI token usage" className="fade-in">
+        <section aria-label="AI token usage" className="fade-in ai-usage">
+            <style>{FEATURE_VARS}</style>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, fontSize: 12, color: muted }}>
                     Tokens read (input) and written (output) by the AI model, per user and per feature.
@@ -130,7 +143,7 @@ export default function AdminAiUsage() {
                                         <span style={{ width: 8, height: 8, borderRadius: 2, background: featureColor(f.feature), flexShrink: 0 }} aria-hidden />
                                         <span style={{ flex: 1 }}>{featureLabel(f.feature)}</span>
                                         <span style={{ fontWeight: 700 }} title={`${exact(f.inputTokens)} in · ${exact(f.outputTokens)} out`}>{compact(f.totalTokens)}</span>
-                                        <span style={{ color: faint, width: 150, textAlign: "right" }}>{exact(f.calls)} calls · {f.users} {f.users === 1 ? "user" : "users"}</span>
+                                        <span style={{ color: faint, width: 150, textAlign: "right" }}>{exact(f.calls)} {f.calls === 1 ? "call" : "calls"} · {f.users} {f.users === 1 ? "user" : "users"}</span>
                                     </div>
                                     <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.05)" }}>
                                         <div style={{ height: 4, borderRadius: 2, width: `${(f.totalTokens / maxFeature) * 100}%`, background: featureColor(f.feature) }} />
@@ -141,14 +154,13 @@ export default function AdminAiUsage() {
                         <div className="card" style={{ padding: 18 }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: faint, letterSpacing: "0.08em", marginBottom: 12 }}>TOKENS PER DAY</div>
                             <ResponsiveContainer width="100%" height={200}>
-                                <AreaChart data={data.daily} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
+                                <BarChart data={daily} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
                                     <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
                                     <XAxis dataKey="date" tickFormatter={day} tick={{ fontSize: 10, fill: faint }} axisLine={false} tickLine={false} />
                                     <YAxis tickFormatter={compact} tick={{ fontSize: 10, fill: faint }} axisLine={false} tickLine={false} />
-                                    <Tooltip content={<DailyTip />} />
-                                    <Area type="monotone" dataKey="inputTokens" name="Input" stackId="t" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} />
-                                    <Area type="monotone" dataKey="outputTokens" name="Output" stackId="t" stroke="#34d399" fill="#34d399" fillOpacity={0.25} />
-                                </AreaChart>
+                                    <Tooltip content={<DailyTip />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
+                                    <Bar dataKey="totalTokens" name="Tokens" fill={DAILY_BAR} radius={[4, 4, 0, 0]} maxBarSize={32} isAnimationActive={false} />
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
