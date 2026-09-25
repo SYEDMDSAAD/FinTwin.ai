@@ -114,13 +114,13 @@ The new file `tests/test_llm_usage_metrics.py` has 7 tests. Ollama is mocked at 
 | Label by feature, never by user | Every distinct label value creates a new time series. One series per user grows Prometheus without limit. Per-user totals belong in the database. |
 | A fixed list of features, anything else becomes `other` | Keeps the number of series known and small, even if a caller passes a typo. |
 | `record_llm_usage` catches every exception | Metrics must never break the feature they measure. A bad response body is logged at debug level and the user still gets an answer. |
-| Skip context fill when `prompt_eval_count` is missing | Ollama can omit or lower the count when it reuses a cached prompt prefix. Recording 0 would drag the distribution down and hide real overflow risk. |
+| Skip context fill when `prompt_eval_count` is missing | A missing count recorded as 0 would drag the distribution down and hide real overflow risk. |
 | Pre-create every label at import | A counter with no increments yet doesn't appear in `/metrics`, which breaks `rate()` on a fresh start. The existing coach and goal-plan metrics follow the same rule. |
 | Fill buckets 0.25, 0.5, 0.75, 0.9, 1.0 | The top two buckets are the danger zone: at 0.9 or above, little room is left for the output, and near 1.0 the start of the prompt may already be cut off. |
 | Speed buckets 2.5 to 150 tokens/s | The dev machine (RTX 3050 laptop GPU) measured about 70–80 tokens/s. A CPU-only VM will be much slower, so the buckets cover both. |
 | `feature` is a keyword argument with a default | Existing callers and test mocks keep working unchanged, so none of the 367 existing tests needed edits. |
 
-One caveat: in the copilot's multi-turn tool loop, Ollama may reuse the cached earlier turns, so `input` tokens for `copilot` can undercount the full conversation size. Output tokens are always exact.
+Input tokens include the whole prompt even when Ollama reuses its cache. Measured on Ollama 0.30.8: the same 55-token prompt sent twice reported 55 both times, and a second conversation turn reported 104, i.e. the first turn (61) plus its answer plus the new question. So `copilot` input tokens reflect the full conversation resent on every tool-loop step.
 
 ## How it was verified
 

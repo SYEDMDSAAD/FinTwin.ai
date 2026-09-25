@@ -125,8 +125,10 @@ def record_llm_usage(feature: str, body: dict, num_ctx: int) -> None:
     Prometheus and in the current request's per-user tally (utils/llm_usage.py).
 
     Never raises: a metrics bug must not fail the user's request.
-    `prompt_eval_count` can be missing or low when Ollama reuses a cached
-    prompt prefix, so context fill is only observed when it is present.
+    `prompt_eval_count` counts the whole prompt, cached prefix included
+    (measured on Ollama 0.30.8: a repeated prompt and a resent conversation
+    both report their full size). It is guarded anyway, since a missing count
+    must not be recorded as a 0% context fill.
     """
     try:
         if feature not in LLM_FEATURES:
