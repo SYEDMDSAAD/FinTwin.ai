@@ -333,7 +333,7 @@ def generate_weekly_report(data: dict) -> dict:
     degraded = False
 
     try:
-        parsed = _parse(ask(_prompt(facts), max_tokens=_MAX_TOKENS, num_ctx=_NUM_CTX))
+        parsed = _parse(ask(_prompt(facts), max_tokens=_MAX_TOKENS, num_ctx=_NUM_CTX, feature="report"))
 
         candidate = str(parsed.get("summary") or "").strip()
         if candidate and is_grounded(candidate, allowed, owners):

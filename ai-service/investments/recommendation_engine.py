@@ -131,7 +131,7 @@ Return ONLY valid JSON, no markdown:
 {{"riskProfile":"","expectedReturn":"","investmentHorizon":"","portfolioScore":0,"recommendations":[{{"asset":"","allocation":0,"reason":""}}]}}"""
 
     try:
-        text = ask(portfolio_prompt, max_tokens=350)
+        text = ask(portfolio_prompt, max_tokens=350, feature="investments")
         text = text.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
         start, end = text.find("{"), text.rfind("}")
         if start == -1 or end == -1:
@@ -230,7 +230,7 @@ def _generate_summary(
     )
 
     try:
-        return ask(prompt, max_tokens=100).strip()
+        return ask(prompt, max_tokens=100, feature="investments").strip()
     except Exception as e:
         logger.warning("Summary generation failed: %s", e)
         first_asset = result["recommendations"][0]["asset"] if result.get("recommendations") else "Index Funds"

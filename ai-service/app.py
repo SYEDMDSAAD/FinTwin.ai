@@ -16,6 +16,7 @@ from spending_coach.routes import router as coach_router
 from statements.routes import router as statements_router
 from categories.routes import router as categories_router
 from market.routes import router as market_router
+from utils import llm_usage
 
 _INTERNAL_KEY = os.environ.get("AI_INTERNAL_KEY", "")
 if not _INTERNAL_KEY:
@@ -64,6 +65,18 @@ async def verify_internal_key(request: Request, call_next):
     if not hmac.compare_digest(key, _INTERNAL_KEY):
         return Response("Forbidden: missing or invalid internal key", status_code=403)
     return await call_next(request)
+
+
+# Tokens this request's model calls used, per feature, returned in the
+# X-LLM-Usage header so the backend can attribute them to the user it knows
+# the request is for. See utils/llm_usage.py.
+@app.middleware("http")
+async def report_llm_usage(request: Request, call_next):
+    tally = llm_usage.start()
+    response = await call_next(request)
+    if tally:
+        response.headers[llm_usage.USAGE_HEADER] = llm_usage.header_value(tally)
+    return response
 
 
 @app.get("/")

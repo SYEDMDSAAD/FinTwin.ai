@@ -230,7 +230,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
         if remaining < _MIN_CALL_SECONDS:
             raise _OutOfTime()
         try:
-            return chat(messages, tools=tools, timeout=remaining)
+            return chat(messages, tools=tools, timeout=remaining, feature="copilot")
         except requests.exceptions.ReadTimeout:
             raise _OutOfTime() from None
 
@@ -348,7 +348,7 @@ Respond in this format:
 **Verdict**
 [one-line verdict]"""
 
-    return ask(prompt)
+    return ask(prompt, feature="advisor")
 
 
 def _portfolio_direct(message: str, user_id, trace: dict | None = None) -> str | None:

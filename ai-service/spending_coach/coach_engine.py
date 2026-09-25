@@ -316,7 +316,7 @@ def generate_spending_coach(transactions):
         started = time.monotonic()
         try:
             text = ask(prompt, max_tokens=350,
-                       timeout=LLM_TIMEOUT_S, num_ctx=LLM_NUM_CTX)
+                       timeout=LLM_TIMEOUT_S, num_ctx=LLM_NUM_CTX, feature="coach")
         finally:
             COACH_LLM_LATENCY.observe(time.monotonic() - started)
 

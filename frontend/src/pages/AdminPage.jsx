@@ -18,6 +18,7 @@ import AdminCopilotFeedback from "../components/admin/AdminCopilotFeedback";
 import AdminAnomalyFeedback from "../components/admin/AdminAnomalyFeedback";
 import AdminImportFormats from "../components/admin/AdminImportFormats";
 import AdminTrainingExport from "../components/admin/AdminTrainingExport";
+import AdminAiUsage from "../components/admin/AdminAiUsage";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -102,6 +103,7 @@ const NAV = [
   { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
   { id: "feedback",    label: "Beta Feedback",    icon: MessageSquareHeart },
   { id: "categories",  label: "AI Quality",       icon: Tags },
+  { id: "ai-usage",    label: "AI Usage",         icon: Cpu },
   { id: "ipos",        label: "IPO Catalog",      icon: Rocket },
 ];
 
@@ -1589,6 +1591,7 @@ export default function AdminPage() {
             {tab === "tickets"    && <TicketsSection/>}
             {tab === "feedback"   && <AdminFeedback/>}
             {tab === "categories" && <><AdminCopilotFeedback/><AdminAnomalyFeedback/><AdminImportFormats/><AdminCategorization/><div style={{ height: 28 }}/><AdminTrainingExport/></>}
+            {tab === "ai-usage"   && <AdminAiUsage/>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

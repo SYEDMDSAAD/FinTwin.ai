@@ -577,7 +577,7 @@ def _narrative(a: dict) -> tuple[dict, str]:
             started = time.monotonic()
             try:
                 text = ask(attempt_prompt, max_tokens=280,
-                           timeout=remaining, num_ctx=LLM_NUM_CTX)
+                           timeout=remaining, num_ctx=LLM_NUM_CTX, feature="goal_plan")
             finally:
                 GOAL_PLAN_LLM_LATENCY.observe(time.monotonic() - started)
         except Exception as e:
