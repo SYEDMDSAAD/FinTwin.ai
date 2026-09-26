@@ -52,6 +52,7 @@ OPTIONAL=(
     setu-webhook-secret=SETU_WEBHOOK_SECRET
     inbound-email-secret=INBOUND_EMAIL_SECRET
     sms-api-key=SMS_API_KEY
+    aws-secret-access-key=AWS_SECRET_ACCESS_KEY
 )
 
 echo "→ vault $VAULT ($LOCATION, RBAC)"
@@ -129,6 +130,11 @@ az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --setti
     AI_INTERNAL_KEY="$(ref ai-internal-key)" \
     METRICS_TOKEN="$(ref metrics-token)" \
     > /dev/null
+# Only when Claude on Bedrock is in use (LLM_PROVIDER=bedrock)
+if [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+    az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --settings \
+        AWS_SECRET_ACCESS_KEY="$(ref aws-secret-access-key)" > /dev/null
+fi
 
 cat <<DONE
 

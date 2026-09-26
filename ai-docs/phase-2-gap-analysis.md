@@ -25,6 +25,11 @@ this analysis. The others are read from the code with file references.
 | G4 | Weekly report and investment summary calls time out at 15 s | `test_report_call_finishes_inside_the_backend_deadline`, `test_summary_call_finishes_inside_the_backend_deadline` |
 | G5 | User-facing fallback says what to do, never mentions Ollama | `test_ollama_down_returns_canned_fallback` |
 
+**Phase 3 (2026-09-26):** G7 (copilot eval, qwen baseline 63%) and G11
+(per-user daily token cap) are done; G19 (evals in CI) waits for Bedrock
+credentials. The eval added **G25**: `get_transactions` has no merchant
+filter. See `phase-3-evals-and-provider-switch.md`.
+
 ---
 
 ## 1. What's already good (keep all of this through the Bedrock move)

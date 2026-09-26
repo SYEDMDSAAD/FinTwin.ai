@@ -86,6 +86,7 @@ or Google sign-in fails in production.
 | `ADMIN_KEY` | your generated value |
 | `METRICS_TOKEN` | your generated value |
 | `GRAFANA_URL` | optional: your Grafana Cloud dashboard link, shown on the admin Monitoring tab |
+| `AI_DAILY_TOKEN_LIMIT` | model tokens one user may use per day across all AI features (default `200000`; `0` = no cap; admins exempt). Matters once `LLM_PROVIDER=bedrock` makes tokens cost money |
 | `AI_SERVICE_URL` | `https://fintwin-ai.azurewebsites.net` **[URL]** |
 | `CORS_ALLOWED_ORIGINS` | `https://fintwin-web.azurewebsites.net` **[URL]** |
 | `MAIL_ENABLED` | `true` |
@@ -144,6 +145,11 @@ users actually open.
 | `BACKEND_URL` | `https://fintwin-api.azurewebsites.net` **[URL]** |
 | `ALLOWED_ORIGINS` | `https://fintwin-web.azurewebsites.net` **[URL]** |
 | `UVICORN_WORKERS` | `2` |
+| `LLM_PROVIDER` | `ollama` (default). `bedrock` switches the AI features to Claude on Amazon Bedrock, and the container then skips Ollama entirely |
+| `AWS_REGION` | only with `bedrock`: the Bedrock region |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | only with `bedrock`: an IAM user allowed to invoke the model (secret → Key Vault as `aws-secret-access-key`) |
+| `BEDROCK_MODEL` | optional, default `anthropic.claude-opus-5` |
+| `BEDROCK_EFFORT` | optional, default `high`; the copilot eval decides whether lower keeps quality |
 
 ## 6. `fintwin-web` — the front door
 

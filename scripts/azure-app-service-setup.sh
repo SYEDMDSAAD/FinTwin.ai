@@ -32,6 +32,10 @@ TAG="${TAG:-latest}"
 set -a; . "$ENV_FILE"; set +a
 
 need() { [ -n "${!1:-}" ] || { echo "$1 is missing from $ENV_FILE"; exit 1; }; }
+# Claude on Bedrock (LLM_PROVIDER=bedrock) needs its region and AWS credentials
+if [ "${LLM_PROVIDER:-ollama}" = "bedrock" ]; then
+    for v in AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do need "$v"; done
+fi
 # MAIL_* is required, not optional: without a mail provider the signup OTP and
 # the password-reset link come back in the API response, and both services now
 # refuse to start in production rather than do that.
@@ -81,6 +85,7 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
     AI_INTERNAL_KEY="$AI_INTERNAL_KEY" \
     AI_SERVICE_URL="https://${APP_AI}.azurewebsites.net" \
     METRICS_TOKEN="$METRICS_TOKEN" GRAFANA_URL="${GRAFANA_URL:-}" \
+    AI_DAILY_TOKEN_LIMIT="${AI_DAILY_TOKEN_LIMIT:-200000}" \
     REDIS_URL="${REDIS_URL:-}" \
     CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://${APP_WEB}.azurewebsites.net}" \
     GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
@@ -126,6 +131,9 @@ az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --setti
     OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-30m}" \
     AI_INTERNAL_KEY="$AI_INTERNAL_KEY" METRICS_TOKEN="$METRICS_TOKEN" \
     BACKEND_URL="https://${APP_API}.azurewebsites.net" \
+    LLM_PROVIDER="${LLM_PROVIDER:-ollama}" \
+    AWS_REGION="${AWS_REGION:-}" BEDROCK_MODEL="${BEDROCK_MODEL:-}" BEDROCK_EFFORT="${BEDROCK_EFFORT:-}" \
+    AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}" AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}" \
     REDIS_URL="${REDIS_URL:-}" \
     UVICORN_WORKERS="${UVICORN_WORKERS:-2}" \
     > /dev/null
