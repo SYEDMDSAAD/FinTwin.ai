@@ -183,6 +183,10 @@ public class TransactionController {
             Map<String, Object> response = new java.util.HashMap<>(result);
             response.put("success", true);
             return ResponseEntity.ok(response);
+        } catch (com.fintwin.ai.AiQuotaExceededException e) {
+            return ResponseEntity.status(429).body(Map.of("success", false, "reply",
+                    "You've reached today's FinTwin AI limit. It resets at midnight — "
+                    + "everything else in FinTwin keeps working as usual."));
         } catch (Exception e) {
             // Was swallowed silently, which made a slow model look like an outage
             log.warn("Copilot chat failed: {}: {}", e.getClass().getSimpleName(), e.getMessage());

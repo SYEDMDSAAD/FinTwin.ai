@@ -2,10 +2,12 @@ package com.fintwin.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fintwin.ai.AiQuotaExceededException;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -53,12 +55,15 @@ public class AiTokenUsageService {
     private final UserRepository users;
     private final ObjectMapper mapper;
     private final TransactionTemplate ownTx;
+    private final long dailyTokenLimit;
 
     public AiTokenUsageService(JdbcTemplate jdbc, UserRepository users, ObjectMapper mapper,
-                               PlatformTransactionManager txManager) {
+                               PlatformTransactionManager txManager,
+                               @Value("${ai.daily-token-limit:200000}") long dailyTokenLimit) {
         this.jdbc = jdbc;
         this.users = users;
         this.mapper = mapper;
+        this.dailyTokenLimit = dailyTokenLimit;
         // Its own read-write transaction: the AI call may sit inside a
         // read-only one (a GET), and a failed write here must not roll back
         // the caller's work.
@@ -94,6 +99,40 @@ public class AiTokenUsageService {
             return Optional.empty();
         }
         return users.findByEmail(auth.getName()).map(User::getId);
+    }
+
+    // ── Daily allowance ──────────────────────────────────────────────────────
+
+    /**
+     * Throws {@link AiQuotaExceededException} when the logged-in user has
+     * used today's allowance. Called before every model-backed AI call.
+     * No user (none today), a limit of 0 (off) and admins are never capped.
+     */
+    public void checkAllowance() {
+        if (dailyTokenLimit <= 0) return;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities().stream().anyMatch(a ->
+                "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_SUPER_ADMIN".equals(a.getAuthority()))) {
+            return;
+        }
+        Optional<Long> userId = currentUserId();
+        if (userId.isEmpty()) return;
+        long used = usedToday(userId.get());
+        if (used >= dailyTokenLimit) {
+            throw new AiQuotaExceededException(used, dailyTokenLimit);
+        }
+    }
+
+    public long usedToday(Long userId) {
+        Long used = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(input_tokens + output_tokens), 0)
+                FROM ai_token_usage WHERE user_id = ? AND usage_date = ?
+                """, Long.class, userId, Date.valueOf(LocalDate.now()));
+        return used == null ? 0 : used;
+    }
+
+    public long dailyTokenLimit() {
+        return dailyTokenLimit;
     }
 
     private static long count(Number n) {

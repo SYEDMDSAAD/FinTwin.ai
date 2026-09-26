@@ -56,6 +56,15 @@ public class AiServiceConfig {
         return build(readTimeoutMs);
     }
 
+    /** The ai-service routes that run the language model (prices, OCR and statements don't). */
+    private static final java.util.Set<String> MODEL_ROUTES = java.util.Set.of(
+            "/chat", "/spending-coach", "/goal-plan", "/reports/weekly-report",
+            "/categories/suggest", "/investment-recommendation");
+
+    static boolean usesTheModel(String path) {
+        return path != null && MODEL_ROUTES.stream().anyMatch(path::endsWith);
+    }
+
     private RestTemplate build(int readTimeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3_000);
@@ -64,6 +73,11 @@ public class AiServiceConfig {
         RestTemplate rt = new RestTemplate(factory);
         rt.getInterceptors().add((request, body, execution) -> {
             request.getHeaders().set("X-Internal-Key", internalKey);
+            return execution.execute(request, body);
+        });
+        // Today's allowance, checked before a model-backed call leaves the backend
+        rt.getInterceptors().add((request, body, execution) -> {
+            if (usesTheModel(request.getURI().getPath())) tokenUsage.checkAllowance();
             return execution.execute(request, body);
         });
         // Model tokens this call used, per feature, added to the user's totals
