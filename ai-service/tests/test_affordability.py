@@ -32,6 +32,12 @@ def test_leaves_other_questions_alone(question):
     ("afford a 1.2 crore flat", 12000000),
     ("Can I afford a car?", None),
     ("can i afford a 2 bhk", None),            # not a price
+    # A word starting with a unit letter is not a unit (found by the copilot eval:
+    # "laptop" read as lakh made a ₹65,000 laptop cost ₹650 crore)
+    ("Can I afford a ₹65,000 laptop?", 65000),
+    ("can i afford a ₹45,000 lens", 45000),
+    ("can i afford a ₹3,000 kettle", 3000),
+    ("can i afford a ₹20,000 cruise", 20000),
 ])
 def test_reads_the_price_the_user_named(question, expected):
     assert af.price_in(question) == expected
