@@ -10,7 +10,7 @@ from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
 from chatbot import affordability, portfolio_answers
-from utils.ollama_client import MODEL, ask, chat
+from utils.llm_client import MODEL, ask, chat
 
 logger = logging.getLogger(__name__)
 

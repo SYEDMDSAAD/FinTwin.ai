@@ -25,7 +25,7 @@ from utils.metrics import (
     GOAL_PLAN_LLM_LATENCY,
     GOAL_PLAN_RETRIES,
 )
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 

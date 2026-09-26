@@ -26,7 +26,7 @@ import json
 import logging
 
 from utils.grounding import amounts, figure_owners, is_grounded
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 

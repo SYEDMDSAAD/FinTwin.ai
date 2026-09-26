@@ -14,7 +14,7 @@ import time
 
 import requests
 
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 

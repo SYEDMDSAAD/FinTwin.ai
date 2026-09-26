@@ -17,7 +17,7 @@ from utils.grounding import (
     figure_owners as _figure_owners,
     is_grounded,
 )
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 
