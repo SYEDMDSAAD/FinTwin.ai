@@ -169,6 +169,14 @@ function Login() {
   const [forgotLoading,    setForgotLoading]    = useState(false);
   const [forgotSent,       setForgotSent]       = useState(false);
 
+  // Admins go to the admin panel: the ADMIN role has no personal-finance
+  // permissions by design, so the dashboard would only show 403s.
+  const goToLanding = async (role) => {
+    if (role === "ADMIN") { navigate("/admin", { replace: true }); return; }
+    const me = await identityApi.get("/auth/me");
+    navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
+  };
+
   const handleLogin = async () => {
     if (!email || !password) { toast.error("Enter your email and password"); return; }
     try {
@@ -178,8 +186,7 @@ function Login() {
       if (res.data.requires2FA) { setTwoFactorToken(res.data.twoFactorToken); setNeeds2FA(true); return; }
       login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Login Successful");
-      const me = await identityApi.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
+      await goToLanding(res.data.role);
     } catch (err) {
       const code = err.response?.data?.error;
       if (err.response?.status === 403 && code === "ACCOUNT_DISABLED") {
@@ -217,8 +224,7 @@ function Login() {
       const res = await identityApi.post("/auth/2fa/login", { twoFactorToken, code });
       login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Login Successful");
-      const me = await identityApi.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
+      await goToLanding(res.data.role);
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid code. Try again.";
       toast.error(msg);
@@ -230,8 +236,7 @@ function Login() {
       const res = await identityApi.post("/auth/google", { credential: credentialResponse.credential });
       login(res.data.accessToken, { email: res.data.email, fullName: res.data.fullName, role: res.data.role }, res.data.refreshToken);
       toast.success("Google Login Successful");
-      const me = await identityApi.get("/auth/me");
-      navigate(me.data.onboardingCompleted ? "/dashboard" : "/onboarding", { replace: true });
+      await goToLanding(res.data.role);
     } catch { toast.error("Google Login Failed"); }
   };
   const openTicket = (prefillEmail = "") => { setTicketDefaultEmail(prefillEmail); setShowTicket(true); };

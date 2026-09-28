@@ -49,6 +49,28 @@ describe('ProtectedRoute', () => {
     renderProtected('/secret', <ProtectedRoute><div>SECRET</div></ProtectedRoute>);
     expect(screen.getByText('SECRET')).toBeInTheDocument();
   });
+
+  it('sends an admin account to the admin panel instead of a personal page', () => {
+    localStorage.setItem('token', 'tok');
+    localStorage.setItem('user', JSON.stringify({ role: 'ADMIN' }));
+    render(
+      <MemoryRouter initialEntries={['/secret']}>
+        <Routes>
+          <Route path="/admin" element={<div>ADMIN AREA</div>} />
+          <Route path="/secret" element={<ProtectedRoute><div>SECRET</div></ProtectedRoute>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText('ADMIN AREA')).toBeInTheDocument();
+    expect(screen.queryByText('SECRET')).not.toBeInTheDocument();
+  });
+
+  it('still renders personal pages for a normal user', () => {
+    localStorage.setItem('token', 'tok');
+    localStorage.setItem('user', JSON.stringify({ role: 'USER' }));
+    renderProtected('/secret', <ProtectedRoute><div>SECRET</div></ProtectedRoute>);
+    expect(screen.getByText('SECRET')).toBeInTheDocument();
+  });
 });
 
 describe('AdminRoute', () => {
