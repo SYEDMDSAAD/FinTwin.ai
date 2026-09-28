@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Creates the Azure App Service setup for FinTwin.ai — one plan, four web apps.
 # Run once; deploys after that are handled by .github/workflows/cd-deploy.yml.
+# Safe to re-run: existing apps are kept, settings are re-applied.
 #
 #   az login
 #   FINTWIN_ENV_FILE=.env.prod scripts/azure-app-service-setup.sh
@@ -60,8 +61,13 @@ az appservice plan create --name "$PLAN" --resource-group "$RG" \
 create_app() {                      # name, image, port
     local name=$1 image=$2 port=$3
     echo "→ web app $name ($image)"
-    az webapp create --name "$name" --resource-group "$RG" --plan "$PLAN" \
-        --container-image-name "$REGISTRY/$image:$TAG" --output none
+    # Safe to re-run: an app that already exists keeps its settings and image
+    if az webapp show --name "$name" --resource-group "$RG" --output none 2>/dev/null; then
+        echo "  (already exists)"
+    else
+        az webapp create --name "$name" --resource-group "$RG" --plan "$PLAN" \
+            --container-image-name "$REGISTRY/$image:$TAG" --output none
+    fi
     az webapp config appsettings set --name "$name" --resource-group "$RG" --settings \
         WEBSITES_PORT="$port" \
         WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
@@ -113,7 +119,7 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
 # Liveness, not /actuator/health: the full health also checks mail and the
 # database, and a mail hiccup must not get the backend restarted
 az webapp config set --name "$APP_API" --resource-group "$RG" \
-    --health-check-path /actuator/health/liveness --output none
+    --generic-configurations '{"healthCheckPath": "/actuator/health/liveness"}' --output none
 
 echo "→ settings: identity"
 az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --settings \
@@ -129,7 +135,7 @@ az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --set
     MAIL_USERNAME="$MAIL_USERNAME" MAIL_PASSWORD="$MAIL_PASSWORD" \
     > /dev/null
 az webapp config set --name "$APP_AUTH" --resource-group "$RG" \
-    --health-check-path /actuator/health/liveness --output none
+    --generic-configurations '{"healthCheckPath": "/actuator/health/liveness"}' --output none
 
 echo "→ settings: ai + ollama"
 # /home is the only storage App Service keeps across restarts — the 2 GB model
@@ -151,14 +157,14 @@ az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --setti
     UVICORN_WORKERS="${UVICORN_WORKERS:-2}" \
     > /dev/null
 az webapp config set --name "$APP_AI" --resource-group "$RG" \
-    --health-check-path /health --output none
+    --generic-configurations '{"healthCheckPath": "/health"}' --output none
 
 echo "→ settings: front door"
 # shellcheck disable=SC2086
 az webapp config appsettings set --name "$APP_WEB" --resource-group "$RG" --settings \
     PORT=8080 $FRONT_HOSTS > /dev/null
 az webapp config set --name "$APP_WEB" --resource-group "$RG" \
-    --health-check-path /healthz --output none
+    --generic-configurations '{"healthCheckPath": "/healthz"}' --output none
 
 cat <<DONE
 
