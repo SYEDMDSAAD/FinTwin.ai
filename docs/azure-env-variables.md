@@ -71,6 +71,7 @@ or Google sign-in fails in production.
 |---|---|
 | `WEBSITES_PORT` | `8080` |
 | `SERVER_PORT` | `8080` |
+| `JAVA_TOOL_OPTIONS` | `-Xmx768m`: caps the heap. App Service has no per-app memory limit, so without it the JVM sizes itself to the whole plan |
 | `APP_REQUIRE_SECURE_CONFIG` | `true` |
 | `DB_URL` | from `backend/.env` |
 | `DB_USERNAME` | from `backend/.env` |
@@ -108,6 +109,7 @@ Sign-up, login, 2FA, refresh tokens. Same database, same two keys.
 |---|---|
 | `WEBSITES_PORT` | `8090` |
 | `IDENTITY_PORT` | `8090` |
+| `JAVA_TOOL_OPTIONS` | `-Xmx512m`: caps the heap, for the same reason as the backend |
 | `APP_REQUIRE_SECURE_CONFIG` | `true` |
 | `DB_URL` | same as the backend |
 | `DB_USERNAME` | same as the backend |

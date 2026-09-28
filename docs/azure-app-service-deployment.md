@@ -1,18 +1,18 @@
 # Running FinTwin.ai on Azure App Service
 
-Four web apps on one Linux plan. Azure handles TLS, certificates and OS
-patching, and deployment slots give you swaps instead of downtime. It costs
-roughly 2.5× the single VM — see [azure-vm-deployment.md](azure-vm-deployment.md)
-for that option, which is still in the repo and still works.
+Four web apps on one Linux plan. Azure handles TLS, certificates, OS patching
+and restarts. On the default B3 plan it costs about $53/month, roughly $8 more
+than the single VM (see [azure-vm-deployment.md](azure-vm-deployment.md), still
+in the repo and still works) for twice the CPU and no server to look after.
 
 ```
-App Service plan (P1v3 — 2 vCPU / 8 GB)
+App Service plan (B3 — 4 vCPU / 7 GB)
 ├── fintwin-web    nginx + the React app   → the only app with your domain on it
 │                  proxies /api/auth|2fa|token|admin → fintwin-auth
 │                           everything else under /api → fintwin-api
 ├── fintwin-api    Spring Boot backend     :8080
 ├── fintwin-auth   identity service        :8090
-└── fintwin-ai     FastAPI + Ollama        :8000   (~4 GB of the plan)
+└── fintwin-ai     FastAPI + Ollama        :8000   (~3.3 GB of the plan)
 
 Supabase → Postgres
 ```
@@ -31,16 +31,45 @@ Central India, pay-as-you-go, September 2026. Check the
 
 | Item | Monthly |
 |---|---|
-| App Service plan, P1v3 (2 vCPU / 8 GB) | ~$113 |
+| App Service plan, **B3** (4 vCPU / 7 GB) | **~$53** ($0.072/hour) |
+| Key Vault (optional) | cents ($0.03 per 10,000 reads) |
 | Supabase | $0–25 |
-| GHCR, managed certificates, custom domain | $0 |
-| **Total** | **~$113–138** |
+| GHCR, managed certificates, `*.azurewebsites.net` HTTPS | $0 |
+| **Total** | **~$53–78** |
 
-**P1v3 is the smallest that fits.** The four apps share the plan's memory:
-Ollama ~4 GB, backend ~1 GB, identity ~0.75 GB, front door ~0.1 GB. A B3
-(4 vCPU / 7 GB, ~$97) technically fits and gives more CPU — which is what makes
-Copilot answers faster — but leaves no headroom, and Basic has no deployment
-slots, which is half the reason to be on App Service at all.
+Prices are the Azure retail price list for Central India on 2026-09-28. The
+plan is billed **every hour it exists, even with the apps stopped**, so it's
+the only real cost.
+
+**Why B3.** The four apps share the plan's memory. Measured and budgeted:
+
+| Part | Memory |
+|---|---|
+| Ollama + qwen2.5:3b (no GPU here, so the whole model is in RAM) | ~2.8 GB |
+| AI service, 2 workers | ~0.5–0.8 GB |
+| Backend, heap capped at 768 MB | ~1.1 GB |
+| Identity, heap capped at 512 MB | ~0.75 GB |
+| Front door + platform overhead | ~0.5 GB |
+| **Total** | **~5.5–6 GB of 7** |
+
+Smaller plans can't hold the model (B2 has 3.5 GB, P0v3 4 GB). P1v3 (2 vCPU /
+8 GB) costs ~$120, over twice as much, with half B3's CPU, and CPU is what
+makes copilot answers faster. What Basic lacks is deployment slots and
+autoscale; neither is used here. Choose `SKU=P1V3` if you need slots.
+
+**The heap caps matter on any plan.** The images start each JVM with
+`MaxRAMPercentage=75`. On the VM that's 75% of a 1 GB container. App Service
+sets no per-app limit, so without a cap each JVM sees the whole plan and could
+grow to ~5 GB. The setup script sets `JAVA_TOOL_OPTIONS=-Xmx768m` (backend) and
+`-Xmx512m` (identity); override with `BACKEND_JAVA_OPTS` / `IDENTITY_JAVA_OPTS`.
+
+**Running it for a limited time** (a demo or interview period): leave it on,
+then delete everything in one command when you're done. Nothing else is left
+billing:
+
+```bash
+az group delete -n fintwin
+```
 
 ---
 
@@ -233,7 +262,8 @@ az webapp show           -g fintwin -n fintwin-web --query state
 az webapp config appsettings list -g fintwin -n fintwin-api --output table
 ```
 
-**Zero-downtime deploys** need a staging slot (Standard or Premium):
+**Zero-downtime deploys** need a staging slot, which needs Standard or Premium
+(`SKU=P1V3`); on the default B3 a deploy restarts each app for a few seconds:
 
 ```bash
 az webapp deployment slot create -g fintwin -n fintwin-api --slot staging
@@ -255,9 +285,9 @@ migrations finish while the old version is still serving.
 | Front door returns 502 | `az webapp log tail -n fintwin-web` — usually the backend app is still starting; nginx resolves the upstreams per request, so it recovers on its own |
 | App won't start, no logs | Almost always the image pull: check `DOCKER_REGISTRY_SERVER_*` settings |
 | Copilot says it's unavailable | The model is still downloading, or `WEBSITES_ENABLE_APP_SERVICE_STORAGE` got turned off — check `az webapp log tail -n fintwin-ai` |
-| Copilot times out | The plan's CPU is shared across four apps. P1v3 gives 2 vCPU; answers take 30–60 s |
+| Copilot times out | The plan's CPU is shared across four apps (B3: 4 vCPU). Measure with the copilot eval; on qwen, fewer tool rounds help most |
 | Backend or identity exits at startup | `APP_REQUIRE_SECURE_CONFIG=true` refuses dev-default secrets and a missing `MAIL_USERNAME`/`MAIL_PASSWORD` — the log names the setting |
-| Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage` — Ollama plus two JVMs is most of 8 GB |
+| Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage`: Ollama plus two JVMs is most of 7 GB. Check `JAVA_TOOL_OPTIONS` is set on both Java apps |
 | Grafana shows no data / "service down" alert | `METRICS_TOKEN` differs between the app setting and the scrape job, or the app is restarting. `curl -H "Authorization: Bearer $METRICS_TOKEN" https://fintwin-api.azurewebsites.net/actuator/prometheus` should return text |
 
 ---

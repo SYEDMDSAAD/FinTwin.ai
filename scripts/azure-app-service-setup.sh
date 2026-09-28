@@ -13,7 +13,13 @@ set -euo pipefail
 RG="${RG:-fintwin}"
 LOCATION="${LOCATION:-centralindia}"
 PLAN="${PLAN:-fintwin-plan}"
-SKU="${SKU:-P1V3}"                 # 2 vCPU / 8 GB — the model alone wants ~4 GB
+# B3: 4 vCPU / 7 GB, ~$53/month in Central India (Sept 2026 retail price).
+# The smallest plan that fits: qwen2.5:3b in RAM (~2.8 GB) + two capped JVMs +
+# the AI service is ~5.5 GB. It also has twice P1v3's CPUs for less than half
+# the price; Basic lacks deployment slots and autoscale, which this doesn't use.
+# SKU=P1V3 for production-grade slots. With LLM_PROVIDER=bedrock (no local
+# model) SKU=B2 (3.5 GB, ~$26) can be enough.
+SKU="${SKU:-B3}"
 ENV_FILE="${FINTWIN_ENV_FILE:-.env.prod}"
 
 # Web app names are part of *.azurewebsites.net, so they must be globally
@@ -74,9 +80,15 @@ create_app "$APP_AUTH" fintwin-identity-service 8090
 create_app "$APP_AI"   fintwin-ai-ollama        8000
 create_app "$APP_WEB"  fintwin-frontend-as      8080
 
+# Heap caps (JAVA_TOOL_OPTIONS, below). The images start the JVM with
+# MaxRAMPercentage=75, which on the VM means 75% of a 1 GB container. App
+# Service has no per-app memory limit, so each JVM would see the whole plan and
+# could grow to ~5 GB — two of them plus the model don't fit, and the apps get
+# killed. The caps match what the VM gives them (backend 768 MB of heap).
 echo "→ settings: backend"
 az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --settings \
     SERVER_PORT=8080 \
+    JAVA_TOOL_OPTIONS="${BACKEND_JAVA_OPTS:--Xmx768m}" \
     DB_URL="$DB_URL" DB_USERNAME="$DB_USERNAME" DB_PASSWORD="$DB_PASSWORD" \
     DDL_AUTO=validate SHOW_SQL=false APP_REQUIRE_SECURE_CONFIG=true \
     FLYWAY_ENABLED="${FLYWAY_ENABLED:-true}" FLYWAY_BASELINE="${FLYWAY_BASELINE:-true}" \
@@ -106,6 +118,7 @@ az webapp config set --name "$APP_API" --resource-group "$RG" \
 echo "→ settings: identity"
 az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --settings \
     IDENTITY_PORT=8090 APP_REQUIRE_SECURE_CONFIG=true \
+    JAVA_TOOL_OPTIONS="${IDENTITY_JAVA_OPTS:--Xmx512m}" \
     DB_URL="$DB_URL" DB_USERNAME="$DB_USERNAME" DB_PASSWORD="$DB_PASSWORD" \
     JWT_SECRET="$JWT_SECRET" FINTWIN_ENCRYPTION_KEY="$FINTWIN_ENCRYPTION_KEY" \
     REDIS_URL="${REDIS_URL:-}" \
@@ -168,7 +181,11 @@ Created. Next:
   4. Monitoring: point Grafana Cloud at the two metrics endpoints with
      METRICS_TOKEN — docs/azure-app-service-deployment.md, "Monitoring".
 
-  5. A custom domain and its free managed certificate:
+  5. Cost: the plan bills every hour it exists, stopped or not (B3 ~\$53/month).
+     When you're done with it, delete everything:
+       az group delete -n $RG
+
+  6. A custom domain and its free managed certificate:
        az webapp config hostname add -g $RG --webapp-name $APP_WEB --hostname your-domain
        az webapp config ssl create   -g $RG --name $APP_WEB --hostname your-domain
      Then set CORS_ALLOWED_ORIGINS and APP_BASE_URL to that domain.
