@@ -14,7 +14,7 @@ import time
 
 import requests
 
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ def suggest(payees: list[str]) -> dict:
         cleaned = [_clean(p) for p in batch]
         try:
             raw = ask(_prompt(cleaned), max_tokens=20 + 12 * len(batch), timeout=remaining,
-                      num_ctx=2048, temperature=0.0, json_mode=True)
+                      num_ctx=2048, temperature=0.0, json_mode=True, feature="category_suggest")
         except (RuntimeError, requests.exceptions.RequestException) as e:
             logger.warning("Category suggestions failed for a batch of %d: %s", len(batch), e)
             complete = False

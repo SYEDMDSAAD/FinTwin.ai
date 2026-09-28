@@ -34,6 +34,13 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
+    // The Prometheus scrape's bearer token is METRICS_TOKEN, not a user JWT;
+    // MetricsTokenFilter checks it. Parsing it here would reject every scrape.
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return MetricsTokenFilter.PATH.equals(request.getRequestURI());
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,

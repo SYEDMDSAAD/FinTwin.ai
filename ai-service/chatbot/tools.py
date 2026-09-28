@@ -13,7 +13,7 @@ from utils import backend_api
 
 logger = logging.getLogger(__name__)
 
-# Ollama/OpenAI-style tool schemas. Kept to four focused tools — small
+# Ollama/OpenAI-style tool schemas. Kept to five focused tools — small
 # models pick the right tool far more reliably from a short list.
 # Holding types as the portfolio stores them.
 PORTFOLIO_TYPES = ["Stocks", "Mutual Fund", "Fixed Deposit", "PPF", "NPS", "Gold",
@@ -153,8 +153,12 @@ TOOLS = [
 ]
 
 
-def execute_tool(name: str, args: dict, user_id: int) -> str:
-    """Run one tool call against the backend; returns a JSON string for the model."""
+def execute_tool(name: str, args: dict, user_id: int, tool_token: str | None = None) -> str:
+    """Run one tool call against the backend; returns a JSON string for the model.
+
+    `user_id` and `tool_token` come from the backend's request, never from the
+    model's arguments, so no prompt can point a tool at another user's data.
+    """
     try:
         if name == "get_transactions":
             params = {
@@ -170,16 +174,16 @@ def execute_tool(name: str, args: dict, user_id: int) -> str:
                 params["category"] = str(args["category"])
             if args.get("group_by") in ("merchant", "category"):
                 params["groupBy"] = args["group_by"]
-            result = backend_api.get(f"/{user_id}/transactions", params)
+            result = backend_api.get(f"/{user_id}/transactions", params, tool_token)
         elif name == "get_budgets":
-            result = backend_api.get(f"/{user_id}/budgets")
+            result = backend_api.get(f"/{user_id}/budgets", None, tool_token)
         elif name == "get_goals":
-            result = backend_api.get(f"/{user_id}/goals")
+            result = backend_api.get(f"/{user_id}/goals", None, tool_token)
         elif name == "get_net_worth":
-            result = backend_api.get(f"/{user_id}/networth")
+            result = backend_api.get(f"/{user_id}/networth", None, tool_token)
         elif name == "get_portfolio":
             params = {"type": args["type"]} if args.get("type") in PORTFOLIO_TYPES else None
-            result = backend_api.get(f"/{user_id}/portfolio", params)
+            result = backend_api.get(f"/{user_id}/portfolio", params, tool_token)
         else:
             return json.dumps({"error": f"Unknown tool '{name}'"})
         # ensure_ascii=False: escaped "\u20b9" was copied into answers verbatim

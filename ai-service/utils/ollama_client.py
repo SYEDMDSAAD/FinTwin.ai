@@ -3,6 +3,8 @@ import time
 import logging
 import requests
 
+from utils.metrics import record_llm_usage
+
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
@@ -19,7 +21,8 @@ _RETRY_DELAY = 2.0
 
 
 def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
-        num_ctx: int = 2048, temperature: float = 0.3, json_mode: bool = False) -> str:
+        num_ctx: int = 2048, temperature: float = 0.3, json_mode: bool = False,
+        feature: str = "other") -> str:
     """One-shot generation.
 
     `timeout` is the read budget in seconds and must be set below whatever
@@ -35,6 +38,8 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
     figure-dense text.
 
     `json_mode` makes Ollama constrain the output to valid JSON.
+
+    `feature` labels the token-usage metrics (see utils/metrics.py).
     """
     if len(prompt) / 3 + max_tokens > num_ctx:
         logger.warning(
@@ -57,7 +62,9 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
             response = requests.post(OLLAMA_URL, json=payload,
                                      timeout=(3.05, timeout))
             response.raise_for_status()
-            return response.json()["response"].strip()
+            body = response.json()
+            record_llm_usage(feature, body, num_ctx)
+            return body["response"].strip()
         except requests.exceptions.ConnectionError as e:
             last_exc = e
             logger.warning("Ollama connection failed (attempt %d/%d): %s", attempt, _MAX_RETRIES, e)
@@ -71,7 +78,7 @@ def ask(prompt: str, max_tokens: int = 512, timeout: float = 120.0,
 
 
 def chat(messages: list[dict], tools: list[dict] | None = None,
-         max_tokens: int = 512, timeout: float = 120.0) -> dict:
+         max_tokens: int = 512, timeout: float = 120.0, feature: str = "other") -> dict:
     """
     Conversation turn via Ollama's /api/chat, optionally offering tools.
     Returns the assistant message dict — may contain 'tool_calls' when the
@@ -80,7 +87,10 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
     `timeout` is the read budget for this one call; callers making several
     calls in a row pass what is left of their overall budget. A read timeout
     raises requests.exceptions.ReadTimeout and is not retried.
+
+    `feature` labels the token-usage metrics (see utils/metrics.py).
     """
+    num_ctx = 4096
     payload = {
         "model": MODEL,
         "messages": messages,
@@ -89,7 +99,7 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
         # Low temperature: Ollama's default (~0.8) makes a 3B model skip tool
         # calls and invent data on some samples — factual/tool turns need
         # near-greedy decoding.
-        "options": {"num_ctx": 4096, "num_predict": max_tokens, "temperature": 0.2},
+        "options": {"num_ctx": num_ctx, "num_predict": max_tokens, "temperature": 0.2},
     }
     if tools:
         payload["tools"] = tools
@@ -99,7 +109,9 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
         try:
             response = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=(3.05, timeout))
             response.raise_for_status()
-            return response.json()["message"]
+            body = response.json()
+            record_llm_usage(feature, body, num_ctx)
+            return body["message"]
         except requests.exceptions.ConnectionError as e:
             last_exc = e
             logger.warning("Ollama chat connection failed (attempt %d/%d): %s",

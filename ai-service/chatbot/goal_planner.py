@@ -25,7 +25,7 @@ from utils.metrics import (
     GOAL_PLAN_LLM_LATENCY,
     GOAL_PLAN_RETRIES,
 )
-from utils.ollama_client import ask
+from utils.llm_client import ask
 
 logger = logging.getLogger(__name__)
 
@@ -577,7 +577,7 @@ def _narrative(a: dict) -> tuple[dict, str]:
             started = time.monotonic()
             try:
                 text = ask(attempt_prompt, max_tokens=280,
-                           timeout=remaining, num_ctx=LLM_NUM_CTX)
+                           timeout=remaining, num_ctx=LLM_NUM_CTX, feature="goal_plan")
             finally:
                 GOAL_PLAN_LLM_LATENCY.observe(time.monotonic() - started)
         except Exception as e:

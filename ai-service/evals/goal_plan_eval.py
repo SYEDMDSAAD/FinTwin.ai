@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from chatbot.goal_planner import PROMPT_VERSION, _analyse, _narrative  # noqa: E402
-from utils.ollama_client import MODEL  # noqa: E402
+from utils.llm_client import MODEL  # noqa: E402
 
 PASS_RATE_FLOOR = 0.6  # below this, the model/prompt pairing needs attention
 

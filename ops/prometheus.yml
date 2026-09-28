@@ -2,32 +2,32 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# The same rules are set up in Grafana Cloud for production:
+# docs/azure-app-service-deployment.md, "Monitoring"
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Both endpoints need "Authorization: Bearer <METRICS_TOKEN>". docker-compose
+# writes the token to this file before Prometheus starts.
 scrape_configs:
   # ── FinTwin backend ──────────────────────────────────────────────────────────
   - job_name: fintwin-backend
     metrics_path: /actuator/prometheus
+    authorization:
+      credentials_file: /prometheus/metrics-token
     static_configs:
       - targets: [backend:8080]
-        labels:
-          application: fintwin-backend
-
-  # ── Identity service ─────────────────────────────────────────────────────────
-  - job_name: fintwin-identity
-    metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: [identity-service:8090]
-        labels:
-          application: fintwin-identity
 
   # ── AI service ───────────────────────────────────────────────────────────────
-  # Guardrail counters: generations by outcome, tips dropped by the grounding
-  # layer, LLM latency against the backend's 20s deadline.
+  # Token usage, generation speed, context fill, guardrail counters.
   - job_name: fintwin-ai-service
     metrics_path: /metrics
+    authorization:
+      credentials_file: /prometheus/metrics-token
     static_configs:
       - targets: [ai-service:8000]
-        labels:
-          application: fintwin-ai-service
+
+  # The identity service exposes health only, no Prometheus endpoint.
 
   # ── Prometheus self-scrape ───────────────────────────────────────────────────
   - job_name: prometheus

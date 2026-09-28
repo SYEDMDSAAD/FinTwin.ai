@@ -4,6 +4,7 @@
 python-dotenv==1.2.2
 requests==2.34.2
 prometheus-client==0.24.1   # /metrics endpoint + AI guardrail counters
+anthropic[bedrock]==1.8.0     # Claude on Amazon Bedrock, used when LLM_PROVIDER=bedrock (utils/bedrock_client.py)
 
 # ── Web framework ────────────────────────────────────────────────────────────
 fastapi==0.138.2

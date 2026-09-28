@@ -31,7 +31,7 @@ set -a; . "$ENV_FILE"; set +a
 
 need() { [ -n "${!1:-}" ] || { echo "$1 is missing from $ENV_FILE"; exit 1; }; }
 for v in DB_PASSWORD JWT_SECRET FINTWIN_ENCRYPTION_KEY AI_INTERNAL_KEY ADMIN_KEY \
-         MAIL_PASSWORD; do need "$v"; done
+         MAIL_PASSWORD METRICS_TOKEN; do need "$v"; done
 
 # Vault secret names allow letters, digits and dashes only — no underscores,
 # which is why these are not just the variable names lowercased.
@@ -43,6 +43,7 @@ SECRETS=(
     ai-internal-key=AI_INTERNAL_KEY
     admin-key=ADMIN_KEY
     mail-password=MAIL_PASSWORD
+    metrics-token=METRICS_TOKEN
 )
 # Only stored if the env file actually has them — unused features stay out
 OPTIONAL=(
@@ -51,6 +52,7 @@ OPTIONAL=(
     setu-webhook-secret=SETU_WEBHOOK_SECRET
     inbound-email-secret=INBOUND_EMAIL_SECRET
     sms-api-key=SMS_API_KEY
+    aws-secret-access-key=AWS_SECRET_ACCESS_KEY
 )
 
 echo "→ vault $VAULT ($LOCATION, RBAC)"
@@ -111,6 +113,7 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
     AI_INTERNAL_KEY="$(ref ai-internal-key)" \
     ADMIN_KEY="$(ref admin-key)" \
     MAIL_PASSWORD="$(ref mail-password)" \
+    METRICS_TOKEN="$(ref metrics-token)" \
     > /dev/null
 
 echo "→ $APP_AUTH: pointing settings at the vault"
@@ -125,7 +128,13 @@ az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --set
 echo "→ $APP_AI: pointing settings at the vault"
 az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --settings \
     AI_INTERNAL_KEY="$(ref ai-internal-key)" \
+    METRICS_TOKEN="$(ref metrics-token)" \
     > /dev/null
+# Only when Claude on Bedrock is in use (LLM_PROVIDER=bedrock)
+if [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+    az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --settings \
+        AWS_SECRET_ACCESS_KEY="$(ref aws-secret-access-key)" > /dev/null
+fi
 
 cat <<DONE
 

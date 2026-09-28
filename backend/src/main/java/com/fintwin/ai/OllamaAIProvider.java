@@ -1,6 +1,8 @@
 package com.fintwin.ai;
 
 import com.fintwin.dto.FinancialSummaryDTO;
+import com.fintwin.security.AiToolToken;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * AIProvider implementation backed by the local Python AI service (Ollama/phi3:mini).
+ * AIProvider implementation backed by the Python AI service (Ollama, qwen2.5:3b).
  * To swap providers, implement AIProvider and update the @Primary annotation here.
  */
 @Component
@@ -29,13 +31,24 @@ public class OllamaAIProvider implements AIProvider {
     @Qualifier("aiChatRestTemplate")
     private RestTemplate aiRestTemplate;
 
+    @Autowired
+    private AiToolToken toolTokens;
+
     @Override
     public String chat(String message, String mode, FinancialSummaryDTO summary) {
         return chatWithTrace(message, mode, summary).reply();
     }
 
+    /**
+     * Guarded by its own circuit breaker ("ai-chat"), separate from the one the
+     * forecast uses: a slow copilot answer must not stop statistical forecasts.
+     * No fallback method — when the breaker is open, CallNotPermittedException
+     * reaches TransactionController, which answers "unavailable" at once
+     * instead of every user waiting out the 90 s read timeout.
+     */
     @Override
     @SuppressWarnings("unchecked")
+    @CircuitBreaker(name = "ai-chat")
     public ChatResult chatWithTrace(String message, String mode, FinancialSummaryDTO summary) {
         Map<String, Object> financialData = new HashMap<>();
         financialData.put("userId",              summary.getUserId());
@@ -54,6 +67,8 @@ public class OllamaAIProvider implements AIProvider {
         // What the figures cover, so the answer can say so instead of implying "now"
         financialData.put("dataFrom",    summary.getDataFrom());
         financialData.put("dataThrough", summary.getDataThrough());
+        // The copilot's pass for its tool calls: only this user's data, only for a few minutes
+        financialData.put("toolToken", toolTokens.mint(summary.getUserId()));
 
         Map<String, Object> body = new HashMap<>();
         body.put("message",       message);

@@ -52,3 +52,6 @@ dist-ssr/
 *.rpm
 .pytest_cache/
 training-export-*/
+
+# Eval run outputs (answers + scores); summaries go in ai-docs
+ai-service/evals/results/

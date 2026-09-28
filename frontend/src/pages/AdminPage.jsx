@@ -18,6 +18,7 @@ import AdminCopilotFeedback from "../components/admin/AdminCopilotFeedback";
 import AdminAnomalyFeedback from "../components/admin/AdminAnomalyFeedback";
 import AdminImportFormats from "../components/admin/AdminImportFormats";
 import AdminTrainingExport from "../components/admin/AdminTrainingExport";
+import AdminAiUsage from "../components/admin/AdminAiUsage";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -102,6 +103,7 @@ const NAV = [
   { id: "tickets",     label: "Support Tickets",  icon: MessageSquare },
   { id: "feedback",    label: "Beta Feedback",    icon: MessageSquareHeart },
   { id: "categories",  label: "AI Quality",       icon: Tags },
+  { id: "ai-usage",    label: "AI Usage",         icon: Cpu },
   { id: "ipos",        label: "IPO Catalog",      icon: Rocket },
 ];
 
@@ -1333,6 +1335,12 @@ function MonitoringSection() {
                    padding:"9px 14px" }}>
           <Zap size={12}/> {auto ? "Auto-refresh ON (30s)" : "Auto-refresh OFF"}
         </button>
+        {/^https:\/\//.test(data?.grafanaUrl || "") && (
+          <a className="ab ab-purple" href={data.grafanaUrl} target="_blank" rel="noopener noreferrer"
+             style={{ padding:"9px 14px", textDecoration:"none" }}>
+            <ArrowUpRight size={12}/> Grafana dashboards &amp; history
+          </a>
+        )}
         {lastAt && (
           <span style={{ fontSize:11, color:"rgba(148,163,184,0.35)", marginLeft:"auto" }}>
             Last updated: {lastAt.toLocaleTimeString("en-IN")}
@@ -1589,6 +1597,7 @@ export default function AdminPage() {
             {tab === "tickets"    && <TicketsSection/>}
             {tab === "feedback"   && <AdminFeedback/>}
             {tab === "categories" && <><AdminCopilotFeedback/><AdminAnomalyFeedback/><AdminImportFormats/><AdminCategorization/><div style={{ height: 28 }}/><AdminTrainingExport/></>}
+            {tab === "ai-usage"   && <AdminAiUsage/>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

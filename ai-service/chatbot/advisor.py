@@ -10,7 +10,7 @@ from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
 from chatbot import affordability, portfolio_answers
-from utils.ollama_client import MODEL, ask, chat
+from utils.llm_client import MODEL, ask, chat
 
 logger = logging.getLogger(__name__)
 
@@ -28,18 +28,12 @@ _OUT_OF_TIME = (
     "or ask something narrower — for example \"How much did I spend on food in August?\""
 )
 
-_FALLBACK = """\
-**Summary**
-FinTwin AI encountered a temporary issue.
-
-**Key Risks**
-AI service could not process financial analysis right now.
-
-**Recommendations**
-Retry after a few seconds. Check that Ollama is running (ollama serve).
-
-**Verdict**
-Temporary AI service interruption."""
+# Shown to users, so it says what to do, not how to fix the server; the
+# cause goes to the logs where the error is caught.
+_FALLBACK = (
+    "FinTwin AI couldn't answer that just now. Please try again in a minute — "
+    "your data is safe and nothing was changed."
+)
 
 
 _PORTFOLIO_CAVEAT = (
@@ -230,7 +224,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
         if remaining < _MIN_CALL_SECONDS:
             raise _OutOfTime()
         try:
-            return chat(messages, tools=tools, timeout=remaining)
+            return chat(messages, tools=tools, timeout=remaining, feature="copilot")
         except requests.exceptions.ReadTimeout:
             raise _OutOfTime() from None
 
@@ -259,7 +253,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
                     except ValueError:
                         args = {}
                 logger.info("Copilot tool call (round %d): %s(%s)", round_no + 1, name, args)
-                result = execute_tool(name, args, user_id)
+                result = execute_tool(name, args, user_id, financial_data.get("toolToken"))
                 tools_attempted += 1
                 trace.setdefault("tools", []).append(
                     {"name": name, "args": args, "ok": not _tool_result_is_error(result)})
@@ -348,10 +342,11 @@ Respond in this format:
 **Verdict**
 [one-line verdict]"""
 
-    return ask(prompt)
+    return ask(prompt, feature="advisor")
 
 
-def _portfolio_direct(message: str, user_id, trace: dict | None = None) -> str | None:
+def _portfolio_direct(message: str, user_id, trace: dict | None = None,
+                      tool_token: str | None = None) -> str | None:
     """
     Plain portfolio data questions answered from the backend's figures, no
     model: a 3B model's prose has contradicted the very numbers it quoted.
@@ -361,7 +356,8 @@ def _portfolio_direct(message: str, user_id, trace: dict | None = None) -> str |
     if routed is None:
         return None
     intent, holding_type = routed
-    result = execute_tool("get_portfolio", {"type": holding_type} if holding_type else {}, user_id)
+    result = execute_tool("get_portfolio", {"type": holding_type} if holding_type else {},
+                          user_id, tool_token)
     if _tool_result_is_error(result):
         return None
     try:
@@ -405,7 +401,8 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
                 return answered
 
         if financial_data.get("userId") is not None:
-            direct = _portfolio_direct(message, financial_data["userId"], trace)
+            direct = _portfolio_direct(message, financial_data["userId"], trace,
+                                       financial_data.get("toolToken"))
             if direct is not None:
                 return direct
             try:

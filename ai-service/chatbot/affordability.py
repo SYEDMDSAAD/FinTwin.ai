@@ -16,9 +16,10 @@ _ASKS = re.compile(
     re.IGNORECASE,
 )
 
-# ₹65,000 · 65k · 5 lakh · 1.2 cr · 8 lakhs
+# ₹65,000 · 65k · 5 lakh · 1.2 cr · 8 lakhs. The unit must be a whole word:
+# without the \b, "₹65,000 laptop" read the "l" of laptop as lakh (₹650 crore).
 _AMOUNT = re.compile(
-    r"(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|l|lakh|lakhs|lac|cr|crore|crores)?",
+    r"(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|l|lakh|lakhs|lac|cr|crore|crores)?\b",
     re.IGNORECASE,
 )
 _MULTIPLIER = {"k": 1_000, "thousand": 1_000, "l": 100_000, "lakh": 100_000, "lakhs": 100_000,

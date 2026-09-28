@@ -19,14 +19,22 @@ _INTERNAL_KEY = os.environ.get("AI_INTERNAL_KEY", "")
 _TIMEOUT = 15
 
 
-def get(path: str, params: dict | None = None) -> dict:
-    """GET {BACKEND_URL}/internal/ai{path} → parsed JSON. Raises RuntimeError on failure."""
+def get(path: str, params: dict | None = None, tool_token: str | None = None) -> dict:
+    """GET {BACKEND_URL}/internal/ai{path} → parsed JSON. Raises RuntimeError on failure.
+
+    `tool_token` is the per-request pass the backend minted for the user being
+    answered (financialData["toolToken"]); the backend refuses the call
+    without it. This service can pass it back but cannot create one.
+    """
     url = f"{BACKEND_URL}/internal/ai{path}"
+    headers = {"X-Internal-Key": _INTERNAL_KEY}
+    if tool_token:
+        headers["X-Tool-Token"] = tool_token
     try:
         resp = requests.get(
             url,
             params=params or {},
-            headers={"X-Internal-Key": _INTERNAL_KEY},
+            headers=headers,
             timeout=_TIMEOUT,
         )
         resp.raise_for_status()

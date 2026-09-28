@@ -14,6 +14,7 @@ import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.service.BudgetService;
+import com.fintwin.security.AiToolToken;
 import com.fintwin.service.GoalPlannerService;
 
 import org.slf4j.Logger;
@@ -23,6 +24,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,8 +39,9 @@ import java.util.Map;
  * pre-stuffed data blob — it requests exactly what a question needs through
  * these endpoints (service-to-service, never exposed to browsers).
  *
- * Auth: X-Internal-Key must match AI_INTERNAL_KEY — the same shared secret the
- * backend already uses when calling the AI service in the other direction.
+ * Auth: X-Internal-Key must match AI_INTERNAL_KEY (the shared service secret),
+ * and X-Tool-Token must be a live token minted for the requested user — see
+ * {@link AiToolToken} and requireAccess().
  */
 @RestController
 @RequestMapping("/internal/ai")
@@ -56,6 +60,7 @@ public class InternalAIController {
     private final LiabilityRepository liabilityRepo;
     private final InvestmentRepository investmentRepo;
     private final InsurancePolicyRepository insuranceRepo;
+    private final AiToolToken toolTokens;
 
     public InternalAIController(
             UserRepository userRepo,
@@ -65,7 +70,8 @@ public class InternalAIController {
             AssetRepository assetRepo,
             LiabilityRepository liabilityRepo,
             InvestmentRepository investmentRepo,
-            InsurancePolicyRepository insuranceRepo
+            InsurancePolicyRepository insuranceRepo,
+            AiToolToken toolTokens
     ) {
         this.userRepo           = userRepo;
         this.txnRepo            = txnRepo;
@@ -75,6 +81,7 @@ public class InternalAIController {
         this.liabilityRepo  = liabilityRepo;
         this.investmentRepo = investmentRepo;
         this.insuranceRepo  = insuranceRepo;
+        this.toolTokens     = toolTokens;
     }
 
     // ── Transactions ──────────────────────────────────────────────────────────
@@ -87,6 +94,7 @@ public class InternalAIController {
     @GetMapping("/{userId}/transactions")
     public ResponseEntity<?> transactions(
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
             @PathVariable Long userId,
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "date") String sort,
@@ -95,7 +103,7 @@ public class InternalAIController {
             @RequestParam(defaultValue = "3") int months,
             @RequestParam(required = false) String groupBy
     ) {
-        ResponseEntity<?> denied = requireKey(key);
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
         if (denied != null) return denied;
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
@@ -192,9 +200,10 @@ public class InternalAIController {
     @GetMapping("/{userId}/budgets")
     public ResponseEntity<?> budgets(
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
             @PathVariable Long userId
     ) {
-        ResponseEntity<?> denied = requireKey(key);
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
         if (denied != null) return denied;
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
@@ -217,9 +226,10 @@ public class InternalAIController {
     @GetMapping("/{userId}/goals")
     public ResponseEntity<?> goals(
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
             @PathVariable Long userId
     ) {
-        ResponseEntity<?> denied = requireKey(key);
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
         if (denied != null) return denied;
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
@@ -271,9 +281,10 @@ public class InternalAIController {
     @GetMapping("/{userId}/networth")
     public ResponseEntity<?> netWorth(
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
             @PathVariable Long userId
     ) {
-        ResponseEntity<?> denied = requireKey(key);
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
         if (denied != null) return denied;
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
@@ -347,10 +358,11 @@ public class InternalAIController {
     @GetMapping("/{userId}/portfolio")
     public ResponseEntity<?> portfolio(
             @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
             @PathVariable Long userId,
             @RequestParam(required = false) String type
     ) {
-        ResponseEntity<?> denied = requireKey(key);
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
         if (denied != null) return denied;
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
@@ -464,12 +476,25 @@ public class InternalAIController {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private ResponseEntity<?> requireKey(String key) {
-        if (internalKey == null || internalKey.isBlank()
-                || key == null || !internalKey.equals(key)) {
+    /**
+     * Two checks, both required: the service key says the caller is the AI
+     * service, and the tool token (minted per copilot request by
+     * OllamaAIProvider) says it is answering THIS user right now. On App
+     * Service this API has a public URL, so the key alone must not be enough
+     * to read anyone's data.
+     */
+    private ResponseEntity<?> requireAccess(String key, String toolToken, Long userId) {
+        if (internalKey == null || internalKey.isBlank() || key == null
+                || !MessageDigest.isEqual(internalKey.getBytes(StandardCharsets.UTF_8),
+                                          key.getBytes(StandardCharsets.UTF_8))) {
             log.warn("Internal AI API called with missing/invalid key");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid internal key"));
+        }
+        if (!toolTokens.allows(toolToken, userId)) {
+            log.warn("Internal AI API called without a valid tool token for the requested user");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Invalid or expired tool token"));
         }
         return null;
     }

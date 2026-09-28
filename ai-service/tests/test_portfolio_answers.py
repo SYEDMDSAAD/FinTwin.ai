@@ -148,7 +148,7 @@ _DATA_JSON = json.dumps(DATA, ensure_ascii=False)
 def test_a_plain_question_never_reaches_the_model(mock_exec, mock_chat):
     reply = generate_financial_advice("Which of my holdings is losing money?", _BASE, "Investment Advisor")
     mock_chat.assert_not_called()
-    mock_exec.assert_called_once_with("get_portfolio", {}, 8)
+    mock_exec.assert_called_once_with("get_portfolio", {}, 8, None)
     assert reply.startswith("1 of your holdings is at a loss")
     assert "not financial advice" in reply
 
@@ -157,7 +157,7 @@ def test_a_plain_question_never_reaches_the_model(mock_exec, mock_chat):
 @patch("chatbot.advisor.execute_tool", return_value=_DATA_JSON)
 def test_a_type_question_fetches_only_that_type(mock_exec, mock_chat):
     generate_financial_advice("How much have I made on my mutual fund?", _BASE, "Investment Advisor")
-    mock_exec.assert_called_once_with("get_portfolio", {"type": "Mutual Fund"}, 8)
+    mock_exec.assert_called_once_with("get_portfolio", {"type": "Mutual Fund"}, 8, None)
 
 
 @patch("chatbot.advisor.chat")
