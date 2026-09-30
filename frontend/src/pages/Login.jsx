@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import API, { identityApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { prefetchDashboard } from "../utils/prefetchDashboard";
 import { GoogleLogin } from "@react-oauth/google";
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowLeft, AlertOctagon, MessageSquare, X, User } from "lucide-react";
 
@@ -149,6 +150,9 @@ function Login() {
   const navigate = useNavigate();
   const { login }  = useAuth();
   const { isDark } = useTheme();
+
+  // Signing in lands on the dashboard: fetch its code while they type
+  useEffect(() => { prefetchDashboard({ whenIdle: true }); }, []);
 
   const [email,           setEmail]           = useState("");
   const [password,        setPassword]        = useState("");

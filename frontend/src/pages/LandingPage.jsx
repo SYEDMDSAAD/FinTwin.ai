@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { toLight } from "./landingLightCss";
+import { prefetchDashboard } from "../utils/prefetchDashboard";
 
 /* Fonts (Space Grotesk, DM Mono) are requested in index.html */
 
@@ -453,6 +454,9 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const isLoggedIn = !!localStorage.getItem("token");
 
+  // A signed-in visitor is one tap from the dashboard: fetch its code now
+  useEffect(() => { if (isLoggedIn) prefetchDashboard({ whenIdle: true }); }, [isLoggedIn]);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -483,7 +487,7 @@ export default function LandingPage() {
         </button>
         <div style={{ width: "100%", height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.1)", margin: "8px 0" }} />
         {isLoggedIn ? (
-          <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/dashboard"); }}>Open Dashboard</button>
+          <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onPointerDown={() => prefetchDashboard()} onClick={() => { setMenuOpen(false); navigate("/dashboard"); }}>Open Dashboard</button>
         ) : (
           <>
             <button className="mob-link" onClick={() => { setMenuOpen(false); navigate("/login"); }}>Log In</button>
@@ -510,7 +514,7 @@ export default function LandingPage() {
               {isDark ? <Sun size={17} aria-hidden /> : <Moon size={17} aria-hidden />}
             </button>
             {isLoggedIn ? (
-              <button className="btn-primary" onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">Open Dashboard</button>
+              <button className="btn-primary" onPointerDown={() => prefetchDashboard()} onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">Open Dashboard</button>
             ) : (
               <>
                 <button className="btn-ghost" onClick={() => navigate("/login")} aria-label="Log in to your account">Log In</button>
@@ -551,7 +555,7 @@ export default function LandingPage() {
 
             <div className="hero-ctas h-el-4">
               {isLoggedIn ? (
-                <button className="btn-hero" onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">
+                <button className="btn-hero" onPointerDown={() => prefetchDashboard()} onClick={() => navigate("/dashboard")} aria-label="Go to your dashboard">
                   Open Dashboard
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
@@ -1013,7 +1017,7 @@ export default function LandingPage() {
                 <button
                   className="btn-hero"
                   style={{ fontSize: 17, padding: "17px 40px", borderRadius: 14 }}
-                  onClick={() => navigate("/dashboard")}
+                  onPointerDown={() => prefetchDashboard()} onClick={() => navigate("/dashboard")}
                   aria-label="Go to your dashboard"
                 >
                   Open Dashboard
