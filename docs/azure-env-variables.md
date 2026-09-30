@@ -88,7 +88,7 @@ or Google sign-in fails in production.
 | `METRICS_TOKEN` | your generated value |
 | `GRAFANA_URL` | optional: your Grafana Cloud dashboard link, shown on the admin Monitoring tab |
 | `AI_DAILY_TOKEN_LIMIT` | model tokens one user may use per day across all AI features (default `200000`; `0` = no cap; admins exempt). Matters once `LLM_PROVIDER=bedrock` makes tokens cost money |
-| `AI_SERVICE_URL` | `https://fintwin-ai.azurewebsites.net` **[URL]** |
+| `AI_SERVICE_URL` | set by `scripts/ai-local-tunnel.sh` to its tunnel URL (`https://fintwin-ai.azurewebsites.net` with `AI_HOST=appservice`) **[URL]** |
 | `CORS_ALLOWED_ORIGINS` | `https://fintwin-web.azurewebsites.net` **[URL]** |
 | `MAIL_ENABLED` | `true` |
 | `MAIL_HOST` | `smtp.gmail.com` |
@@ -131,7 +131,7 @@ Sign-up, login, 2FA, refresh tokens. Same database, same two keys.
 `APP_BASE_URL` is what password-reset links point at, so it must be the address
 users actually open.
 
-## 5. `fintwin-ai` — FastAPI + Ollama
+## 5. `fintwin-ai` — FastAPI + Ollama (only with `AI_HOST=appservice`)
 
 | Name | Value |
 |---|---|
