@@ -439,6 +439,12 @@ body.sidebar-animating [class*="backdrop-blur"] {
 [data-theme="light"] .text-yellow-300    { color: #d97706 !important; }
 [data-theme="light"] .text-amber-400,
 [data-theme="light"] .text-amber-300     { color: #d97706 !important; }
+/* The pale -200 shades are near-invisible on white: warning and error copy
+   (e.g. "AI analysis was unavailable" on a report) needs the dark shade */
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-200\/90 { color: #92400e !important; }
+[data-theme="light"] .text-red-200       { color: #b91c1c !important; }
+[data-theme="light"] .hover\:text-purple-200:hover { color: #5b21b6 !important; }
 [data-theme="light"] .text-purple-400,
 [data-theme="light"] .text-purple-300    { color: #7c3aed !important; }
 [data-theme="light"] .text-violet-400,
