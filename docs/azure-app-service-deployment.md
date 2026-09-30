@@ -171,6 +171,12 @@ on :8000, loads the model, opens a Cloudflare quick tunnel, and sets
 new on every start, and changing the setting restarts the backend, so allow a
 minute or two before the site's AI answers.
 
+- **It heals itself.** Every minute it checks the AI service and the tunnel.
+  After two failed tunnel checks (an internet drop, say) it opens a new
+  tunnel and points the backend at it — about 2–3 minutes, with the site
+  briefly unreachable while the backend restarts. With no internet it keeps
+  retrying. It connects to Cloudflare over IPv4 (`TUNNEL_IP_VERSION` to
+  change): over IPv6 the tunnel dropped within seconds after a reconnect.
 - **The machine must stay awake.** The script holds off sleep, lid closed
   included, for as long as it runs. Keep it plugged in.
 - **Anyone who finds the URL still can't use it.** Every route except `/health`
