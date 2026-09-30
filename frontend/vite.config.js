@@ -25,16 +25,26 @@ export default defineConfig({
     cssMinify: false,
     // Split heavy third-party libs into their own chunks so they're cached
     // independently and only fetched when a route that needs them loads.
-    rollupOptions: {
+    //
+    // Explicit groups with priorities, not manualChunks: with manualChunks,
+    // Rolldown placed React's CommonJS module inside `charts` (and part of it in
+    // `motion`), so every page — the landing page too — downloaded the whole
+    // charting library (~116 KB gzipped) before it could render anything.
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("recharts") || id.includes("d3-")) return "charts";
-            if (id.includes("jspdf") || id.includes("html2canvas")) return "pdf";
-            if (id.includes("framer-motion")) return "motion";
-            if (id.includes("react")) return "react-vendor";
-            return "vendor";
-          }
+        codeSplitting: {
+          groups: [
+            { name: "react-vendor", priority: 4,
+              test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|use-sync-external-store)[\\/]/ },
+            { name: "charts", priority: 3,
+              test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|react-smooth|recharts-scale|decimal\.js-light|es-toolkit|immer|reselect|@reduxjs|react-redux|redux|redux-thunk|eventemitter3|react-is)[\\/]/ },
+            { name: "pdf", priority: 3, test: /node_modules[\\/](jspdf|html2canvas)/ },
+            { name: "motion", priority: 3, test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/ },
+            // No catch-all vendor group: it pulled the markdown renderer (only the
+            // copilot uses it, ~450 KB of source) into what the landing page loads.
+            // Anything not grouped above is split by default, next to the pages
+            // that import it.
+          ],
         },
       },
     },

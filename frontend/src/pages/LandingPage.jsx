@@ -4,12 +4,10 @@ import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { toLight } from "./landingLightCss";
 
-/* ─── Google Fonts ─────────────────────────────────────────────── */
-const GFONTS = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');`;
+/* Fonts (Space Grotesk, DM Mono) are requested in index.html */
 
 /* ─── All Landing CSS ──────────────────────────────────────────── */
 const CSS = `
-${GFONTS}
 
 .land *, .land *::before, .land *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .land { font-family: 'Inter', 'DM Sans', system-ui, sans-serif; background: #060810; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
@@ -35,7 +33,7 @@ ${GFONTS}
 .btn-primary:active { transform: translateY(0); }
 .lnav-ham { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 8px; border-radius: 8px; }
 .lnav-ham span { display: block; width: 22px; height: 2px; background: #e2e8f0; border-radius: 2px; transition: all 0.25s; }
-.mob-menu { display: none; position: fixed; inset: 0; z-index: 190; background: rgba(6,8,16,0.97); backdrop-filter: blur(20px); flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+.mob-menu { display: none; position: fixed; inset: 0; z-index: 210; /* above .lnav (200), or the navbar hides its ✕ */ background: rgba(6,8,16,0.97); backdrop-filter: blur(20px); flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
 .mob-menu.open { display: flex; }
 .mob-link { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: #e2e8f0; text-decoration: none; background: none; border: none; cursor: pointer; transition: color 0.15s; }
 .mob-link:hover { color: #a78bfa; }
@@ -100,6 +98,7 @@ ${GFONTS}
 /* ── Feature cards ──────────────── */
 .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 56px; }
 .feat-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.feat-split { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
 .feat-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 28px; transition: all 0.25s ease; cursor: default; }
 .feat-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.04); border-color: rgba(167,139,250,0.18); box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(167,139,250,0.12); }
 .feat-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 18px; flex-shrink: 0; }
@@ -161,8 +160,8 @@ ${GFONTS}
 .price-amount span { font-size: 24px; color: rgba(148,163,184,0.6); font-weight: 500; }
 .price-desc { font-size: 15px; color: rgba(148,163,184,0.75); margin-bottom: 32px; line-height: 1.6; }
 .price-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 36px; }
-.price-feat { display: flex; align-items: center; gap: 12px; font-size: 14px; color: rgba(226,232,240,0.85); }
-.price-feat-check { width: 20px; height: 20px; border-radius: 50%; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.price-feat { display: flex; align-items: flex-start; gap: 12px; text-align: left; font-size: 14px; color: rgba(226,232,240,0.85); }
+.price-feat-check { margin-top: 1px; width: 20px; height: 20px; border-radius: 50%; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
 
 
 /* ── Final CTA ──────────────────── */
@@ -223,12 +222,17 @@ ${GFONTS}
   .hero-right { display: none; }
   .feat-grid { grid-template-columns: 1fr; }
   .feat-grid-3 { grid-template-columns: 1fr; }
+  .feat-split { grid-template-columns: 1fr; gap: 24px; }
   .sec-grid { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
   .lnav-links { display: none; }
   .lnav-ham { display: flex; }
 }
 @media (max-width: 600px) {
+  /* Logo + Log In + Get Started + menu needed ~510 px, so on a phone the menu
+     button fell off the screen. Both buttons are in the menu and the hero. */
+  .lnav-inner { padding: 0 16px; gap: 12px; }
+  .lnav-right .btn-ghost, .lnav-right .btn-primary { display: none; }
   .section { padding: 72px 20px; }
   .hero-inner { padding: 60px 20px 40px; }
   .footer-grid { grid-template-columns: 1fr; }
@@ -736,7 +740,7 @@ export default function LandingPage() {
             {/* AI Copilot chat card */}
             <Reveal delay={1}>
               <div className="feat-card" style={{ gridColumn: "1 / -1" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "center" }}>
+                <div className="feat-split">
                   <div>
                     <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🤖</div>
                     <div className="feat-card-title">AI Copilot with advisor modes</div>
