@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Creates the Azure App Service setup for FinTwin.ai — one plan, four web apps.
+# Creates the Azure App Service setup for FinTwin.ai — one plan, three web apps,
+# plus a fourth for the AI service when AI_HOST=appservice.
 # Run once; deploys after that are handled by .github/workflows/cd-deploy.yml.
 # Safe to re-run: existing apps are kept, settings are re-applied.
 #
@@ -9,18 +10,25 @@
 # Reads your secrets from .env.prod (same file the VM uses) and sets them as app
 # settings. Nothing is printed: `az webapp config appsettings set` echoes every
 # value it stores, so its output is sent to /dev/null throughout.
+#
+# Where the AI service runs (AI_HOST):
+#   local       (default) on your own machine's GPU, reached through a Cloudflare
+#               tunnel — scripts/ai-local-tunnel.sh starts it and points the
+#               backend at it. qwen2.5:3b on App Service CPUs managed ~0.4
+#               tokens/s, so every AI call timed out; a laptop GPU does ~70.
+#   appservice  as a fourth web app on the plan, with Ollama inside it (B3+)
 set -euo pipefail
 
 RG="${RG:-fintwin}"
 LOCATION="${LOCATION:-centralindia}"
 PLAN="${PLAN:-fintwin-plan}"
-# B3: 4 vCPU / 7 GB, ~$53/month in Central India (Sept 2026 retail price).
-# The smallest plan that fits: qwen2.5:3b in RAM (~2.8 GB) + two capped JVMs +
-# the AI service is ~5.5 GB. It also has twice P1v3's CPUs for less than half
-# the price; Basic lacks deployment slots and autoscale, which this doesn't use.
-# SKU=P1V3 for production-grade slots. With LLM_PROVIDER=bedrock (no local
-# model) SKU=B2 (3.5 GB, ~$26) can be enough.
-SKU="${SKU:-B3}"
+AI_HOST="${AI_HOST:-local}"
+# Prices are Central India retail, Sept 2026.
+# B2: 2 vCPU / 3.5 GB, ~$26/month — the two capped JVMs and nginx use ~1.1 GB.
+# B3: 4 vCPU / 7 GB, ~$53/month — needed when the plan also holds qwen2.5:3b
+#     (~2.8 GB in RAM). Basic lacks deployment slots and autoscale, which this
+#     doesn't use; SKU=P1V3 if you need them.
+if [ "$AI_HOST" = "appservice" ]; then SKU="${SKU:-B3}"; else SKU="${SKU:-B2}"; fi
 ENV_FILE="${FINTWIN_ENV_FILE:-.env.prod}"
 
 # Web app names are part of *.azurewebsites.net, so they must be globally
@@ -83,7 +91,7 @@ FRONT_HOSTS="BACKEND_HOST=${APP_API}.azurewebsites.net IDENTITY_HOST=${APP_AUTH}
 
 create_app "$APP_API"  fintwin-backend          8080
 create_app "$APP_AUTH" fintwin-identity-service 8090
-create_app "$APP_AI"   fintwin-ai-ollama        8000
+[ "$AI_HOST" = "appservice" ] && create_app "$APP_AI" fintwin-ai-ollama 8000
 create_app "$APP_WEB"  fintwin-frontend-as      8080
 
 # Heap caps (JAVA_TOOL_OPTIONS, below). The images start the JVM with
@@ -91,6 +99,12 @@ create_app "$APP_WEB"  fintwin-frontend-as      8080
 # Service has no per-app memory limit, so each JVM would see the whole plan and
 # could grow to ~5 GB — two of them plus the model don't fit, and the apps get
 # killed. The caps match what the VM gives them (backend 768 MB of heap).
+#
+# With AI_HOST=local the AI URL is left alone here: it changes every time the
+# tunnel starts, and scripts/ai-local-tunnel.sh sets it. Until then the backend
+# can't reach the AI and serves its fallback answers.
+AI_URL_SETTING=()
+[ "$AI_HOST" = "appservice" ] && AI_URL_SETTING=(AI_SERVICE_URL="https://${APP_AI}.azurewebsites.net")
 echo "→ settings: backend"
 az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --settings \
     SERVER_PORT=8080 \
@@ -101,7 +115,7 @@ az webapp config appsettings set --name "$APP_API" --resource-group "$RG" --sett
     DB_POOL_MAX="${DB_POOL_MAX:-20}" \
     JWT_SECRET="$JWT_SECRET" FINTWIN_ENCRYPTION_KEY="$FINTWIN_ENCRYPTION_KEY" \
     AI_INTERNAL_KEY="$AI_INTERNAL_KEY" \
-    AI_SERVICE_URL="https://${APP_AI}.azurewebsites.net" \
+    "${AI_URL_SETTING[@]}" \
     METRICS_TOKEN="$METRICS_TOKEN" GRAFANA_URL="${GRAFANA_URL:-}" \
     AI_DAILY_TOKEN_LIMIT="${AI_DAILY_TOKEN_LIMIT:-200000}" \
     REDIS_URL="${REDIS_URL:-}" \
@@ -137,6 +151,7 @@ az webapp config appsettings set --name "$APP_AUTH" --resource-group "$RG" --set
 az webapp config set --name "$APP_AUTH" --resource-group "$RG" \
     --generic-configurations '{"healthCheckPath": "/actuator/health/liveness"}' --output none
 
+if [ "$AI_HOST" = "appservice" ]; then
 echo "→ settings: ai + ollama"
 # /home is the only storage App Service keeps across restarts — the 2 GB model
 # lives there so a restart doesn't re-download it. The start limit is raised
@@ -158,6 +173,7 @@ az webapp config appsettings set --name "$APP_AI" --resource-group "$RG" --setti
     > /dev/null
 az webapp config set --name "$APP_AI" --resource-group "$RG" \
     --generic-configurations '{"healthCheckPath": "/health"}' --output none
+fi
 
 echo "→ settings: front door"
 # shellcheck disable=SC2086
@@ -181,15 +197,25 @@ Created. Next:
          DOCKER_REGISTRY_SERVER_PASSWORD=<classic PAT with read:packages>
 
   3. Your app: https://${APP_WEB}.azurewebsites.net
+DONE
+if [ "$AI_HOST" = "appservice" ]; then cat <<DONE
      The first AI answer waits for a ~2 GB model download — watch it with
        az webapp log tail -g $RG -n $APP_AI
+DONE
+else cat <<DONE
+     AI features answer once your machine serves them:
+       scripts/ai-local-tunnel.sh
+     While it isn't running, they show their fallback answers.
+DONE
+fi
+cat <<DONE
 
   4. Monitoring: point Grafana Cloud at the two metrics endpoints with
      METRICS_TOKEN — docs/azure-app-service-deployment.md, "Monitoring".
 
-  5. Cost: the plan bills every hour it exists, stopped or not (B3 ~\$53/month).
+  5. Cost: the plan bills every hour it exists, stopped or not ($SKU).
      When you're done with it, delete everything:
-       az group delete -n $RG
+       scripts/azure-teardown.sh
 
   6. A custom domain and its free managed certificate:
        az webapp config hostname add -g $RG --webapp-name $APP_WEB --hostname your-domain

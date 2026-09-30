@@ -9,6 +9,7 @@ receives a pre-attached data dump and never has to invent numbers.
 import json
 import logging
 
+from chatbot.affordability import inr
 from utils import backend_api
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,12 @@ TOOLS = [
                 "recorded under any category. "
                 "For 'where/who did I receive the MOST money from' or 'top income "
                 "sources' also set group_by='merchant' — this sums ALL matching "
-                "transactions per sender and returns totals, which single rows cannot."
+                "transactions per sender and returns totals, which single rows cannot. "
+                "Also the tool for subscriptions and recurring payments (Netflix, "
+                "Spotify, rent, EMIs): set group_by='merchant' and months=3 — a "
+                "merchant charged every month is a recurring payment. Grouped "
+                "results give totalAmount for the whole period and perMonth; "
+                "quote perMonth for anything 'a month' or 'each month'."
             ),
             "parameters": {
                 "type": "object",
@@ -153,6 +159,21 @@ TOOLS = [
 ]
 
 
+def _add_per_month(result: dict, months: int) -> None:
+    """Grouped totals cover the whole period. A small model quotes a 3-month
+    total as "each month" (Netflix ₹1,947 instead of ₹649), so each group also
+    carries the monthly figure, worked out here rather than by the model."""
+    if not isinstance(result, dict) or not isinstance(result.get("groups"), list):
+        return
+    months = max(1, months)
+    result["periodMonths"] = months
+    for g in result["groups"]:
+        if isinstance(g, dict) and isinstance(g.get("totalAmount"), (int, float)):
+            per_month = round(g["totalAmount"] / months)
+            g["perMonth"] = per_month
+            g["perMonthFormatted"] = inr(per_month)
+
+
 def execute_tool(name: str, args: dict, user_id: int, tool_token: str | None = None) -> str:
     """Run one tool call against the backend; returns a JSON string for the model.
 
@@ -165,16 +186,19 @@ def execute_tool(name: str, args: dict, user_id: int, tool_token: str | None = N
                 # Default to biggest-first: "top/most" questions are the common
                 # case and a wrong "most" is worse than a wrong order for
                 # "recent" questions (the model passes sort=date explicitly there).
-                "sort":   args.get("sort", "amount"),
-                "type":   args.get("type", "expense"),
-                "limit":  int(args.get("limit", 10)),
-                "months": int(args.get("months", 3)),
+                # `or`, not a default: small models send "months": null
+                "sort":   args.get("sort") or "amount",
+                "type":   args.get("type") or "expense",
+                "limit":  int(args.get("limit") or 10),
+                "months": int(args.get("months") or 3),
             }
             if args.get("category"):
                 params["category"] = str(args["category"])
             if args.get("group_by") in ("merchant", "category"):
                 params["groupBy"] = args["group_by"]
             result = backend_api.get(f"/{user_id}/transactions", params, tool_token)
+            if "groupBy" in params:
+                _add_per_month(result, params["months"])
         elif name == "get_budgets":
             result = backend_api.get(f"/{user_id}/budgets", None, tool_token)
         elif name == "get_goals":

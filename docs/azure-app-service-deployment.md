@@ -1,18 +1,21 @@
 # Running FinTwin.ai on Azure App Service
 
-Four web apps on one Linux plan. Azure handles TLS, certificates, OS patching
-and restarts. On the default B3 plan it costs about $53/month, roughly $8 more
-than the single VM (see [azure-vm-deployment.md](azure-vm-deployment.md), still
-in the repo and still works) for twice the CPU and no server to look after.
+Three web apps on one Linux plan, plus the AI service on your own machine's
+GPU, reached through a Cloudflare tunnel. Azure handles TLS, certificates, OS
+patching and restarts. The B2 plan costs about $26/month.
 
 ```
-App Service plan (B3 — 4 vCPU / 7 GB)
+App Service plan (B2 — 2 vCPU / 3.5 GB)
 ├── fintwin-web    nginx + the React app   → the only app with your domain on it
 │                  proxies /api/auth|2fa|token|admin → fintwin-auth
 │                           everything else under /api → fintwin-api
-├── fintwin-api    Spring Boot backend     :8080
-├── fintwin-auth   identity service        :8090
-└── fintwin-ai     FastAPI + Ollama        :8000   (~3.3 GB of the plan)
+├── fintwin-api    Spring Boot backend     :8080  ──┐ AI_SERVICE_URL
+└── fintwin-auth   identity service        :8090    │
+                                                    ▼
+                          Cloudflare quick tunnel (*.trycloudflare.com)
+                                                    ▼
+Your machine: AI service :8000 + Ollama + qwen2.5:3b on the GPU
+              (the copilot's tools call back to fintwin-api)
 
 Supabase → Postgres
 ```
@@ -24,6 +27,26 @@ hostnames — one origin means CORS and cookies keep working as they do today.
 
 ---
 
+## Why the AI isn't on Azure
+
+The first deployment ran the AI service and qwen2.5:3b as a fourth app on a B3
+plan. It generated **~0.4 tokens/s**: App Service has no GPU, B3's four vCPUs
+are small and shared with the other apps, and llama.cpp's threads spin at every
+layer while waiting for one another, so a paused thread stalls the rest. Every
+AI call hit its timeout and fell back. The same model on a laptop RTX 3050 does
+**~70 tokens/s**.
+
+Faster Azure CPUs only reach a few tokens/s (P2v3, ~$239/month); a GPU VM is
+~$423/month. So the AI runs on your machine, and the site works without it:
+when the machine is off, the backend's circuit breaker trips and AI features
+show their rule-based fallbacks.
+
+`AI_HOST=appservice` still builds the old layout (B3, a `fintwin-ai` app with
+Ollama inside) — useful with `LLM_PROVIDER=bedrock`, where no model runs on
+the plan.
+
+---
+
 ## What it costs
 
 Central India, pay-as-you-go, September 2026. Check the
@@ -31,44 +54,31 @@ Central India, pay-as-you-go, September 2026. Check the
 
 | Item | Monthly |
 |---|---|
-| App Service plan, **B3** (4 vCPU / 7 GB) | **~$53** ($0.072/hour) |
+| App Service plan, **B2** (2 vCPU / 3.5 GB) | **~$26** ($0.036/hour) |
+| Cloudflare quick tunnel | $0 |
 | Key Vault (optional) | cents ($0.03 per 10,000 reads) |
 | Supabase | $0–25 |
 | GHCR, managed certificates, `*.azurewebsites.net` HTTPS | $0 |
-| **Total** | **~$53–78** |
+| **Total** | **~$26–51** |
 
-Prices are the Azure retail price list for Central India on 2026-09-28. The
-plan is billed **every hour it exists, even with the apps stopped**, so it's
+The plan is billed **every hour it exists, even with the apps stopped**, so it's
 the only real cost.
 
-**Why B3.** The four apps share the plan's memory. Measured and budgeted:
-
-| Part | Memory |
-|---|---|
-| Ollama + qwen2.5:3b (no GPU here, so the whole model is in RAM) | ~2.8 GB |
-| AI service, 2 workers | ~0.5–0.8 GB |
-| Backend, heap capped at 768 MB | ~1.1 GB |
-| Identity, heap capped at 512 MB | ~0.75 GB |
-| Front door + platform overhead | ~0.5 GB |
-| **Total** | **~5.5–6 GB of 7** |
-
-Smaller plans can't hold the model (B2 has 3.5 GB, P0v3 4 GB). P1v3 (2 vCPU /
-8 GB) costs ~$120, over twice as much, with half B3's CPU, and CPU is what
-makes copilot answers faster. What Basic lacks is deployment slots and
-autoscale; neither is used here. Choose `SKU=P1V3` if you need slots.
+**Why B2.** Without the model the plan holds two capped JVMs (~1.1 GB and
+~0.75 GB) and nginx, about 2.5 GB with platform overhead. B1 (1.75 GB) is too
+tight for two JVMs.
 
 **The heap caps matter on any plan.** The images start each JVM with
 `MaxRAMPercentage=75`. On the VM that's 75% of a 1 GB container. App Service
-sets no per-app limit, so without a cap each JVM sees the whole plan and could
-grow to ~5 GB. The setup script sets `JAVA_TOOL_OPTIONS=-Xmx768m` (backend) and
-`-Xmx512m` (identity); override with `BACKEND_JAVA_OPTS` / `IDENTITY_JAVA_OPTS`.
+sets no per-app limit, so without a cap each JVM sees the whole plan. The setup
+script sets `JAVA_TOOL_OPTIONS=-Xmx768m` (backend) and `-Xmx512m` (identity);
+override with `BACKEND_JAVA_OPTS` / `IDENTITY_JAVA_OPTS`.
 
 **Running it for a limited time** (a demo or interview period): leave it on,
-then delete everything in one command when you're done. Nothing else is left
-billing:
+then delete everything when you're done. Nothing else is left billing:
 
 ```bash
-az group delete -n fintwin
+scripts/azure-teardown.sh
 ```
 
 ---
@@ -95,18 +105,18 @@ az login
 FINTWIN_ENV_FILE=.env.prod scripts/azure-app-service-setup.sh
 ```
 
-This creates the resource group, the plan and the four web apps, sets every
+This creates the resource group, the plan and the three web apps, sets every
 app setting from `.env.prod`, turns on Always On, and sets health-check paths.
 Override `PREFIX=` if `fintwin-*.azurewebsites.net` names are taken — they are
 global.
 
 ### 3. Let App Service pull your images
 
-GHCR packages are private by default. Either make the four packages public in
+GHCR packages are private by default. Either make the three packages public in
 GitHub, or give each app a read token:
 
 ```bash
-for app in fintwin-web fintwin-api fintwin-auth fintwin-ai; do
+for app in fintwin-web fintwin-api fintwin-auth; do
   az webapp config appsettings set -g fintwin -n $app --settings \
     DOCKER_REGISTRY_SERVER_URL=https://ghcr.io \
     DOCKER_REGISTRY_SERVER_USERNAME=<github-user> \
@@ -132,8 +142,9 @@ In the repo's GitHub settings:
 | Variable | `PROD_BASE_URL` | `https://fintwin-web.azurewebsites.net` or your domain |
 
 Every push to `main` then builds six images, points each web app at this
-commit's image and restarts them — AI first, front door last, so the proxy
-comes back once what it proxies to is up.
+commit's image and restarts them — front door last, so the proxy comes back
+once what it proxies to is up. Apps that don't exist (`fintwin-ai`, by
+default) are skipped.
 
 ### 5. Your domain
 
@@ -147,32 +158,43 @@ Java apps. The certificate is free and renews itself — no certbot.
 
 ---
 
-## The model
+## The AI service on your machine
 
-The ~2 GB model is **not** in the image; it downloads on first start into
-`/home/ollama`, which App Service keeps across restarts and redeploys.
+```bash
+az login
+scripts/ai-local-tunnel.sh      # keep it running; Ctrl+C stops it
+```
 
-- **First start takes 5–15 minutes.** The AI service answers immediately; the
-  Copilot replies "temporarily unavailable" until the download finishes.
-  Watch it: `az webapp log tail -g fintwin -n fintwin-ai`.
-- **`WEBSITES_ENABLE_APP_SERVICE_STORAGE=true` must stay on** for the AI app.
-  Turn it off and every restart re-downloads 2 GB.
-- `/home` is network-backed storage, so the model loads more slowly than from a
-  local disk on the VM. Expect the first answer after an idle period to be
-  slower than the rest.
+It starts Ollama (if it isn't already running as a service) and the AI service
+on :8000, loads the model, opens a Cloudflare quick tunnel, and sets
+`AI_SERVICE_URL` on `fintwin-api` to the tunnel's URL. A quick tunnel's URL is
+new on every start, and changing the setting restarts the backend, so allow a
+minute or two before the site's AI answers.
+
+- **The machine must stay awake.** The script holds off sleep, lid closed
+  included, for as long as it runs. Keep it plugged in.
+- **Anyone who finds the URL still can't use it.** Every route except `/health`
+  needs `X-Internal-Key`, which only the backend has.
+- **When it isn't running**, AI features answer with their fallbacks within a
+  few calls; nothing else on the site changes.
+- **Before an interview:** run it, wait for "AI is live on the site", then ask
+  the copilot something.
+- It uses `AI_INTERNAL_KEY` and `METRICS_TOKEN` from `.env.prod`; logs go to
+  `logs/ai-service.log` and `logs/ai-tunnel.log`.
+- It stops if port 8000 is taken (for example by `dev.sh`'s AI service). Stop
+  that first, or set `AI_PORT`.
 
 ---
 
 ## Monitoring
 
 Production monitoring is **Grafana Cloud's free tier, scraping the apps over
-HTTPS.** Nothing extra runs on the plan, so Ollama keeps its memory. You get
+HTTPS.** Nothing extra runs on the plan. You get
 the same dashboards as the local Prometheus and Grafana, 14 days of history,
 and email alerts.
 
 ```
-fintwin-api  /actuator/prometheus ─┐   Bearer METRICS_TOKEN
-fintwin-ai   /metrics             ─┴──────────────────────── Grafana Cloud: dashboards + alerts
+fintwin-api  /actuator/prometheus ──────── Bearer METRICS_TOKEN ──── Grafana Cloud: dashboards + alerts
 ```
 
 Prometheus itself can't run well here. Its database needs a local disk, App
@@ -209,7 +231,7 @@ metrics.
    | Job name | Scrape URL | Auth |
    |---|---|---|
    | `fintwin-backend` | `https://fintwin-api.azurewebsites.net/actuator/prometheus` | Bearer, token = `METRICS_TOKEN` (without the word "Bearer") |
-   | `fintwin-ai-service` | `https://fintwin-ai.azurewebsites.net/metrics` | Bearer, same token |
+   | `fintwin-ai-service` | only with `AI_HOST=appservice`: `https://fintwin-ai.azurewebsites.net/metrics` | Bearer, same token |
 
    Leave the scrape interval at 60 s, which the free tier is sized for. Use
    **Test connection** on each: a 401 means the token doesn't match the app
@@ -257,13 +279,13 @@ metrics.
 
 ```bash
 az webapp log tail       -g fintwin -n fintwin-api      # follow logs
-az webapp restart        -g fintwin -n fintwin-ai
+az webapp restart        -g fintwin -n fintwin-api
 az webapp show           -g fintwin -n fintwin-web --query state
 az webapp config appsettings list -g fintwin -n fintwin-api --output table
 ```
 
 **Zero-downtime deploys** need a staging slot, which needs Standard or Premium
-(`SKU=P1V3`); on the default B3 a deploy restarts each app for a few seconds:
+(`SKU=P1V3`); on the default B2 a deploy restarts each app for a few seconds:
 
 ```bash
 az webapp deployment slot create -g fintwin -n fintwin-api --slot staging
@@ -284,24 +306,22 @@ migrations finish while the old version is still serving.
 |---|---|
 | Front door returns 502 | `az webapp log tail -n fintwin-web` — usually the backend app is still starting; nginx resolves the upstreams per request, so it recovers on its own |
 | App won't start, no logs | Almost always the image pull: check `DOCKER_REGISTRY_SERVER_*` settings |
-| Copilot says it's unavailable | The model is still downloading, or `WEBSITES_ENABLE_APP_SERVICE_STORAGE` got turned off — check `az webapp log tail -n fintwin-ai` |
-| Copilot times out | The plan's CPU is shared across four apps (B3: 4 vCPU). Measure with the copilot eval; on qwen, fewer tool rounds help most |
+| AI features give fallback answers | `scripts/ai-local-tunnel.sh` isn't running, or the machine slept. Check `az webapp config appsettings list -n fintwin-api --query "[?name=='AI_SERVICE_URL']"` matches the URL it printed, and `logs/ai-tunnel.log` |
+| Copilot answers but its tools fail | The AI service reaches the backend at `https://fintwin-api.azurewebsites.net` — see `logs/ai-service.log` |
 | Backend or identity exits at startup | `APP_REQUIRE_SECURE_CONFIG=true` refuses dev-default secrets and a missing `MAIL_USERNAME`/`MAIL_PASSWORD` — the log names the setting |
-| Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage`: Ollama plus two JVMs is most of 7 GB. Check `JAVA_TOOL_OPTIONS` is set on both Java apps |
+| Everything got slow | `az monitor metrics list --resource <plan-id> --metric MemoryPercentage`. Check `JAVA_TOOL_OPTIONS` is set on both Java apps |
 | Grafana shows no data / "service down" alert | `METRICS_TOKEN` differs between the app setting and the scrape job, or the app is restarting. `curl -H "Authorization: Bearer $METRICS_TOKEN" https://fintwin-api.azurewebsites.net/actuator/prometheus` should return text |
 
 ---
 
 ## What to know before choosing this over the VM
 
-- **Your services get public URLs.** `fintwin-api`, `fintwin-auth` and
-  `fintwin-ai` are reachable from the internet. The AI service checks
+- **Your services get public URLs.** `fintwin-api`, `fintwin-auth` and the
+  AI tunnel are reachable from the internet. The AI service checks
   `X-Internal-Key`, and the two Java services check JWTs, so they are not
   *open* — but on the VM they were unreachable altogether. Closing this properly
   means VNet integration with private endpoints, which costs more again.
-- **Four apps share one plan's CPU and memory.** A heavy statement import and a
+- **The apps share one plan's CPU and memory.** A heavy statement import and a
   Copilot answer at the same time compete; on the VM they did too, but there you
   can see it with `docker stats`.
-- **`/home` is slower than local disk**, which the model loading notices.
-- **The combined AI + Ollama image is new and hasn't run in Azure yet.** Expect
-  the first deploy to need a look at the logs.
+- **The AI is only up while your machine is.** Plan interview demos around it.

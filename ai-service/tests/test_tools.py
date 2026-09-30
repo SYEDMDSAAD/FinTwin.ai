@@ -52,6 +52,34 @@ def test_get_transactions_group_by_passes_through(mock_get):
 
 
 @patch("chatbot.tools.backend_api.get")
+def test_grouped_results_carry_a_monthly_figure(mock_get):
+    mock_get.return_value = {"groupedBy": "merchant", "groups": [
+        {"merchant": "Netflix", "totalAmount": 1947, "totalAmountFormatted": "₹1,947"}]}
+    out = json.loads(tools.execute_tool(
+        "get_transactions", {"group_by": "merchant", "months": 3}, user_id=8))
+    assert out["periodMonths"] == 3
+    assert out["groups"][0]["perMonth"] == 649
+    assert out["groups"][0]["perMonthFormatted"] == "₹649"
+
+
+@patch("chatbot.tools.backend_api.get")
+def test_null_arguments_fall_back_to_defaults(mock_get):
+    mock_get.return_value = {"transactions": []}
+    out = json.loads(tools.execute_tool(
+        "get_transactions", {"months": None, "limit": None, "sort": None, "type": None}, user_id=8))
+    assert "error" not in out
+    params = mock_get.call_args.args[1]
+    assert (params["months"], params["limit"], params["sort"], params["type"]) == (3, 10, "amount", "expense")
+
+
+@patch("chatbot.tools.backend_api.get")
+def test_ungrouped_results_are_left_alone(mock_get):
+    mock_get.return_value = {"transactions": [{"amount": -649}]}
+    out = json.loads(tools.execute_tool("get_transactions", {"months": 3}, user_id=8))
+    assert "periodMonths" not in out
+
+
+@patch("chatbot.tools.backend_api.get")
 def test_get_transactions_invalid_group_by_dropped(mock_get):
     mock_get.return_value = {"totalMatching": 0, "transactions": []}
     tools.execute_tool("get_transactions", {"group_by": "nonsense"}, user_id=8)
@@ -146,6 +174,35 @@ def test_tool_call_round_trip(mock_chat, mock_exec):
     # Second chat call must include the tool result message
     second_call_messages = mock_chat.call_args_list[1].args[0]
     assert any(m.get("role") == "tool" for m in second_call_messages)
+
+
+@patch("chatbot.advisor.execute_tool")
+@patch("chatbot.advisor.chat")
+def test_empty_reply_is_retried_with_the_real_tool_names(mock_chat, mock_exec):
+    # What Ollama returns when the model calls a tool it wasn't offered
+    # ("get_subscriptions"): the call is dropped and nothing is left
+    mock_chat.side_effect = [
+        {"role": "assistant", "content": ""},
+        {"role": "assistant", "content": "", "tool_calls": [{"function": {
+            "name": "get_transactions", "arguments": {"group_by": "merchant"}}}]},
+        {"role": "assistant", "content": "Netflix is ₹649 a month."},
+    ]
+    mock_exec.return_value = json.dumps({"merchants": [{"merchant": "Netflix", "total": 649}]})
+
+    reply = generate_financial_advice("analyze my subscriptions", _BASE_DATA, "Savings Advisor")
+
+    assert "Netflix" in reply
+    nudges = [m for m in mock_chat.call_args_list[1].args[0]
+              if m.get("role") == "system" and "There is no other tool" in m["content"]]
+    assert len(nudges) == 1 and "get_transactions" in nudges[0]["content"]
+
+
+@patch("chatbot.advisor.chat")
+def test_empty_reply_is_retried_only_once(mock_chat):
+    mock_chat.return_value = {"role": "assistant", "content": ""}
+    reply = generate_financial_advice("analyze my subscriptions", _BASE_DATA, "Savings Advisor")
+    assert mock_chat.call_count == 2
+    assert "couldn't answer" in reply
 
 
 @patch("chatbot.advisor.ask")

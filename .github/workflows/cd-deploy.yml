@@ -233,8 +233,16 @@ jobs:
         run: |
           set -euo pipefail
           IMAGES="api:fintwin-backend auth:fintwin-identity-service ai:fintwin-ai-ollama web:fintwin-frontend-as"
+          # The AI app exists only with AI_HOST=appservice; by default the AI
+          # runs on a local machine behind a tunnel (scripts/ai-local-tunnel.sh)
+          APPS=""
           for pair in $IMAGES; do
             app="${PREFIX}-${pair%%:*}"
+            if ! az webapp show --name "$app" --resource-group "$RG" --output none 2>/dev/null; then
+              echo "→ $app doesn't exist, skipping"
+              continue
+            fi
+            APPS="$APPS ${pair%%:*}"
             image="ghcr.io/${OWNER}/${pair##*:}:${TAG}"
             echo "→ $app ← $image"
             az webapp config container set \
@@ -245,6 +253,7 @@ jobs:
           # Restarting in this order means the front door comes back last,
           # once what it proxies to is already up
           for suffix in ai auth api web; do
+            case " $APPS " in *" $suffix "*) ;; *) continue ;; esac
             az webapp restart --name "${PREFIX}-${suffix}" --resource-group "$RG" --output none
           done
 

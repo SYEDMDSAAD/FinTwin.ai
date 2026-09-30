@@ -55,3 +55,6 @@ training-export-*/
 
 # Eval run outputs (answers + scores); summaries go in ai-docs
 ai-service/evals/results/
+
+# Local run logs (dev.sh, scripts/ai-local-tunnel.sh)
+logs/

@@ -35,6 +35,15 @@ _FALLBACK = (
     "your data is safe and nothing was changed."
 )
 
+# Sent when the model's reply is empty, which is what an invented tool name
+# leaves behind
+_EMPTY_REPLY_NUDGE = (
+    "You can only call these tools: "
+    + ", ".join(t["function"]["name"] for t in TOOLS)
+    + ". There is no other tool. Call one of them, or "
+    "answer from the summary above. Subscriptions and recurring payments come from "
+    "get_transactions with group_by='merchant'."
+)
 
 _PORTFOLIO_CAVEAT = (
     "\n\n_Based on the holdings recorded in FinTwin. This is not financial advice — "
@@ -192,6 +201,7 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
 
     tools_attempted = 0
     tools_succeeded = 0
+    retried_empty = False
     used_portfolio = False
     portfolio_summary = ""
     portfolio_data: dict = {}
@@ -232,6 +242,18 @@ def _chat_with_tools(message: str, financial_data: dict, mode: str, intent: str,
         for round_no in range(_MAX_TOOL_ROUNDS):
             reply = budgeted_chat(TOOLS)
             tool_calls = reply.get("tool_calls") or []
+
+            if not tool_calls and not (reply.get("content") or "").strip() and not retried_empty:
+                # Nothing came back. Usually the model called a tool that doesn't
+                # exist ("get_subscriptions") — Ollama drops calls to tools it
+                # wasn't offered, leaving an empty message. Name the real ones
+                # and let it try once more.
+                retried_empty = True
+                trace["retried_empty"] = True
+                logger.info("Copilot got an empty reply; retrying with the tool names")
+                messages.append({"role": "system", "content": _EMPTY_REPLY_NUDGE})
+                reply = budgeted_chat(TOOLS)
+                tool_calls = reply.get("tool_calls") or []
 
             if not tool_calls:
                 # A small model asked for data, got only errors, and answered

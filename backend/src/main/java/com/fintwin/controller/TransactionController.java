@@ -167,6 +167,11 @@ public class TransactionController {
         return TransactionDTO.from(service.uploadScreenshot(file));
     }
 
+    static final String AI_OFFLINE_REPLY =
+            "FinTwin AI is offline right now, so the copilot can't answer. Everything else "
+            + "works as usual: your transactions, budgets, goals and analytics are up to date. "
+            + "Try the copilot again later.";
+
     private static boolean isTimeout(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
             if (t instanceof java.net.SocketTimeoutException) return true;
@@ -193,7 +198,7 @@ public class TransactionController {
             boolean slow = isTimeout(e);
             return ResponseEntity.status(slow ? 504 : 503).body(Map.of("success", false, "reply", slow
                     ? "The copilot took too long to answer this one. Try asking again, or ask something narrower."
-                    : "FinTwin AI is unavailable right now. Please try again in a moment."));
+                    : AI_OFFLINE_REPLY));
         }
     }
 

@@ -591,5 +591,25 @@ class TransactionServiceTest {
         assertThat(groups.get(1)).containsEntry("count", 2).containsEntry("total", 400.0).containsEntry("sampleId", 1L)
                 .containsEntry("merchant", "Paid to SARA ENTERPRISES");
     }
-}
 
+    // ── uploadScreenshot — AI offline ────────────────────────────────────────
+
+    @Test
+    void receiptUploadSaysTheAiIsOfflineInsteadOfFailingVaguely() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(user));
+        when(aiRestTemplate.postForEntity(org.mockito.ArgumentMatchers.eq("http://localhost:8000/ocr"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(java.util.Map.class)))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException("tunnel is gone"));
+        var receipt = new org.springframework.mock.web.MockMultipartFile(
+                "file", "receipt.png", "image/png", new byte[]{1, 2, 3});
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.uploadScreenshot(receipt))
+                .isInstanceOfSatisfying(com.fintwin.exception.ApiException.class, e -> {
+                    org.assertj.core.api.Assertions.assertThat(e.getStatus())
+                            .isEqualTo(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+                    org.assertj.core.api.Assertions.assertThat(e.getCode()).isEqualTo("ai_unavailable");
+                    org.assertj.core.api.Assertions.assertThat(e.getMessage()).contains("Add this expense by hand");
+                });
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+}

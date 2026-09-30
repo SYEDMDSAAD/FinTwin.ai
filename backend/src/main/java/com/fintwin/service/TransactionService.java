@@ -879,11 +879,21 @@ public class TransactionService {
             HttpEntity<MultiValueMap<String, Object>> requestEntity =
                     new HttpEntity<>(body, headers);
 
-            ResponseEntity<Map> response = aiRestTemplate.postForEntity(
-                    aiServiceUrl + "/ocr",
-                    requestEntity,
-                    Map.class
-            );
+            ResponseEntity<Map> response;
+            try {
+                response = aiRestTemplate.postForEntity(
+                        aiServiceUrl + "/ocr",
+                        requestEntity,
+                        Map.class
+                );
+            } catch (org.springframework.web.client.RestClientException e) {
+                // Receipts are read by the AI service, which may be offline for a while
+                log.warn("Receipt reader unavailable: {}", e.getClass().getSimpleName());
+                throw new com.fintwin.exception.ApiException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "Reading receipts needs FinTwin AI, which is offline right now. "
+                        + "Add this expense by hand, or try the receipt again later.",
+                        "ai_unavailable");
+            }
 
             Map result = response.getBody();
 
