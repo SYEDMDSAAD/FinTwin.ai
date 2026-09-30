@@ -96,7 +96,10 @@ curl -s -o /dev/null --max-time 120 http://localhost:11434/api/generate \
 
 echo "→ cloudflare tunnel"
 : >"$LOGS/ai-tunnel.log"
-cloudflared tunnel --no-autoupdate --url "http://localhost:$PORT" >"$LOGS/ai-tunnel.log" 2>&1 &
+# IPv4 to Cloudflare: over IPv6 the tunnel registered and then dropped within
+# seconds, with QUIC and HTTP/2 alike, after the home network reconnected
+cloudflared tunnel --no-autoupdate --edge-ip-version "${TUNNEL_IP_VERSION:-4}" \
+    --url "http://localhost:$PORT" >"$LOGS/ai-tunnel.log" 2>&1 &
 PIDS+=($!)
 URL=""
 for _ in $(seq 1 30); do
