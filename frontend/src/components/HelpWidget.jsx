@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HelpCircle, X, Search, MessageCircle, Home, ChevronRight, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import { useCurrentUser } from "../context/AuthContext";
 
 // Real answers, not links to articles that don't exist. Anything that changes
 // in the app (bank linking, the model) should change here too.
@@ -55,9 +56,9 @@ export default function HelpWidget() {
   const [sending, setSending]     = useState(false);
   const [openFaq, setOpenFaq]     = useState(null);
 
-  const user  = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; } })();
+  const user  = useCurrentUser();
   const email = user.email || "";
-  const name  = user.fullName || localStorage.getItem("fullName") || "there";
+  const name  = user.fullName || "there";
 
   const needle = search.trim().toLowerCase();
   const filteredLinks = FAQ.filter(f =>

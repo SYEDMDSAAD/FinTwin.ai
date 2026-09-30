@@ -2,6 +2,7 @@ import { Bell, LogOut, User, Settings, ChevronDown, Sun, Moon } from "lucide-rea
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useCurrentUser } from "../context/AuthContext";
 
 function Header({ notifications = [], scoreData }) {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ function Header({ notifications = [], scoreData }) {
   const profileRef = useRef(null);
   const notifRef   = useRef(null);
 
-  const userData = JSON.parse(localStorage.getItem("user")) || {};
+  const userData = useCurrentUser();
   const fullName = userData.fullName || "User";
   const email    = userData.email    || "";
   const initial  = fullName.charAt(0).toUpperCase();

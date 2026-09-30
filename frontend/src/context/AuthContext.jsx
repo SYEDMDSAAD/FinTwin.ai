@@ -50,6 +50,16 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
     };
 
+    // After the user edits their profile: everything showing the user (the
+    // header's name, the help widget) reads this, so it updates at once
+    const updateUser = (changes) => {
+        setUser((prev) => {
+            const next = { ...(prev || {}), ...changes };
+            localStorage.setItem("user", JSON.stringify(next));
+            return next;
+        });
+    };
+
     // Calls identity service to revoke refresh token, then clears local state
     const logout = async () => {
         const refreshToken = localStorage.getItem("refreshToken");
@@ -82,6 +92,7 @@ export const AuthProvider = ({ children }) => {
                 token,
                 user,
                 login,
+                updateUser,
                 logout,
                 logoutSync,
                 isAuthenticated: !!token,
@@ -94,3 +105,10 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
+// The signed-in user for display. Outside an AuthProvider (a component
+// rendered on its own, as in tests) it falls back to what login stored.
+export const useCurrentUser = () => {
+    const auth = useContext(AuthContext);
+    return (auth ? auth.user : safeParse(localStorage.getItem("user"))) || {};
+};
