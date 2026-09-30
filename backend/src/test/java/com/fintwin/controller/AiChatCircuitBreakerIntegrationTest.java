@@ -53,7 +53,7 @@ class AiChatCircuitBreakerIntegrationTest extends AbstractIntegrationTest {
         long blockedBefore = breaker.getMetrics().getNumberOfNotPermittedCalls();
         ResponseEntity<Map> blocked = ask(token);
         assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        assertThat(blocked.getBody()).containsEntry("reply", "FinTwin AI is unavailable right now. Please try again in a moment.");
+        assertThat(blocked.getBody()).containsEntry("reply", TransactionController.AI_OFFLINE_REPLY);
         assertThat(breaker.getMetrics().getNumberOfNotPermittedCalls()).isGreaterThan(blockedBefore);
         assertThat(breaker.getMetrics().getNumberOfFailedCalls()).isEqualTo(failedBefore);
     }

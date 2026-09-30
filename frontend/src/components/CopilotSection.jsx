@@ -5,13 +5,15 @@ import {
 } from "react";
 
 import { useTheme } from "../context/ThemeContext";
+import useAiStatus from "../hooks/useAiStatus";
 
 import {
     Sparkles,
     ArrowUp,
     Trash2,
     ChevronDown,
-    Check
+    Check,
+    CloudOff
 } from "lucide-react";
 
 import ReactMarkdown from "react-markdown";
@@ -118,7 +120,7 @@ function CopilotSection({
 
             e.preventDefault();
 
-            sendMessage();
+            if (canSend) sendMessage();
         }
     };
 
@@ -148,7 +150,9 @@ function CopilotSection({
            prose-strong:text-purple-700
            prose-li:text-gray-700`;
 
-    const canSend = !aiLoading && chatMessage.trim().length > 0;
+    const aiOnline = useAiStatus();
+
+    const canSend = aiOnline && !aiLoading && chatMessage.trim().length > 0;
 
     // =====================================
     // AI AVATAR (small sparkle disc)
@@ -575,6 +579,34 @@ function CopilotSection({
 
             <div className="px-5 pb-5 pt-2">
 
+                {!aiOnline && (
+                    <div
+                        role="status"
+                        className={`
+                            mb-3
+                            flex items-start gap-3
+                            rounded-2xl
+                            border
+                            px-4 py-3
+                            text-[13px]
+                            leading-relaxed
+                            ${isDark
+                                ? "bg-amber-500/[0.08] border-amber-400/20 text-amber-100"
+                                : "bg-amber-50 border-amber-200 text-amber-900"}
+                        `}
+                    >
+                        <CloudOff size={17} className="shrink-0 mt-0.5" />
+                        <div>
+                            <div className="font-semibold">FinTwin AI is offline right now</div>
+                            <div className={isDark ? "text-amber-100/75" : "text-amber-900/80"}>
+                                The copilot can't answer until it's back. Everything else works:
+                                your transactions, budgets, goals and analytics are up to date,
+                                and the coach and reports show calculated figures meanwhile.
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div
                     className={`
                         w-full
@@ -587,7 +619,10 @@ function CopilotSection({
                 >
 
                     <textarea
-                        placeholder="Ask FinTwin AI anything about your money..."
+                        placeholder={aiOnline
+                            ? "Ask FinTwin AI anything about your money..."
+                            : "The copilot is offline — try again later"}
+                        disabled={!aiOnline}
                         value={chatMessage}
                         onChange={(e) => setChatMessage(e.target.value)}
                         onKeyDown={handleKeyDown}

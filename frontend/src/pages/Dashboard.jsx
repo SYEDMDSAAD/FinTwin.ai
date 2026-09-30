@@ -1180,12 +1180,11 @@ function Dashboard() {
 
             refreshDashboard();
 
-        } catch {
+        } catch (err) {
 
-
-
+            // The backend says why, e.g. that FinTwin AI (which reads receipts) is offline
             toast.error(
-                "Failed to upload screenshot."
+                err?.response?.data?.error || "Failed to upload screenshot."
             );
         }
     };
