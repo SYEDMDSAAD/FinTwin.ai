@@ -102,4 +102,27 @@ class MerchantCategorizerTest {
         assertThat(MerchantCategorizer.categorize(null)).isEmpty();
         assertThat(MerchantCategorizer.categorize("  ")).isEmpty();
     }
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            // a PhonePe merchant QR
+            "AC222606252344022637257445, true",
+            "' AC222606252344022637257445 ', true",
+            // a payment to a person, card and online merchants, and junk
+            "T2606241705189563531737, false",
+            "HDFF18AF5AF5BA548CFAB0F3F9945A7BC6F, false",
+            "AC2226062523, false",
+            "ACX22606252344022637257445, false",
+    })
+    void merchantReference(String reference, boolean merchant) {
+        assertThat(MerchantCategorizer.isMerchantReference(reference)).isEqualTo(merchant);
+    }
+
+    @Test
+    void certainPerson_isAMaskedContactOrAPhoneNumberId_neverAName() {
+        assertThat(MerchantCategorizer.isCertainPerson("Paid to ******1893")).isTrue();
+        assertThat(MerchantCategorizer.isCertainPerson("Paid to 9561926162567ptyes")).isTrue();
+        assertThat(MerchantCategorizer.isCertainPerson("Paid to Datta Murlidhar Mehkarkar")).isFalse();
+        assertThat(MerchantCategorizer.isCertainPerson(null)).isFalse();
+    }
 }
