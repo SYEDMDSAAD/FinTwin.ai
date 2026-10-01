@@ -104,13 +104,36 @@ export function parseGrid(rawGrid) {
     const headerIdx = findHeaderRow(grid);
     const headers = uniqueHeaders(grid[headerIdx]);
 
-    const rows = grid.slice(headerIdx + 1)
+    const rows = [];
+    for (const r of grid.slice(headerIdx + 1)) {
         // Footer lines ("Statement summary", "** End of statement **") have
         // one or two cells; a transaction row fills most of the table.
-        .filter(r => r.filter(c => c !== "").length >= Math.min(3, headers.length))
-        .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
+        if (r.filter(c => c !== "").length >= Math.min(3, headers.length)) {
+            rows.push(Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
+            continue;
+        }
+        // PhonePe puts the payment's id on a line of its own under it. An
+        // "AC…" id is a merchant QR, which tells a shop from a person.
+        const id = r.join(" ").match(PAYMENT_ID);
+        const last = rows[rows.length - 1];
+        if (id && last && !last[REFERENCE]) last[REFERENCE] = id[1];
+    }
 
     return { headers, rows, preambleLines: headerIdx, preamble: grid.slice(0, headerIdx) };
+}
+
+const PAYMENT_ID = /Transaction ID\s*:\s*([A-Za-z0-9]+)/i;
+
+// Kept off the column names, so it never shows up as a column to map
+export const REFERENCE = Symbol("reference");
+
+// The payment app's id for a row: its own column in a CSV export, a line
+// under the row in a PDF
+function paymentId(row) {
+    if (row[REFERENCE]) return row[REFERENCE];
+    const column = Object.keys(row).find(h => /^(transaction|txn)\s*id$/i.test(h.trim()));
+    const id = column ? String(row[column]).trim() : "";
+    return /^[A-Za-z0-9]+$/.test(id) ? id : null;
 }
 
 // Two columns can share a name ("Amount", "Amount"); a select keyed on the
@@ -290,6 +313,8 @@ export function buildImportRows(rows, mapping, { debitCreditMode = false, flipSi
         if (balance !== null) item.balance = balance;
         const category = mapping.category ? (row[mapping.category] || "").trim() : "";
         if (category) item.category = category;
+        const reference = paymentId(row);
+        if (reference) item.reference = reference;
         out.push(item);
     }
     return { rows: out, skipped };

@@ -146,9 +146,33 @@ describe("a PhonePe statement end to end", () => {
 
         expect(built.skipped).toBe(0);
         expect(built.rows).toEqual([
-            { date: "2026-03-26", merchant: "Received from A Friend", amount: 1001 },
-            { date: "2026-03-27", merchant: "Paid to Apple Services", amount: -99 },
-            { date: "2026-03-28", merchant: "Paid to SHOP NAME", amount: -1180 },
+            { date: "2026-03-26", merchant: "Received from A Friend", amount: 1001, reference: "T26032622535583" },
+            { date: "2026-03-27", merchant: "Paid to Apple Services", amount: -99, reference: "HDFDF120FD8998" },
+            { date: "2026-03-28", merchant: "Paid to SHOP NAME", amount: -1180, reference: "T28032609025512" },
+        ]);
+    });
+
+    // The PDF puts the id on a line of its own under each payment; the server
+    // hands that back as a near-empty row
+    it("keeps the payment id from the line under each row of a PDF", () => {
+        const parsed = parseGrid([
+            ["Date", "Transaction Details", "Type", "Amount"],
+            ["Jun 25, 2026", "Paid to Jamil Shaikh", "Debit", "INR 60.00"],
+            ["11:44 PM", "Transaction ID : AC222606252344022637257445", "", ""],
+            ["", "UTR No : 085229582795", "", ""],
+            ["", "Debited from XX7677", "", ""],
+            ["Jun 27, 2026", "Received from A Friend", "Credit", "INR 990.00"],
+            ["03:22 PM", "Transaction ID : T2606271522422180680340", "", ""],
+            ["Jun 28, 2026", "Paid to SHOP NAME", "Debit", "INR 20.00"],
+        ]);
+        const { mapping, debitCreditMode } = guessMapping(parsed.headers);
+        const built = buildImportRows(parsed.rows, mapping, { debitCreditMode, flipSign: false });
+
+        expect(parsed.headers).toEqual(["Date", "Transaction Details", "Type", "Amount"]);
+        expect(built.rows.map(r => [r.merchant, r.amount, r.reference])).toEqual([
+            ["Paid to Jamil Shaikh", -60, "AC222606252344022637257445"],
+            ["Received from A Friend", 990, "T2606271522422180680340"],
+            ["Paid to SHOP NAME", -20, undefined],
         ]);
     });
 });

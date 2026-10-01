@@ -544,6 +544,55 @@ class TransactionServiceTest {
         assertThat(savedRows().get(0).getAccountRef()).isEqualTo("HDFC ··1234");
     }
 
+    // ── importBatch — shops that go by a person's name ───────────────────────
+
+    @Test
+    void importBatch_aMerchantQrIdMakesAPersonLookingNameALocalShop_butAShopWordStillWins() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        org.mockito.Mockito.doReturn(new com.fintwin.util.Categorized("People", com.fintwin.util.Categorized.PERSON))
+                .when(categoryService).classify(eq("Paid to Jamil Shaikh"), any(), org.mockito.ArgumentMatchers.<Double>any());
+        org.mockito.Mockito.doReturn(new com.fintwin.util.Categorized("Food", com.fintwin.util.Categorized.SHOP_WORD))
+                .when(categoryService).classify(eq("Paid to Noor bakery"), any(), org.mockito.ArgumentMatchers.<Double>any());
+
+        Map<String, Object> stall = row("2026-09-01", "Paid to Jamil Shaikh", -50.0);
+        stall.put("reference", "AC222606252344022637257445");
+        Map<String, Object> bakery = row("2026-09-01", "Paid to Noor bakery", -60.0);
+        bakery.put("reference", "AC222606252344022637257446");
+        Map<String, Object> friend = row("2026-09-02", "Paid to Jamil Shaikh", -70.0);
+        friend.put("reference", "T2606241705189563531737");
+        service.importBatch(List.of(stall, bakery, friend), "BANK", null);
+
+        List<Transaction> saved = savedRows();
+        assertThat(saved.get(0).getCategory()).isEqualTo("Local Shops");
+        assertThat(saved.get(0).getCategorySource()).isEqualTo(com.fintwin.util.Categorized.MERCHANT_REF);
+        assertThat(saved.get(1).getCategory()).isEqualTo("Food");
+        assertThat(saved.get(2).getCategory()).isEqualTo("People");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void importBatch_placesPersonLookingPayeesByHowTheyArePaid_butNeverARowTheUserReviewed() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction stall = txn(1, "Paid to Datta Ram Pawar", -20.0, "People");
+        stall.setCategorySource(com.fintwin.util.Categorized.PERSON);
+        Transaction reviewed = txn(2, "Paid to Sita Devi", -30.0, "People");
+        reviewed.setCategorySource(com.fintwin.util.Categorized.PERSON);
+        ReflectionTestUtils.setField(reviewed, "categoryReview", com.fintwin.util.Categorized.CONFIRMED);
+        Transaction uncle = txn(3, "Paid to Anwar Rehman", -1922.0, "People");
+        uncle.setCategorySource(com.fintwin.util.Categorized.PERSON);
+        when(repository.findByUser(user)).thenReturn(List.of(stall, reviewed, uncle));
+
+        service.importBatch(List.of(row("2026-09-01", "Netflix", -649.0)), "BANK", null);
+
+        ArgumentCaptor<List<Transaction>> captor = ArgumentCaptor.forClass(List.class);
+        verify(repository, atLeastOnce()).saveAll(captor.capture());
+        List<Transaction> replaced = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertThat(replaced).containsExactly(stall);
+        assertThat(stall.getCategory()).isEqualTo("Local Shops");
+        assertThat(reviewed.getCategory()).isEqualTo("People");
+        assertThat(uncle.getCategory()).isEqualTo("People");
+    }
+
     // ── re-sorting "Other" ───────────────────────────────────────────────────
 
     private static Transaction txn(long id, String merchant, double amount, String category) {

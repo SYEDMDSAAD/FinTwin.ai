@@ -28,6 +28,11 @@ public final class MerchantCategorizer {
     private MerchantCategorizer() {}
 
     public static final String PEOPLE = "People";
+    /**
+     * A shop, stall or auto known only by its owner's name: "Datta Murlidhar
+     * Mehkarkar" selling tea. What it sells is unknown, so it isn't guessed.
+     */
+    public static final String LOCAL_SHOPS = "Local Shops";
 
     // Phrase → category. Checked before shop words, so "HOTEL" in "Taj Hotels"
     // stays Travel while a local "Hotel Garib Nawaz" is a place to eat.
@@ -143,6 +148,9 @@ public final class MerchantCategorizer {
             "^(paid to|paid -|paid|sent to|payment to|transfer to|received from|money received from|"
             + "upi/(?:dr|cr)/\\d+/|upi-|upi/|pos\\s*\\d*\\s*|ach d-|neft (?:cr|dr)-?)\\s*",
             Pattern.CASE_INSENSITIVE);
+    // PhonePe gives a payment to a merchant QR an id of "AC" and 24 digits
+    // ("AC222606252344022637257445"); payments to a person start with "T"
+    private static final Pattern MERCHANT_REF = Pattern.compile("^AC\\d{24}$");
     private static final Pattern NON_WORD = Pattern.compile("[^a-z0-9&'.@]+");
 
     private static void brand(String category, String... phrases) {
@@ -180,6 +188,25 @@ public final class MerchantCategorizer {
         return Optional.empty();
     }
 
+    /**
+     * The payment app's transaction id marks the payee as a shop. Of 338
+     * PhonePe payments checked by hand, every "AC…" id was a shop; a shop's
+     * name may still look like a person's ("Jamilbhai Bhajewale").
+     */
+    public static boolean isMerchantReference(String reference) {
+        return reference != null && MERCHANT_REF.matcher(reference.trim()).matches();
+    }
+
+    /**
+     * A payee that can only be a person: a contact the UPI app masked, or a
+     * phone-number UPI id. Shops get a QR, not a phone number.
+     */
+    public static boolean isCertainPerson(String merchant) {
+        if (merchant == null) return false;
+        if (MASKED_CONTACT.matcher(merchant).find()) return true;
+        return PHONE_VPA.matcher(payeeOf(merchant).replaceAll("\\s+", "")).matches();
+    }
+
     /** "Paid to AQsa bakery show room" → "AQsa bakery show room". */
     public static String payeeOf(String merchant) {
         String m = merchant.trim();
@@ -205,9 +232,7 @@ public final class MerchantCategorizer {
      * look just like "Rahul".
      */
     static boolean looksLikePerson(String payee, String original) {
-        if (MASKED_CONTACT.matcher(original).find()) return true;
-        String compact = payee.replaceAll("\\s+", "");
-        if (PHONE_VPA.matcher(compact).matches()) return true;
+        if (isCertainPerson(original)) return true;
 
         String cleaned = payee.replaceAll("[.,]", " ").trim();
         if (cleaned.isEmpty() || cleaned.matches(".*\\d.*") || cleaned.contains("@")

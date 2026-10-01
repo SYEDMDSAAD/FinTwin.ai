@@ -16,6 +16,10 @@ public record Categorized(String category, String source) {
     public static final String SHOP_WORD = "SHOP_WORD";
     /** The payee looks like a person. */
     public static final String PERSON = "PERSON";
+    /** The payment app's transaction id says the payee is a shop (PhonePe "AC…" merchant QR). */
+    public static final String MERCHANT_REF = "MERCHANT_REF";
+    /** A person-looking name the user only ever pays small sums: a stall, a shop or an auto. */
+    public static final String PAYMENT_PATTERN = "PAYMENT_PATTERN";
     /** Money between the user's own accounts. */
     public static final String SELF_TRANSFER = "SELF_TRANSFER";
     /** Nothing matched — left in "Other". */

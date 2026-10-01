@@ -534,8 +534,10 @@ public class TransactionService {
                 t.setDate(date);
                 t.setMerchant(merchant);
                 t.setAmount(amount);
-                t.applyPrediction(importCategory(row.get("category"), merchant, amount,
-                                             isCard, cardDataPresent, learnedRules));
+                t.applyPrediction(merchantRefCategory(
+                        importCategory(row.get("category"), merchant, amount,
+                                       isCard, cardDataPresent, learnedRules),
+                        row.get("reference")));
                 t.setSource(isCard ? ACCOUNT_CARD : "STATEMENT");
                 t.setExternalId(externalId);
                 t.setAccountRef(accountRef);
@@ -554,6 +556,7 @@ public class TransactionService {
 
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
+            applyPaymentPatterns(user);
 
             // The first card statement makes bank-side bill payments already on
             // record duplicates of these purchases — restamp them, as the AA
@@ -617,6 +620,48 @@ public class TransactionService {
         }
 
         return categoryService.classify(narration, learnedRules, amount);
+    }
+
+    /**
+     * A row whose payment-app id marks a merchant QR is a shop, even when its
+     * name reads like a person's or says nothing. Anything a rule placed more
+     * surely (a brand, a shop word, the user's own rule) is kept.
+     */
+    private static com.fintwin.util.Categorized merchantRefCategory(
+            com.fintwin.util.Categorized c, Object reference) {
+        boolean weak = com.fintwin.util.Categorized.PERSON.equals(c.source())
+                || com.fintwin.util.Categorized.NONE.equals(c.source());
+        if (weak && reference != null
+                && com.fintwin.util.MerchantCategorizer.isMerchantReference(reference.toString())) {
+            return new com.fintwin.util.Categorized(com.fintwin.util.MerchantCategorizer.LOCAL_SHOPS,
+                    com.fintwin.util.Categorized.MERCHANT_REF);
+        }
+        return c;
+    }
+
+    /**
+     * Re-places every person-looking payee by how the user pays them, across
+     * all their money rather than one file: a later statement showing the
+     * payee sending money back turns a "shop" into a person. Rows the user
+     * reviewed are left alone.
+     */
+    private void applyPaymentPatterns(User user) {
+        List<Transaction> all = repository.findByUser(user);
+        com.fintwin.util.PaymentPatterns.Ledger ledger = new com.fintwin.util.PaymentPatterns.Ledger();
+        for (Transaction t : all) ledger.add(t.getMerchant(), t.getAmount());
+
+        List<Transaction> changed = new ArrayList<>();
+        for (Transaction t : all) {
+            if (t.getCategoryReview() != null) continue;
+            com.fintwin.util.PaymentPatterns
+                    .refine(t.getCategorySource(), t.getMerchant(), ledger.of(t.getMerchant()))
+                    .filter(c -> !c.category().equals(t.getCategory()))
+                    .ifPresent(c -> {
+                        t.applyPrediction(c);
+                        changed.add(t);
+                    });
+        }
+        if (!changed.isEmpty()) repository.saveAll(changed);
     }
 
     // =========================
