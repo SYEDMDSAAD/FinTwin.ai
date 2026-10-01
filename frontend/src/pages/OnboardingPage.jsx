@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import API, { identityApi } from "../services/api";
 import toast from "react-hot-toast";
+import { BANK_LINK_ENABLED, BANK_LINK_OFF_MESSAGE } from "../utils/bankLink";
 import {
   CheckCircle, Sparkles, ChevronRight, Building2, RefreshCw,
   Shield, Bell, Edit2, Lock, FileText, FlaskConical
@@ -989,19 +990,20 @@ export default function OnboardingPage() {
                     <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", whiteSpace: "nowrap" }}>DEMO ONLY</span>
                   </div>
                   <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 4px", lineHeight: 1.65 }}>
-                    This is a <strong style={{ color: "#fbbf24" }}>demo sandbox — not real transactions</strong>. It links to Setu's test banks, which return sample data, not your own accounts or money.
+                    Automatic bank linking is <strong style={{ color: "#fbbf24" }}>a demo for now and isn't switched on during the beta</strong>, so it may not work if you try it. It only links Setu's test banks, never your real accounts.
                   </p>
                   <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 14px", lineHeight: 1.6 }}>
-                    Use it to see how automatic bank linking will work. To judge what FinTwin tells you about your own spending, use option 1.
+                    Please upload a statement with option 1 instead. It takes a minute and gives you insights on your own spending.
                   </p>
 
                   {!setuOpen ? (
                     <button
-                      onClick={() => setSetuOpen(true)}
-                      style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.06)", color: "#fbbf24", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                      onClick={() => BANK_LINK_ENABLED ? setSetuOpen(true) : toast(BANK_LINK_OFF_MESSAGE, { icon: "🧪", duration: 6000 })}
+                      aria-disabled={!BANK_LINK_ENABLED}
+                      style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.06)", color: "#fbbf24", fontSize: 13, fontWeight: 700, cursor: BANK_LINK_ENABLED ? "pointer" : "not-allowed", opacity: BANK_LINK_ENABLED ? 1 : 0.5, fontFamily: "inherit" }}
                     >
                       {/* in a span: light mode darkens amber text, but not on buttons */}
-                      <span style={{ color: "#fbbf24" }}>Use the sandbox</span>
+                      <span style={{ color: "#fbbf24" }}>{BANK_LINK_ENABLED ? "Use the sandbox" : "Not available in the beta"}</span>
                     </button>
                   ) : (
                     <>
@@ -1281,14 +1283,14 @@ export default function OnboardingPage() {
                       <Building2 size={16} color="#22d3ee" />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>Better insights with bank connection</div>
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Connect your bank for real transaction data instead of estimates.</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>Better insights with a statement</div>
+                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Upload a bank or UPI statement for real transaction data instead of estimates.</div>
                     </div>
                     <button
                       onClick={() => { setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
                       style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
                     >
-                      Connect →
+                      Upload →
                     </button>
                   </div>
                 )}

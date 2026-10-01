@@ -70,6 +70,6 @@ describe("HelpWidget", () => {
     await user.click(screen.getByRole("button"));
 
     await user.click(screen.getByText(/connect my bank account/i));
-    expect(await screen.findByText(/still in testing/i)).toBeInTheDocument();
+    expect(await screen.findByText(/isn.t switched on during the beta/i)).toBeInTheDocument();
   });
 });

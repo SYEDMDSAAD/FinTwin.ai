@@ -37,17 +37,16 @@ describe("OnboardingPage — step 2, adding transactions", () => {
     expect(screen.getByText("RECOMMENDED")).toBeInTheDocument();
     expect(screen.getByText("Try the Setu bank-link sandbox")).toBeInTheDocument();
     expect(screen.getByText("DEMO ONLY")).toBeInTheDocument();
-    expect(screen.getByText(/demo sandbox — not real transactions/)).toBeInTheDocument();
-    expect(screen.getByText(/use option 1/)).toBeInTheDocument();
+    expect(screen.getByText(/a demo for now and isn't switched on during the beta/)).toBeInTheDocument();
+    expect(screen.getByText(/upload a statement with option 1/)).toBeInTheDocument();
   });
 
-  it("asks for the sandbox mobile number only once the user chooses the sandbox", () => {
+  it("keeps the sandbox closed while bank linking is off for the beta", () => {
     openStepTwo();
 
+    fireEvent.click(screen.getByText("Not available in the beta"));
     expect(screen.queryByLabelText(/MOBILE NUMBER/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Use the sandbox"));
-    expect(screen.getByLabelText(/MOBILE NUMBER/)).toBeInTheDocument();
-    expect(screen.getByText("Connect sandbox →")).toBeInTheDocument();
+    expect(screen.queryByText("Connect sandbox →")).not.toBeInTheDocument();
   });
 
   it("opens the statement importer and holds Continue until something is imported", () => {
