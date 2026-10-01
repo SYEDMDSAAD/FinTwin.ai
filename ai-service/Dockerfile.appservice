@@ -24,7 +24,7 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
 COPY . .
 
 # Where Ollama keeps models: App Service persists /home, so a restart doesn't
