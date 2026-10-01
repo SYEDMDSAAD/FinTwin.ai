@@ -490,12 +490,15 @@ export default function SettingsPage({ navigateTo }) {
                       <div style={{ textAlign: "center", padding: "24px 0" }}>
                         <Wifi size={32} color="rgba(148,163,184,0.2)" style={{ marginBottom: 10 }} />
                         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>No bank accounts linked yet.</p>
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px auto 0", maxWidth: 380, lineHeight: 1.55 }}>
+                          Bank linking is a demo and isn't switched on during the beta. Please import a bank or UPI statement instead.
+                        </p>
                         <button
                           className="sp-action-btn primary"
                           style={{ marginTop: 14 }}
-                          onClick={() => navigateTo("Transactions")}
+                          onClick={() => navigateTo("Imports")}
                         >
-                          Connect a Bank Account
+                          Import a Statement
                         </button>
                       </div>
                     )}
@@ -532,7 +535,7 @@ export default function SettingsPage({ navigateTo }) {
                   <SectionLabel>ABOUT SETU AA</SectionLabel>
                   <div style={{ padding: "14px 20px" }}>
                     <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, margin: 0 }}>
-                      FinTwin connects via RBI's Account Aggregator framework. We never see your banking credentials — you only share the data you explicitly consent to, and you can revoke access anytime.
+                      FinTwin connects via RBI's Account Aggregator framework. We never see your banking credentials — you only share the data you explicitly consent to, and you can revoke access anytime. During the beta this is a demo with Setu's test banks and isn't switched on, so import a statement for your real data.
                     </p>
                   </div>
                 </div>

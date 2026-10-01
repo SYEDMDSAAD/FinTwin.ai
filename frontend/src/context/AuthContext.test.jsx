@@ -8,7 +8,7 @@ vi.mock('../services/api', () => ({
   identityApi: { post: vi.fn().mockResolvedValue({}) },
 }));
 
-import { AuthProvider, useAuth } from './AuthContext';
+import { AuthProvider, useAuth, useCurrentUser } from './AuthContext';
 import { identityApi } from '../services/api';
 
 const wrapper = ({ children }) => <AuthProvider>{children}</AuthProvider>;
@@ -33,6 +33,18 @@ describe('AuthContext', () => {
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.isAdmin).toBe(true);
     expect(result.current.user.email).toBe('a@b.c');
+  });
+
+  it('updateUser() changes the name everywhere that shows it, and keeps it', () => {
+    localStorage.setItem('token', 'tok');
+    localStorage.setItem('user', JSON.stringify({ email: 'a@b.c', fullName: 'Old Name', role: 'USER' }));
+    const { result } = renderHook(() => ({ auth: useAuth(), shown: useCurrentUser() }), { wrapper });
+
+    act(() => result.current.auth.updateUser({ fullName: 'New Name' }));
+
+    expect(result.current.shown.fullName).toBe('New Name');                // what the header renders
+    expect(result.current.shown.email).toBe('a@b.c');                      // the rest is kept
+    expect(JSON.parse(localStorage.getItem('user')).fullName).toBe('New Name'); // survives a reload
   });
 
   it('login() persists token, refresh token and user, and flips auth state', () => {

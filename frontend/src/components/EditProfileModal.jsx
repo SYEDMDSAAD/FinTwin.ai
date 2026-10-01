@@ -23,9 +23,11 @@ import { useState, useEffect } from "react";
 import { User, Mail, X } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 
 export function EditProfileModal({ open, onClose, profile, onSuccess }) {
   const [fullName, setFullName] = useState("");
+  const auth = useAuth();
 
   useEffect(() => {
     if (profile) setFullName(profile.fullName || "");
@@ -34,8 +36,9 @@ export function EditProfileModal({ open, onClose, profile, onSuccess }) {
   const handleUpdate = async () => {
     if (!fullName.trim()) { toast.error("Please enter your name."); return; }
     try {
-      await API.put("/profile/update", { fullName });
-      localStorage.setItem("fullName", fullName);
+      await API.put("/profile/update", { fullName: fullName.trim() });
+      // The header and help widget read the signed-in user, not the profile
+      auth?.updateUser({ fullName: fullName.trim() });
       toast.success("Profile updated!");
       onSuccess();
       onClose();

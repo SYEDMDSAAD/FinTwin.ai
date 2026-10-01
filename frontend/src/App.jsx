@@ -10,10 +10,11 @@ import { lazy, Suspense } from "react";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { loadDashboard } from "./utils/prefetchDashboard";
 
 // Pages are code-split so the initial bundle only loads what the first route needs
 // (heavy deps like recharts/jspdf/framer-motion then load on demand, not up front).
-const Dashboard         = lazy(() => import("./pages/Dashboard"));
+const Dashboard         = lazy(loadDashboard);   // also prefetched from landing and login
 const Login             = lazy(() => import("./pages/Login"));
 const Register          = lazy(() => import("./pages/Register"));
 const AdminPage         = lazy(() => import("./pages/AdminPage"));
@@ -33,8 +34,10 @@ function RouteFallback() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#0f172a",
-            color: "#94a3b8",
+            // The theme's own background, not a fixed slate block that flashes
+            // dark in light mode
+            background: "var(--bg-base)",
+            color: "var(--text-secondary)",
             fontFamily: "system-ui, sans-serif",
         }}>
             Loading…

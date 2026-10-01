@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HelpCircle, X, Search, MessageCircle, Home, ChevronRight, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import { useCurrentUser } from "../context/AuthContext";
 
 // Real answers, not links to articles that don't exist. Anything that changes
 // in the app (bank linking, the model) should change here too.
@@ -16,7 +17,7 @@ const FAQ = [
   },
   {
     q: "Can I connect my bank account?",
-    a: "Not yet for real accounts — bank linking through RBI's Account Aggregator is still in testing, and the Connect Bank button on Transactions is a demo sandbox. For your real data, import a PDF, Excel or CSV statement from Imports.",
+    a: "Not yet. Bank linking through RBI's Account Aggregator is a demo and isn't switched on during the beta, so please don't use the Connect Bank button. Import a PDF, Excel or CSV statement from Imports instead; you can download one from PhonePe, Paytm or your bank's app.",
   },
   {
     q: "A transaction is in the wrong category. What do I do?",
@@ -55,9 +56,9 @@ export default function HelpWidget() {
   const [sending, setSending]     = useState(false);
   const [openFaq, setOpenFaq]     = useState(null);
 
-  const user  = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; } })();
+  const user  = useCurrentUser();
   const email = user.email || "";
-  const name  = user.fullName || localStorage.getItem("fullName") || "there";
+  const name  = user.fullName || "there";
 
   const needle = search.trim().toLowerCase();
   const filteredLinks = FAQ.filter(f =>

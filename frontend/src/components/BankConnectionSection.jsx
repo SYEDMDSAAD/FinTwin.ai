@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Link2, Unlink, RefreshCw, CheckCircle2, Clock, AlertCircle, X, Smartphone, FlaskConical } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { BANK_LINK_ENABLED, BANK_LINK_OFF_MESSAGE } from "../utils/bankLink";
 import GlassCard from "./GlassCard";
 import API from "../services/api";
 
@@ -64,6 +65,10 @@ function BankConnectionSection({ onSynced }) {
     };
 
     const openModal = () => {
+        if (!BANK_LINK_ENABLED) {
+            toast(BANK_LINK_OFF_MESSAGE, { icon: "🧪", duration: 6000 });
+            return;
+        }
         setMobile("");
         setMobileError("");
         setRefreshTargetId(null);
@@ -198,17 +203,18 @@ function BankConnectionSection({ onSynced }) {
                         <div role="note" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 10, maxWidth: 520, padding: "10px 12px", borderRadius: 10, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}>
                             <FlaskConical size={14} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
                             <span style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-                                This is a <strong style={{ color: "var(--text-primary)" }}>demo sandbox</strong>, not your real bank. It adds
-                                random sample transactions — use it only if you want to try the app out. For your actual
-                                spending, import your bank or UPI statements instead.
+                                Bank linking is a <strong style={{ color: "var(--text-primary)" }}>demo for now and isn't switched on during the beta</strong>,
+                                so please don't use it. It only links test banks with sample data, never your real account.
+                                To add your transactions, import a bank or UPI statement (PhonePe, Paytm or your bank's app).
                             </span>
                         </div>
                     </div>
                     <button
                         onClick={openModal}
                         disabled={connecting}
+                        aria-disabled={!BANK_LINK_ENABLED}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:cursor-not-allowed transition-all text-white"
-                        style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)" }}
+                        style={{ background: "linear-gradient(135deg, #a78bfa, #7c3aed)", opacity: BANK_LINK_ENABLED ? 1 : 0.5, cursor: BANK_LINK_ENABLED ? undefined : "not-allowed" }}
                     >
                         <Link2 size={15} />
                         {connecting ? "Opening consent..." : "Connect Bank"}
