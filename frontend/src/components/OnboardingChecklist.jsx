@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CheckCircle, Circle, X } from "lucide-react";
+import { BANK_LINK_ENABLED } from "../utils/bankLink";
 
 const STEPS = [
   { key: "account",     label: "Create your account" },
@@ -7,7 +8,7 @@ const STEPS = [
   { key: "budget",      label: "Set a budget" },
   { key: "goal",        label: "Create a financial goal" },
   { key: "bank",        label: "Connect a bank account" },
-];
+].filter(s => s.key !== "bank" || BANK_LINK_ENABLED);
 
 export default function OnboardingChecklist({ transactions = [], budgets = [], goals = [], bankConnected = false }) {
   const [dismissed, setDismissed] = useState(
@@ -29,7 +30,7 @@ export default function OnboardingChecklist({ transactions = [], budgets = [], g
     bank:        bankConnected,
   };
 
-  const done = Object.values(checks).filter(Boolean).length;
+  const done = STEPS.filter(s => checks[s.key]).length;
   const total = STEPS.length;
   const pct = Math.round((done / total) * 100);
 
