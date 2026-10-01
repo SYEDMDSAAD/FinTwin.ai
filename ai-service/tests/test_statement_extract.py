@@ -335,6 +335,65 @@ def test_upi_app_layout_keeps_every_transaction_and_its_amount():
     assert rows[1][1] == "Paid to Apple Services"
 
 
+def column_ruled_pdf() -> bytes:
+    """An older bank layout: lines between the columns but none between rows
+    (each ruled cell holds a whole page), the date printed once per day, a
+    "Value / Date" label on two lines, wrapped narrations and a TOTAL line."""
+    cols = [(10, 18, "L"), (29, 18, "L"), (48, 70, "L"), (119, 15, "L"),
+            (135, 20, "R"), (156, 20, "R"), (177, 23, "R")]
+    # (date, value date, narration lines, deposit, withdrawal, balance)
+    txns = [
+        ("16 Jun 19", "16 Jun 19", ["BALANCE FORWARD"], "", "", "10,000.00"),
+        ("17 Jun 19", "16 Jun 19", ["ATM WITHDRAWAL SELF-SWITCH", "AT NFS 04:54:54/916704002072"], "", "1,500.00", "8,500.00"),
+        ("", "", ["PURCHASE HOTEL SARAVANA", "CHENNAI IN 13:44:16/369548"], "", "966.00", "7,534.00"),
+        ("", "", ["CRADJ/UPI/AXB/916616736180"], "1,035.49", "", "8,569.49"),
+        ("19 Jun 19", "19 Jun 19", ["UPI/917209458811/", "PAYTM/PAYTM@ICICI/ICIC0000555/"], "", "10.17", "8,559.32"),
+        ("", "", ["TOTAL"], "1,035.49", "2,476.17", "8,559.32"),
+    ]
+    pdf = FPDF()
+    pdf.set_auto_page_break(False)
+    pdf.add_page()
+    pdf.set_font("helvetica", size=7)
+    pdf.set_xy(cols[1][0], 20); pdf.cell(cols[1][1], 3, "Value")
+    for (x, w, a), text in zip(cols, ["Date", "", "Description", "Cheque", "Deposit", "Withdrawal", "Balance"]):
+        if text:
+            pdf.set_xy(x, 23.5); pdf.cell(w, 3, text, align=a)
+    pdf.set_xy(cols[1][0], 27); pdf.cell(cols[1][1], 3, "Date")
+    y = 32
+    for date_, vdate, narration, dep, wd, bal in txns:
+        for (x, w, a), text in zip(cols, [date_, vdate, narration[0], "", dep, wd, bal]):
+            if text:
+                pdf.set_xy(x, y); pdf.cell(w, 3.5, text, align=a)
+        for more in narration[1:]:
+            y += 3.5
+            pdf.set_xy(cols[2][0], y); pdf.cell(cols[2][1], 3.5, more)
+        y += 3.5
+    pdf.rect(9, 30, 192, y - 28)
+    for x, _, _ in cols[1:]:
+        pdf.line(x - 0.5, 30, x - 0.5, y + 2)
+    return bytes(pdf.output())
+
+
+def test_column_ruled_statement_is_split_into_its_transactions():
+    grid = extract(column_ruled_pdf()).grid
+    header = next(r for r in grid if "Description" in r)
+    rows = [r for r in grid if r is not header and r[0][:2].isdigit()]
+
+    # "Value" above "Date" is one column
+    assert header[:3] == ["Date", "Value Date", "Description"]
+    # one row per transaction, each with its own amount; undated rows take the day's date
+    assert [(r[0], r[4], r[5]) for r in rows] == [
+        ("16 Jun 19", "", ""),
+        ("17 Jun 19", "", "1,500.00"),
+        ("17 Jun 19", "", "966.00"),
+        ("17 Jun 19", "1,035.49", ""),
+        ("19 Jun 19", "", "10.17"),
+    ]
+    assert rows[2][2] == "PURCHASE HOTEL SARAVANA CHENNAI IN 13:44:16/369548"
+    # the TOTAL line is not a transaction
+    assert not any(r[0] and "TOTAL" in r[2] for r in grid)
+
+
 def test_password_protected_pdf_asks_then_opens():
     data = encrypted_pdf("SAAD0109")
 

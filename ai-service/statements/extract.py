@@ -172,6 +172,12 @@ def _ruled_rows(page) -> list[list[str]]:
                   for ci, bbox in enumerate(row.cells)]
                  for ri, row in enumerate(table.rows)]
         width = max((len(r) for r in lines), default=0)
+        # Lines between the columns but none between the rows: each cell holds
+        # a whole page of transactions ("1,500.00", "966.00", … stacked), and
+        # only word positions can tell the rows apart
+        if any(sum(1 for text, _, _ in cell if _is_amount(text)) >= 2
+               for r in lines for cell in r):
+            continue
         # How far right each column's text reaches: the wrap width for it
         reach = [max((ln[1] for r in lines if i < len(r) for ln in r[i]), default=0.0)
                  for i in range(width)]
@@ -272,8 +278,16 @@ _DATE_RE = re.compile(
     r"^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{1,2}[\s\-/]?[A-Za-z]{3,9}[\s\-/,]*\d{2,4}"
     # month first, as UPI apps write it: "Jun 24, 2026"
     r"|[A-Za-z]{3,9}\.?[\s\-]*\d{1,2},?[\s\-]*\d{4})$")
+# Totals and carried balances print like a transaction without a date
+_SUMMARY_RE = re.compile(
+    r"^(total|grand total|sub ?total|closing balance|opening balance|balance forward|"
+    r"brought forward|carried forward|b/f|c/f)\b", re.I)
 _BARE_CURRENCY = re.compile(r"^(₹|rs\.?|inr)$", re.I)
 _AMOUNT_RE = re.compile(r"^\(?[-+]?(₹|rs\.?|inr)?\s?[\d,]*\d(\.\d{1,2})?\)?\s*(dr|cr)?\.?$", re.I)
+
+
+def _is_amount(text: str) -> bool:
+    return bool(_AMOUNT_RE.match(text)) and any(ch.isdigit() for ch in text)
 
 
 @dataclass
@@ -369,8 +383,22 @@ def _layout_rows(words: list[dict], layout):
     header_at = next((i for i, line in enumerate(lines) if _header_hits(line) >= 3), None)
 
     if header_at is not None:
-        columns = _header_columns(lines[header_at])
+        header = list(lines[header_at])
         body = lines[header_at + 1:]
+        # A label split over two lines ("Value" above "Date") sits on the
+        # lines just above and below the header, with nothing but header words
+        height = max(w["bottom"] - w["top"] for w in header)
+        for near, take in ((lines[header_at - 1] if header_at else None, "above"),
+                           (body[0] if body else None, "below")):
+            if not near or _header_hits(near) != len(near):
+                continue
+            gap = (min(w["top"] for w in header) - max(w["bottom"] for w in near) if take == "above"
+                   else min(w["top"] for w in near) - max(w["bottom"] for w in header))
+            if gap < height:
+                header += near
+                if take == "below":
+                    body = body[1:]
+        columns = _header_columns(sorted(header, key=lambda w: w["x0"]))
         sample = [lines[header_at]] + [ln for ln in body if _starts_with_date(ln)]
         layout = (columns, _gutters(columns, sample))
     elif layout is None:
@@ -414,7 +442,14 @@ def _layout_rows(words: list[dict], layout):
             filled = [c for c in cells if c]
             has_amount = any(_AMOUNT_RE.match(c) and any(ch.isdigit() for ch in c)
                              for i, c in enumerate(cells) if i != date_col and c)
-        if (filled and not has_date and not has_amount and prev_is_txn
+        # Many banks print the date once per day: a line with an amount and no
+        # date, right under that day's rows, is the day's next transaction
+        if (has_amount and not has_date and not cells[date_col] and prev_is_txn and adjacent
+                and not _SUMMARY_RE.match(" ".join(c for c in cells if c))):
+            cells[date_col] = rows[-1][date_col]
+            rows.append(cells)
+            last_line_cols = col_words
+        elif (filled and not has_date and not has_amount and prev_is_txn
                 and adjacent and not cells[date_col]):
             prev = rows[-1]
             for i, c in enumerate(cells):
