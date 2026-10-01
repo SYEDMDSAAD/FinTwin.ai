@@ -668,7 +668,7 @@ export default function OnboardingPage() {
                 onClick={() => { toast.dismiss(t.id); setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
                 style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
               >
-                Connect bank →
+                Upload statement →
               </button>
               <button
                 onClick={() => toast.dismiss(t.id)}
