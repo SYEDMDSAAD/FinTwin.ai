@@ -51,6 +51,7 @@ def test_investing_is_saving_not_spending():
     assert "Investments: ₹12,280" in reply    # ₹36,840 / 3
     assert "put away about **₹19,261**" in reply    # ₹6,981 left over + ₹12,280 invested
     assert "Transfer" not in reply            # moving between your own accounts isn't spending
+    assert "**Out:** ₹30,929 (₹12,280 of it invested)" in reply
 
 
 def test_only_flexible_spending_is_offered_as_a_cut():
@@ -76,6 +77,8 @@ def test_works_out_the_purchase_discussed_earlier():
     reply = sp.answer("Check my spending patterns and tell how can I boost my finances to buy the car "
                       "as soon as possible", {**DATA, "conversationHistory": CAR_CHAT})
     assert "**Saving for ₹10,00,000**" in reply
+    # It's what was asked, so it comes before the breakdown
+    assert reply.index("**Saving for") < reply.index("**Where it goes each month**")
     assert "(₹6,981 a month): about 11.9 years" in reply      # 10,00,000 / 6,981
     assert "(₹9,273 a month): about 9.0 years" in reply       # with the trims
     assert "(₹19,261 a month): about 4.3 years" in reply      # counting investments
@@ -87,8 +90,8 @@ def test_no_purchase_unless_asked_about_one():
 
 
 def test_mentions_recurring_payments_and_budget_overruns():
-    reply = sp.answer("where does my money go", DATA)
-    assert "Netflix" in reply
+    reply = sp.answer("where does my money go", {**DATA, "subscriptions": ["Paid to SPOTIFY INDIA PVT LTD", "Netflix"]})
+    assert "**Recurring payments:** SPOTIFY INDIA PVT LTD, Netflix." in reply   # without "Paid to"
     assert "Food exceeded by 12%" in reply
 
 

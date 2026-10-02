@@ -48,6 +48,8 @@ _FLEXIBLE = {"food", "shopping", "entertainment", "travel", "local shops", "groc
 # Neither: money sent to people may be family support; "Other" is unknown
 _NEUTRAL = {"people", "other"}
 
+_PAYEE_PREFIX = re.compile(r"^(paid\s+to|payment\s+to|sent\s+to|transfer\s+to)\s+", re.IGNORECASE)
+
 TRIM = 0.25            # "trim by a quarter": large enough to matter, small enough to be real
 
 
@@ -104,8 +106,9 @@ def answer(message: str, data: dict) -> str | None:
     if data.get("dataFrom") and data.get("dataThrough"):
         period = f" ({data['dataFrom']} to {data['dataThrough']})"
     rate = f" ({left / income * 100:.0f}% of what comes in)" if income > 0 else ""
-    out = [f"Here's where your money goes, as a monthly average of what you've recorded{period}.",
-           f"**In:** {inr(income)} · **Out:** {inr(expenses)} · **Left over:** {inr(left)}{rate}"]
+    invested_note = f" ({inr(investing)} of it invested)" if investing else ""
+    summary = (f"**In:** {inr(income)} · **Out:** {inr(expenses)}{invested_note} · "
+               f"**Left over:** {inr(left)}{rate}")
 
     # Where it goes
     lines = []
@@ -114,26 +117,28 @@ def answer(message: str, data: dict) -> str | None:
                      f"you actually put away about **{inr(put_away)}** a month.")
     total_spend = sum(spending.values())
     for c, v in sorted(spending.items(), key=lambda cv: -cv[1])[:7]:
-        note = " (not yet categorised; sorting these sharpens this picture)" if kind(c) == "other" else ""
+        note = {"other": " (not yet categorised; sorting these sharpens this picture)",
+                "people": " (money sent to people: rent, family or splitting bills)"}.get(kind(c), "")
         share = f", {v / total_spend * 100:.0f}% of spending" if total_spend else ""
         lines.append(f"- {c}: {inr(v)}{share}{note}")
-    out.append("**Each month**\n" + "\n".join(lines))
+    breakdown = "**Where it goes each month**\n" + "\n".join(lines)
 
     # What could be freed
     if flexible and freed >= 100:
         trims = [f"- {c}: {inr(v)} → {inr(v * (1 - TRIM))}, frees **{inr(v * TRIM)}**"
                  for c, v in flexible]
-        out.append("**Where you could free up money**: trimming your flexible spending by a quarter\n"
+        freeing = ("**Where you could free up money**: trimming your flexible spending by a quarter\n"
                    + "\n".join(trims)
                    + f"\n\nTogether that's about **{inr(freed)} more a month**, taking what's left over "
                      f"from {inr(left)} to {inr(left + freed)}. Rent, EMIs, bills and health aren't "
                      f"counted here.")
     else:
-        out.append("Most of your spending is commitments (rent, EMIs, bills), so there's little "
+        freeing = ("Most of your spending is commitments (rent, EMIs, bills), so there's little "
                    "flexible spending to trim. The bigger lever is income.")
 
-    # A purchase being saved for
+    # A purchase being saved for: the answer to the question, so it goes first
     price = price_in(message) or remembered_price(message, data.get("conversationHistory"))
+    saving_for = None
     if price and (_ABOUT_BUYING.search(message or "") or price_in(message)):
         steps = []
         if left > 0:
@@ -141,7 +146,7 @@ def answer(message: str, data: dict) -> str | None:
         else:
             steps.append("- Right now nothing is left over each month, so it can't be saved for yet")
         if flexible and freed >= 100 and left + freed > 0:
-            steps.append(f"- With the trims above ({inr(left + freed)} a month): "
+            steps.append(f"- With the trims below ({inr(left + freed)} a month): "
                          f"{_duration(price / (left + freed))}")
         extra = 5000
         if left + freed + extra > 0:
@@ -151,11 +156,20 @@ def answer(message: str, data: dict) -> str | None:
             steps.append(f"- If what you invest went towards it too ({inr(put_away)} a month): "
                          f"{_duration(price / put_away)}. That's your call; it would pause your "
                          f"long-term saving.")
-        out.append(f"**Saving for {inr(price)}**\n" + "\n".join(steps))
+        saving_for = f"**Saving for {inr(price)}**\n" + "\n".join(steps)
 
-    subs = [str(s) for s in (data.get("subscriptions") or []) if s][:6]
+    if saving_for:
+        out = [f"Here's how soon you could get to {inr(price)}, from a monthly average of what "
+               f"you've recorded{period}.", summary, saving_for, breakdown, freeing]
+    else:
+        out = [f"Here's where your money goes, as a monthly average of what you've recorded{period}.",
+               summary, breakdown, freeing]
+
+    # Statements name payees "Paid to X"; the name is what matters
+    subs = [_PAYEE_PREFIX.sub("", str(s)).strip() for s in (data.get("subscriptions") or []) if s][:6]
     if subs:
-        out.append("**Recurring payments worth a look:** " + ", ".join(subs) + ".")
+        out.append("**Recurring payments:** " + ", ".join(subs)
+                   + ". Any you no longer use are an easy saving.")
     alerts = [str(a) for a in (data.get("budgetAlerts") or []) if a]
     if alerts:
         out.append("**Over budget this month:** " + "; ".join(alerts) + ".")
