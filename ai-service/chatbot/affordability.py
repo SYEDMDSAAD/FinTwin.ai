@@ -26,8 +26,24 @@ _MULTIPLIER = {"k": 1_000, "thousand": 1_000, "l": 100_000, "lakh": 100_000, "la
                "lac": 100_000, "cr": 10_000_000, "crore": 10_000_000, "crores": 10_000_000}
 
 
+# How answer() ends when the question named no price. The user's next message
+# is then usually just the price ("10lakhs"), with no "afford" in it.
+ASKS_FOR_PRICE = "Tell me the price and I'll work it through."
+
+
 def asks_about_affording(question: str) -> bool:
     return bool(_ASKS.search(question or ""))
+
+
+def is_price_reply(message: str, history: list[dict] | None) -> bool:
+    """The user answering our "what does it cost?" with a price.
+
+    Without this, "10lakhs" went to the model, which divided ₹10 lakh by the
+    user's income instead of their saving and said 2 years, not 12.
+    """
+    last = (history or [])[-1:]
+    return bool(last) and ASKS_FOR_PRICE in str(last[0].get("reply") or "") \
+        and price_in(message) is not None
 
 
 def price_in(question: str) -> float | None:
@@ -76,7 +92,7 @@ def answer(question: str, data: dict) -> str | None:
         if monthly_savings > 0:
             lines.append(f"A purchase you could cover from a year of that saving is about "
                          f"{inr(monthly_savings * 12)}.")
-        lines.append("What does the one you're looking at cost? Tell me the price and I'll work it through.")
+        lines.append(f"What does the one you're looking at cost? {ASKS_FOR_PRICE}")
         return "\n\n".join(lines)
 
     if monthly_savings <= 0:
