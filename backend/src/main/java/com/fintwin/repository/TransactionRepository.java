@@ -35,11 +35,12 @@ public interface TransactionRepository
      */
     // Channel "AA" = the Account Aggregator: bank rows, and card rows whose
     // external id is a Setu txnId ("CARD:…"); card statements and alert
-    // emails share source CARD but carry STMT:/MAIL: ids.
+    // emails share source CARD but carry STMT:/MAIL: ids. The shared demo
+    // account's generated data isn't anyone's categorisation, so it's left out.
     @Query("SELECT CASE WHEN t.source = 'BANK' OR t.externalId LIKE 'CARD:%' THEN 'AA' ELSE t.source END, "
          + "t.categorySource, t.categoryReview, "
          + "CASE WHEN t.user.trainingConsentAt IS NULL THEN false ELSE true END, COUNT(t) "
-         + "FROM Transaction t GROUP BY "
+         + "FROM Transaction t WHERE t.user.role IS NULL OR t.user.role <> 'DEMO' GROUP BY "
          + "CASE WHEN t.source = 'BANK' OR t.externalId LIKE 'CARD:%' THEN 'AA' ELSE t.source END, "
          + "t.categorySource, t.categoryReview, "
          + "CASE WHEN t.user.trainingConsentAt IS NULL THEN false ELSE true END")

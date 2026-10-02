@@ -200,6 +200,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private int limitFor(String path) {
         if (path.contains("/auth"))                                  return 5;
+        if (path.contains("/demo/start"))                            return 5;
+        if (path.endsWith("/visits"))                                return 20;
         if (path.contains("/chat") || path.contains("/coach")
                 || path.contains("/reports") || path.contains("/goals")
                 || path.contains("/investments"))                    return 20;
@@ -219,6 +221,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String bucketKey(String path) {
         if (path.contains("/auth"))   return "auth";
+        if (path.contains("/demo/start")) return "demo";
+        if (path.endsWith("/visits"))     return "visit";
         if (path.contains("/chat"))   return "ai";
         return "api";
     }
@@ -236,6 +240,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
+            // Every demo visitor is the same account: limit each visit on its
+            // own, or a few visitors would use up the limit for everyone
+            Object demoSession = claims.get(com.fintwin.demo.DemoSession.CLAIM);
+            if (demoSession instanceof String sid) return "demo:" + sid;
             return claims.getSubject();
         } catch (Exception e) {
             return null; // Invalid token — JWT filter will reject it properly

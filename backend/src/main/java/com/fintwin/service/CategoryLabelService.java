@@ -92,7 +92,9 @@ public class CategoryLabelService {
             long n = ((Number) r[4]).longValue();
 
             total += n;
-            boolean real = !NOT_REAL.contains(channel) && !Categorized.SEED.equals(method);
+            // A row with no source (older data, manual entry) is real; Set.of's
+            // contains(null) throws, which took the whole stats page down
+            boolean real = (channel == null || !NOT_REAL.contains(channel)) && !Categorized.SEED.equals(method);
             if (!real) { sandbox += n; continue; }
 
             long[] c = byMethod.computeIfAbsent(method, k -> new long[4]);

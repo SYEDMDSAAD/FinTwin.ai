@@ -28,17 +28,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role")
     long countByRole(@Param("role") String role);
 
+    /** Every account except the shared demo one. */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role IS NULL OR u.role <> 'DEMO'")
+    long countRealUsers();
+
     // Enabled admins to notify on security alerts.
     @Query("SELECT u FROM User u WHERE u.role IN :roles AND u.enabled = true")
     List<User> findEnabledByRoleIn(@Param("roles") List<String> roles);
 
     // 1 round-trip to Supabase instead of 4 COUNT queries for admin stats
-    @Query(value = "SELECT COUNT(*), COUNT(*) FILTER (WHERE enabled = true), COUNT(*) FILTER (WHERE created_at > :weekAgo), COUNT(*) FILTER (WHERE role = 'ADMIN') FROM users",
+    // The shared demo account (role DEMO) is not a user, so it isn't counted
+    @Query(value = "SELECT COUNT(*), COUNT(*) FILTER (WHERE enabled = true), COUNT(*) FILTER (WHERE created_at > :weekAgo), COUNT(*) FILTER (WHERE role = 'ADMIN') FROM users WHERE COALESCE(role, 'USER') <> 'DEMO'",
            nativeQuery = true)
     List<Object[]> countUserStats(@Param("weekAgo") LocalDateTime weekAgo);
 
     // 1 round-trip instead of 3 COUNT queries for adoption stats
-    @Query(value = "SELECT COUNT(*), COUNT(*) FILTER (WHERE two_factor_enabled = true), COUNT(*) FILTER (WHERE onboarding_completed = true) FROM users",
+    @Query(value = "SELECT COUNT(*), COUNT(*) FILTER (WHERE two_factor_enabled = true), COUNT(*) FILTER (WHERE onboarding_completed = true) FROM users WHERE COALESCE(role, 'USER') <> 'DEMO'",
            nativeQuery = true)
     List<Object[]> countAdoptionStats();
 

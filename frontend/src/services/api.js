@@ -1,4 +1,5 @@
 import axios from "axios";
+import { showDemoBlocked, storedUserIsDemo } from "../utils/demoGuard";
 
 // ── Main backend — business data (transactions, dashboard, AI, etc.) ──────────
 const API = axios.create({
@@ -44,6 +45,12 @@ function registerRefreshInterceptor(client) {
         (response) => response,
         async (error) => {
             const originalRequest = error.config;
+
+            // The read-only demo turned a write away: say so once, kindly
+            if (error.response?.status === 403 && error.response?.data?.code === "demo_read_only") {
+                showDemoBlocked(error.response.data.error);
+                return Promise.reject(error);
+            }
 
             // Skip refresh on auth endpoints or if already retried
             if (
@@ -101,10 +108,13 @@ registerRefreshInterceptor(identityApi);
 registerRefreshInterceptor(API);
 
 function clearAuthAndRedirect() {
+    // A demo session simply ends (it has no refresh token): back to the
+    // landing page, where a new one is a click away, not to a login form
+    const demo = storedUserIsDemo();
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
-    window.location.href = "/login";
+    window.location.href = demo ? "/?demo=ended" : "/login";
 }
 
 export default API;

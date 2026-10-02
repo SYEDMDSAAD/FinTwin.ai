@@ -7,6 +7,11 @@ import App from "./App.jsx";
 import "./index.css";
 
 import { Toaster } from "react-hot-toast";
+import { installDemoToastGuard } from "./utils/demoGuard";
+
+// In the read-only demo, a blocked action shows one "this is a demo" message
+// rather than that plus the page's own "Failed to …"
+installDemoToastGuard();
 
 import { AuthProvider }
     from "./context/AuthContext";

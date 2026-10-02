@@ -61,6 +61,25 @@ public enum Role {
      */
     PREMIUM_USER(combine(USER, EnumSet.noneOf(Permission.class))),
 
+    // The shared demo account: see everything, change nothing. No WRITE_*,
+    // DELETE_*, EXPORT_* or bank permissions; DemoReadOnlyFilter also turns
+    // away anything but reads (and the copilot) for endpoints without checks.
+    DEMO(EnumSet.of(
+            Permission.READ_OWN_PROFILE,
+            Permission.READ_OWN_TRANSACTIONS,
+            Permission.READ_OWN_BUDGETS,
+            Permission.READ_OWN_GOALS,
+            Permission.READ_OWN_NET_WORTH,
+            Permission.READ_OWN_INVESTMENTS,
+            Permission.READ_OWN_INSURANCE,
+            Permission.READ_OWN_BANK_CONNECTIONS,
+            Permission.USE_AI_BASIC,
+            Permission.USE_AI_COPILOT,
+            Permission.USE_AI_FORECAST,
+            Permission.USE_AI_REPORT,
+            Permission.USE_AI_SPENDING_COACH
+    )),
+
     /**
      * Internal support agent — read-only access to any user's data.
      * Does NOT inherit USER permissions (different trust domain).

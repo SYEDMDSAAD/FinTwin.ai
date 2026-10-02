@@ -105,6 +105,14 @@ public class JwtFilter extends OncePerRequestFilter {
                     }
                 }
 
+                // A demo visitor: the session id tells them apart within the shared
+                // account. Only honoured on the demo account itself.
+                Object demoSid = claims.get(com.fintwin.demo.DemoSession.CLAIM);
+                if (demoSid instanceof String sid
+                        && com.fintwin.demo.DemoSession.ROLE.equalsIgnoreCase(dbUser.getRole())) {
+                    request.setAttribute(com.fintwin.demo.DemoSession.REQUEST_ATTR, sid);
+                }
+
                 // Expose impersonation context so audit logs attribute to the admin.
                 String impBy = (String) claims.get("imp_by");
                 if (impBy != null) {

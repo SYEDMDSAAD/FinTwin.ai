@@ -36,8 +36,8 @@ const sections = [
     body: "Bank data is fetched via the RBI's Account Aggregator framework operated by Setu. FinTwin AI acts as a Financial Information User (FIU). You can revoke consent anytime from Settings → Connections.",
   },
   {
-    title: "9. Cookies",
-    body: "We use minimal essential cookies for authentication (JWT tokens). We do not use tracking or advertising cookies.",
+    title: "9. Cookies and visit counts",
+    body: "We use minimal essential cookies for authentication (JWT tokens). We do not use tracking or advertising cookies. To count how many people visit, your browser keeps an anonymous random ID (in local storage, not a cookie), and when you open our home page we record that ID with the site you came from and whether you're on a phone or a computer. If you try the demo account, we also record which pages you open and the questions you ask its copilot, which are about the demo's sample data. None of this includes your name, email or IP address, and it isn't linked to any account you create.",
   },
   {
     title: "10. Changes to This Policy",
@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
           <div style={{ width:44, height:44, borderRadius:13, background:"linear-gradient(135deg,#a78bfa,#22d3ee)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", flexShrink:0 }}>F</div>
           <div>
             <div style={{ fontSize:22, fontWeight:800, color:txt, letterSpacing:"-0.02em" }}>Privacy Policy</div>
-            <div style={{ fontSize:12, color:txtSub }}>FinTwin AI · Last updated June 2026</div>
+            <div style={{ fontSize:12, color:txtSub }}>FinTwin AI · Last updated October 2026</div>
           </div>
         </div>
 

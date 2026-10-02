@@ -188,6 +188,8 @@ public class TransactionController {
             Map<String, Object> response = new java.util.HashMap<>(result);
             response.put("success", true);
             return ResponseEntity.ok(response);
+        } catch (com.fintwin.demo.DemoLimitException e) {
+            return ResponseEntity.status(429).body(Map.of("success", false, "reply", e.getMessage()));
         } catch (com.fintwin.ai.AiQuotaExceededException e) {
             return ResponseEntity.status(429).body(Map.of("success", false, "reply",
                     "You've reached today's FinTwin AI limit. It resets at midnight — "
