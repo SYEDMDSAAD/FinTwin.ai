@@ -123,3 +123,43 @@ def test_other_messages_are_not_price_replies(message, history):
     if history is None:
         history = _after_we_asked_the_price(DATA)
     assert not af.is_price_reply(message, history)
+
+
+# ── A price already given, referred back to ───────────────────────────────────
+
+CAR_CHAT = [
+    {"message": "Can I afford a car?", "reply": af.answer("Can I afford a car?", SCREENSHOT)},
+    {"message": "about 10 lakhs INR", "reply": af.answer("about 10 lakhs INR", SCREENSHOT)},
+]
+
+
+@pytest.mark.parametrize("message", ["Can I afford it?", "can i buy the car now?", "Can I afford that?"])
+def test_reuses_the_price_given_earlier_and_says_so(message):
+    reply = af.answer(message, {**SCREENSHOT, "conversationHistory": CAR_CHAT})
+    assert reply.startswith("Taking the ₹10,00,000 you mentioned earlier.")
+    assert "about 12 years of everything you save" in reply
+
+
+@pytest.mark.parametrize("message", ["Can I afford a laptop?", "Can I afford the new iPhone?"])
+def test_a_new_item_is_asked_for_its_own_price(message):
+    reply = af.answer(message, {**SCREENSHOT, "conversationHistory": CAR_CHAT})
+    assert af.ASKS_FOR_PRICE in reply and "₹10,00,000" not in reply
+
+
+def test_buying_the_car_sooner_gets_the_plan_not_another_price_question(monkeypatch):
+    # The question from the 2026-10-02 16:05 screenshot
+    def boom(*a, **k):
+        raise AssertionError("the model should not be asked")
+
+    monkeypatch.setattr("chatbot.advisor.chat", boom)
+    monkeypatch.setattr("chatbot.advisor.ask", boom)
+    data = {**SCREENSHOT, "dataFrom": "2026-07-15",
+            "categorySpending": {"Investments": 36840, "Food": 9600, "Shopping": 6000},
+            "conversationHistory": CAR_CHAT}
+    trace = {}
+    reply = generate_financial_advice(
+        "Can u check my finances to suggest me how can i buy the car as soon as possible",
+        data, "Savings Advisor", trace)
+    assert trace["path"] == "spending_plan_direct"
+    assert "**Saving for ₹10,00,000**" in reply
+    assert af.ASKS_FOR_PRICE not in reply

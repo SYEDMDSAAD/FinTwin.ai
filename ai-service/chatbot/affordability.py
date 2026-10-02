@@ -31,6 +31,31 @@ _MULTIPLIER = {"k": 1_000, "thousand": 1_000, "l": 100_000, "lakh": 100_000, "la
 ASKS_FOR_PRICE = "Tell me the price and I'll work it through."
 
 
+# Every affordability answer starts with this
+LEAD = "On what you've recorded"
+# "the car", "it", "that one": the user means something already priced
+_REFERS_BACK = re.compile(r"\b(the|it|that|this|same)\b", re.IGNORECASE)
+
+
+def remembered_price(message: str, history: list[dict] | None) -> float | None:
+    """The price from an earlier affordability answer, when the message refers
+    back to it. "how can I buy the car sooner" two messages after "10 lakhs"
+    means that car; "can I afford a laptop?" is a new item and gets asked."""
+    if not _REFERS_BACK.search(message or ""):
+        return None
+    thread = [str(h.get("message") or "") for h in (history or [])
+              if str(h.get("reply") or "").startswith(LEAD)]
+    # "the iPhone" after a chat about a car is something else
+    named = re.findall(r"\bthe\s+(?:new\s+|same\s+)?([a-z]{3,})", (message or "").lower())
+    if named and not any(n in " ".join(thread).lower() for n in named):
+        return None
+    for m in reversed(thread):
+        price = price_in(m)
+        if price:
+            return price
+    return None
+
+
 def asks_about_affording(question: str) -> bool:
     return bool(_ASKS.search(question or ""))
 
@@ -86,6 +111,10 @@ def answer(question: str, data: dict) -> str | None:
         return None                                   # nothing imported: let the model say so
 
     price = price_in(question)
+    remembered = False
+    if price is None:
+        price = remembered_price(question, data.get("conversationHistory"))
+        remembered = price is not None
     if price is None:
         lines = [f"On what you've recorded{_period(data)}, you take in about {inr(income)} a month "
                  f"and spend about {inr(expenses)}, leaving {inr(monthly_savings)}."]
@@ -119,7 +148,8 @@ def answer(question: str, data: dict) -> str | None:
         verdict = (f"about {months / 12:.0f} years of everything you save — out of reach "
                    f"without a loan or a change in income")
 
-    return (f"On what you've recorded{_period(data)}: about {inr(income)} in and {inr(expenses)} out "
+    earlier = f"Taking the {inr(price)} you mentioned earlier.\n\n" if remembered else ""
+    return (f"{earlier}On what you've recorded{_period(data)}: about {inr(income)} in and {inr(expenses)} out "
             f"a month, leaving {inr(monthly_savings)}.\n\n"
             f"{inr(price)} is {size} — {verdict}.\n\n"
             f"This doesn't count what you already have saved or any loan you'd take — "
