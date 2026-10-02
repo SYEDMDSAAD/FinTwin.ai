@@ -230,6 +230,10 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.POST, "/api/v1/demo/start")
                                 .permitAll()
 
+                                // The landing page counting its (anonymous) visitors
+                                .requestMatchers(HttpMethod.POST, "/api/v1/visits")
+                                .permitAll()
+
                                 // Support tickets — users submit from login page (unauthenticated)
                                 .requestMatchers(HttpMethod.POST, "/api/v1/tickets")
                                 .permitAll()

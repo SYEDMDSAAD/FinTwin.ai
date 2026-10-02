@@ -35,6 +35,7 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
     private static final List<Rule> ALLOWED = List.of(
             new Rule("POST", "/api/v1/transactions/chat"),
             new Rule("POST", "/api/v1/demo/event"),
+            new Rule("POST", "/api/v1/visits"),
             new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"));
 
     // Writes the app makes by itself (marking things seen). Answered as done
