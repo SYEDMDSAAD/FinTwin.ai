@@ -9,7 +9,7 @@ import requests
 from chatbot.intent_classifier import classify_intent
 from chatbot.prompt_engine import build_financial_context, build_base_context, format_history_block
 from chatbot.tools import TOOLS, execute_tool
-from chatbot import affordability, portfolio_answers
+from chatbot import affordability, portfolio_answers, spending_plan
 from utils.llm_client import MODEL, ask, chat
 
 logger = logging.getLogger(__name__)
@@ -423,6 +423,15 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
             answered = affordability.answer(message, financial_data)
             if answered:
                 trace["path"] = "affordability_direct"
+                return answered
+
+        # "Check my spending patterns" / "how can I save more": every figure is
+        # worked out in code. Left to the model it called investing a risk and
+        # quoted category totals that contradicted each other.
+        if spending_plan.asks_for_plan(message):
+            answered = spending_plan.answer(message, financial_data)
+            if answered:
+                trace["path"] = "spending_plan_direct"
                 return answered
 
         if financial_data.get("userId") is not None:

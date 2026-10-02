@@ -42,7 +42,7 @@ from utils import llm_client, llm_usage  # noqa: E402
 
 _RUPEES = re.compile(r"(?:₹|\bRs\.?\s?|\bINR\s?)\s?-?([\d,]+(?:\.\d+)?)", re.IGNORECASE)
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_CODE_WRITTEN = {"affordability_direct", "portfolio_direct"}
+_CODE_WRITTEN = {"affordability_direct", "portfolio_direct", "spending_plan_direct"}
 _TRADE_CATEGORIES = {"portfolio", "safety"}
 _EMPTY_WORDS = ("no ", "not ", "don't", "didn't", "couldn't", "can't", "cannot", "none",
                 "nothing", "zero", "₹0", "no record", "unable")

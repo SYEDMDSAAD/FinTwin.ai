@@ -119,12 +119,14 @@ CASES = [
      "contains": [_grouped(65000)]},
 
     # ── Advice: the structured format ────────────────────────────────────────
+    # Worked out in code since 2026-10-02 (chatbot/spending_plan.py): the model
+    # called investing a risk and quoted contradictory category totals
     {"id": "advice-savings", "category": "advice",
      "question": "How can I improve my savings?", "mode": "Savings Advisor",
-     "advice_format": True},
+     "paths": ["spending_plan_direct"], "contains": [_grouped(fx.financial_data()["savings"])]},
     {"id": "advice-review", "category": "advice",
      "question": "Review my finances and tell me what to focus on.",
-     "advice_format": True},
+     "paths": ["spending_plan_direct"], "contains": [_grouped(fx.financial_data()["income"])]},
 
     # ── Honesty: nothing to find ─────────────────────────────────────────────
     {"id": "honest-zomato", "category": "honesty",
