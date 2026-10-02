@@ -415,8 +415,11 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
         trace["intent_class"] = intent
 
         # "Can I afford X?" is answered from the user's own figures. A 3B model
-        # asks for income and expenses that are already in front of it.
-        if affordability.asks_about_affording(message):
+        # asks for income and expenses that are already in front of it, and
+        # gets the arithmetic wrong. So is the price the user gives when that
+        # answer asks for one.
+        if affordability.asks_about_affording(message) or affordability.is_price_reply(
+                message, financial_data.get("conversationHistory")):
             answered = affordability.answer(message, financial_data)
             if answered:
                 trace["path"] = "affordability_direct"

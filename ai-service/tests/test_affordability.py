@@ -76,3 +76,50 @@ def test_the_copilot_answers_without_calling_the_model(monkeypatch):
     reply = generate_financial_advice("Can I afford a car?", DATA, "Purchase Advisor", trace)
     assert trace["path"] == "affordability_direct"
     assert "₹15,000" in reply
+
+
+# ── The price, given as a follow-up ───────────────────────────────────────────
+
+# The figures from the conversation that went wrong (2026-10-02)
+SCREENSHOT = {"userId": 8, "income": 37910, "expenses": 30929, "savings": 6981,
+              "savingsRatio": 18, "financialScore": 60, "categorySpending": {},
+              "dataThrough": "2026-09-22"}
+
+
+def _after_we_asked_the_price(data):
+    first = af.answer("Can I afford a car?", data)
+    return [{"message": "Can I afford a car?", "reply": first}]
+
+
+def test_a_bare_price_after_we_asked_for_it_goes_back_to_the_calculator(monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("the model should not be asked")
+
+    monkeypatch.setattr("chatbot.advisor.chat", boom)
+    monkeypatch.setattr("chatbot.advisor.ask", boom)
+    data = {**SCREENSHOT, "conversationHistory": _after_we_asked_the_price(SCREENSHOT)}
+    trace = {}
+
+    reply = generate_financial_advice("10lakhs", data, "Savings Advisor", trace)
+
+    assert trace["path"] == "affordability_direct"
+    assert "₹10,00,000" in reply
+    # ₹10,00,000 / ₹6,981 a month = 143 months. The model had divided by the
+    # income instead (26.4 months) and called it "within 2 years".
+    assert "about 12 years of everything you save" in reply
+
+
+@pytest.mark.parametrize("message", ["10lakhs", "around 8 lakh", "₹8,50,000", "65k"])
+def test_recognises_a_price_reply(message):
+    assert af.is_price_reply(message, _after_we_asked_the_price(DATA))
+
+
+@pytest.mark.parametrize("message, history", [
+    ("10lakhs", []),                                                       # nothing asked yet
+    ("10lakhs", [{"message": "hi", "reply": "Hello! How can I help?"}]),   # we didn't ask a price
+    ("never mind, show my budgets", None),                                 # no price in it
+])
+def test_other_messages_are_not_price_replies(message, history):
+    if history is None:
+        history = _after_we_asked_the_price(DATA)
+    assert not af.is_price_reply(message, history)
