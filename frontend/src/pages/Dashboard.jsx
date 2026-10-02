@@ -4,6 +4,7 @@ import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
+import DemoBanner from "../components/DemoBanner";
 
 import { useTheme } from "../context/ThemeContext";
 
@@ -1687,6 +1688,8 @@ function Dashboard() {
                     min-w-0
                 "
             >
+
+                <DemoBanner section={activeSection} />
 
                 {activeSection === "Dashboard" && (
                   <Header

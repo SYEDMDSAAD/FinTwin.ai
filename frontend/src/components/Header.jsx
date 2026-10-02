@@ -27,9 +27,14 @@ function Header({ notifications = [], scoreData }) {
     : "Good Evening";
 
   const logout = () => {
+    const wasDemo = userData.role === "DEMO";
+    // Keep the anonymous visitor id, or a returning visitor counts as new
+    const visitor = localStorage.getItem("fintwin_visitor");
     localStorage.clear();
+    if (visitor) localStorage.setItem("fintwin_visitor", visitor);
     sessionStorage.removeItem("splashShown");
-    navigate("/login");
+    // Leaving the demo goes back to the landing page, not to a login form
+    navigate(wasDemo ? "/" : "/login");
   };
 
   // outside-click → close dropdowns

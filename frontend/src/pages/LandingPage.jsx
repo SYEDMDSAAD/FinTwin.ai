@@ -4,6 +4,9 @@ import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { toLight } from "./landingLightCss";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
+import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { startDemo } from "../utils/demo";
 
 /* Fonts (Space Grotesk, DM Mono) are requested in index.html */
 
@@ -52,6 +55,12 @@ const CSS = `
 .btn-hero { background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); color: #fff; border: none; border-radius: 13px; padding: 15px 32px; font-weight: 700; font-size: 16px; cursor: pointer; transition: all 0.2s; font-family: inherit; box-shadow: 0 4px 24px rgba(124,58,237,0.4); display: flex; align-items: center; gap: 8px; }
 .btn-hero:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(124,58,237,0.55); }
 .btn-hero-ghost { background: transparent; color: rgba(226,232,240,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 13px; padding: 15px 28px; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.demo-cta { flex-basis: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; padding: 12px 14px; border: 1px dashed rgba(167,139,250,0.35); border-radius: 14px; background: rgba(167,139,250,0.06); font-size: 14px; color: rgba(226,232,240,0.8); line-height: 1.5; }
+.demo-cta strong { color: #e2e8f0; }
+.demo-cta p { flex: 1; min-width: 200px; }
+.btn-demo { background: transparent; border: 1px solid rgba(167,139,250,0.55); color: #c4b5fd; border-radius: 11px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; white-space: nowrap; }
+.btn-demo:hover { background: rgba(167,139,250,0.12); }
+.btn-demo:disabled { opacity: 0.6; cursor: wait; }
 .btn-hero-ghost:hover { border-color: rgba(167,139,250,0.45); color: #a78bfa; background: rgba(167,139,250,0.06); transform: translateY(-1px); }
 .hero-stats { display: flex; gap: 32px; flex-wrap: wrap; }
 .hero-stat-val { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; }
@@ -452,6 +461,33 @@ export default function LandingPage() {
   const { isDark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const auth = useAuth();
+  const [demoStarting, setDemoStarting] = useState(false);
+
+  // "Try the demo": one click into a shared account with sample data
+  const tryDemo = async () => {
+    if (demoStarting) return;
+    setDemoStarting(true);
+    prefetchDashboard();
+    try {
+      await startDemo(auth?.login ?? (() => {}));
+      navigate("/dashboard");
+    } catch {
+      toast.error("The demo couldn't start just now. Please try again in a moment.");
+      setDemoStarting(false);
+    }
+  };
+
+  // Back here because a demo session ran out
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("demo") === "ended") {
+      toast("Your demo session ended. Start a new one any time.", { icon: "👋" });
+      params.delete("demo");
+      const rest = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : ""));
+    }
+  }, []);
   const isLoggedIn = !!localStorage.getItem("token");
 
   // A signed-in visitor is one tap from the dashboard: fetch its code now
@@ -490,6 +526,7 @@ export default function LandingPage() {
           <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onPointerDown={() => prefetchDashboard()} onClick={() => { setMenuOpen(false); navigate("/dashboard"); }}>Open Dashboard</button>
         ) : (
           <>
+            <button className="mob-link" onClick={() => { setMenuOpen(false); tryDemo(); }}>Try the demo</button>
             <button className="mob-link" onClick={() => { setMenuOpen(false); navigate("/login"); }}>Log In</button>
             <button className="btn-primary" style={{ fontSize: 18, padding: "16px 40px", borderRadius: 16 }} onClick={() => { setMenuOpen(false); navigate("/register"); }}>Get Started</button>
           </>
@@ -566,6 +603,13 @@ export default function LandingPage() {
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Log In</button>
+                  <div className="demo-cta">
+                    <p>Not ready to upload your own statement? <strong>Try a demo account</strong>: no sign-up, one click.</p>
+                    <button className="btn-demo" onPointerDown={() => prefetchDashboard()} onClick={tryDemo}
+                            disabled={demoStarting} aria-label="Try FinTwin with a demo account, no sign-up">
+                      {demoStarting ? "Opening the demo…" : "Try the demo →"}
+                    </button>
+                  </div>
                 </>
               )}
             </div>

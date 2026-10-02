@@ -63,7 +63,9 @@ export const AuthProvider = ({ children }) => {
     // Calls identity service to revoke refresh token, then clears local state
     const logout = async () => {
         const refreshToken = localStorage.getItem("refreshToken");
-        if (refreshToken) {
+        // The demo account is shared: logging it out on the server would sign
+        // out every other visitor, so a demo session just ends here
+        if (refreshToken && user?.role !== "DEMO") {
             try {
                 await identityApi.post("/auth/logout", { refreshToken });
             } catch {
