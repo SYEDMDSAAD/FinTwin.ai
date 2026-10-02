@@ -62,4 +62,13 @@ class CategorySourceTest {
         assertThat(methods.get(1)).containsEntry("correctionRate", 10.0);
         assertThat(methods.get(2)).containsEntry("correctionRate", null);
     }
+
+    @Test
+    void aRowWithNoSourceCountsAndDoesNotBreakTheStats() {
+        // Set.of(...).contains(null) throws: one transaction without a source
+        // used to fail the whole admin stats page with a 500
+        List<Object[]> rows = List.<Object[]>of(new Object[]{null, Categorized.BRAND, null, false, 2L});
+        Map<String, Object> s = CategoryLabelService.stats(rows, 0);
+        assertThat(s).containsEntry("transactions", 2L).containsEntry("excludedSampleData", 0L);
+    }
 }
