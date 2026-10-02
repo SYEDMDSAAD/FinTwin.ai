@@ -48,6 +48,19 @@ export async function startDemo(login) {
     login(data.accessToken, { email: data.email, fullName: data.fullName, role: data.role });
 }
 
+/**
+ * Counts a landing-page visit for the admin's Growth tab: the anonymous
+ * visitor id and where they came from. Admins browsing their own site aren't
+ * counted. Never fails loudly.
+ */
+export function recordVisit() {
+    try {
+        if (JSON.parse(localStorage.getItem("user") || "{}").role === "ADMIN") return;
+    } catch { /* not signed in */ }
+    const id = visitorId();
+    if (id) API.post("/visits", { visitorId: id, source: visitSource() }).catch(() => {});
+}
+
 /** A page the demo visitor opened, or their click on "Sign up". Never fails loudly. */
 export function demoEvent(kind, detail) {
     API.post("/demo/event", { kind, detail }).catch(() => {});

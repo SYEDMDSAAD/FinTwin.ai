@@ -19,6 +19,7 @@ import AdminAnomalyFeedback from "../components/admin/AdminAnomalyFeedback";
 import AdminImportFormats from "../components/admin/AdminImportFormats";
 import AdminTrainingExport from "../components/admin/AdminTrainingExport";
 import AdminAiUsage from "../components/admin/AdminAiUsage";
+import AdminGrowth from "../components/admin/AdminGrowth";
 import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -95,6 +96,7 @@ const G = `
 
 const NAV = [
   { id: "overview",    label: "Overview",        icon: LayoutDashboard },
+  { id: "growth",      label: "Growth",           icon: TrendingUp },
   { id: "users",       label: "Users",            icon: Users },
   { id: "audit",       label: "Audit Logs",       icon: FileText },
   { id: "monitoring",  label: "Monitoring",       icon: BarChart2 },
@@ -1598,6 +1600,7 @@ export default function AdminPage() {
             {tab === "feedback"   && <AdminFeedback/>}
             {tab === "categories" && <><AdminCopilotFeedback/><AdminAnomalyFeedback/><AdminImportFormats/><AdminCategorization/><div style={{ height: 28 }}/><AdminTrainingExport/></>}
             {tab === "ai-usage"   && <AdminAiUsage/>}
+            {tab === "growth"     && <AdminGrowth/>}
             {tab === "ipos"       && <AdminIpos/>}
           </div>
         </div>

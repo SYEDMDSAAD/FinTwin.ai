@@ -6,7 +6,7 @@ import { toLight } from "./landingLightCss";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { startDemo } from "../utils/demo";
+import { recordVisit, startDemo } from "../utils/demo";
 
 /* Fonts (Space Grotesk, DM Mono) are requested in index.html */
 
@@ -477,6 +477,9 @@ export default function LandingPage() {
       setDemoStarting(false);
     }
   };
+
+  // Count this visit for the admin's Growth tab (anonymous)
+  useEffect(() => { recordVisit(); }, []);
 
   // Back here because a demo session ran out
   useEffect(() => {
