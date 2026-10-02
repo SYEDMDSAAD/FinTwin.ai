@@ -414,6 +414,16 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
         intent = classify_intent(message)
         trace["intent_class"] = intent
 
+        # "Check my spending patterns" / "how can I buy the car sooner": every
+        # figure is worked out in code. Left to the model it called investing a
+        # risk and quoted category totals that contradicted each other. First,
+        # because it includes the purchase timeline an affordability answer gives.
+        if spending_plan.asks_for_plan(message):
+            answered = spending_plan.answer(message, financial_data)
+            if answered:
+                trace["path"] = "spending_plan_direct"
+                return answered
+
         # "Can I afford X?" is answered from the user's own figures. A 3B model
         # asks for income and expenses that are already in front of it, and
         # gets the arithmetic wrong. So is the price the user gives when that
@@ -423,15 +433,6 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
             answered = affordability.answer(message, financial_data)
             if answered:
                 trace["path"] = "affordability_direct"
-                return answered
-
-        # "Check my spending patterns" / "how can I save more": every figure is
-        # worked out in code. Left to the model it called investing a risk and
-        # quoted category totals that contradicted each other.
-        if spending_plan.asks_for_plan(message):
-            answered = spending_plan.answer(message, financial_data)
-            if answered:
-                trace["path"] = "spending_plan_direct"
                 return answered
 
         if financial_data.get("userId") is not None:

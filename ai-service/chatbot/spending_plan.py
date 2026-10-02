@@ -16,7 +16,7 @@ those are divided by the months covered before anything is compared.
 import re
 from datetime import date
 
-from chatbot.affordability import inr, price_in
+from chatbot.affordability import inr, price_in, remembered_price
 
 _ASKS = re.compile(
     r"\bspending\s+(pattern|habit|trend)s?\b"
@@ -25,7 +25,9 @@ _ASKS = re.compile(
     r"|\bhow\s+(can|do|could|should|would)\s+i\s+(save|boost|improve|cut|reduce|spend\s+less)\b"
     r"|\b(save|saving)\s+more\b"
     r"|\b(reduce|cut|lower|trim)\s+(down\s+)?(on\s+)?(my\s+)?(spending|expenses|costs)\b"
-    r"|\bboost\s+my\s+(finances|savings|saving)\b",
+    r"|\bboost\s+my\s+(finances|savings|saving)\b"
+    # "how can I buy the car as soon as possible": a plan, not just a yes/no
+    r"|\b(buy|afford|get)\b.*\b(sooner|faster|quicker|quickly|as\s+soon\s+as|asap)\b",
     re.IGNORECASE,
 )
 # Questions about investments go to the portfolio tools ("how can I improve my
@@ -61,19 +63,6 @@ def _months(data: dict) -> int:
         return max(1, (end.year - start.year) * 12 + end.month - start.month + 1)
     except (TypeError, ValueError):
         return 1
-
-
-def _price_under_discussion(message: str, history: list[dict] | None) -> float | None:
-    """A price named now, or in an affordability answer earlier in the chat."""
-    named = price_in(message)
-    if named:
-        return named
-    for h in reversed(history or []):
-        if str(h.get("reply") or "").startswith("On what you've recorded"):
-            price = price_in(str(h.get("message") or ""))
-            if price:
-                return price
-    return None
 
 
 def _duration(months: float) -> str:
@@ -144,7 +133,7 @@ def answer(message: str, data: dict) -> str | None:
                    "flexible spending to trim. The bigger lever is income.")
 
     # A purchase being saved for
-    price = _price_under_discussion(message, data.get("conversationHistory"))
+    price = price_in(message) or remembered_price(message, data.get("conversationHistory"))
     if price and (_ABOUT_BUYING.search(message or "") or price_in(message)):
         steps = []
         if left > 0:
