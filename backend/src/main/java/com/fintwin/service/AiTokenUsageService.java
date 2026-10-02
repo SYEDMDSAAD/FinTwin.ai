@@ -111,8 +111,11 @@ public class AiTokenUsageService {
     public void checkAllowance() {
         if (dailyTokenLimit <= 0) return;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        // The demo account has its own per-visit and per-day question limits
+        // (DemoLimits): a per-account cap would let one visitor use up everyone's
         if (auth == null || auth.getAuthorities().stream().anyMatch(a ->
-                "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_SUPER_ADMIN".equals(a.getAuthority()))) {
+                "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_SUPER_ADMIN".equals(a.getAuthority())
+                        || "ROLE_DEMO".equals(a.getAuthority()))) {
             return;
         }
         Optional<Long> userId = currentUserId();

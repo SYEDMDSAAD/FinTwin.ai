@@ -64,6 +64,12 @@ public class ChatService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.fintwin.demo.DemoLimits demoLimits;
+
+    @Autowired
+    private com.fintwin.demo.DemoActivityRecorder demoActivity;
+
     /** Why an answer wasn't helpful — a fixed list, so they can be counted. */
     public static final Set<String> RATING_REASONS =
             Set.of("WRONG_NUMBERS", "DIDNT_ANSWER", "NOT_USEFUL", "TOO_LONG", "OTHER");
@@ -75,6 +81,12 @@ public class ChatService {
     public Map<String, Object> chat(String message, String mode) {
         if (message == null || message.isBlank()) {
             return Map.of("reply", "Please enter a message.");
+        }
+        // A demo visitor: within this visit's and the demo's question allowance
+        String demoSession = com.fintwin.demo.DemoSession.current().orElse(null);
+        if (demoSession != null) {
+            demoLimits.checkQuestion(demoSession, chatHistoryRepository.countByDemoSession(demoSession));
+            demoActivity.event(demoSession, "question", message);
         }
         metrics.aiChatCalls.increment();
         User user = resolveCurrentUser();
@@ -101,7 +113,9 @@ public class ChatService {
     @PreAuthorize("hasAuthority('USE_AI_COPILOT')")
     public List<Map<String, Object>> getChatHistory() {
         User user = resolveCurrentUser();
-        List<ChatHistory> history = chatHistoryRepository.findAllByUserOrderByTimestampAsc(user);
+        List<ChatHistory> history = com.fintwin.demo.DemoSession.current()
+                .map(sid -> chatHistoryRepository.findAllByUserAndDemoSessionOrderByTimestampAsc(user, sid))
+                .orElseGet(() -> chatHistoryRepository.findAllByUserOrderByTimestampAsc(user));
         List<Map<String, Object>> result = new ArrayList<>();
         for (ChatHistory chat : history) {
             String id = String.valueOf(chat.getId());
@@ -220,6 +234,12 @@ public class ChatService {
     @Transactional
     public void clearChatHistory() {
         User user = resolveCurrentUser();
+        var demoSession = com.fintwin.demo.DemoSession.current();
+        if (demoSession.isPresent()) {
+            // Only this visitor's chat, never everyone else's in the demo
+            chatHistoryRepository.deleteByUserAndDemoSession(user, demoSession.get());
+            return;
+        }
         chatHistoryRepository.deleteByUser(user);
         // Clearing the chat also withdraws the answers the user rated
         feedbackRepository.deleteByUser(user);
@@ -234,6 +254,11 @@ public class ChatService {
         ChatHistory chat = chatHistoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Chat message not found"));
         if (chat.getUser() == null || !chat.getUser().getId().equals(user.getId())) {
+            throw new NotFoundException("Chat message not found");
+        }
+        // In the demo, a visitor may delete only their own exchanges
+        var demoSession = com.fintwin.demo.DemoSession.current();
+        if (demoSession.isPresent() && !demoSession.get().equals(chat.getDemoSession())) {
             throw new NotFoundException("Chat message not found");
         }
         chatHistoryRepository.delete(chat);
@@ -287,7 +312,12 @@ public class ChatService {
         chat.setReply(reply);
         chat.setTimestamp(LocalDateTime.now());
         chat.setUser(user);
+        String demoSession = com.fintwin.demo.DemoSession.current().orElse(null);
+        chat.setDemoSession(demoSession);
         ChatHistory saved = chatHistoryRepository.save(chat);
+        // The demo's history is bounded by its question allowance and cleared
+        // nightly; trimming by user would delete other visitors' chats
+        if (demoSession != null) return saved;
 
         long count = chatHistoryRepository.countByUser(user);
         if (count > MAX_HISTORY) {

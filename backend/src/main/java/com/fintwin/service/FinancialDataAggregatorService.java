@@ -113,8 +113,10 @@ public class FinancialDataAggregatorService {
     }
 
     private List<Map<String, String>> recentHistory(User user) {
-        List<ChatHistory> history =
-                chatHistoryRepository.findTop10ByUserOrderByTimestampDesc(user);
+        // In the shared demo account, only this visitor's own chat
+        List<ChatHistory> history = com.fintwin.demo.DemoSession.current()
+                .map(sid -> chatHistoryRepository.findTop10ByUserAndDemoSessionOrderByTimestampDesc(user, sid))
+                .orElseGet(() -> chatHistoryRepository.findTop10ByUserOrderByTimestampDesc(user));
         Collections.reverse(history);
         List<Map<String, String>> result = new ArrayList<>();
         for (ChatHistory chat : history) {

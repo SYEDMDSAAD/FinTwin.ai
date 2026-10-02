@@ -28,4 +28,13 @@ extends JpaRepository<
 
     void deleteByUser(User user);
 
+
+    // The shared demo account keeps each visitor's chat apart by session
+    List<ChatHistory> findTop10ByUserAndDemoSessionOrderByTimestampDesc(User user, String demoSession);
+
+    List<ChatHistory> findAllByUserAndDemoSessionOrderByTimestampAsc(User user, String demoSession);
+
+    long countByDemoSession(String demoSession);
+
+    void deleteByUserAndDemoSession(User user, String demoSession);
 }

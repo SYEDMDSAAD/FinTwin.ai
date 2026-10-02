@@ -119,6 +119,23 @@ public class JwtUtil {
     // =====================================
 
     // Carries imp_by claim so audit logs during the session are traceable to the admin.
+    /**
+     * The demo account's pass: one per click on "Try the demo". Everyone uses
+     * the same account, so the session id is what tells visitors apart (their
+     * copilot chat, rate limits, usage stats). No refresh token goes with it;
+     * when it expires the visitor starts a new demo.
+     */
+    public String generateDemoToken(String email, String sessionId, long ttlMillis) {
+        return Jwts.builder()
+                .subject(email)
+                .claim("role", "DEMO")
+                .claim(com.fintwin.demo.DemoSession.CLAIM, sessionId)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + ttlMillis))
+                .signWith(SECRET_KEY)
+                .compact();
+    }
+
     public String generateImpersonationToken(String targetEmail, String adminEmail) {
         return Jwts.builder()
                 .subject(targetEmail)

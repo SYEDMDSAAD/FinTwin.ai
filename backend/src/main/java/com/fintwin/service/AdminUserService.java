@@ -300,7 +300,7 @@ public class AdminUserService {
         result.put("aiServiceOnline", aiOnline);
         result.put("aiServiceUrl", aiServiceUrl);
         result.put("dbStatus", "connected");
-        result.put("totalUsers", userRepository.count());
+        result.put("totalUsers", userRepository.countRealUsers());
         result.put("totalAuditEvents", auditLogRepository.count());
         result.put("failedLoginsToday",     auditLogRepository.countFailedLoginsAfter(LocalDateTime.now().withHour(0).withMinute(0).withSecond(0)));
         result.put("failedLoginsThisWeek",  auditLogRepository.countFailedLoginsAfter(LocalDateTime.now().minusDays(7)));

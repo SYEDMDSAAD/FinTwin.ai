@@ -98,6 +98,19 @@ public class JwtFilter extends OncePerRequestFilter {
                     request.setAttribute("imp_by", impBy);
                 }
 
+                // The shared demo account (backend's "Try the demo") may only read
+                // here. Everyone in the demo is this one account: a visitor's
+                // logout would sign out every other visitor, and setting up 2FA
+                // or changing the password would change the demo for all of them.
+                if (dbUser != null && "DEMO".equalsIgnoreCase(dbUser.getRole())
+                        && !"GET".equals(request.getMethod()) && !"HEAD".equals(request.getMethod())) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"This is a demo account, so nothing can be "
+                            + "changed here. Sign up to do this with your own data.\",\"code\":\"demo_read_only\"}");
+                    return;
+                }
+
                 if (jwtUtil.validateToken(token)) {
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());

@@ -50,6 +50,10 @@ public class ChatHistory {
     @Column(name = "rating_reason", length = 40)
     private String ratingReason;
 
+    // Set only in the shared demo account: which visitor's chat this is
+    @Column(name = "demo_session", length = 40)
+    private String demoSession;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore

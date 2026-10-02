@@ -48,7 +48,7 @@ public class SecurityAdminService {
         long suspiciousSessions = auditLogRepository.findSuspiciousSessions(oneDayAgo).size();
         long dataAnomalies      = auditLogRepository.findHighReadVolume(oneDayAgo, 50).size();
         long blockedIPs         = blockedIPRepository.count();
-        long usersWithout2FA    = userRepository.count() - userRepository.countByTwoFactorEnabledTrue();
+        long usersWithout2FA    = userRepository.countRealUsers() - userRepository.countByTwoFactorEnabledTrue();
         long failedLoginsToday  = auditLogRepository.countFailedLoginsAfter(
                 LocalDateTime.now().withHour(0).withMinute(0).withSecond(0));
 

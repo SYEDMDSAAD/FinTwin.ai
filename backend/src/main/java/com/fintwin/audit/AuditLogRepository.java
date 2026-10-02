@@ -185,7 +185,8 @@ public interface AuditLogRepository
     @Query("SELECT a.userId, COUNT(DISTINCT a.ipAddress) as ipCount FROM AuditLog a WHERE a.action = 'LOGIN' AND a.success = true AND a.timestamp >= :since AND a.userId IS NOT NULL GROUP BY a.userId HAVING COUNT(DISTINCT a.ipAddress) > 1 ORDER BY ipCount DESC")
     List<Object[]> findSuspiciousSessions(@Param("since") LocalDateTime since);
 
-    @Query("SELECT a.userId, COUNT(a) as cnt FROM AuditLog a WHERE a.action = 'READ' AND a.timestamp >= :since AND a.userId IS NOT NULL GROUP BY a.userId HAVING COUNT(a) >= :threshold ORDER BY cnt DESC")
+    // The shared demo account reads a lot by design (every visitor uses it); it isn't an anomaly
+    @Query("SELECT a.userId, COUNT(a) as cnt FROM AuditLog a WHERE a.action = 'READ' AND a.timestamp >= :since AND a.userId IS NOT NULL AND a.userId NOT IN (SELECT u.id FROM User u WHERE u.role = 'DEMO') GROUP BY a.userId HAVING COUNT(a) >= :threshold ORDER BY cnt DESC")
     List<Object[]> findHighReadVolume(@Param("since") LocalDateTime since, @Param("threshold") long threshold);
 
     @Query("SELECT DISTINCT a.ipAddress FROM AuditLog a WHERE a.action = 'LOGIN' AND a.success = false AND a.timestamp >= :since AND a.ipAddress IS NOT NULL")

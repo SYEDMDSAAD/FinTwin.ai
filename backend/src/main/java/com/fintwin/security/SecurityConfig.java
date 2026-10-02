@@ -47,6 +47,7 @@ public class SecurityConfig {
 
         private final JwtFilter jwtFilter;
         private final RateLimitFilter rateLimitFilter;
+        private final com.fintwin.demo.DemoReadOnlyFilter demoReadOnlyFilter;
 
         @Autowired
         private FinTwinPermissionEvaluator finTwinPermissionEvaluator;
@@ -56,10 +57,12 @@ public class SecurityConfig {
 
         public SecurityConfig(
                 JwtFilter jwtFilter,
-                RateLimitFilter rateLimitFilter
+                RateLimitFilter rateLimitFilter,
+                com.fintwin.demo.DemoReadOnlyFilter demoReadOnlyFilter
         ) {
                 this.jwtFilter = jwtFilter;
                 this.rateLimitFilter = rateLimitFilter;
+                this.demoReadOnlyFilter = demoReadOnlyFilter;
         }
 
         @Bean
@@ -223,6 +226,10 @@ public class SecurityConfig {
                                 .requestMatchers("/api/v1/market/**")
                                 .permitAll()
 
+                                // "Try the demo": one click, no account
+                                .requestMatchers(HttpMethod.POST, "/api/v1/demo/start")
+                                .permitAll()
+
                                 // Support tickets — users submit from login page (unauthenticated)
                                 .requestMatchers(HttpMethod.POST, "/api/v1/tickets")
                                 .permitAll()
@@ -269,6 +276,12 @@ public class SecurityConfig {
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
+                )
+
+                // Keeps the shared demo account read-only; needs the user JwtFilter found
+                .addFilterAfter(
+                        demoReadOnlyFilter,
+                        JwtFilter.class
                 );
 
         return http.build();
