@@ -254,4 +254,17 @@ public class FinancialGoal {
     ) {
         this.user = user;
     }
+
+    // Only in the shared demo account: whose goal this is (their demo
+    // session), and which sample goal a regenerated copy stands in for
+    @Column(name = "demo_session", length = 40)
+    private String demoSession;
+
+    @Column(name = "demo_replaces")
+    private Long demoReplaces;
+
+    public String getDemoSession() { return demoSession; }
+    public void setDemoSession(String demoSession) { this.demoSession = demoSession; }
+    public Long getDemoReplaces() { return demoReplaces; }
+    public void setDemoReplaces(Long demoReplaces) { this.demoReplaces = demoReplaces; }
 }

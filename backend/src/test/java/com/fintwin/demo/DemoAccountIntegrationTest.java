@@ -171,6 +171,56 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
                 .isGreaterThanOrEqualTo(3);
     }
 
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> goals(String token) throws Exception {
+        return JSON.readValue(call(token, HttpMethod.GET, "/api/v1/goals", null).getBody(), List.class);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void eachVisitorBuildsAndRegeneratesGoalsOfTheirOwn() throws Exception {
+        String a = startDemo();
+        String b = startDemo();
+        List<Map<String, Object>> samples = goals(a);
+        assertThat(samples).hasSize(3);
+        Object sampleId = samples.get(0).get("id");
+
+        // A builds a goal: theirs alone
+        ResponseEntity<String> made = call(a, HttpMethod.POST, "/api/v1/goals",
+                Map.of("title", "New Laptop", "targetAmount", 80000, "durationMonths", 8));
+        assertThat(made.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Object ownId = JSON.readValue(made.getBody(), Map.class).get("id");
+        assertThat(goals(a)).hasSize(4);
+        assertThat(goals(b)).hasSize(3);
+
+        // A regenerates a sample goal: their copy takes its place, for them only
+        ResponseEntity<String> regen = call(a, HttpMethod.POST, "/api/v1/goals/" + sampleId + "/regenerate", Map.of());
+        assertThat(regen.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Object copyId = JSON.readValue(regen.getBody(), Map.class).get("id");
+        assertThat(copyId).isNotEqualTo(sampleId);
+        assertThat(goals(a)).hasSize(4).extracting(g -> g.get("id")).contains(copyId).doesNotContain(sampleId);
+        assertThat(goals(b)).extracting(g -> g.get("id")).contains(sampleId).doesNotContain(copyId, ownId);
+
+        // The shared samples can't be edited; one's own goals can be deleted; another's can't
+        ResponseEntity<String> edit = call(a, HttpMethod.PUT, "/api/v1/goals/" + samples.get(1).get("id"),
+                Map.of("title", "Changed", "targetAmount", 1000, "durationMonths", 2));
+        assertThat(edit.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(JSON.readValue(edit.getBody(), Map.class)).containsEntry("code", "demo_read_only");
+        assertThat(call(b, HttpMethod.DELETE, "/api/v1/goals/" + ownId, null).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(call(a, HttpMethod.DELETE, "/api/v1/goals/" + ownId, null).getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(goals(a)).hasSize(3);
+
+        // Five goals a visit
+        for (int i = 0; i < 5; i++) {
+            call(a, HttpMethod.POST, "/api/v1/goals", Map.of("title", "Goal " + i, "targetAmount", 10000, "durationMonths", 6));
+        }
+        ResponseEntity<String> sixth = call(a, HttpMethod.POST, "/api/v1/goals",
+                Map.of("title", "One too many", "targetAmount", 10000, "durationMonths", 6));
+        assertThat(sixth.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(goals(b)).hasSize(3);
+    }
+
     @Test
     void theDemoIsNotCountedAsAUser() {
         demo.demoUser();

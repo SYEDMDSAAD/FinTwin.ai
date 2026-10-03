@@ -55,12 +55,17 @@ const CSS = `
 .btn-hero { background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); color: #fff; border: none; border-radius: 13px; padding: 15px 32px; font-weight: 700; font-size: 16px; cursor: pointer; transition: all 0.2s; font-family: inherit; box-shadow: 0 4px 24px rgba(124,58,237,0.4); display: flex; align-items: center; gap: 8px; }
 .btn-hero:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(124,58,237,0.55); }
 .btn-hero-ghost { background: transparent; color: rgba(226,232,240,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 13px; padding: 15px 28px; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-.demo-cta { flex-basis: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; padding: 12px 14px; border: 1px dashed rgba(167,139,250,0.35); border-radius: 14px; background: rgba(167,139,250,0.06); font-size: 14px; color: rgba(226,232,240,0.8); line-height: 1.5; }
-.demo-cta strong { color: #e2e8f0; }
-.demo-cta p { flex: 1; min-width: 200px; }
-.btn-demo { background: transparent; border: 1px solid rgba(167,139,250,0.55); color: #c4b5fd; border-radius: 11px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; white-space: nowrap; }
-.btn-demo:hover { background: rgba(167,139,250,0.12); }
-.btn-demo:disabled { opacity: 0.6; cursor: wait; }
+.demo-cta { flex-basis: 100%; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 10px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(34,211,238,0.16) 0%, rgba(167,139,250,0.16) 100%); border: 1px solid rgba(34,211,238,0.5); box-shadow: 0 0 0 4px rgba(34,211,238,0.07), 0 10px 36px rgba(34,211,238,0.2); }
+.demo-cta-text { flex: 1; min-width: 220px; }
+.demo-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #22d3ee; margin-bottom: 6px; }
+.demo-badge-dot { width: 7px; height: 7px; border-radius: 50%; background: #22d3ee; animation: demoPulse 1.8s ease-out infinite; }
+.demo-cta-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 800; color: #f1f5f9; line-height: 1.3; }
+.demo-cta-sub { font-size: 13.5px; color: rgba(226,232,240,0.78); line-height: 1.5; margin-top: 3px; }
+.btn-demo { background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%); color: #04131a; border: none; border-radius: 13px; padding: 14px 26px; font-weight: 800; font-size: 15px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap; box-shadow: 0 6px 24px rgba(34,211,238,0.45); }
+.btn-demo:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(34,211,238,0.6); }
+.btn-demo:active { transform: translateY(0); }
+.btn-demo:disabled { opacity: 0.7; cursor: wait; transform: none; }
+@keyframes demoPulse { 0% { box-shadow: 0 0 0 0 rgba(34,211,238,0.65); } 70% { box-shadow: 0 0 0 8px rgba(34,211,238,0); } 100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); } }
 .btn-hero-ghost:hover { border-color: rgba(167,139,250,0.45); color: #a78bfa; background: rgba(167,139,250,0.06); transform: translateY(-1px); }
 .hero-stats { display: flex; gap: 32px; flex-wrap: wrap; }
 .hero-stat-val { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; }
@@ -257,7 +262,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) {
   .reveal, .h-el-1, .h-el-2, .h-el-3, .h-el-4, .h-el-5, .h-el-6 { animation: none !important; opacity: 1 !important; transform: none !important; transition: none !important; }
   .glow-blob { animation: none !important; }
-  .hero-badge-dot { animation: none !important; }
+  .hero-badge-dot, .demo-badge-dot { animation: none !important; }
   .tx-dot-1, .tx-dot-2, .tx-dot-3 { animation: none !important; opacity: 1 !important; }
   .score-ring-anim { animation: none !important; stroke-dashoffset: 126 !important; }
 }
@@ -607,7 +612,11 @@ export default function LandingPage() {
                   </button>
                   <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Log In</button>
                   <div className="demo-cta">
-                    <p>Not ready to upload your own statement? <strong>Try a demo account</strong>: no sign-up, one click.</p>
+                    <div className="demo-cta-text">
+                      <div className="demo-badge"><span className="demo-badge-dot" aria-hidden="true" />Live demo · no sign-up</div>
+                      <div className="demo-cta-title">Not ready to upload your own statement?</div>
+                      <div className="demo-cta-sub">Try a demo account with a full set of sample data: explore the dashboard, build a goal and ask the AI copilot anything. One click.</div>
+                    </div>
                     <button className="btn-demo" onPointerDown={() => prefetchDashboard()} onClick={tryDemo}
                             disabled={demoStarting} aria-label="Try FinTwin with a demo account, no sign-up">
                       {demoStarting ? "Opening the demo…" : "Try the demo →"}

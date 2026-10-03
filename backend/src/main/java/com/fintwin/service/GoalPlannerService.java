@@ -88,7 +88,7 @@ public class GoalPlannerService {
                 buildCategorySpending(ctx.transactions);
 
         List<FinancialGoal> existingGoals =
-                goalRepository.findByUser(user);
+                goalsFor(user);
 
         String aiPlan = generateAIPlan(
                 dto, ctx.monthlyIncome, ctx.monthlyExpenses,
@@ -97,6 +97,18 @@ public class GoalPlannerService {
         );
 
         FinancialGoal goal = new FinancialGoal();
+        String demoSession = demoSessionOf(user);
+        if (demoSession != null) {
+            long made = goalRepository.findByUser(user).stream()
+                    .filter(g -> demoSession.equals(g.getDemoSession()) && g.getDemoReplaces() == null).count();
+            if (made >= DEMO_GOALS_PER_VISIT) {
+                throw new com.fintwin.exception.ApiException(org.springframework.http.HttpStatus.FORBIDDEN,
+                        "The demo lets you build " + DEMO_GOALS_PER_VISIT + " goals. "
+                        + "Sign up (it's free) to plan as many as you like with your own data.",
+                        com.fintwin.demo.DemoReadOnlyFilter.READ_ONLY_CODE);
+            }
+            goal.setDemoSession(demoSession);
+        }
         goal.setTitle(dto.getTitle().trim());
         goal.setTargetAmount(dto.getTargetAmount());
         goal.setDurationMonths(dto.getDurationMonths());
@@ -149,7 +161,7 @@ public class GoalPlannerService {
     // security-context resolution and authorization on the public path.
     public List<FinancialGoal> getGoalsForUser(User user) {
 
-        List<FinancialGoal> goals = goalRepository.findByUser(user);
+        List<FinancialGoal> goals = goalsFor(user);
 
         FinancialContext ctx = buildFinancialContext(user);
 
@@ -194,16 +206,7 @@ public class GoalPlannerService {
                         new NotFoundException("User not found")
                 );
 
-        FinancialGoal goal = goalRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Goal not found")
-                );
-
-        if (goal.getUser().getId().longValue()
-        != user.getId().longValue()) {
-            throw new ForbiddenException("Unauthorized Goal Access");
-        }
+        FinancialGoal goal = ownedGoal(id, user, false);
 
         FinancialContext ctx = buildFinancialContext(user);
 
@@ -218,7 +221,7 @@ public class GoalPlannerService {
                 buildCategorySpending(ctx.transactions);
 
         List<FinancialGoal> otherGoals = new ArrayList<>();
-        for (FinancialGoal g : goalRepository.findByUser(user)) {
+        for (FinancialGoal g : goalsFor(user)) {
             if (!g.getId().equals(id)) otherGoals.add(g);
         }
 
@@ -261,16 +264,7 @@ public class GoalPlannerService {
                         new NotFoundException("User not found")
                 );
 
-        FinancialGoal goal = goalRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Goal not found")
-                );
-
-        if (goal.getUser().getId().longValue()
-        != user.getId().longValue()) {
-            throw new ForbiddenException("Unauthorized Goal Access");
-        }
+        FinancialGoal goal = ownedGoal(id, user, false);
 
         goalRepository.delete(goal);
         profileService.saveScoreSnapshot(user);
@@ -295,16 +289,7 @@ public class GoalPlannerService {
                         new NotFoundException("User not found")
                 );
 
-        FinancialGoal goal = goalRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Goal not found")
-                );
-
-        if (goal.getUser().getId().longValue()
-        != user.getId().longValue()) {
-            throw new ForbiddenException("Unauthorized Goal Access");
-        }
+        FinancialGoal goal = ownedGoal(id, user, false);
 
         if (Boolean.TRUE.equals(goal.getCompleted())) {
             return goal;
@@ -345,16 +330,7 @@ public class GoalPlannerService {
                         new NotFoundException("User not found")
                 );
 
-        FinancialGoal goal = goalRepository
-                .findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Goal not found")
-                );
-
-        if (goal.getUser().getId().longValue()
-        != user.getId().longValue()) {
-            throw new ForbiddenException("Unauthorized Goal Access");
-        }
+        FinancialGoal goal = ownedGoal(id, user, true);
 
         FinancialContext ctx = buildFinancialContext(user);
 
@@ -370,7 +346,7 @@ public class GoalPlannerService {
                 ? goal.getSuccessProbability() : 0.0;
 
         List<FinancialGoal> otherGoals = new ArrayList<>();
-        for (FinancialGoal g : goalRepository.findByUser(user)) {
+        for (FinancialGoal g : goalsFor(user)) {
             if (!g.getId().equals(id)) otherGoals.add(g);
         }
 
@@ -392,6 +368,94 @@ public class GoalPlannerService {
         profileService.saveScoreSnapshot(user);
 
         return saved;
+    }
+
+    // =========================
+    // THE SHARED DEMO ACCOUNT
+    // Everyone in the demo is one account. Its sample goals are shared; the
+    // goals a visitor builds carry their demo session and only they see them.
+    // Regenerating a sample goal makes the visitor their own copy, which takes
+    // the sample's place for them alone. The nightly rebuild clears it all.
+    // =========================
+
+    static final int DEMO_GOALS_PER_VISIT = 5;
+
+    /** The visitor's demo session, when this is the demo account; null otherwise. */
+    private static String demoSessionOf(User user) {
+        if (!com.fintwin.demo.DemoSession.ROLE.equalsIgnoreCase(user.getRole())) return null;
+        return com.fintwin.demo.DemoSession.current().orElse(null);
+    }
+
+    /**
+     * The goals this user sees. For a real user, all of theirs. For a demo
+     * visitor, the sample goals they haven't replaced, plus their own; with no
+     * visitor known (the copilot's data calls), just the samples.
+     */
+    private List<FinancialGoal> goalsFor(User user) {
+        List<FinancialGoal> all = goalRepository.findByUser(user);
+        if (!com.fintwin.demo.DemoSession.ROLE.equalsIgnoreCase(user.getRole())) return all;
+        String session = demoSessionOf(user);
+        Set<Long> replaced = new HashSet<>();
+        for (FinancialGoal g : all) {
+            if (session != null && session.equals(g.getDemoSession()) && g.getDemoReplaces() != null) {
+                replaced.add(g.getDemoReplaces());
+            }
+        }
+        List<FinancialGoal> visible = new ArrayList<>();
+        for (FinancialGoal g : all) {
+            boolean sample = g.getDemoSession() == null && !replaced.contains(g.getId());
+            boolean own = session != null && session.equals(g.getDemoSession());
+            if (sample || own) visible.add(g);
+        }
+        return visible;
+    }
+
+    /**
+     * A goal the caller may change. In the demo, a visitor changes only their
+     * own goals; regenerating a sample goal returns their copy of it (saved by
+     * the caller), and any other change to a sample is turned away.
+     */
+    private FinancialGoal ownedGoal(Long id, User user, boolean regenerating) {
+        FinancialGoal goal = goalRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Goal not found"));
+        if (goal.getUser().getId().longValue() != user.getId().longValue()) {
+            throw new ForbiddenException("Unauthorized Goal Access");
+        }
+        if (!com.fintwin.demo.DemoSession.ROLE.equalsIgnoreCase(user.getRole())) return goal;
+
+        String session = demoSessionOf(user);
+        if (goal.getDemoSession() != null) {
+            // Another visitor's goal doesn't exist as far as this one is concerned
+            if (!goal.getDemoSession().equals(session)) throw new NotFoundException("Goal not found");
+            return goal;
+        }
+        if (regenerating && session != null) return demoCopy(goal, session);
+        throw new com.fintwin.exception.ApiException(org.springframework.http.HttpStatus.FORBIDDEN,
+                "The sample goals can't be changed in the demo, but you can regenerate their plan "
+                + "or build your own goal to try this.",
+                com.fintwin.demo.DemoReadOnlyFilter.READ_ONLY_CODE);
+    }
+
+    private static FinancialGoal demoCopy(FinancialGoal sample, String session) {
+        FinancialGoal copy = new FinancialGoal();
+        copy.setTitle(sample.getTitle());
+        copy.setTargetAmount(sample.getTargetAmount());
+        copy.setCurrentSaved(sample.getCurrentSaved());
+        copy.setDurationMonths(sample.getDurationMonths());
+        copy.setMonthlyTarget(sample.getMonthlyTarget());
+        copy.setSuccessProbability(sample.getSuccessProbability());
+        copy.setAiPlan(sample.getAiPlan());
+        copy.setExpectedSaved(sample.getExpectedSaved());
+        copy.setProgressPercent(sample.getProgressPercent());
+        copy.setAvailableSavings(sample.getAvailableSavings());
+        copy.setGoalHealth(sample.getGoalHealth());
+        copy.setCreatedAt(sample.getCreatedAt());
+        copy.setCompleted(sample.getCompleted());
+        copy.setCompletedAt(sample.getCompletedAt());
+        copy.setUser(sample.getUser());
+        copy.setDemoSession(session);
+        copy.setDemoReplaces(sample.getId());
+        return copy;
     }
 
     // =========================
@@ -493,8 +557,11 @@ public class GoalPlannerService {
     private void recomputeProgressFor(User user, FinancialGoal goal) {
         List<FinancialGoal> goals = new ArrayList<>();
         goals.add(goal);
-        for (FinancialGoal g : goalRepository.findByUser(user)) {
-            if (!Objects.equals(g.getId(), goal.getId())) goals.add(g);
+        for (FinancialGoal g : goalsFor(user)) {
+            // A demo visitor's fresh copy of a sample goal stands in for it
+            if (!Objects.equals(g.getId(), goal.getId()) && !Objects.equals(g.getId(), goal.getDemoReplaces())) {
+                goals.add(g);
+            }
         }
         recomputeProgress(user, goals);
     }
