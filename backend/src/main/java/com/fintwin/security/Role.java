@@ -61,7 +61,7 @@ public enum Role {
      */
     PREMIUM_USER(combine(USER, EnumSet.noneOf(Permission.class))),
 
-    // The shared demo account: see everything, change nothing. No WRITE_*,
+    // The shared demo account: see everything, change nothing but goals. No other WRITE_*,
     // DELETE_*, EXPORT_* or bank permissions; DemoReadOnlyFilter also turns
     // away anything but reads (and the copilot) for endpoints without checks.
     DEMO(EnumSet.of(
@@ -69,6 +69,9 @@ public enum Role {
             Permission.READ_OWN_TRANSACTIONS,
             Permission.READ_OWN_BUDGETS,
             Permission.READ_OWN_GOALS,
+            // Goals are the one thing a demo visitor can make: kept per visitor
+            // by GoalPlannerService, so nobody else sees them
+            Permission.WRITE_OWN_GOALS,
             Permission.READ_OWN_NET_WORTH,
             Permission.READ_OWN_INVESTMENTS,
             Permission.READ_OWN_INSURANCE,

@@ -36,6 +36,11 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
             new Rule("POST", "/api/v1/transactions/chat"),
             new Rule("POST", "/api/v1/demo/event"),
             new Rule("POST", "/api/v1/visits"),
+            // Building and regenerating goals, kept per visitor (GoalPlannerService)
+            new Rule("POST", "/api/v1/goals"),
+            new Rule("POST", "/api/v1/goals/\\d+/(regenerate|complete)"),
+            new Rule("PUT", "/api/v1/goals/\\d+"),
+            new Rule("DELETE", "/api/v1/goals/\\d+"),
             new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"));
 
     // Writes the app makes by itself (marking things seen). Answered as done
