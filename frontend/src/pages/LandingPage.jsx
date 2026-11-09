@@ -595,7 +595,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="hero-sub h-el-3">
-              FinTwin AI reads your bank and UPI statements, runs its AI on our own servers — not Google's — and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Bank linking through RBI's Account Aggregator is in testing.
+              FinTwin AI reads your bank and UPI statements, runs its AI on our own servers, and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Bank linking through RBI's Account Aggregator is in testing.
             </p>
 
             <div className="hero-ctas h-el-4">
@@ -1095,7 +1095,7 @@ export default function LandingPage() {
               )}
             </div>
             <p style={{ marginTop: 20, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
-              Free · No credit card · Runs on our servers, not Google's
+              Free · No credit card · Runs on our servers
             </p>
           </Reveal>
         </div>
