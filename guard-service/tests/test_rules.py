@@ -134,6 +134,13 @@ def test_scan_facts_for_a_cafe_that_goes_over_budget():
     assert {450, 200, 6000, 5750, 4550, 9, 3} <= allowed
 
 
+def test_a_stray_rupee_prefix_is_fixed_and_still_checked():
+    assert rules.clean_message("You have R3,500 in your buffer.", {3500}) == "You have ₹3,500 in your buffer."
+    assert rules.clean_message("Rs. 450 more than planned.", {450}) == "₹450 more than planned."
+    with pytest.raises(rules.AnswerRejected, match="9999"):
+        rules.clean_message("That's R9,999 over.", {3500})          # was waved through before
+
+
 def test_a_persons_name_and_upi_id_never_reach_the_model():
     _, _, f, untrusted, _ = scan(PERSON, 2000)
     assert f["payee_kind"] == "person" and f["category"] == "Other"

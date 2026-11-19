@@ -51,6 +51,18 @@ SPECS = {
 }
 
 
+# Gemini 3 takes a thinking level. Gemini 2.5 rejects that ("Thinking level is not
+# supported for this model") and takes a token budget instead, kept well inside
+# max_output_tokens because its thinking counts towards that limit.
+_THINKING_BUDGET = {"LOW": 512, "MEDIUM": 1024}
+
+
+def thinking_config(level: str, model: str) -> types.ThinkingConfig:
+    if model.startswith("gemini-2"):
+        return types.ThinkingConfig(thinking_budget=_THINKING_BUDGET[level])
+    return types.ThinkingConfig(thinking_level=getattr(types.ThinkingLevel, level))
+
+
 class ModelError(RuntimeError):
     """The model couldn't answer: quota, safety block, network. The message is a short code."""
 
@@ -73,8 +85,8 @@ def build_agent(key: str, model=None) -> LlmAgent:
             safety_settings=_SAFETY,
             max_output_tokens=2048,
         ),
-        planner=BuiltInPlanner(thinking_config=types.ThinkingConfig(
-            thinking_level=getattr(types.ThinkingLevel, thinking))),
+        planner=BuiltInPlanner(thinking_config=thinking_config(
+            thinking, model if isinstance(model, str) else MODEL)),
         # One agent per job, never handing the user to another agent
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,

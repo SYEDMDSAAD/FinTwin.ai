@@ -156,3 +156,13 @@ def test_real_user_data_only_goes_to_vertex(monkeypatch):
     assert brain.availability(persona=False) is None
     monkeypatch.setenv("GUARD_AI", "off")
     assert brain.availability(persona=False) == "ai_off"
+
+
+def test_gemini_2_models_get_a_thinking_budget_instead_of_a_level():
+    old = brain.thinking_config("MEDIUM", "gemini-2.5-flash")
+    assert old.thinking_budget == 1024 and old.thinking_level is None
+    new = brain.thinking_config("LOW", "gemini-3.8-flash")
+    assert new.thinking_level == types.ThinkingLevel.LOW and new.thinking_budget is None
+    agent = brain.build_agent("scan", model="gemini-2.5-flash")
+    assert agent.planner.thinking_config.thinking_budget == 512
+

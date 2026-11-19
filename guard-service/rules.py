@@ -70,6 +70,9 @@ _SHAMING = re.compile(
     r"\b(waste|wasting|wasteful|stupid|irresponsible|shame|ashamed|guilt|guilty|lazy|"
     r"foolish|reckless|careless|silly|idiot)\b", re.IGNORECASE)
 _PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?%")
+# "R3,500" (a model's slip for ₹, seen from Gemini) passed the figure check unseen, and
+# "Rs 3,500" reads inconsistently. Both become "₹3,500" before the checks run.
+_RUPEE_PREFIX = re.compile(r"(?<![A-Za-z])(?:Rs\.?|INR|R)\s?(?=\d)")
 _LINKISH = re.compile(r"https?://|www\.|upi://|[A-Za-z0-9._-]{2,}@[A-Za-z]{2,}", re.IGNORECASE)
 # "450 रुपये", "450 రూపాయలు": rupees written out in the languages users can pick,
 # which grounding.amounts (₹, Rs, INR, "rupees") would miss
@@ -311,7 +314,7 @@ def figures(obj) -> set[int]:
 # ── Checking what an agent wrote ─────────────────────────────────────────────
 
 def clean_message(text, allowed: set[int], limit: int = 240) -> str:
-    text = " ".join(str(text or "").split())
+    text = _RUPEE_PREFIX.sub("₹", " ".join(str(text or "").split()))
     if len(text) > limit:
         raise AnswerRejected(f"the message is longer than {limit} characters")
     if _SHAMING.search(text):

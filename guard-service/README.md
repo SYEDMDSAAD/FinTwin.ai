@@ -83,7 +83,7 @@ Hindi or Telugu messages:
 | `GUARD_STORE=firestore` | keep data in Firestore (default: in memory, lost on restart) |
 | `GOOGLE_GENAI_USE_VERTEXAI=TRUE`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION=global` | Gemini on Vertex AI |
 | `GOOGLE_API_KEY` | Gemini on AI Studio (made-up data only) |
-| `GUARD_MODEL` | default `gemini-3.8-flash` |
+| `GUARD_MODEL` | default `gemini-3.8-flash`. Gemini 2.5 models work on AI Studio too (they get a thinking budget instead of a level); Vertex's global endpoint doesn't serve `gemini-2.5-flash` |
 | `GUARD_AI=off` | the fixed rules decide everything |
 | `GUARD_SCAN_SECONDS` and the others in `main.py` | time limits per agent; each request fits inside the backend's 20 s |
 
