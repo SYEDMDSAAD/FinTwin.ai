@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { LayoutDashboard, Wallet, LayoutGrid } from "lucide-react";
+import { LayoutDashboard, Wallet, LayoutGrid, ScanLine } from "lucide-react";
+import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
 
 const PRIMARY_TABS = [
     { name: "Dashboard",    icon: LayoutDashboard },
     { name: "Transactions", icon: Wallet },
     { name: "Services",     icon: LayoutGrid },
 ];
+// Spend Guard's scanner is used at the shop counter, so on phones it gets a tab
+const GUARD_TAB = { name: "Spend Guard", label: "Scan", icon: ScanLine };
 
 function BottomNav({ activeSection, setActiveSection }) {
+    const guardOn = useSpendGuardEnabled();
+    const tabs = guardOn ? [PRIMARY_TABS[0], PRIMARY_TABS[1], GUARD_TAB, PRIMARY_TABS[2]] : PRIMARY_TABS;
     const [isLight, setIsLight] = useState(
         () => document.documentElement.dataset.theme === "light"
     );
@@ -29,7 +34,8 @@ function BottomNav({ activeSection, setActiveSection }) {
 
     // Section names that should light up the "Services" tab even though they're
     // not the tab's own activeSection value (everything except Dashboard/Transactions).
-    const isServicesActive = activeSection !== "Dashboard" && activeSection !== "Transactions";
+    const isServicesActive = activeSection !== "Dashboard" && activeSection !== "Transactions"
+        && !(guardOn && activeSection === GUARD_TAB.name);
 
     // Tab bar is portalled to document.body so it is never trapped inside an
     // overflow:hidden ancestor (iOS Safari position:fixed fix).
@@ -49,7 +55,7 @@ function BottomNav({ activeSection, setActiveSection }) {
                 borderTop: `1px solid ${isLight ? "rgba(15,23,42,0.07)" : "rgba(255,255,255,0.05)"}`,
             }}
         >
-            {PRIMARY_TABS.map(({ name, icon: Icon }) => {
+            {tabs.map(({ name, label, icon: Icon }) => {
                 const active = name === "Services" ? isServicesActive : activeSection === name;
                 return (
                     <button
@@ -83,7 +89,7 @@ function BottomNav({ activeSection, setActiveSection }) {
                             color: active ? activeColor : (isLight ? "rgba(51,65,85,0.55)" : "rgba(148,163,184,0.50)"),
                             transition: "color 0.15s",
                         }}>
-                            {name}
+                            {label || name}
                         </span>
                     </button>
                 );

@@ -16,7 +16,9 @@ import {
     Shield,
     FileInput,
     Info,
+    ScanLine,
 } from "lucide-react";
+import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
 
 const NAV_GROUPS = [
     {
@@ -36,6 +38,8 @@ const NAV_GROUPS = [
             { name: "AI Intelligence",    icon: <Brain size={17} /> },
             { name: "AI Copilot",         icon: <MessageSquare size={17} /> },
             { name: "AI Spending Coach",  icon: <Zap size={17} /> },
+            // Prototype: only shown to users the backend has let in
+            { name: "Spend Guard",        icon: <ScanLine size={17} />, gated: true },
         ],
     },
     {
@@ -121,6 +125,10 @@ const NavItem = memo(function NavItem({ item, active, expanded, onClick }) {
 
 function Sidebar({ activeSection, setActiveSection }) {
     const [expanded, setExpanded] = useState(false);
+    const guardOn = useSpendGuardEnabled();
+    const groups = useMemo(() => NAV_GROUPS.map((g) => ({
+        ...g, items: g.items.filter((item) => !item.gated || guardOn),
+    })), [guardOn]);
 
     // Pre-build stable click handlers so NavItem (memo'd) never re-renders from inline arrows
     const clickHandlers = useMemo(() => {
@@ -172,7 +180,7 @@ function Sidebar({ activeSection, setActiveSection }) {
 
             {/* ── Nav ── */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
-                {NAV_GROUPS.map((group) => (
+                {groups.map((group) => (
                     <div key={group.label} className="mb-5">
                         {expanded && (
                             <p className="text-[10px] font-semibold tracking-widest text-zinc-600 px-3 mb-1.5 uppercase">

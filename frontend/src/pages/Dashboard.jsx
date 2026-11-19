@@ -81,6 +81,8 @@ from "./InvestmentsPage";
 import SpendingCoachPage
 from "./SpendingCoachPage";
 
+import SpendGuardPage from "./SpendGuardPage";
+
 import BottomNav from "../components/BottomNav";
 import CreditScoreCard from "../components/CreditScoreCard";
 import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
@@ -2133,6 +2135,14 @@ function Dashboard() {
 
                     )
                 }
+
+                {/* =========================
+                    Spend Guard (prototype; the page explains itself if it's off)
+                ========================= */}
+
+                {activeSection === "Spend Guard" && (
+                    <SpendGuardPage />
+                )}
 
                 {/* =========================
                     Net Worth

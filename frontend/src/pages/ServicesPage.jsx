@@ -1,8 +1,9 @@
 import {
     ArrowLeft,
     BarChart3, Brain, MessageSquare, Zap, Target, ShieldCheck,
-    Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings, Info,
+    Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings, Info, ScanLine,
 } from "lucide-react";
+import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
 
 const GROUPS = [
     {
@@ -18,6 +19,7 @@ const GROUPS = [
             { name: "AI Intelligence",   icon: Brain,         desc: "Forecasts, alerts & score" },
             { name: "AI Copilot",        icon: MessageSquare, desc: "Chat with your finances" },
             { name: "AI Spending Coach", icon: Zap,           desc: "Personalized coaching" },
+            { name: "Spend Guard",       icon: ScanLine,      desc: "Pause before you pay", gated: true },
         ],
     },
     {
@@ -42,6 +44,7 @@ const GROUPS = [
 ];
 
 function ServicesPage({ navigateTo }) {
+    const guardOn = useSpendGuardEnabled();
     return (
         <div style={{ paddingBottom: 96 }}>
             <div style={{ marginBottom: 24 }}>
@@ -75,7 +78,7 @@ function ServicesPage({ navigateTo }) {
                     </p>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        {group.items.map(({ name, icon: Icon, desc }) => (
+                        {group.items.filter((item) => !item.gated || guardOn).map(({ name, icon: Icon, desc }) => (
                             <button
                                 key={name}
                                 onClick={() => navigateTo(name)}
