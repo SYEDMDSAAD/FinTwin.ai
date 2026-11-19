@@ -62,7 +62,7 @@ MCC_CATEGORY = {
 ESSENTIAL = {"Groceries", "Health", "Bills", "Rent", "Transport", "Education"}
 # Things that can sit on a 48-hour wishlist (not food at a counter)
 WAITABLE = {"Shopping", "Entertainment", "Travel", "Other"}
-# Betting and gambling: always looked at, never the fast lane
+# Betting and gambling: never the fast lane, and always paused, whatever the amount
 ALWAYS_CHECK_MCC = {"7995"}
 
 # Confirm-shaming is a banned dark pattern (CCPA dark-pattern guidelines, 2023)
@@ -392,6 +392,8 @@ def check_scan(answer, facts: dict, allowed: set[int]) -> dict:
     decision = getattr(answer, "decision", None)
     if decision not in ("go", "pause"):
         raise AnswerRejected("decision must be go or pause")
+    if decision == "go" and facts.get("betting"):
+        raise AnswerRejected("a betting payment always pauses, whatever the amount")
     message = clean_message(getattr(answer, "message", ""), allowed)
     if decision == "pause" and not message:
         raise AnswerRejected("a pause needs a message that names the trade-off")

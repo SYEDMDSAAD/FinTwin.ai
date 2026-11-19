@@ -1,7 +1,7 @@
 """Runs the scan and top-up agents on made-up cases against the real model.
 
     cd guard-service
-    GOOGLE_API_KEY=... ./venv/bin/python evals/run_evals.py              # all 20 cases
+    GOOGLE_API_KEY=... ./venv/bin/python evals/run_evals.py              # all 21 cases
     ./venv/bin/python evals/run_evals.py --only betting_late,topup_medicine
     ./venv/bin/python evals/run_evals.py --out ~/Documents/FinTwin-Buildathon/evals.json
 

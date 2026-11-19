@@ -4,7 +4,7 @@ import MockAdapter from "axios-mock-adapter";
 
 import API from "../services/api";
 import { forgetGuardEnabled } from "../services/guardApi";
-import { resetMock } from "../services/guardMock";
+import { mockGuard, resetMock } from "../services/guardMock";
 import Sidebar from "../components/Sidebar";
 import SpendGuardPage from "./SpendGuardPage";
 import * as format from "../components/guard/format";
@@ -270,6 +270,13 @@ describe("SpendGuardPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "Wishlist for 2 days" }));
         expect(await screen.findByText("On your wishlist", {}, { timeout: 3000 })).toBeInTheDocument();
         expect(mock.history.post).toHaveLength(0);                                  // nothing left the browser
+    });
+
+    it("always pauses a bet in mock mode, however small", async () => {
+        resetMock();
+        const r = await mockGuard("check", { qr: "upi://pay?pa=quickbet@sample&pn=QuickBet&mc=7995", amount: 50 });
+        expect(r.decision).toBe("pause");
+        expect(r.message).toMatch(/^This ₹50 payment is to a betting merchant\. It would push .+ back about 1 day\.$/);
     });
 });
 

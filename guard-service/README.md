@@ -66,7 +66,7 @@ fine. Real FinTwin data (`BACKEND_URL` set, no persona) only ever goes to
 Vertex AI. On AI Studio the code refuses and uses the rules instead
 (`needs_vertex_for_real_data`).
 
-To run the agents on 20 made-up cases, including prompt-injection attempts and
+To run the agents on 21 made-up cases, including prompt-injection attempts and
 Hindi or Telugu messages:
 
 ```bash

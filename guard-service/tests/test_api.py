@@ -5,7 +5,7 @@ import time
 import main
 from agents import schemas
 from conftest import KEY
-from samples import CAFE, GROCER, LATE, ZARA
+from samples import BETTING, CAFE, GROCER, LATE, ZARA
 
 
 def pause(message, wishlist=False):
@@ -88,6 +88,13 @@ def test_a_broken_answer_falls_back_to_the_rules(api, brain, clock):
     assert (body["decision"], body["source"]) == ("pause", "fallback")
     assert "9,999" not in body["message"]
     assert body["reason"] is None              # why the AI fell back isn't shown to the user
+
+
+def test_a_small_bet_still_pauses_when_the_agent_says_go(api, brain):
+    brain.answers["scan"] = [go()]
+    body = api("check", qr=BETTING, amount=50).json()     # under the ₹100 minimum that waves other payments through
+    assert (body["decision"], body["source"]) == ("pause", "fallback")
+    assert body["message"].startswith("This ₹50 payment is to a betting merchant.")
 
 
 def test_a_slow_agent_never_holds_up_a_payment(api, brain, monkeypatch):

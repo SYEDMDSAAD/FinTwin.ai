@@ -16,7 +16,7 @@ def _evals():
 def test_every_eval_case_builds_the_way_main_does():
     evals = _evals()
     cases = json.loads((ROOT / "evals" / "cases.json").read_text())
-    assert len(cases) == 20 and len({c["id"] for c in cases}) == 20
+    assert len(cases) == 21 and len({c["id"] for c in cases}) == 21
     for case in cases:
         text, _ = evals.build(case)
         facts = json.loads(text.split("\n")[1])

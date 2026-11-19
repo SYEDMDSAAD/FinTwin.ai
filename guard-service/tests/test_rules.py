@@ -195,6 +195,14 @@ def test_betting_is_always_paused_by_the_fallback():
     assert out["decision"] == "pause" and out["message"].startswith("This ₹500 payment is to a betting merchant.")
 
 
+def test_a_bet_always_pauses_even_when_the_agent_says_go():
+    _, _, f, _, allowed = scan(BETTING, 100)
+    with pytest.raises(rules.AnswerRejected, match="betting"):
+        rules.check_scan(NS(decision="go", message="", show_wishlist=False), f, allowed)
+    answer = NS(decision="pause", message="This ₹100 payment is to a betting merchant.", show_wishlist=False)
+    assert rules.check_scan(answer, f, allowed)["decision"] == "pause"
+
+
 # ── Top-up ───────────────────────────────────────────────────────────────────
 
 def test_a_top_up_never_goes_past_the_buffer():

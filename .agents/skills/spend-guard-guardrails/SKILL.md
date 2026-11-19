@@ -52,8 +52,9 @@ a model can ignore a prompt, but not a check.
 
 11. Essentials (groceries, health, bills, rent, transport, education) and payments under the user's
     minimum (₹100 by default) skip the AI.
-12. Betting (MCC 7995) never skips the AI, and the fixed-rule fallback always pauses it.
-13. After 3 pauses in a day, Spend Guard stops pausing, so it never nags. Betting is still checked.
+12. **Betting (MCC 7995) always pauses**, whatever the amount: it never skips the AI, `check_scan` rejects
+    a "go", and the fixed-rule fallback pauses it.
+13. After 3 pauses in a day, Spend Guard stops pausing, so it never nags. Betting still pauses.
 14. "Pay anyway" unlocks after a 5-second pause (`PAUSE_SECONDS` in `ScanPanel.jsx`). The user can always
     pay: Spend Guard advises, it never blocks.
 15. Made-up sample shops (UPI IDs ending in `@sample`) never open a UPI app.

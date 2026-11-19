@@ -133,20 +133,25 @@ const ACTIONS = {
         const week = { left, left_after: left - rupees, days_to_allowance: daysToAllowance(),
                        share_of_left_pct: left > 0 ? Math.round((rupees * 100) / left) : 100 };
         const goal = { name: GOALS[0].title, delay_days: Math.max(1, Math.ceil(rupees / 200)) };
+        const delay = ` It would push ${goal.name} back about ${goal.delay_days} day${goal.delay_days === 1 ? "" : "s"}.`;
+        // Betting (MCC 7995) never takes the fast lane and always pauses, as in guard-service
+        const betting = q.mc === "7995";
         let decision = "go", message = "", source = "mock", showWishlist = false, reason = null;
         if (week.left_after < 0) {
             decision = "insufficient";
             source = "rules";
             message = `Your spending account has ${inr(left)}, so your bank would decline this ${inr(rupees)} payment. Ask for a top-up if you need it.`;
-        } else if (ESSENTIAL.has(category) || rupees < s.settings.minCheck) {
+        } else if (!betting && (ESSENTIAL.has(category) || rupees < s.settings.minCheck)) {
             source = "fast_lane";
             reason = ESSENTIAL.has(category) ? "essential" : "small";
-        } else if (budget?.over_after || week.share_of_left_pct >= 40) {
+        } else if (betting || budget?.over_after || week.share_of_left_pct >= 40) {
             decision = "pause";
             showWishlist = WAITABLE.has(category);
-            message = budget?.over_after
-                ? `This takes your ${category} budget ${inr(-budget.left_after)} over. It would push ${goal.name} back about ${goal.delay_days} days.`
-                : `${inr(rupees)} is ${week.share_of_left_pct}% of what's left this week.`;
+            message = betting
+                ? `This ${inr(rupees)} payment is to a betting merchant.${delay}`
+                : budget?.over_after
+                    ? `This takes your ${category} budget ${inr(-budget.left_after)} over.${delay}`
+                    : `${inr(rupees)} is ${week.share_of_left_pct}% of what's left this week.`;
         }
         const e = {
             id: newId(), type: "scan", at: new Date().toISOString(), amount: rupees, exact: exact.toFixed(2),

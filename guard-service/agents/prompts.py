@@ -27,11 +27,12 @@ Most payments should go. Pause only when FACTS show a real trade-off, such as:
 - the user has paid here three or more times this week (history.visits_here_this_week)
 - it uses 40% or more of what's left this week (week.share_of_left_pct)
 - the user has regretted spends in this category before (history.regrets_same_category)
-- it's a betting or gambling payment (betting is true): pause unless it's very small
 One mild sign on its own is not enough. If the user paid anyway after most of
 their recent pauses (history.paid_anyway_of_last_5_pauses is 4 or 5), pause
-only for the clearest cases. budget is null when there's no budget for this
-category, and goal is null when there's no savings goal.
+only for the clearest cases. The one exception: always pause a betting or
+gambling payment (betting is true), whatever the amount or history.
+budget is null when there's no budget for this category, and goal is null
+when there's no savings goal.
 
 The message (pause only, empty for go): one or two sentences under 240
 characters that name the trade-off with FACTS' own numbers, such as what's
