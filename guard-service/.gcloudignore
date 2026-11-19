@@ -1,0 +1,13 @@
+# What `gcloud run deploy --source .` leaves out of the upload
+.gcloudignore
+.git
+.gitignore
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+tests/
+evals/
+.env
+.env.*
