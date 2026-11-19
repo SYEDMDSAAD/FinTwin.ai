@@ -202,6 +202,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.contains("/auth"))                                  return 5;
         if (path.contains("/demo/start"))                            return 5;
         if (path.endsWith("/visits"))                                return 20;
+        // Spend Guard: every check can be a model call. Kept above 20 because a
+        // team on one venue Wi-Fi shares an IP; the per-user limit is the real cap
+        if (path.startsWith("/api/v1/guard"))                        return 60;
         if (path.contains("/chat") || path.contains("/coach")
                 || path.contains("/reports") || path.contains("/goals")
                 || path.contains("/investments"))                    return 20;
@@ -215,7 +218,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 || path.contains("/transactions/income")
                 || path.contains("/forecast")
                 || path.contains("/chat")
-                || path.contains("/coach"))                          return 30;
+                || path.contains("/coach")
+                || path.startsWith("/api/v1/guard"))                 return 30;
         return 200;
     }
 
@@ -223,6 +227,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.contains("/auth"))   return "auth";
         if (path.contains("/demo/start")) return "demo";
         if (path.endsWith("/visits"))     return "visit";
+        // Its own bucket: a shared "api" bucket keeps the limit of whichever
+        // path created it first, so Spend Guard's would not apply
+        if (path.startsWith("/api/v1/guard")) return "guard";
         if (path.contains("/chat"))   return "ai";
         return "api";
     }

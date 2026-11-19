@@ -56,10 +56,25 @@ public class AiServiceConfig {
         return build(readTimeoutMs);
     }
 
-    /** The ai-service routes that run the language model (prices, OCR and statements don't). */
+    /**
+     * Spend Guard's own service on Cloud Run (guard-service/). Its agents answer
+     * inside their own time limits and fall back to fixed rules, so 20 s is
+     * headroom: a scan check normally returns in under 2 s.
+     */
+    @Bean("guardRestTemplate")
+    public RestTemplate guardRestTemplate(
+            @Value("${guard.service.read-timeout-ms:20000}") int readTimeoutMs) {
+        return build(readTimeoutMs);
+    }
+
+    /**
+     * The routes that run the language model (prices, OCR and statements don't).
+     * Spend Guard's agent routes count against the same daily allowance.
+     */
     private static final java.util.Set<String> MODEL_ROUTES = java.util.Set.of(
             "/chat", "/spending-coach", "/goal-plan", "/reports/weekly-report",
-            "/categories/suggest", "/investment-recommendation");
+            "/categories/suggest", "/investment-recommendation",
+            "/guard/check", "/guard/topup", "/guard/rebalance", "/guard/payday", "/guard/hello");
 
     static boolean usesTheModel(String path) {
         return path != null && MODEL_ROUTES.stream().anyMatch(path::endsWith);
