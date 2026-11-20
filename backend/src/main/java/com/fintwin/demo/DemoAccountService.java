@@ -109,8 +109,9 @@ public class DemoAccountService {
             User user = demoUser();
             LocalDate latest = transactions.latestTransactionDate(user.getId());
             LocalDate today = LocalDate.now(INDIA);
-            // Also when it was built before it had insurance policies
-            if (latest == null || latest.isBefore(today.minusDays(1)) || policies.countByUser(user) == 0) rebuild();
+            // Also when it was built before it had insurance policies or Spend Guard payments
+            if (latest == null || latest.isBefore(today.minusDays(1)) || policies.countByUser(user) == 0
+                    || transactions.countByUserAndSource(user, com.fintwin.service.SpendGuardLinks.SOURCE) == 0) rebuild();
         } catch (Exception e) {
             // A demo that fails to build must not take the app down with it
             log.error("Demo account not prepared at startup", e);

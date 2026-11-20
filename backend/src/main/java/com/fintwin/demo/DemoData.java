@@ -11,6 +11,7 @@ import com.fintwin.model.User;
 import com.fintwin.util.Categorized;
 import com.fintwin.util.GoalMath;
 
+import com.fintwin.service.SpendGuardLinks;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,7 +86,23 @@ final class DemoData {
         add(out, today.minusDays(41), "Croma", -12_999, "Shopping", Categorized.BRAND);
         add(out, today.minusDays(33), "Udemy", -449, "Education", Categorized.BRAND);
         add(out, today.minusDays(18), "MakeMyTrip", -5_420, "Travel", Categorized.BRAND);
+
+        // Spend Guard payments, as the Transactions page shows them: one paid
+        // yesterday that no statement has confirmed yet, and one the last
+        // statement didn't show (the user is asked whether they paid)
+        spendGuard(out, today.minusDays(1), "Chai Corner", -450, "Food", "d3e00000000000000001",
+                SpendGuardLinks.SOURCE);
+        spendGuard(out, today.minusDays(4), "Paid to Rohan", -2_000, "People", "d3e00000000000000002",
+                SpendGuardLinks.SOURCE_NOT_IN_STATEMENT);
         return out;
+    }
+
+    private void spendGuard(List<Transaction> out, LocalDate date, String merchant, double amount, String category,
+                            String eventId, String source) {
+        add(out, date, merchant, amount, category, Categorized.BRAND);
+        Transaction t = out.get(out.size() - 1);
+        t.setSource(source);
+        t.setExternalId(SpendGuardLinks.EXTERNAL_ID_PREFIX + eventId);
     }
 
     List<Budget> budgets() {

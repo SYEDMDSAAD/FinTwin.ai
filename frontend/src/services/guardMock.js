@@ -73,6 +73,7 @@ function brief(e) {
         id: e.id, type: e.type, at: e.at, amount: e.moved || e.amount, category: e.category,
         payeeName: e.payeeName || e.note || "", decision: e.decision, message: e.message, source: e.source,
         choice: e.choice, worthIt: e.worthIt, toRebalance: toRebalance(e), proposedCuts: e.proposedCuts || null,
+        notInStatement: Boolean(e.notInStatement), canUndo: e.type === "scan" && e.choice === "paid",
     };
 }
 
@@ -186,14 +187,18 @@ const ACTIONS = {
         if (e.choice) throw fail("You've already decided on this one.");
         const out = { choice, link: null, toRebalance: 0, needsUpiId: false };
         if (e.type === "scan") {
-            if (choice === "paid") {
+            if (choice === "paid" || choice === "opened") {
                 if (e.decision === "insufficient" || e.amount > s.balances.spending) {
                     throw fail("Your spending account doesn't have enough for this. Ask for a top-up first.");
                 }
-                s.balances.spending -= e.amount;
-                e.paidAt = new Date().toISOString();
                 out.link = /[?&]am=\d/i.test(e.qr) ? e.qr : `${e.qr}&am=${e.exact}${/[?&]cu=/i.test(e.qr) ? "" : "&cu=INR"}`;
-                out.toRebalance = over(e);
+                if (choice === "opened") {
+                    out.choice = "pending";             // nothing moves until it's confirmed
+                } else {
+                    s.balances.spending -= e.amount;
+                    e.paidAt = new Date().toISOString();
+                    out.toRebalance = over(e);
+                }
             } else if (choice === "skipped" && e.decision === "pause") {
                 s.saved += e.amount;
             } else if (choice === "wishlist") {
@@ -222,7 +227,36 @@ const ACTIONS = {
                               exact: null, addedAt: new Date().toISOString(),
                               readyAt: new Date(Date.now() + 48 * 3600e3).toISOString() });
         }
-        e.choice = choice;
+        e.choice = out.choice;
+        return { ...out, wallet: view() };
+    },
+
+    "undo-paid"({ eventId }) {
+        const e = find(eventId);
+        if (e.type !== "scan" || e.choice !== "paid") throw fail("Only a payment marked as paid can be taken back.");
+        s.balances.spending += e.amount;
+        e.choice = "not_paid";
+        e.notInStatement = false;
+        return { choice: "not_paid", link: null, wallet: view() };
+    },
+
+    "keep-paid"({ eventId }) {
+        const e = find(eventId);
+        if (e.type !== "scan" || e.choice !== "paid") throw fail("Only a payment marked as paid can be kept.");
+        e.notInStatement = false;
+        return { wallet: view() };
+    },
+
+    confirm({ eventId, paid }) {
+        const e = find(eventId);
+        if (e.type !== "scan" || e.choice !== "pending") throw fail("This payment isn't waiting for an answer.");
+        const out = { choice: paid ? "paid" : "not_paid", link: null, toRebalance: 0 };
+        if (paid) {
+            s.balances.spending = Math.max(0, s.balances.spending - e.amount);
+            e.paidAt = new Date().toISOString();
+            out.toRebalance = over(e);
+        }
+        e.choice = out.choice;
         return { ...out, wallet: view() };
     },
 
@@ -317,6 +351,23 @@ const ACTIONS = {
             message: `Bills of ${inr(bills)} come out first. ${inr(goalPot)} goes to your goals, ${inr(buffer)} stays as a buffer, and about ${inr(week)} a week is yours to spend.`,
             source: "mock", reason: null, created_at: new Date().toISOString(),
         };
+        s.plans[plan.id] = plan;
+        return { planId: plan.id, plan };
+    },
+
+    "edit-plan"({ planId, goals = [], buffer, weekly = [] }) {
+        const p = s.plans[planId];
+        if (!p) throw fail("That plan wasn't found.");
+        const floor = Math.round((BUDGETS.Groceries[0] + BUDGETS.Transport[0] + BUDGETS.Health[0]) / 4.33);
+        const names = new Set(GOALS.map((g) => g.title));
+        if (goals.some((g) => !names.has(g.goal))) throw fail("This plan doesn't work yet: that isn't one of your goals.");
+        if (weekly.length !== 4 || Math.min(...weekly) < floor) {
+            throw fail(`This plan doesn't work yet: every week needs at least ${inr(floor)} for essentials.`);
+        }
+        const total = p.bills + goals.reduce((a, g) => a + g.amount, 0) + buffer + weekly.reduce((a, b) => a + b, 0);
+        if (total !== p.salary) throw fail(`This plan doesn't work yet: the plan adds up to ${inr(total)}, not the salary of ${inr(p.salary)}.`);
+        const plan = { ...p, id: newId(), goals, buffer, weekly, source: "user", reason: "edited",
+                       message: "Your own split. Approve it to start the month.", created_at: new Date().toISOString() };
         s.plans[plan.id] = plan;
         return { planId: plan.id, plan };
     },

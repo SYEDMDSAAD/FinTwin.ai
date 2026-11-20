@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Hand, Heart, ShoppingBag, Zap } from "lucide-react";
 import { guard, guardError } from "../../services/guardApi";
 import CutsCard from "./CutsCard";
+import { storedUserIsDemo } from "../../utils/demoGuard";
 import UpiAppChoice from "./UpiAppChoice";
 import { SOURCE_LABEL, hoursUntil, inr, isPhone, openUpi, shortTime } from "./format";
 
@@ -317,7 +318,7 @@ function Recent({ items }) {
     if (!items.length) return null;
     return (
         <details className="sg-card sg-details">
-            <summary>Recent decisions ({items.length})</summary>
+            <summary>Recent top-ups ({items.length})</summary>
             <ul className="sg-list" style={{ marginTop: 8 }}>
                 {items.map((e) => (
                     <li key={e.id}>
@@ -390,6 +391,7 @@ function Settings({ wallet, onWallet }) {
                                onChange={(e) => setMinCheck(e.target.value.replace(/\D/g, ""))} />
                     </span>
                 </label>
+                {!storedUserIsDemo() && <>
                 <label className="sg-field">
                     <span className="sg-label">
                         Your spending account's UPI ID{s.ownUpiId ? ` (now ${s.ownUpiId})` : ""}
@@ -402,6 +404,7 @@ function Settings({ wallet, onWallet }) {
                     <span className="sg-label">Name on that account</span>
                     <input className="sg-input" maxLength={40} value={ownName} onChange={(e) => setOwnName(e.target.value)} />
                 </label>
+                </>}
                 <div className="sg-row">
                     <button type="submit" className="sg-btn sg-btn-primary">Save settings</button>
                     {!confirmReset ? (
@@ -433,7 +436,7 @@ export default function WalletPanel({ wallet, onWallet, onBuy, topupPrefill }) {
             <Topup key={topupPrefill ?? "none"} wallet={wallet} prefill={topupPrefill} onWallet={onWallet} />
             <CheckIns items={wallet.checkIns} onAnswered={refresh} />
             <Wishlist items={wallet.wishlist} onWallet={onWallet} onBuy={onBuy} />
-            <Recent items={wallet.recent} />
+            <Recent items={(wallet.recent || []).filter((e) => e.type !== "scan")} />
             <Settings wallet={wallet} onWallet={onWallet} />
         </div>
     );

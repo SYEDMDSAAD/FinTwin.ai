@@ -8,13 +8,14 @@ import PayQr from "./PayQr";
  * it). On a computer: the payment as a QR code to scan with the phone. The
  * link is the same one either way; only how it reaches the app changes.
  */
-export default function UpiAppChoice({ link, children }) {
+export default function UpiAppChoice({ link, preview = false, children }) {
     // A computer has no UPI app: show the same payment as a code to scan with the phone
     if (!isPhone()) {
         return (
             <>
-                <div style={{ display: "flex", justifyContent: "center", margin: "4px 0 12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "4px 0 12px" }}>
                     <PayQr link={link} />
+                    {preview && <span className="sg-note" style={{ marginTop: 6 }}>Sample code: no shop behind it</span>}
                 </div>
                 <p className="sg-sub" style={{ margin: "0 0 12px" }}>
                     Open Google Pay on your phone, tap Scan, and point it at this code. The payee and amount
@@ -24,11 +25,17 @@ export default function UpiAppChoice({ link, children }) {
             </>
         );
     }
+    // A sample shop's preview: the same step, with nothing that opens an app
+    const open = (appId) => {
+        if (preview) return;
+        if (appId) openUpi(link, appId);
+        else openUpi(link);
+    };
     return (
         <>
             <div className="sg-row">
-                <button type="button" className="sg-btn" onClick={() => openUpi(link)}>
-                    <ExternalLink size={15} /> Open Google Pay again
+                <button type="button" className="sg-btn" onClick={() => open()} disabled={preview}>
+                    <ExternalLink size={15} /> {preview ? "Open Google Pay" : "Open Google Pay again"}
                 </button>
                 {children}
             </div>
@@ -37,7 +44,7 @@ export default function UpiAppChoice({ link, children }) {
             </p>
             <div className="sg-row" role="group" aria-labelledby="sg-backup-apps">
                 {BACKUP_APPS.map((a) => (
-                    <button key={a.id} type="button" className="sg-btn" onClick={() => openUpi(link, a.id)}>
+                    <button key={a.id} type="button" className="sg-btn" onClick={() => open(a.id)} disabled={preview}>
                         {a.name}
                     </button>
                 ))}

@@ -3,7 +3,7 @@ transactions, goal earmarks, records kept in FinTwin, and the Copilot's summary.
 import asyncio
 import copy
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -232,3 +232,112 @@ def test_a_failed_read_is_never_kept(monkeypatch):
     monkeypatch.setattr(data.backend_api, "get", down)
     assert asyncio.run(data.load(13, "tok")).data_ok is False
     assert 13 not in data._cache
+
+
+# ── Tapping Pay only opens the UPI app; the money moves once it's confirmed ──
+
+def _opened(api, brain, amount=2400):
+    brain.answers["scan"] = [go()]
+    body = api("check", qr=ZARA, amount=amount).json()
+    out = api("outcome", eventId=body["eventId"], choice="opened").json()
+    return body["eventId"], out
+
+
+def test_pay_opens_the_app_but_moves_nothing_until_the_user_says_they_paid(api, brain, real):
+    eid, out = _opened(api, brain)
+    assert out["choice"] == "pending" and out["link"].startswith("upi://pay?pa=zara.store@hdfcbank")
+    assert "record" not in out and out["wallet"]["balances"]["spending"] == 5000      # nothing taken yet
+
+    paid = api("confirm", eventId=eid, paid=True).json()
+    assert paid["choice"] == "paid" and paid["record"]["amount"] == "2400.00"         # now FinTwin records it
+    assert paid["wallet"]["balances"]["spending"] == 2600
+    assert api("confirm", eventId=eid, paid=False).status_code == 400                  # decided once
+
+
+def test_i_didnt_pay_keeps_the_money_and_says_so_in_the_history(api, brain, real):
+    eid, _ = _opened(api, brain)
+    out = api("confirm", eventId=eid, paid=False).json()
+    assert out["choice"] == "not_paid" and "record" not in out
+    assert out["wallet"]["balances"]["spending"] == 5000
+    assert [e["choice"] for e in out["wallet"]["recent"] if e["id"] == eid] == ["not_paid"]
+
+
+def test_a_payment_found_in_the_transactions_counts_as_paid_without_recording_it_twice(api, brain, real, monkeypatch, clock):
+    eid, _ = _opened(api, brain)
+    day = clock["now"].date().isoformat()
+
+    async def found(uid, token):
+        return [{"date": day, "amount": -2400.0, "merchant": "ZARA STORE"}]
+    monkeypatch.setattr(data, "recent_payments", found)
+    w = api("wallet").json()
+    e = next(x for x in w["recent"] if x["id"] == eid)
+    assert (e["choice"], e["detected"]) == ("paid", True)
+    assert w["balances"]["spending"] == 2600            # the bank's row is the record: no second one
+
+
+def test_no_sign_of_it_after_three_days_means_not_paid_and_a_failed_read_decides_nothing(api, brain, real, monkeypatch, clock):
+    eid, _ = _opened(api, brain)
+
+    async def unreadable(uid, token):
+        return None
+    monkeypatch.setattr(data, "recent_payments", unreadable)
+    clock["now"] = clock["now"] + timedelta(days=1)
+    assert next(x for x in api("wallet").json()["recent"] if x["id"] == eid)["choice"] == "pending"
+
+    async def nothing(uid, token):
+        return []
+    monkeypatch.setattr(data, "recent_payments", nothing)
+    clock["now"] = clock["now"] + timedelta(days=3)
+    w = api("wallet").json()
+    assert next(x for x in w["recent"] if x["id"] == eid)["choice"] == "not_paid"
+
+
+def test_a_pending_payment_matches_only_the_same_amount_in_the_window():
+    e = {"opened_at": "2026-11-19T14:00:00+05:30", "exact": "450.00"}
+    assert rules.pending_match(e, [{"date": "2026-11-20", "amount": -450.4}])
+    assert not rules.pending_match(e, [{"date": "2026-11-20", "amount": -452}])     # a different amount
+    assert not rules.pending_match(e, [{"date": "2026-11-18", "amount": -450}])     # before the scan
+    assert not rules.pending_match(e, [{"date": "2026-11-23", "amount": -450}])     # too late
+    assert not rules.pending_match(e, [{"date": "junk"}, {}])
+
+
+# ── Taking back "I paid", and a payment the statement didn't show ──
+
+def _paid(api, brain):
+    eid, _ = _opened(api, brain)
+    return eid, api("confirm", eventId=eid, paid=True).json()
+
+
+def test_i_paid_by_mistake_can_be_taken_back_and_the_money_returns(api, brain, real):
+    eid, paid = _paid(api, brain)
+    assert paid["wallet"]["balances"]["spending"] == 2600
+    assert next(e for e in paid["wallet"]["recent"] if e["id"] == eid)["canUndo"] is True
+    out = api("undo-paid", eventId=eid, stillProvisional=True).json()
+    assert out["choice"] == "not_paid" and out["unrecord"] is True          # the backend removes the transaction
+    assert out["wallet"]["balances"]["spending"] == 5000
+    assert api("undo-paid", eventId=eid).status_code == 400                  # once
+
+
+def test_a_payment_the_bank_statement_took_over_stays_paid(api, brain, real):
+    eid, _ = _paid(api, brain)
+    r = api("undo-paid", eventId=eid, stillProvisional=False)
+    assert r.status_code == 400 and "bank statement shows" in r.json()["detail"]
+
+
+def test_kept_payment_stays_paid_and_stops_asking(api, brain, real):
+    eid, _ = _paid(api, brain)
+    w = api("keep-paid", eventId=eid).json()["wallet"]
+    e = next(x for x in w["recent"] if x["id"] == eid)
+    assert e["choice"] == "paid" and e["notInStatement"] is False and w["balances"]["spending"] == 2600
+
+
+def test_a_demo_visit_opens_with_a_week_of_history_to_look_at(api, monkeypatch):
+    monkeypatch.delenv("GUARD_PERSONA", raising=False)
+    w = api("wallet", userId=10**12 + 77, demo=True).json()
+    by_name = {e["payeeName"]: e for e in w["recent"]}
+    assert {by_name[n]["choice"] for n in by_name} == {"paid", "skipped", "pending"}
+    assert by_name["Rohan"]["notInStatement"] is True and by_name["Fresh Mart"]["choice"] == "pending"
+    assert w["savedByPausing"] == 2700 and w["balances"]["spending"] == 5000 - 2450
+    # Remove the one the statement didn't show: the money comes back, nothing to unrecord in FinTwin
+    out = api("undo-paid", userId=10**12 + 77, demo=True, eventId=by_name["Rohan"]["id"], why="not_in_statement").json()
+    assert out["wallet"]["balances"]["spending"] == 5000 - 450

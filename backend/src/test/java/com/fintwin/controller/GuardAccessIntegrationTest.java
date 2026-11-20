@@ -18,8 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Who can reach Spend Guard, through the real security chain: logged-out
- * visitors and the shared demo account never do, and a normal user who isn't
- * on the prototype allowlist is turned away before anything leaves the backend.
+ * visitors never do, a demo visit gets its own sandboxed path, and a normal user
+ * who isn't on the prototype allowlist is turned away before anything leaves
+ * the backend.
  */
 @TestPropertySource(properties = {
         "guard.service.url=http://localhost:1",   // nothing listens there
@@ -66,7 +67,7 @@ class GuardAccessIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void demoAccount_lacksThePermission() {
+    void demoVisit_isLetIn_onItsOwnSandboxedPath() {
         demo.rebuild();
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
@@ -74,10 +75,14 @@ class GuardAccessIntegrationTest extends AbstractIntegrationTest {
                 new HttpEntity<>(Map.of("visitorId", "guard-visitor-0001", "source", "test"), h), Map.class);
         String token = (String) start.getBody().get("accessToken");
 
-        // GET passes the demo read-only filter, so this is the permission check answering
+        // A demo visit sees Spend Guard, even with nobody on the allowlist...
         ResponseEntity<Map> enabled = get(token, "enabled");
-        assertThat(enabled.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        // and a write is stopped too
-        assertThat(post(token, "check").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(enabled.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(enabled.getBody()).containsEntry("enabled", true).containsEntry("demo", true);
+        // ...its calls get past the read-only filter and the permission check to the
+        // proxy (nothing listens at the test's guard URL, so: can't be reached)...
+        assertThat(post(token, "check").getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        // ...but not the set-up probe
+        assertThat(post(token, "hello").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

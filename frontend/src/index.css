@@ -17,11 +17,11 @@
     --border-subtle:      rgba(255,255,255,0.06);
     --border-floating:    rgba(255,255,255,0.08);
     --text-primary:       #e2e8f0;
-    --text-secondary:     rgba(148,163,184,0.75);
-    --text-muted:         rgba(100,116,139,0.6);
-    --text-label:         rgba(148,163,184,0.5);
-    --text-dim:           rgba(148,163,184,0.40);
-    --text-dimmer:        rgba(148,163,184,0.35);
+    --text-secondary:     #b4bfcd;
+    --text-muted:         #94a3b8;
+    --text-label:         #94a3b8;
+    --text-dim:           #8b97a8;
+    --text-dimmer:        #808b9c;
     --scrollbar-thumb:    rgba(255,255,255,0.10);
     --scrollbar-hover:    rgba(255,255,255,0.18);
 }
@@ -44,8 +44,8 @@
     --text-secondary:     rgba(30,41,59,0.85);
     --text-muted:         rgba(51,65,85,0.80);
     --text-label:         rgba(51,65,85,0.70);
-    --text-dim:           rgba(30,41,59,0.60);
-    --text-dimmer:        rgba(30,41,59,0.50);
+    --text-dim:           rgba(30,41,59,0.78);
+    --text-dimmer:        rgba(30,41,59,0.70);
     --scrollbar-thumb:    rgba(109,40,217,0.15);
     --scrollbar-hover:    rgba(109,40,217,0.25);
 }
@@ -162,8 +162,8 @@ body.sidebar-animating [class*="backdrop-blur"] {
 [data-theme="light"] .text-zinc-200                       { color: #334155               !important; }
 [data-theme="light"] .text-zinc-300                       { color: #475569               !important; }
 [data-theme="light"] .text-zinc-400                       { color: #64748b               !important; }
-[data-theme="light"] .text-zinc-500                       { color: #94a3b8               !important; }
-[data-theme="light"] .text-zinc-600                       { color: #94a3b8               !important; }
+[data-theme="light"] .text-zinc-500                       { color: #566275               !important; }
+[data-theme="light"] .text-zinc-600                       { color: #566275               !important; }
 [data-theme="light"] .hover\:text-zinc-100:hover          { color: #0f172a               !important; }
 [data-theme="light"] .hover\:text-zinc-200:hover          { color: #1e293b               !important; }
 [data-theme="light"] .group:hover .group-hover\:text-zinc-200 { color: #1e293b          !important; }
@@ -424,21 +424,21 @@ body.sidebar-animating [class*="backdrop-blur"] {
 
 /* ── 4. Tailwind accent text — darken for light contrast ── */
 [data-theme="light"] .text-green-400,
-[data-theme="light"] .text-green-300     { color: #16a34a !important; }
+[data-theme="light"] .text-green-300     { color: #15803d !important; }
 [data-theme="light"] .text-emerald-400,
-[data-theme="light"] .text-emerald-300   { color: #059669 !important; }
+[data-theme="light"] .text-emerald-300   { color: #047857 !important; }
 [data-theme="light"] .text-cyan-400,
-[data-theme="light"] .text-cyan-300      { color: #0891b2 !important; }
+[data-theme="light"] .text-cyan-300      { color: #0e7490 !important; }
 [data-theme="light"] .text-blue-400,
 [data-theme="light"] .text-blue-300      { color: #1d4ed8 !important; }
 [data-theme="light"] .text-red-400,
-[data-theme="light"] .text-red-300       { color: #dc2626 !important; }
+[data-theme="light"] .text-red-300       { color: #b91c1c !important; }
 [data-theme="light"] .text-orange-400,
-[data-theme="light"] .text-orange-300    { color: #ea580c !important; }
+[data-theme="light"] .text-orange-300    { color: #c2410c !important; }
 [data-theme="light"] .text-yellow-400,
-[data-theme="light"] .text-yellow-300    { color: #d97706 !important; }
+[data-theme="light"] .text-yellow-300    { color: #b45309 !important; }
 [data-theme="light"] .text-amber-400,
-[data-theme="light"] .text-amber-300     { color: #d97706 !important; }
+[data-theme="light"] .text-amber-300     { color: #b45309 !important; }
 /* The pale -200 shades are near-invisible on white: warning and error copy
    (e.g. "AI analysis was unavailable" on a report) needs the dark shade */
 [data-theme="light"] .text-amber-200,
@@ -505,19 +505,19 @@ body.sidebar-animating [class*="backdrop-blur"] {
 /* ── 10. Inline accent text — hex values too neon on white ─ */
 [data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(74, 222, 128)"],
 [data-theme="light"] :not(button)[style*="color: #4ade80"],
-[data-theme="light"] :not(button)[style*="color:#4ade80"]    { color: #16a34a !important; }
+[data-theme="light"] :not(button)[style*="color:#4ade80"]    { color: #15803d !important; }
 
 [data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(34, 211, 238)"],
 [data-theme="light"] :not(button)[style*="color: #22d3ee"],
-[data-theme="light"] :not(button)[style*="color:#22d3ee"]    { color: #0891b2 !important; }
+[data-theme="light"] :not(button)[style*="color:#22d3ee"]    { color: #0e7490 !important; }
 
 [data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(248, 113, 113)"],
 [data-theme="light"] :not(button)[style*="color: #f87171"],
-[data-theme="light"] :not(button)[style*="color:#f87171"]    { color: #dc2626 !important; }
+[data-theme="light"] :not(button)[style*="color:#f87171"]    { color: #b91c1c !important; }
 
 [data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(251, 191, 36)"],
 [data-theme="light"] :not(button)[style*="color: #fbbf24"],
-[data-theme="light"] :not(button)[style*="color:#fbbf24"]    { color: #d97706 !important; }
+[data-theme="light"] :not(button)[style*="color:#fbbf24"]    { color: #b45309 !important; }
 
 [data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(167, 139, 250)"],
 [data-theme="light"] :not(button)[style*="color: #a78bfa"],
@@ -1070,3 +1070,53 @@ body {
 [data-theme="light"] .profile-page :not([style*="background"])[style*="color: rgb(226, 232, 240)"] {
   color: var(--text-primary) !important;
 }
+
+/* Neon text on light-tinted buttons (not gradient-filled ones) is unreadable on white */
+[data-theme="light"] button:not([style*="gradient"])[style*="color: rgb(34, 211, 238)"] { color: #0e7490 !important; }
+[data-theme="light"] button:not([style*="gradient"])[style*="color: rgb(74, 222, 128)"] { color: #15803d !important; }
+[data-theme="light"] button:not([style*="gradient"])[style*="color: rgb(248, 113, 113)"] { color: #b91c1c !important; }
+[data-theme="light"] button:not([style*="gradient"])[style*="color: rgb(251, 191, 36)"] { color: #b45309 !important; }
+[data-theme="light"] button:not([style*="gradient"])[style*="color: rgb(167, 139, 250)"] { color: #6d28d9 !important; }
+
+/* Dark mode: faded greys and zinc-500/600 fall under 4.5:1 on the near-black cards */
+:root:not([data-theme="light"]) .text-zinc-500 { color: #a1a1aa !important; }
+:root:not([data-theme="light"]) .text-zinc-600 { color: #8f8f99 !important; }
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.7)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.7)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.3)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.3)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.3)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.3)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.35)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.35)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.35)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.35)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.4)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.4)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.4)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.4)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.45)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.45)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.45)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.45)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.5)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.5)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.5)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.5)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.55)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.55)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.55)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.55)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.6)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.6)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.6)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.6)"],
+:root:not([data-theme="light"]) [style*="color: rgba(148, 163, 184, 0.65)"],
+:root:not([data-theme="light"]) [style*="color:rgba(148,163,184,0.65)"],
+:root:not([data-theme="light"]) [style*="color: rgba(100, 116, 139, 0.65)"],
+:root:not([data-theme="light"]) [style*="color:rgba(100,116,139,0.65)"] {
+  color: #94a3b8 !important;
+}
+
+/* Chart axis labels: Recharts' default #666 is too dim on the dark cards */
+:root:not([data-theme="light"]) .recharts-cartesian-axis-tick-value { fill: #94a3b8; }

@@ -51,6 +51,14 @@ public class SpendGuardLinks {
     private static final Logger log = LoggerFactory.getLogger(SpendGuardLinks.class);
 
     public static final String SOURCE = "SPEND_GUARD";
+    /** A statement covering its date came in without it: the user is asked whether they paid. */
+    public static final String SOURCE_NOT_IN_STATEMENT = "SPEND_GUARD_UNMATCHED";
+    /** The user said they paid anyway (from another account, say): never asked again. */
+    public static final String SOURCE_KEPT = "SPEND_GUARD_KEPT";
+
+    public static boolean isSpendGuard(String source) {
+        return source != null && source.startsWith(SOURCE);
+    }
     public static final String EXTERNAL_ID_PREFIX = "GUARD:";
     static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
 
@@ -150,9 +158,42 @@ public class SpendGuardLinks {
         User user = users.findById(userId).orElse(null);
         if (user == null) return false;
         Optional<Transaction> t = transactions.findByUserAndExternalId(user, EXTERNAL_ID_PREFIX + eventId);
-        if (t.isEmpty() || !SOURCE.equals(t.get().getSource())) return false;
+        if (t.isEmpty() || !isSpendGuard(t.get().getSource())) return false;
         transactions.delete(t.get());
         return true;
+    }
+
+    /** Is the transaction recorded for this event still Spend Guard's own (not taken over by a statement)? */
+    @Transactional(readOnly = true)
+    public boolean stillProvisional(Long userId, String eventId) {
+        if (eventId == null || !EVENT_ID.matcher(eventId).matches()) return false;
+        return users.findById(userId)
+                .flatMap(u -> transactions.findByUserAndExternalId(u, EXTERNAL_ID_PREFIX + eventId))
+                .map(t -> isSpendGuard(t.getSource()))
+                .orElse(false);
+    }
+
+    /** "I did pay": a payment the statement didn't show stays, and stops asking. */
+    @Transactional
+    public void keepPayment(Long userId, String eventId) {
+        if (eventId == null || !EVENT_ID.matcher(eventId).matches()) return;
+        users.findById(userId)
+                .flatMap(u -> transactions.findByUserAndExternalId(u, EXTERNAL_ID_PREFIX + eventId))
+                .filter(t -> SOURCE_NOT_IN_STATEMENT.equals(t.getSource()))
+                .ifPresent(t -> { t.setSource(SOURCE_KEPT); transactions.save(t); });
+    }
+
+    /** Event ids of the Spend Guard payments a statement didn't show, waiting for the user's answer. */
+    @Transactional(readOnly = true)
+    public java.util.Set<String> notInStatement(Long userId) {
+        User user = users.findById(userId).orElse(null);
+        if (user == null) return java.util.Set.of();
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (Transaction t : transactions.findByUserAndSource(user, SOURCE_NOT_IN_STATEMENT)) {
+            String ext = t.getExternalId();
+            if (ext != null && ext.startsWith(EXTERNAL_ID_PREFIX)) out.add(ext.substring(EXTERNAL_ID_PREFIX.length()));
+        }
+        return out;
     }
 
     private Categorized category(User user, String merchant, String category, String source) {

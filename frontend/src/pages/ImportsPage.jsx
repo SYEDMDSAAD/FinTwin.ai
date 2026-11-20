@@ -158,7 +158,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
       const imported = res.data?.imported ?? built.rows.length;
       const duplicates = res.data?.duplicates ?? 0;
       const reconciled = res.data?.reconciled ?? 0;
-      setResult({ imported, duplicates, reconciled, skipped: (res.data?.skipped ?? 0) + built.skipped });
+      const notInStatement = res.data?.notInStatement ?? 0;
+      setResult({ imported, duplicates, reconciled, notInStatement, skipped: (res.data?.skipped ?? 0) + built.skipped });
       setCoverageKey(k => k + 1);
       reportMapping(imported);
       toast.success(duplicates
@@ -560,7 +561,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
               <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", marginBottom: 20 }}>
                 {result.imported} transactions imported
                 {result.duplicates > 0 && <> · {result.duplicates} already imported earlier, skipped</>}
-                {result.reconciled > 0 && <> · {result.reconciled} already added from alert emails, now confirmed by the statement</>}
+                {result.reconciled > 0 && <> · {result.reconciled} already added from alert emails or Spend Guard, now confirmed by the statement</>}
+                {result.notInStatement > 0 && <> · {result.notInStatement} Spend Guard payment{result.notInStatement === 1 ? " wasn't" : "s weren't"} in this statement: check Transactions to say whether you paid</>}
                 {result.skipped > 0 && <> · {result.skipped} rows could not be read</>}
               </div>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>

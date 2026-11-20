@@ -76,7 +76,10 @@ describe("SpendGuardPage", () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         mock.onPost("/guard/check").reply(200, PAUSE);
         mock.onPost("/guard/outcome").reply(200, {
-            choice: "paid", link: CAFE + "&am=450.00", toRebalance: 200, needsUpiId: false,
+            choice: "pending", link: CAFE + "&am=450.00", toRebalance: 0, needsUpiId: false, wallet: WALLET,
+        });
+        mock.onPost("/guard/confirm").reply(200, {
+            choice: "paid", link: null, toRebalance: 200,
             wallet: { ...WALLET, balances: { main: 30000, spending: 4550 } },
         });
         render(<SpendGuardPage />);
@@ -101,8 +104,8 @@ describe("SpendGuardPage", () => {
         fireEvent.click(payAnyway);
 
         await waitFor(() => expect(format.openUpi).toHaveBeenCalledWith(CAFE + "&am=450.00"));
-        expect(posted("outcome")).toEqual([{ eventId: "e1", choice: "paid" }]);
-        expect(await screen.findByText("Keep this month on track")).toBeInTheDocument();
+        expect(posted("outcome")).toEqual([{ eventId: "e1", choice: "opened" }]);   // only the app opens
+        expect(await screen.findByText("Did the payment go through?")).toBeInTheDocument();
 
         // Google Pay didn't open: the same link goes to a backup app instead
         fireEvent.click(screen.getByRole("button", { name: "PhonePe" }));
@@ -112,27 +115,61 @@ describe("SpendGuardPage", () => {
         fireEvent.click(screen.getByRole("button", { name: /open google pay again/i }));
         expect(format.openUpi).toHaveBeenLastCalledWith(CAFE + "&am=450.00");
         expect(posted("outcome")).toHaveLength(1);                         // switching apps records nothing new
+
+        fireEvent.click(screen.getByRole("button", { name: "I paid" }));
+        expect(await screen.findByText("Keep this month on track")).toBeInTheDocument();
+        expect(posted("confirm")).toEqual([{ eventId: "e1", paid: true }]);
     });
 
-    it("says a paid payment was added to the transactions, and takes it back if it wasn't paid", async () => {
+    it("records a payment only once the user says they paid", async () => {
         mock.onPost("/guard/check").reply(200, {
             ...PAUSE, eventId: "e9", decision: "go", message: "", source: "fast_lane", reason: "small",
         });
-        mock.onPost("/guard/outcome").reply(200, {
-            choice: "paid", link: CAFE + "&am=450.00", toRebalance: 0, recordedTransactionId: 321, wallet: WALLET,
-        });
-        mock.onPost("/guard/unrecord").reply(200, { removed: true });
+        mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: CAFE + "&am=450.00", toRebalance: 0, wallet: WALLET });
+        mock.onPost("/guard/confirm").reply(200, { choice: "paid", toRebalance: 0, recordedTransactionId: 321, wallet: WALLET });
         const changed = vi.fn();
         render(<SpendGuardPage onFinTwinChanged={changed} />);
         await pasteAndCheck(CAFE, 450);
         fireEvent.click(await screen.findByRole("button", { name: /^pay/i }));
-
+        expect(await screen.findByText("Did the payment go through?")).toBeInTheDocument();
+        expect(changed).not.toHaveBeenCalled();                 // nothing recorded just for opening the app
+        fireEvent.click(screen.getByRole("button", { name: "I paid" }));
         expect(await screen.findByText(/Added to your transactions/)).toBeInTheDocument();
         expect(changed).toHaveBeenCalledTimes(1);               // the dashboard reloads its transactions
-        fireEvent.click(screen.getByRole("button", { name: "I didn't pay" }));
-        expect(await screen.findByText("Taken out of your transactions.")).toBeInTheDocument();
-        expect(changed).toHaveBeenCalledTimes(2);
-        expect(posted("unrecord")).toEqual([{ eventId: "e9" }]);
+    });
+
+    it("keeps the money when the user didn't pay, and says so", async () => {
+        mock.onPost("/guard/check").reply(200, {
+            ...PAUSE, eventId: "e8", decision: "go", message: "", source: "fast_lane", reason: "small",
+        });
+        mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: CAFE + "&am=450.00", toRebalance: 0, wallet: WALLET });
+        mock.onPost("/guard/confirm").reply(200, { choice: "not_paid", toRebalance: 0, wallet: WALLET });
+        render(<SpendGuardPage />);
+        await pasteAndCheck(CAFE, 450);
+        fireEvent.click(await screen.findByRole("button", { name: /^pay/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "I didn't pay" }));
+        expect(await screen.findByText("Not paid")).toBeInTheDocument();
+        expect(screen.getByText(/stays in your spending account/)).toBeInTheDocument();
+        expect(posted("confirm")).toEqual([{ eventId: "e8", paid: false }]);
+    });
+
+    it("shows scan history on the Scan tab, where a waiting payment can be settled", async () => {
+        const recent = [
+            { id: "p1", type: "scan", at: new Date().toISOString(), amount: 450, category: "Food", payeeName: "Chai Corner", decision: "go", choice: "pending", source: "ai" },
+            { id: "p2", type: "scan", at: new Date().toISOString(), amount: 2400, category: "Shopping", payeeName: "Urban Threads", decision: "pause", choice: "not_paid", source: "ai" },
+            { id: "p3", type: "scan", at: new Date().toISOString(), amount: 900, category: "Food", payeeName: "Bistro", decision: "go", choice: "paid", detected: true, source: "ai" },
+            { id: "t1", type: "topup", at: new Date().toISOString(), amount: 800, category: "Other", payeeName: "", decision: "approve", choice: "paid", source: "ai" },
+        ];
+        mock.onPost("/guard/wallet").reply(200, { ...WALLET, recent });
+        mock.onPost("/guard/confirm").reply(200, { choice: "paid", toRebalance: 0, wallet: { ...WALLET, recent } });
+        render(<SpendGuardPage />);
+        const history = await screen.findByRole("region", { name: "Scan history" });
+        expect(within(history).getByText("Waiting to confirm")).toBeInTheDocument();
+        expect(within(history).getByText("Didn't pay")).toBeInTheDocument();
+        expect(within(history).getByText("Paid · found in your transactions")).toBeInTheDocument();
+        expect(within(history).queryByText("Top-up")).not.toBeInTheDocument();          // top-ups stay in the Wallet tab
+        fireEvent.click(within(history).getByRole("button", { name: "I paid" }));
+        await waitFor(() => expect(posted("confirm")).toEqual([{ eventId: "p1", paid: true }]));
     });
 
     it("checks a typed UPI ID the same way as a scanned code", async () => {
@@ -153,20 +190,54 @@ describe("SpendGuardPage", () => {
             { qr: "upi://pay?pa=ravi.kumar@okicici&pn=Ravi%20%26%20Sons&cu=INR", amount: "650" }]));
     });
 
-    it("never opens a UPI app for a made-up sample shop", async () => {
+    it("shows a made-up sample shop's Pay step as a preview that opens nothing", async () => {
         mock.onPost("/guard/check").reply(200, {
             ...PAUSE, eventId: "e2", decision: "go", message: "", source: "fast_lane", reason: "small",
             payeeUpi: "chaicorner@sample",
         });
-        mock.onPost("/guard/outcome").reply(200, { choice: "paid", link: "upi://pay?pa=chaicorner@sample&am=450.00",
+        mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: "upi://pay?pa=chaicorner@sample&am=450.00",
                                                    toRebalance: 0, wallet: WALLET });
         render(<SpendGuardPage />);
         fireEvent.click(await screen.findByRole("button", { name: "Café, ₹450" }));
         fireEvent.click(screen.getByRole("button", { name: /check before paying/i }));
         expect(await screen.findByText("Small payments never wait")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: /pay ₹450 in google pay/i }));
-        expect(await screen.findByText("Sample code: nothing to pay")).toBeInTheDocument();
+        expect(await screen.findByText(/sample shop, nothing is paid/)).toBeInTheDocument();
+        expect(screen.getByText("Over to Google Pay")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /open google pay/i })).toBeDisabled();       // a preview
+        expect(screen.getByRole("button", { name: "PhonePe" })).toBeDisabled();
         expect(format.openUpi).not.toHaveBeenCalled();
+    });
+
+    it("on a laptop, previews a sample shop's payment QR, marked as a sample", async () => {
+        format.isPhone.mockReturnValue(false);
+        mock.onPost("/guard/check").reply(200, {
+            ...PAUSE, eventId: "e2", decision: "go", message: "", source: "fast_lane", reason: "small", payeeUpi: "chaicorner@sample",
+        });
+        mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: "upi://pay?pa=chaicorner@sample&am=450.00",
+                                                   toRebalance: 0, wallet: WALLET });
+        render(<SpendGuardPage />);
+        fireEvent.click(await screen.findByRole("button", { name: "Café, ₹450" }));
+        fireEvent.click(screen.getByRole("button", { name: /check before paying/i }));
+        fireEvent.click(await screen.findByRole("button", { name: /pay ₹450/i }));
+        expect(await screen.findByText("Scan to pay with your phone")).toBeInTheDocument();
+        expect(screen.getByText("Sample code: no shop behind it")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /copy payment link/i })).not.toBeInTheDocument();
+    });
+
+    it("in the demo, a real shop's code opens the visitor's own Google Pay", async () => {
+        localStorage.setItem("user", JSON.stringify({ role: "DEMO" }));
+        try {
+            mock.onPost("/guard/check").reply(200, { ...PAUSE, decision: "go", message: "", source: "fast_lane", reason: "small" });
+            mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: CAFE + "&am=450.00", toRebalance: 0, wallet: WALLET });
+            render(<SpendGuardPage />);
+            await pasteAndCheck(CAFE, 450);
+            fireEvent.click(await screen.findByRole("button", { name: /^pay/i }));
+            await waitFor(() => expect(format.openUpi).toHaveBeenCalledWith(CAFE + "&am=450.00"));
+            expect(screen.getByText(/this is your own Google Pay/)).toBeInTheDocument();
+        } finally {
+            localStorage.removeItem("user");
+        }
     });
 
     it("sends a payment the account can't cover to a top-up for the shortfall", async () => {
@@ -309,6 +380,36 @@ describe("SpendGuardPage", () => {
         expect(posted("approve-plan")).toEqual([{ planId: "p1" }]);
     });
 
+    it("lets the user set the plan themselves, and only sends a split that adds up", async () => {
+        const proposed = { id: "p1", salary: 45000, bills: 14500, buffer: 2500, weekly: [5250, 5250, 5250, 5250],
+                           goals: [{ goal: "Goa trip", amount: 6000 }, { goal: "Emergency fund", amount: 1000 }],
+                           message: "Rent and bills take ₹14,500.", source: "ai" };
+        mock.onPost("/guard/payday").reply(200, { planId: "p1", plan: proposed });
+        mock.onPost("/guard/edit-plan").reply(200, {
+            planId: "p2", plan: { ...proposed, id: "p2", buffer: 3500, goals: [{ goal: "Goa trip", amount: 5000 }, { goal: "Emergency fund", amount: 1000 }],
+                                  source: "user", message: "Your own split. Approve it to start the month." },
+        });
+        mock.onPost("/guard/approve-plan").reply(200, { wallet: { ...WALLET, buffer: 3500, weekly: 5250 } });
+        render(<SpendGuardPage />);
+        fireEvent.click(await screen.findByRole("tab", { name: /payday/i }));
+        fireEvent.change(screen.getByLabelText("Salary in rupees"), { target: { value: "45000" } });
+        fireEvent.click(screen.getByRole("button", { name: /plan my month/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "Set it yourself" }));
+
+        fireEvent.change(screen.getByLabelText("Goa trip in rupees"), { target: { value: "5000" } });
+        expect(screen.getByText("₹1,000 left to place")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Use my plan" })).toBeDisabled();
+        fireEvent.change(screen.getByLabelText("Buffer for top-ups in rupees"), { target: { value: "3500" } });
+        expect(screen.getByText("Adds up to ₹45,000")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Use my plan" }));
+
+        expect(await screen.findByText("Your plan")).toBeInTheDocument();
+        expect(posted("edit-plan")).toEqual([{ planId: "p1", buffer: 3500, weekly: [5250, 5250, 5250, 5250],
+                                               goals: [{ goal: "Goa trip", amount: 5000 }, { goal: "Emergency fund", amount: 1000 }] }]);
+        fireEvent.click(screen.getByRole("button", { name: "Approve this plan" }));
+        await waitFor(() => expect(posted("approve-plan")).toEqual([{ planId: "p2" }]));
+    });
+
     it("runs end to end in mock mode, with no backend", async () => {
         localStorage.setItem("fintwin_guard_mock", "1");
         resetMock();
@@ -320,6 +421,26 @@ describe("SpendGuardPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "Wishlist for 2 days" }));
         expect(await screen.findByText("On your wishlist", {}, { timeout: 3000 })).toBeInTheDocument();
         expect(mock.history.post).toHaveLength(0);                                  // nothing left the browser
+    });
+
+    it("lets a demo visitor scan or type any code; with the hand-off switched off, nothing opens", async () => {
+        localStorage.setItem("user", JSON.stringify({ role: "DEMO" }));
+        try {
+            mock.onPost("/guard/check").reply(200, { ...PAUSE, decision: "go", message: "", source: "fast_lane", reason: "small" });
+            mock.onPost("/guard/outcome").reply(200, { choice: "pending", link: null, toRebalance: 0, wallet: WALLET });
+            render(<SpendGuardPage />);
+            expect(await screen.findByText(/a sample shows a preview/)).toBeInTheDocument();
+            expect(screen.getByLabelText("UPI ID")).toBeInTheDocument();                 // the real scan options
+            for (const name of ["Café, ₹450", "A friend, ₹2,000", "Betting app, ₹300"]) {
+                expect(screen.getByRole("button", { name })).toBeInTheDocument();         // and the samples
+            }
+            await pasteAndCheck(CAFE, 450);                                                // a real shop's code
+            fireEvent.click(await screen.findByRole("button", { name: /^pay/i }));
+            expect(await screen.findByText("Demo: nothing is paid")).toBeInTheDocument();
+            expect(format.openUpi).not.toHaveBeenCalled();
+        } finally {
+            localStorage.removeItem("user");
+        }
     });
 
     it("asks what a payment to an unknown payee is for, then checks with the answer", async () => {
@@ -365,7 +486,7 @@ describe("SpendGuardPage", () => {
         format.isPhone.mockReturnValue(false);
         const link = CAFE + "&am=450.00";
         mock.onPost("/guard/check").reply(200, { ...PAUSE, decision: "go", message: "", source: "fast_lane", reason: "small" });
-        mock.onPost("/guard/outcome").reply(200, { choice: "paid", link, toRebalance: 0, wallet: WALLET });
+        mock.onPost("/guard/outcome").reply(200, { choice: "pending", link, toRebalance: 0, wallet: WALLET });
         render(<SpendGuardPage />);
         await pasteAndCheck(CAFE, 450);
         fireEvent.click(await screen.findByRole("button", { name: /pay ₹450 in google pay/i }));
@@ -452,11 +573,20 @@ describe("Spend Guard in the navigation", () => {
         expect(await within(container).findByTitle("Spend Guard")).toBeInTheDocument();
     });
 
-    it("stays hidden for the demo account and when the check fails", async () => {
+    it("stays hidden when the backend says no or the check fails", async () => {
         localStorage.setItem("token", "t");
         mock.onGet("/guard/enabled").reply(403);
         renderSidebar();
         await waitFor(() => expect(mock.history.get).toHaveLength(1));
         expect(screen.queryByTitle("Spend Guard")).not.toBeInTheDocument();
+    });
+
+    it("shows for the demo account when the backend opens it", async () => {
+        localStorage.setItem("token", "demo-token");
+        localStorage.setItem("user", JSON.stringify({ role: "DEMO" }));
+        mock.onGet("/guard/enabled").reply(200, { enabled: true, demo: true });
+        const { container } = renderSidebar();
+        expect(await within(container).findByTitle("Spend Guard")).toBeInTheDocument();
+        localStorage.removeItem("user");
     });
 });

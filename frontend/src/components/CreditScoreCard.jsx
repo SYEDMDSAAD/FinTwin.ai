@@ -198,7 +198,7 @@ export default function CreditScoreCard() {
 
       {/* Disclaimer — required: this is an internal estimate, not a bureau score */}
       {data?.disclaimer && (
-        <p style={{ fontSize: 10.5, color: "rgba(148,163,184,0.55)", lineHeight: 1.5, margin: "0 0 12px", fontStyle: "italic" }}>
+        <p style={{ fontSize: 10.5, color: "var(--text-dim)", lineHeight: 1.5, margin: "0 0 12px", fontStyle: "italic" }}>
           {data.disclaimer}
         </p>
       )}

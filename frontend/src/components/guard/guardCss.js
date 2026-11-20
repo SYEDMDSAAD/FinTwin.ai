@@ -20,7 +20,7 @@ export const GUARD_CSS = `
     --sg-border-strong: rgba(255,255,255,0.14);
     --sg-ink: #e8eaf0;
     --sg-ink-2: rgba(203,213,225,0.78);
-    --sg-ink-3: rgba(148,163,184,0.62);
+    --sg-ink-3: #94a3b8;
     --sg-accent: #a78bfa;
     --sg-accent-soft: rgba(167,139,250,0.12);
     --sg-good: #4ade80;
@@ -43,7 +43,7 @@ export const GUARD_CSS = `
     --sg-border-strong: rgba(109,40,217,0.24);
     --sg-ink: #0f172a;
     --sg-ink-2: rgba(30,41,59,0.82);
-    --sg-ink-3: rgba(51,65,85,0.62);
+    --sg-ink-3: #526073;
     --sg-accent: #7c3aed;
     --sg-accent-soft: rgba(124,58,237,0.09);
     --sg-good: #0a7d0a;
@@ -142,6 +142,10 @@ export const GUARD_CSS = `
   .sg-decision-pause { border-left-color: var(--sg-warn); }
   .sg-decision-go { border-left-color: var(--sg-good); }
   .sg-decision-insufficient { border-left-color: var(--sg-crit); }
+  .sg-plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .sg-linkbtn { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--sg-accent); cursor: pointer; text-decoration: underline; }
+  .sg-linkbtn:disabled { opacity: 0.5; cursor: default; }
+  .sg-confirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--sg-border); }
   .sg-message { font-size: 16px; line-height: 1.55; color: var(--sg-ink); margin: 12px 0; }
   .sg-breath { height: 4px; border-radius: 4px; background: var(--sg-track); overflow: hidden; margin: 4px 0 14px; }
   .sg-breath > div { height: 100%; width: 100%; background: var(--sg-warn); transform-origin: left; animation: sg-breathe 5s linear forwards; }

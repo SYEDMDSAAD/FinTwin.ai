@@ -3,6 +3,7 @@ import { Download, SlidersHorizontal, X, Search, Check, Pencil } from "lucide-re
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
 import CategoryDropdown from "./CategoryDropdown";
+import SpendGuardTxTag from "./SpendGuardTxTag";
 
 const CATEGORIES = [
   "Food & Drinks","Shopping","Housing","Transportation","Vehicle",
@@ -112,7 +113,7 @@ const RANGES = [[3, "3 months"], [6, "6 months"], [12, "1 year"], [24, "2 years"
 const CHUNK = 300;
 
 const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
-  transactions = [], onChanged, months, onMonthsChange, chunkSize = CHUNK,
+  transactions = [], onChanged, onReload, months, onMonthsChange, chunkSize = CHUNK,
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -531,7 +532,10 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
                       }}>
                         {pos ? "↓" : "↑"}
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)" }}>{t.merchant}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)" }}>{t.merchant}</span>
+                        <SpendGuardTxTag t={t} onChanged={onReload} />
+                      </div>
                     </div>
 
                     {/* Category — click to edit; correction is remembered per payee */}
@@ -564,7 +568,10 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
                         <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: pos ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", border: `1px solid ${pos ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pos ? "#4ade80" : "#f87171" }}>
                           {pos ? "↓" : "↑"}
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>{cleanMerchant(t.merchant)}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>{cleanMerchant(t.merchant)}</span>
+                          <SpendGuardTxTag t={t} onChanged={onReload} />
+                        </div>
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 700, color: pos ? "#4ade80" : "#f87171", flexShrink: 0, marginLeft: 8 }}>
                         {pos ? "+" : "-"}₹{Math.abs(t.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })}

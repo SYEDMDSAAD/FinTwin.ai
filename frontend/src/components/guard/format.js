@@ -19,6 +19,7 @@ export const SOURCE_LABEL = {
     rules: "Fixed rule",
     fallback: "Fixed rules, AI unavailable",
     mock: "Mock, no AI",
+    user: "Your plan",
 };
 
 export const FAST_LANE_REASON = {
@@ -56,6 +57,8 @@ export const SAMPLES = [
     { label: "Café, ₹450", qr: "upi://pay?pa=chaicorner@sample&pn=Chai%20Corner&mc=5814&cu=INR", amount: 450 },
     { label: "Clothes, ₹2,400", qr: "upi://pay?pa=urbanthreads@sample&pn=Urban%20Threads&mc=5651", amount: 2400 },
     { label: "Groceries, ₹1,800", qr: "upi://pay?pa=freshmart@sample&pn=FreshMart&mc=5411", amount: 1800 },
+    { label: "A friend, ₹2,000", qr: "upi://pay?pa=rohan@sample&pn=Rohan", amount: 2000 },
+    { label: "Betting app, ₹300", qr: "upi://pay?pa=luckyplay@sample&pn=LuckyPlay&mc=7995", amount: 300 },
 ];
 
 // The same UPI ID rule guard-service applies (rules.VPA)

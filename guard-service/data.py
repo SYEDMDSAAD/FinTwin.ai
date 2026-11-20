@@ -13,6 +13,7 @@ import copy
 import logging
 import os
 import time
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 
 import backend_api
@@ -77,8 +78,13 @@ PERSONA = Finances(
 )
 
 
+# A visit to FinTwin's shared demo account, set per request by main.persisted:
+# it gets the made-up persona, and nothing is read from or written to FinTwin
+demo_visit: ContextVar[bool] = ContextVar("demo_visit", default=False)
+
+
 def persona_mode() -> bool:
-    return os.environ.get("GUARD_PERSONA") == "1" or not backend_api.configured()
+    return demo_visit.get() or os.environ.get("GUARD_PERSONA") == "1" or not backend_api.configured()
 
 
 def _int(v) -> int:
@@ -133,6 +139,21 @@ async def load(user_id: int, tool_token: str | None) -> Finances:
         _cache.clear()
     _cache[int(user_id)] = (time.monotonic(), finances)     # only good reads are kept
     return copy.deepcopy(finances)
+
+
+async def recent_payments(user_id: int, tool_token: str | None) -> list[dict] | None:
+    """The user's latest expense transactions (date and amount), to see whether
+    a payment handed to their UPI app went through. None in persona mode or
+    when FinTwin can't be read, so nothing is decided on a guess."""
+    if persona_mode():
+        return None
+    try:
+        got = await _read(user_id, "/transactions", tool_token,
+                          {"type": "expense", "sort": "date", "limit": 25, "months": 2})
+    except RuntimeError:
+        return None
+    rows = got.get("transactions") if isinstance(got, dict) else None
+    return rows if isinstance(rows, list) else None
 
 
 async def categorize(user_id: int, name: str, tool_token: str | None) -> tuple[str, str] | None:

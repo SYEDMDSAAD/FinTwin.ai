@@ -29,7 +29,7 @@ const NAV_GROUPS = [
             { name: "About App",    icon: <Info size={17} /> },
             { name: "Dashboard",    icon: <LayoutDashboard size={17} /> },
             // Near the top: only shown to users the backend has let in
-            { name: "Spend Guard",  icon: <ScanLine size={17} />, gated: true },
+            { name: "Spend Guard",  icon: <ScanLine size={17} />, gated: true, isNew: true },
             { name: "Analytics",    icon: <BarChart3 size={17} /> },
             { name: "Transactions", icon: <Wallet size={17} /> },
         ],
@@ -103,6 +103,13 @@ const NavItem = memo(function NavItem({ item, active, expanded, onClick }) {
                 <span className="text-[13px] font-medium leading-none whitespace-nowrap overflow-hidden">
                     {item.name}
                 </span>
+            )}
+            {item.isNew && expanded && (
+                <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider"
+                      style={{ background: "#15803d", color: "#fff" }}>New</span>
+            )}
+            {item.isNew && !expanded && (
+                <span aria-hidden className="absolute top-1 right-1 h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />
             )}
 
             {/* Tooltip for collapsed */}

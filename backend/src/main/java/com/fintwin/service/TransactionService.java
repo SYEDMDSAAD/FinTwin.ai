@@ -432,9 +432,12 @@ public class TransactionService {
      * {@code reconciled} counts rows that were already on record from alert
      * emails: the statement row took them over rather than adding a second copy.
      */
-    public record ImportResult(int imported, int duplicates, int skipped, int reconciled) {
+    public record ImportResult(int imported, int duplicates, int skipped, int reconciled, int notInStatement) {
         public ImportResult(int imported, int duplicates, int skipped) {
-            this(imported, duplicates, skipped, 0);
+            this(imported, duplicates, skipped, 0, 0);
+        }
+        public ImportResult(int imported, int duplicates, int skipped, int reconciled) {
+            this(imported, duplicates, skipped, reconciled, 0);
         }
     }
 
@@ -469,6 +472,7 @@ public class TransactionService {
         List<Transaction> takenOver = new ArrayList<>();
         int duplicates = 0;
         int skipped = 0;
+        LocalDate firstDay = null, lastDay = null;       // the dates this file covers
 
         // Transactions that arrived from alert emails or Spend Guard payments and
         // no statement has claimed yet. A statement row for the same money
@@ -502,6 +506,8 @@ public class TransactionService {
                     skipped++;
                     continue;
                 }
+                if (firstDay == null || date.isBefore(firstDay)) firstDay = date;
+                if (lastDay == null || date.isAfter(lastDay)) lastDay = date;
 
                 Double amount = StatementImport.parseAmount(row.get("amount"));
                 if (amount == null || amount == 0.0) {
@@ -569,6 +575,21 @@ public class TransactionService {
             repository.saveAll(takenOver);
         }
 
+        // Spend Guard payments dated inside this statement that no row matched:
+        // the user may not have paid, or paid from another account. They're
+        // flagged for the user to answer (keep or remove), never deleted here.
+        List<Transaction> notInStatement = new ArrayList<>();
+        for (Transaction t : fromAlerts) {
+            if (SpendGuardLinks.SOURCE.equals(t.getSource()) && firstDay != null
+                    && !t.getDate().isBefore(firstDay) && !t.getDate().isAfter(lastDay)) {
+                t.setSource(SpendGuardLinks.SOURCE_NOT_IN_STATEMENT);
+                notInStatement.add(t);
+            }
+        }
+        if (!notInStatement.isEmpty()) {
+            repository.saveAll(notInStatement);
+        }
+
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
             applyPaymentPatterns(user);
@@ -593,7 +614,7 @@ public class TransactionService {
             log.info("Statement import: {} rows matched earlier statement rows by date and amount for user #{}",
                      overlapping.size(), user.getId());
         }
-        return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size());
+        return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size(), notInStatement.size());
     }
 
     /**

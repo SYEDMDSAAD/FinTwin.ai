@@ -13,11 +13,13 @@ can show a full month on stage.
 """
 import asyncio
 import functools
+from collections import OrderedDict
 import hmac
 import json
 import logging
 import os
 import time
+from types import SimpleNamespace
 from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
@@ -103,6 +105,9 @@ class Body(BaseModel):
     model_config = ConfigDict(extra="ignore")
     userId: int = Field(gt=0)                       # set by the backend, never the browser
     toolToken: str | None = Field(default=None, max_length=512)
+    # Set by the backend for a visit to the shared demo account (userId is then
+    # that visit's own id): made-up data, sample shops only, kept in memory
+    demo: bool = False
 
 
 class CheckBody(Body):
@@ -116,7 +121,8 @@ class CheckBody(Body):
 
 class OutcomeBody(Body):
     eventId: str = Field(max_length=64)
-    choice: Literal["paid", "skipped", "wishlist"]
+    # "opened": the UPI app was opened for a scan; the payment waits for /confirm
+    choice: Literal["opened", "paid", "skipped", "wishlist"]
     amount: int | None = Field(default=None, gt=0)  # top-ups: which of the offered amounts
 
 
@@ -130,6 +136,17 @@ class EventBody(Body):
     eventId: str = Field(max_length=64)
 
 
+class ConfirmBody(EventBody):
+    paid: bool
+
+
+class UndoBody(EventBody):
+    # Set by the FinTwin backend, never by the browser: is the transaction Spend
+    # Guard recorded still its own, or has a bank statement taken it over?
+    stillProvisional: bool | None = None
+    why: Literal["user", "not_in_statement"] = "user"
+
+
 class RegretBody(EventBody):
     worthIt: bool
 
@@ -140,6 +157,18 @@ class PaydayBody(Body):
 
 class PlanBody(Body):
     planId: str = Field(max_length=64)
+
+
+class GoalShare(BaseModel):
+    goal: str = Field(max_length=120)
+    amount: int = Field(ge=0, le=10_000_000)
+
+
+class PlanEditBody(PlanBody):
+    """The user's own version of a proposed plan: same salary and bills, their split."""
+    goals: list[GoalShare] = Field(default_factory=list, max_length=20)
+    buffer: int = Field(ge=0, le=10_000_000)
+    weekly: list[int] = Field(min_length=4, max_length=4)
 
 
 class WishBody(Body):
@@ -207,7 +236,10 @@ def _brief(e: dict) -> dict:
         "id": e["id"], "type": e["type"], "at": e["at"], "amount": e.get("moved") or e["amount"],
         "category": e.get("category"), "payeeName": e.get("payee_name") or e.get("note") or "",
         "decision": e["decision"], "message": e.get("message", ""), "source": e["source"],
-        "choice": e.get("choice"), "worthIt": e.get("worth_it"),
+        "choice": e.get("choice"), "worthIt": e.get("worth_it"), "detected": e.get("detected"),
+        "notInStatement": bool(e.get("not_in_statement")),
+        # "I paid" by mistake can be taken back; a payment the bank showed can't
+        "canUndo": e["type"] == "scan" and e.get("choice") == "paid" and not e.get("detected"),
         "toRebalance": _to_rebalance(e), "proposedCuts": e.get("proposed_cuts"),
     }
 
@@ -301,16 +333,80 @@ def persisted(handler):
     runs, and writes them back afterwards if the route changed them."""
     @functools.wraps(handler)
     async def run(body, *args, **kwargs):
-        if not isinstance(store, BackendStore):
-            return await handler(body, *args, **kwargs)
-        await store.open(body.userId, body.toolToken)
-        before = store.fingerprint(body.userId)
+        demo = data.demo_visit.set(bool(body.demo))
         try:
-            return await handler(body, *args, **kwargs)
+            if body.demo:
+                first = body.userId not in _demo_visits
+                _demo_visit_seen(body.userId)       # in memory only, never FinTwin
+                if first:
+                    _seed_demo(body.userId)
+                return await handler(body, *args, **kwargs)
+            if not isinstance(store, BackendStore):
+                return await handler(body, *args, **kwargs)
+            await store.open(body.userId, body.toolToken)
+            before = store.fingerprint(body.userId)
+            try:
+                return await handler(body, *args, **kwargs)
+            finally:
+                if store.fingerprint(body.userId) != before:
+                    store.save_soon(body.userId, body.toolToken, lambda: summary(body.userId))
         finally:
-            if store.fingerprint(body.userId) != before:
-                store.save_soon(body.userId, body.toolToken, lambda: summary(body.userId))
+            data.demo_visit.reset(demo)
     return run
+
+
+# Judging (Nov–Dec 2026): a demo visitor who scans a real shop's code gets the real
+# hand-off to their own UPI app. Set DEMO_REAL_HANDOFF=0 to show "nothing is paid" instead.
+DEMO_REAL_HANDOFF = os.environ.get("DEMO_REAL_HANDOFF", "1") != "0"
+
+# Demo visits live in memory; the oldest are dropped so they can't pile up
+MAX_DEMO_VISITS = 500
+_demo_visits: OrderedDict[int, None] = OrderedDict()
+
+# A demo visit opens with a week of Spend Guard already behind it, so a judge
+# sees every outcome at once: paid, a pause that saved money, a betting pause,
+# one waiting to be confirmed, and one the bank statement didn't show.
+_DEMO_HISTORY = [
+    # days ago, payee, upi, mcc, category, rupees, decision, source, choice, extra
+    (4, "Rohan", "rohan@sample", "", "People", 2000, "go", "ai", "paid",
+     {"recorded": True, "not_in_statement": True,
+      "message": "Paying back a dinner share fits this week."}),
+    (3, "Chai Corner", "chaicorner@sample", "5814", "Food", 450, "go", "fast_lane", "paid", {"recorded": True}),
+    (2, "Urban Threads", "urbanthreads@sample", "5651", "Shopping", 2400, "pause", "ai", "skipped",
+     {"message": "This ₹2,400 would take your Shopping budget ₹1,500 over and push your Goa trip back about 12 days."}),
+    (1, "LuckyPlay", "luckyplay@sample", "7995", "Entertainment", 300, "pause", "rules", "skipped",
+     {"message": "Betting payments always get a pause, whatever the amount."}),
+    (0, "Fresh Mart", "freshmart@sample", "5411", "Groceries", 1800, "go", "fast_lane", "pending", {}),
+]
+
+
+def _seed_demo(uid: int) -> None:
+    now_dt = rules.now()
+    w = _wallet(uid, now_dt)
+    for days, name, upi, mcc, cat, rupees, decision, source, choice, extra in _DEMO_HISTORY:
+        at = (now_dt - timedelta(days=days, hours=2)).isoformat()
+        qr = f"upi://pay?pa={upi}&pn={name.replace(' ', '%20')}" + (f"&mc={mcc}" if mcc else "")
+        e = {"type": "scan", "at": at, "amount": rupees, "exact": f"{rupees}.00", "category": cat,
+             "category_source": "BRAND", "payee": upi, "payee_name": name, "qr": qr,
+             "decision": decision, "message": "", "show_wishlist": False, "source": source,
+             "reason": "small" if source == "fast_lane" else None, "facts": {}, "choice": choice,
+             "worth_it": None, "decided_at": at, "opened_at": at, "sample_history": True}
+        e.update(extra)
+        if choice == "paid":
+            e["paid_at"] = at
+            w["balances"]["spending"] = max(0, w["balances"]["spending"] - rupees)
+        elif choice == "skipped":
+            _saved(w, rupees, now_dt)
+        store.add_event(uid, e)
+    store.save_wallet(uid, w)
+
+
+def _demo_visit_seen(uid: int) -> None:
+    _demo_visits[uid] = None
+    _demo_visits.move_to_end(uid)
+    while len(_demo_visits) > MAX_DEMO_VISITS:
+        old, _ = _demo_visits.popitem(last=False)
+        store.reset(old)
 
 
 @app.on_event("shutdown")
@@ -339,7 +435,9 @@ async def hello(body: Body):
 @persisted
 async def wallet(body: Body):
     now_dt = rules.now()
-    return _view(body.userId, _wallet(body.userId, now_dt), now_dt)
+    w = _wallet(body.userId, now_dt)
+    await _settle_pending(body, w, now_dt)
+    return _view(body.userId, w, now_dt)
 
 
 @app.post("/guard/check")
@@ -348,6 +446,8 @@ async def check(body: CheckBody):
     """A scanned QR code, before paying: go, pause, or not enough money."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
     qr = rules.parse_upi(body.qr)
+    # A demo visit may check any code (the made-up persona's money, nothing of
+    # anyone's real data); it just never gets a payment link back, see outcome
     # A QR code that carries an amount fixes it; otherwise the user types one
     exact = qr.am if qr.am is not None else rules.clean_amount(body.amount)
     w = _wallet(uid, now_dt)
@@ -414,23 +514,23 @@ async def outcome(body: OutcomeBody):
     out = {"choice": body.choice, "link": None, "toRebalance": 0, "needsUpiId": False}
 
     if e["type"] == "scan":
-        if body.choice == "paid":
+        if body.choice in ("opened", "paid"):
             if e["decision"] == "insufficient" or e["amount"] > w["balances"]["spending"]:
                 raise rules.GuardError("Your spending account doesn't have enough for this. Ask for a top-up first.")
-            w["balances"]["spending"] -= e["amount"]
-            fields.update(paid_at=now_dt.isoformat(), paid_anyway=e["decision"] == "pause")
             # The merchant's own link, only ever rebuilt from the stored QR code
+            # The merchant's own link, only ever rebuilt from the stored QR code. A demo
+            # gets it for a sample shop (shown as a preview, never opened) and, while
+            # DEMO_REAL_HANDOFF is on, for a real code: the visitor's own UPI app opens,
+            # and nothing is paid unless they approve it with their PIN.
             qr = rules.parse_upi(e["qr"])
-            out["link"] = rules.handoff_link(qr, Decimal(e["exact"]))
-            out["toRebalance"] = _over_by(e)
-            # FinTwin records it as a transaction (the backend checks every field);
-            # a statement row for the same money takes it over later. Sample
-            # shops aren't real payments, so they're never recorded.
-            if not rules.is_sample(qr) and not data.persona_mode():
-                data.forget(uid)            # the new transaction changes a budget's spending
-                out["record"] = {"eventId": e["id"], "merchant": (e.get("payee_name") or qr.pa)[:120],
-                                 "amount": e["exact"], "category": e["category"],
-                                 "categorySource": e.get("category_source")}
+            handoff = not body.demo or rules.is_sample(qr) or DEMO_REAL_HANDOFF
+            out["link"] = rules.handoff_link(qr, Decimal(e["exact"])) if handoff else None
+            fields.update(opened_at=now_dt.isoformat(), paid_anyway=e["decision"] == "pause")
+            if body.choice == "opened":
+                # Nothing moves yet: the user may not finish paying
+                fields["choice"] = out["choice"] = "pending"
+            else:
+                _mark_paid(uid, e, w, now_dt, fields, out)
         elif body.choice == "skipped":
             if e["decision"] == "pause":
                 _saved(w, e["amount"], now_dt)
@@ -472,6 +572,107 @@ async def outcome(body: OutcomeBody):
     store.save_wallet(uid, w)
     out["wallet"] = _view(uid, w, now_dt)
     return out
+
+
+def _mark_paid(uid: int, e: dict, w: dict, now_dt, fields: dict, out: dict, detected: bool = False) -> None:
+    """A scanned payment that went through: off the spending account, and, when
+    the user confirmed it, proposed to FinTwin as a transaction (a detected one
+    is already there). Sample shops and the persona are never recorded."""
+    w["balances"]["spending"] = max(0, w["balances"]["spending"] - e["amount"])
+    fields.update(choice="paid", paid_at=now_dt.isoformat(), detected=detected)
+    out.update(choice="paid", toRebalance=_over_by(e))
+    qr = rules.parse_upi(e["qr"])
+    if not detected and not rules.is_sample(qr) and not data.persona_mode():
+        data.forget(uid)            # the new transaction changes a budget's spending
+        out["record"] = {"eventId": e["id"], "merchant": (e.get("payee_name") or qr.pa)[:120],
+                         "amount": e["exact"], "category": e["category"],
+                         "categorySource": e.get("category_source")}
+        fields["recorded"] = True
+
+
+def _mark_not_paid(e: dict, now_dt, fields: dict, out: dict, why: str) -> None:
+    fields.update(choice="not_paid", not_paid_at=now_dt.isoformat(), not_paid_why=why)
+    out.update(choice="not_paid", toRebalance=0)
+
+
+@app.post("/guard/confirm")
+@persisted
+async def confirm(body: ConfirmBody):
+    """After the UPI app was opened: did the payment go through?"""
+    uid, now_dt = body.userId, rules.now()
+    e = _event(uid, body.eventId)
+    if e["type"] != "scan" or e.get("choice") != "pending":
+        raise rules.GuardError("This payment isn't waiting for an answer.")
+    w = _wallet(uid, now_dt)
+    fields: dict = {}
+    out = {"link": None, "toRebalance": 0}
+    if body.paid:
+        _mark_paid(uid, e, w, now_dt, fields, out)
+    else:
+        _mark_not_paid(e, now_dt, fields, out, "user")
+    store.update_event(uid, e["id"], fields)
+    store.save_wallet(uid, w)
+    out["wallet"] = _view(uid, w, now_dt)
+    return out
+
+
+@app.post("/guard/undo-paid")
+@persisted
+async def undo_paid(body: UndoBody):
+    """"I paid" was a mistake, or the statement didn't show the payment and the
+    user says it never happened: the money goes back to the spending account and
+    the history says not paid. The backend removes the transaction it recorded."""
+    uid, now_dt = body.userId, rules.now()
+    e = _event(uid, body.eventId)
+    if e["type"] != "scan" or e.get("choice") != "paid":
+        raise rules.GuardError("Only a payment marked as paid can be taken back.")
+    if e.get("detected") or (e.get("recorded") and body.stillProvisional is False):
+        raise rules.GuardError("Your bank statement shows this payment, so it stays as paid.")
+    w = _wallet(uid, now_dt)
+    w["balances"]["spending"] += e["amount"]
+    fields: dict = {"not_in_statement": False}
+    out = {"link": None, "unrecord": bool(e.get("recorded"))}
+    _mark_not_paid(e, now_dt, fields, out, body.why)
+    store.update_event(uid, e["id"], fields)
+    store.save_wallet(uid, w)
+    out["wallet"] = _view(uid, w, now_dt)
+    return out
+
+
+@app.post("/guard/keep-paid")
+@persisted
+async def keep_paid(body: EventBody):
+    """The statement didn't show it, but the user did pay (from another account,
+    say): it stays paid and stops asking."""
+    uid, now_dt = body.userId, rules.now()
+    e = _event(uid, body.eventId)
+    if e["type"] != "scan" or e.get("choice") != "paid":
+        raise rules.GuardError("Only a payment marked as paid can be kept.")
+    store.update_event(uid, e["id"], {"not_in_statement": False, "kept": True})
+    w = _wallet(uid, now_dt)
+    return {"wallet": _view(uid, w, now_dt)}
+
+
+async def _settle_pending(body: Body, w: dict, now_dt) -> None:
+    """Payments still waiting: paid once one turns up in FinTwin's transactions,
+    not paid after PENDING_DAYS with no sign of it. Never on a failed read."""
+    uid = body.userId
+    waiting = [e for e in store.events(uid) if e.get("type") == "scan" and e.get("choice") == "pending"]
+    if not waiting:
+        return
+    rows = await data.recent_payments(uid, body.toolToken)
+    changed = False
+    for e in waiting:
+        fields: dict = {}
+        if rows and rules.pending_match(e, rows):
+            _mark_paid(uid, e, w, now_dt, fields, {}, detected=True)
+        elif rules.pending_expired(e, now_dt):
+            _mark_not_paid(e, now_dt, fields, {}, "not_detected")
+        if fields:
+            store.update_event(uid, e["id"], fields)
+            changed = True
+    if changed:
+        store.save_wallet(uid, w)
 
 
 @app.post("/guard/topup")
@@ -598,6 +799,32 @@ async def payday(body: PaydayBody):
     return {"planId": plan_id, "plan": {**plan, "id": plan_id}}
 
 
+@app.post("/guard/edit-plan")
+@persisted
+async def edit_plan(body: PlanEditBody):
+    """The user sets the split themselves. It passes the same checks as the
+    agent's plan (it adds up to the salary, every week covers essentials, only
+    their own goals), and becomes a new proposal to approve. No AI involved."""
+    uid, now_dt = body.userId, rules.now()
+    p = store.plan(uid, rules.valid_id(body.planId))
+    if p is None:
+        raise rules.GuardError("That plan wasn't found.")
+    w = _wallet(uid, now_dt)
+    finances = await data.load(uid, body.toolToken)
+    facts, _ = rules.payday_facts(salary=p["salary"], wallet=w, finances=finances)
+    answer = SimpleNamespace(goals=[SimpleNamespace(goal=g.goal, amount=g.amount) for g in body.goals],
+                             buffer=body.buffer, weekly=list(body.weekly), message="")
+    try:
+        result = rules.check_plan(answer, facts, [g.title for g in finances.goals], set())
+    except rules.AnswerRejected as e:
+        raise rules.GuardError(f"This plan doesn't work yet: {e}.")
+    result["message"] = "Your own split. Approve it to start the month."
+    plan = {"salary": p["salary"], "bills": facts["bills"], **result, "source": "user", "reason": "edited",
+            "model": None, "ms": 0, "created_at": now_dt.isoformat()}
+    plan_id = store.save_plan(uid, plan)
+    return {"planId": plan_id, "plan": {**plan, "id": plan_id}}
+
+
 @app.post("/guard/approve-plan")
 @persisted
 async def approve_plan(body: PlanBody):
@@ -676,6 +903,8 @@ async def settings(body: SettingsBody):
         s["min_check"] = body.minCheck
     if body.maxPausesPerDay is not None:
         s["max_pauses_per_day"] = body.maxPausesPerDay
+    if body.ownUpiId is not None and body.demo:
+        raise rules.GuardError("In the demo, top-ups move pretend money only.")
     if body.ownUpiId is not None:
         upi = body.ownUpiId.strip()
         if upi and not rules.VPA.match(upi):
@@ -692,5 +921,7 @@ async def settings(body: SettingsBody):
 async def demo_reset(body: Body):
     """Starts this user's Spend Guard demo again. Their FinTwin data isn't touched."""
     store.reset(body.userId)
+    if body.demo:
+        _seed_demo(body.userId)
     now_dt = rules.now()
     return _view(body.userId, _wallet(body.userId, now_dt), now_dt)

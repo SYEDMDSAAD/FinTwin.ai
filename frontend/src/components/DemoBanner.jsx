@@ -9,7 +9,7 @@ import { demoEvent, isDemoUser } from "../utils/demo";
  * Shown across the app in the demo account: what it is, and the way out to
  * the real thing. Also tells the admin page which sections demo visitors open.
  */
-export default function DemoBanner({ section }) {
+export default function DemoBanner({ section, onOpenGuard }) {
     const user = useCurrentUser();
     const auth = useAuth();
     const navigate = useNavigate();
@@ -36,6 +36,15 @@ export default function DemoBanner({ section }) {
             <p className="min-w-0 flex-1 text-zinc-300">
                 <span className="font-semibold text-white">You're exploring a demo account</span>
                 {" "}with sample data. Look around and ask the copilot anything; nothing here is real or can be changed.
+                {section !== "Spend Guard" && onOpenGuard && (
+                    <>
+                        {" "}<span className="font-semibold text-white">New:</span>{" "}
+                        <button type="button" onClick={onOpenGuard}
+                                className="font-semibold text-green-400 underline underline-offset-2">
+                            try Spend Guard
+                        </button>, which checks a payment before you pay.
+                    </>
+                )}
             </p>
             <button
                 onClick={signUp}

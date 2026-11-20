@@ -47,6 +47,7 @@ public interface TransactionRepository
     List<Object[]> countCategoryLabels();
 
     long countByUserAndSource(User user, String source);
+    List<Transaction> findByUserAndSource(User user, String source);
 
     void deleteByUser(User user);
 

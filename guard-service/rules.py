@@ -280,6 +280,33 @@ def mask_upi(upi: str) -> str:
     return (name[:2] + "***@" + handle) if len(name) > 2 else ("***@" + handle)
 
 
+# ── A payment handed to the UPI app, waiting to be confirmed ─────────────────
+
+# Tapping Pay only opens the UPI app; the money hasn't moved until the user says
+# so or the payment turns up in their transactions. After this many days with
+# neither, it counts as not paid.
+PENDING_DAYS = 3
+
+
+def pending_match(event: dict, rows: list[dict]) -> bool:
+    """A transaction for this payment: the same amount (to the rupee), on the
+    day it was handed over or within PENDING_DAYS after."""
+    day = local(event["opened_at"]).date()
+    want = Decimal(event["exact"])
+    for r in rows:
+        try:
+            d, amt = date.fromisoformat(str(r["date"])[:10]), abs(Decimal(str(r["amount"])))
+        except (KeyError, ValueError, ArithmeticError):
+            continue
+        if day <= d <= day + timedelta(days=PENDING_DAYS) and abs(amt - want) <= 1:
+            return True
+    return False
+
+
+def pending_expired(event: dict, now_dt: datetime) -> bool:
+    return now_dt - local(event["opened_at"]) > timedelta(days=PENDING_DAYS)
+
+
 # ── Time, week and history ───────────────────────────────────────────────────
 
 def is_late(dt: datetime) -> bool:

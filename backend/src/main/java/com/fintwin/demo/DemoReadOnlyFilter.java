@@ -41,7 +41,10 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
             new Rule("POST", "/api/v1/goals/\\d+/(regenerate|complete)"),
             new Rule("PUT", "/api/v1/goals/\\d+"),
             new Rule("DELETE", "/api/v1/goals/\\d+"),
-            new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"));
+            new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"),
+            // Spend Guard: each visit has its own records in guard-service's
+            // memory, with made-up data; nothing reaches the shared account
+            new Rule("POST", "/api/v1/guard/[a-z-]+"));
 
     // Writes the app makes by itself (marking things seen). Answered as done
     // without doing them, so visitors don't get error messages they caused

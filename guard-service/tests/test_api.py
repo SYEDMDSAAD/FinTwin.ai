@@ -291,6 +291,27 @@ def test_the_payday_planner_gets_three_tries_then_the_rules_plan(api, brain):
     assert p["bills"] + sum(g["amount"] for g in p["goals"]) + p["buffer"] + sum(p["weekly"]) == 45000
 
 
+def test_the_user_can_set_their_own_plan_and_it_is_checked_like_the_agents(api, brain):
+    brain.answers["payday"] = [plan()]
+    p = api("payday", salary=45000).json()
+    goals = p["plan"]["goals"]
+    asked = len(brain.asked)
+    mine = {"planId": p["planId"], "goals": [{"goal": g["goal"], "amount": 0} for g in goals],
+            "buffer": 4000, "weekly": [6625] * 4}
+    e = api("edit-plan", **mine).json()
+    assert e["plan"]["source"] == "user" and e["plan"]["buffer"] == 4000 and e["planId"] != p["planId"]
+    assert len(brain.asked) == asked                       # no AI for the user's own split
+    w = api("approve-plan", planId=e["planId"]).json()["wallet"]
+    assert (w["buffer"], w["weekly"]) == (4000, 6625)
+
+    r = api("edit-plan", **{**mine, "weekly": [6000] * 4})
+    assert r.status_code == 400 and "adds up to" in r.json()["detail"]
+    r = api("edit-plan", **{**mine, "weekly": [100, 100, 100, 26000 - 4000 + 6225]})
+    assert r.status_code == 400 and "essentials" in r.json()["detail"]
+    r = api("edit-plan", **{**mine, "goals": [{"goal": "A yacht", "amount": 0}]})
+    assert r.status_code == 400 and "isn't one of" in r.json()["detail"]
+
+
 # ── Settings and setup ───────────────────────────────────────────────────────
 
 def test_settings_are_checked(api):
@@ -312,3 +333,48 @@ def test_hello_reports_whether_the_ai_answers(api, brain):
     brain.answers["hello"] = ["Hi from Spend Guard!"]
     r = api("hello").json()
     assert r["ai"] == "ready" and r["greeting"] == "Hi from Spend Guard!" and r["store"] == "MemoryStore"
+
+
+# ── Visits to the shared demo account ────────────────────────────────────────
+
+SAMPLE_SHOP = "upi://pay?pa=urbanthreads@sample&pn=Urban%20Threads&mc=5651"
+VISIT = 10**12 + 7                       # the backend gives each demo visit its own id
+
+
+def test_a_demo_visit_checks_any_code_on_made_up_data_hands_real_codes_to_the_visitors_app_and_never_touches_fintwin(api, brain, monkeypatch):
+    import backend_api
+    import data
+    monkeypatch.delenv("GUARD_PERSONA")
+    monkeypatch.setattr(backend_api, "configured", lambda: True)       # FinTwin is there...
+
+    async def no_reads(*_a, **_k):
+        raise AssertionError("a demo visit read FinTwin")
+    monkeypatch.setattr(data, "_read", no_reads)                       # ...and is never asked
+    assert data.persona_mode() is False
+
+    assert api("wallet", user_id=VISIT, demo=True).json()["data"] == "persona"
+
+    # A real shop's code is checked like any other, and paying hands it to the
+    # visitor's own UPI app; a sample shop's link is only for the preview
+    brain.answers["scan"] = [go(), go(), go()]
+    def pay(qr, amount):
+        eid = api("check", user_id=VISIT, demo=True, qr=qr, amount=amount).json()["eventId"]
+        return api("outcome", user_id=VISIT, demo=True, eventId=eid, choice="opened").json()
+    real = pay(CAFE, 450)
+    assert real["link"].startswith("upi://pay?pa=") and "@sample" not in real["link"] and "record" not in real
+    sample = pay(SAMPLE_SHOP, 2400)
+    assert "@sample" in sample["link"] and "record" not in sample
+    # With the judging switch off, a real code gets no link at all
+    monkeypatch.setattr(main, "DEMO_REAL_HANDOFF", False)
+    assert pay(CAFE, 450)["link"] is None
+    assert main.store.events(VISIT) and main.store.events(VISIT + 1) == []   # each visit is its own
+    assert api("settings", user_id=VISIT, demo=True, ownUpiId="me@okaxis").status_code == 400
+    assert data.persona_mode() is False                                 # only for the demo request itself
+
+
+def test_old_demo_visits_are_dropped_from_memory(api, monkeypatch):
+    monkeypatch.setattr(main, "MAX_DEMO_VISITS", 2)
+    monkeypatch.setattr(main, "_demo_visits", main.OrderedDict())
+    for v in (1, 2, 3):
+        api("check", user_id=VISIT + v, demo=True, qr=SAMPLE_SHOP, amount=50)
+    assert main.store.events(VISIT + 1) == [] and main.store.events(VISIT + 3)

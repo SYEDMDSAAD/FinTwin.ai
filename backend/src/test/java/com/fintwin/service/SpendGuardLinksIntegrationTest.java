@@ -107,6 +107,47 @@ class SpendGuardLinksIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aPaymentTheStatementDidntShow_isFlagged_thenKeptOrRemovedByTheUser() {
+        String email = "guard-links-unmatched@example.com";
+        User user = user(email);
+        links.recordPayment(user.getId(), Map.of("eventId", "e0e1", "merchant", "Never Paid", "amount", "700", "category", "Food"));
+        links.recordPayment(user.getId(), Map.of("eventId", "e0e2", "merchant", "Paid Elsewhere", "amount", "300", "category", "Food"));
+        assertThat(links.stillProvisional(user.getId(), "e0e1")).isTrue();
+
+        // A statement covering today, with other rows but neither payment
+        String token = jwtUtil.generateToken(email, "USER");
+        ResponseEntity<Map> imported = restTemplate.exchange(
+                baseUrl() + "/api/v1/transactions/batch?accountType=BANK", HttpMethod.POST,
+                json(token, List.of(Map.of("date", TODAY.minusDays(2).toString(), "merchant", "DMART", "amount", -1200),
+                                    Map.of("date", TODAY.toString(), "merchant", "UBER", "amount", -180))),
+                Map.class);
+        assertThat(imported.getBody()).containsEntry("notInStatement", 2);
+        assertThat(links.notInStatement(user.getId())).containsExactlyInAnyOrder("e0e1", "e0e2");
+        assertThat(transactions.findByUser(user)).hasSize(4);                 // flagged, never deleted
+
+        links.keepPayment(user.getId(), "e0e2");                              // "I paid from another account"
+        assertThat(transactions.findByUserAndExternalId(user, "GUARD:e0e2").orElseThrow().getSource())
+                .isEqualTo("SPEND_GUARD_KEPT");
+        assertThat(links.unrecordPayment(user.getId(), "e0e1")).isTrue();     // "I didn't pay"
+        assertThat(links.notInStatement(user.getId())).isEmpty();
+        assertThat(transactions.findByUser(user)).hasSize(3);
+    }
+
+    @Test
+    void aStatementThatEndsBeforeThePayment_flagsNothing() {
+        String email = "guard-links-older@example.com";
+        User user = user(email);
+        links.recordPayment(user.getId(), Map.of("eventId", "e0e3", "merchant", "Today", "amount", "250", "category", "Food"));
+        String token = jwtUtil.generateToken(email, "USER");
+        ResponseEntity<Map> imported = restTemplate.exchange(
+                baseUrl() + "/api/v1/transactions/batch?accountType=BANK", HttpMethod.POST,
+                json(token, List.of(Map.of("date", TODAY.minusDays(10).toString(), "merchant", "DMART", "amount", -900))),
+                Map.class);
+        assertThat(imported.getBody()).containsEntry("notInStatement", 0);
+        assertThat(links.stillProvisional(user.getId(), "e0e3")).isTrue();
+    }
+
+    @Test
     void aPaymentRecordIsCheckedField_byField() {
         User user = user("guard-links-bad@example.com");
         Long uid = user.getId();

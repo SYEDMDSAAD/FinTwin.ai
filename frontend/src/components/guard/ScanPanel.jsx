@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Hand, AlertTriangle, Copy, RotateCcw, ShieldCheck } from "lucide-react";
 import { guard, guardError } from "../../services/guardApi";
+import { storedUserIsDemo } from "../../utils/demoGuard";
 import QrScanner from "./QrScanner";
 import CutsCard from "./CutsCard";
 import UpiAppChoice from "./UpiAppChoice";
+import ScanHistory from "./ScanHistory";
 import { FAST_LANE_REASON, SAMPLES, SOURCE_LABEL, inr, inrExact, isPhone, isSample, openUpi, previewQr, upiLinkFor } from "./format";
 
 // A pause asks for five seconds before "Pay anyway" works: long enough to
@@ -31,7 +33,7 @@ function Facts({ result }) {
     return <div className="sg-chips">{chips.map((c) => <span key={c} className="sg-chip">{c}</span>)}</div>;
 }
 
-export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinChanged }) {
+export default function ScanPanel({ wallet, onWallet, onNeedTopup, initial, onFinTwinChanged }) {
     const [qr, setQr] = useState(null);
     const [amount, setAmount] = useState("");
     const [result, setResult] = useState(null);
@@ -47,6 +49,8 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
     const handled = useRef(null);
 
     const preview = qr ? previewQr(qr) : null;
+    const demo = storedUserIsDemo();
+    // A made-up sample shop: nothing to pay, so the Pay step is shown as a preview
     const sample = qr ? isSample(qr) : false;
 
     function reset() {
@@ -92,13 +96,16 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
         return () => clearTimeout(t);
     }, [wait]);
 
-    async function didNotPay() {
+    // After the UPI app was opened: did the payment go through?
+    async function confirm(paid) {
         setBusy(true);
         setError("");
         try {
-            const r = await guard("unrecord", { eventId: result.eventId });
-            setAfter((a) => ({ ...a, recorded: r.removed ? "removed" : a.recorded }));
-            if (r.removed) onFinTwinChanged?.();
+            const r = await guard("confirm", { eventId: result.eventId, paid });
+            setAfter((a) => ({ ...a, choice: r.choice, toRebalance: r.toRebalance || 0,
+                               recorded: r.recordedTransactionId ? "yes" : null }));
+            onWallet?.(r.wallet);
+            if (r.recordedTransactionId) onFinTwinChanged?.();
         } catch (e) {
             setError(guardError(e));
         } finally {
@@ -110,11 +117,10 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
         setBusy(true);
         setError("");
         try {
-            const r = await guard("outcome", { eventId: result.eventId, choice });
-            setAfter({ choice, link: r.link, toRebalance: r.toRebalance || 0,
-                       recorded: r.recordedTransactionId ? "yes" : null });
+            // Paying only opens the UPI app: nothing moves until the user confirms
+            const r = await guard("outcome", { eventId: result.eventId, choice: choice === "paid" ? "opened" : choice });
+            setAfter({ choice: r.choice || choice, link: r.link, toRebalance: r.toRebalance || 0, recorded: null });
             onWallet?.(r.wallet);
-            if (r.recordedTransactionId) onFinTwinChanged?.();
             if (choice === "paid" && r.link && !sample) openUpi(r.link);
         } catch (e) {
             setError(guardError(e));
@@ -141,6 +147,8 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
     }
 
     // ── Step 1: get a code ───────────────────────────────────────────────────
+    // The shared demo uses made-up payments only: nothing real can be paid
+    const history = <ScanHistory items={wallet?.recent} onWallet={onWallet} onFinTwinChanged={onFinTwinChanged} />;
     if (!qr) {
         return (
             <div className="sg-stack">
@@ -149,6 +157,13 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
                     <p className="sg-sub" style={{ margin: "4px 0 14px" }}>
                         Spend Guard looks at the payment first. Then Google Pay pays, as usual.
                     </p>
+                    {demo && (
+                        <p className="sg-note" style={{ margin: "0 0 12px" }}>
+                            Demo: scan, upload or type any code, or pick a sample below. Spend Guard checks it
+                            against a made-up month. A real shop's code opens your own Google Pay, where you
+                            pay only if you approve it with your PIN; a sample shows a preview.
+                        </p>
+                    )}
                     <QrScanner onCode={(code) => pickCode(code)} />
                 </div>
                 <div className="sg-card">
@@ -183,6 +198,7 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
                         ))}
                     </div>
                 </div>
+                {history}
             </div>
         );
     }
@@ -319,39 +335,76 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinCha
                 </div>
             </div>
 
-            {after?.choice === "paid" && (
+            {after?.choice === "pending" && (
                 <div className="sg-card" role="status">
+                    {sample && (
+                        <span className="sg-chip sg-chip-warn" style={{ marginBottom: 8 }}>
+                            {demo ? "Demo preview" : "Preview"} · sample shop, nothing is paid
+                        </span>
+                    )}
                     <div className="sg-h2">
-                        {sample ? "Sample code: nothing to pay" : isPhone() ? "Over to Google Pay" : "Scan to pay with your phone"}
+                        {!after.link ? "Demo: nothing is paid" : isPhone() ? "Over to Google Pay" : "Scan to pay with your phone"}
                     </div>
-                    {(sample || isPhone()) && (
+                    {!after.link ? (
+                        <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
+                            With your own account, Google Pay opens here with the payee and amount filled in (on a
+                            computer, you scan a code with your phone). You approve it there with your PIN.
+                        </p>
+                    ) : isPhone() && (
                         <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
                             {sample
-                                ? "With a real QR code, Google Pay opens here with the payee and amount filled in (on a computer, you scan a code with your phone). You approve it there with your PIN."
+                                ? `With a real shop, Google Pay opens now with ${result.payeeName || "the payee"} and ${inrExact(result.amount)} filled in. You approve it there with your PIN.`
                                 : "Google Pay should open with the payee and amount filled in. You approve it there with your PIN, as usual."}
                         </p>
                     )}
-                    {!sample && after.link && (
-                        <UpiAppChoice link={after.link}>
-                            <button type="button" className="sg-btn sg-btn-quiet"
-                                    onClick={() => navigator.clipboard?.writeText(after.link)}>
-                                <Copy size={15} /> Copy payment link
-                            </button>
+                    {demo && !sample && after.link && (
+                        <p className="sg-note" style={{ margin: "0 0 12px" }}>
+                            Demo: this is your own Google Pay. Nothing is paid unless you approve it with your PIN,
+                            and nothing is recorded in FinTwin.
+                        </p>
+                    )}
+                    {after.link && (
+                        <UpiAppChoice link={after.link} preview={sample}>
+                            {!sample && (
+                                <button type="button" className="sg-btn sg-btn-quiet"
+                                        onClick={() => navigator.clipboard?.writeText(after.link)}>
+                                    <Copy size={15} /> Copy payment link
+                                </button>
+                            )}
                         </UpiAppChoice>
                     )}
-                    {after.recorded === "yes" && (
-                        <div className="sg-row" style={{ marginTop: 12, alignItems: "center" }}>
-                            <span className="sg-sub" style={{ flex: 1 }}>
-                                Added to your transactions. Your bank statement replaces it when you import it.
-                            </span>
-                            <button type="button" className="sg-btn sg-btn-quiet" onClick={didNotPay} disabled={busy}>
+                    <div className="sg-confirm">
+                        <div className="sg-h2" style={{ fontSize: 15 }}>Did the payment go through?</div>
+                        <p className="sg-sub" style={{ margin: "2px 0 10px" }}>
+                            {inrExact(result.amount)} comes off your spending account only once you've paid.
+                            {sample || demo ? "" : " If you don't say, Spend Guard looks for it in your transactions."}
+                        </p>
+                        <div className="sg-row">
+                            <button type="button" className="sg-btn sg-btn-primary" onClick={() => confirm(true)} disabled={busy}>
+                                I paid
+                            </button>
+                            <button type="button" className="sg-btn" onClick={() => confirm(false)} disabled={busy}>
                                 I didn't pay
                             </button>
                         </div>
-                    )}
-                    {after.recorded === "removed" && (
-                        <p className="sg-sub" style={{ margin: "12px 0 0" }}>Taken out of your transactions.</p>
-                    )}
+                    </div>
+                </div>
+            )}
+            {after?.choice === "paid" && (
+                <div className="sg-card" role="status">
+                    <div className="sg-h2">Paid</div>
+                    <p className="sg-sub" style={{ marginTop: 4 }}>
+                        {inrExact(result.amount)} came off your spending account.
+                        {after.recorded === "yes" ? " Added to your transactions; your bank statement replaces it when you import it." : ""}
+                    </p>
+                </div>
+            )}
+            {after?.choice === "not_paid" && (
+                <div className="sg-card" role="status">
+                    <div className="sg-h2">Not paid</div>
+                    <p className="sg-sub" style={{ marginTop: 4 }}>
+                        {inrExact(result.amount)} stays in your spending account. It's in your scan history as not paid.
+                    </p>
                 </div>
             )}
             {after?.choice === "paid" && after.toRebalance > 0 && (

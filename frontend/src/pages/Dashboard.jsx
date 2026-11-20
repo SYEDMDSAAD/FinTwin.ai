@@ -5,6 +5,7 @@ import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
 import DemoBanner from "../components/DemoBanner";
+import SpendGuardCard from "../components/SpendGuardCard";
 
 import { useTheme } from "../context/ThemeContext";
 
@@ -1670,7 +1671,7 @@ function Dashboard() {
                 "
             >
 
-                <DemoBanner section={activeSection} />
+                <DemoBanner section={activeSection} onOpenGuard={() => navigateTo("Spend Guard")} />
 
                 {activeSection === "Dashboard" && (
                   <Header
@@ -1712,6 +1713,8 @@ function Dashboard() {
                             activeGoals={goals.length}
                             alerts={notifications.length}
                         />
+
+                        <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />
 
                         {loading ? (
 
@@ -1898,6 +1901,7 @@ function Dashboard() {
                             <EnhancedTransactionsTable
                                 transactions={transactions}
                                 onChanged={handleCategoryChanged}
+                                onReload={() => fetchTransactions(txMonths)}
                                 months={txMonths}
                                 onMonthsChange={(m) => { setTxMonths(m); fetchTransactions(m); }}
                             />

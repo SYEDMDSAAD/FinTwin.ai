@@ -55,6 +55,55 @@ export function PlanView({ plan }) {
     );
 }
 
+/* The user's own split of a proposed plan: every part editable, with what's
+   left to place shown live. The guard service checks it the same way as the
+   agent's plan, so nothing here is trusted. */
+function PlanEditor({ plan, busy, onSave, onCancel }) {
+    const [goals, setGoals] = useState(plan.goals.map((g) => ({ goal: g.goal, amount: String(g.amount) })));
+    const [buffer, setBuffer] = useState(String(plan.buffer));
+    const [weekly, setWeekly] = useState(plan.weekly.map(String));
+    const num = (v) => Number(v) || 0;
+    const placed = plan.bills + sum(goals.map((g) => num(g.amount))) + num(buffer) + sum(weekly.map(num));
+    const left = plan.salary - placed;
+    const digits = (v) => v.replace(/\D/g, "").slice(0, 8);
+    const field = (label, value, set) => (
+        <label className="sg-field" key={label}>
+            <span className="sg-label">{label}</span>
+            <span className="sg-money">
+                <span>₹</span>
+                <input className="sg-input" inputMode="numeric" value={value} aria-label={`${label} in rupees`}
+                       onChange={(e) => set(digits(e.target.value))} />
+            </span>
+        </label>
+    );
+
+    return (
+        <form onSubmit={(e) => {
+            e.preventDefault();
+            onSave({ goals: goals.map((g) => ({ goal: g.goal, amount: num(g.amount) })),
+                     buffer: num(buffer), weekly: weekly.map(num) });
+        }}>
+            <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
+                Rent and bills stay at {inr(plan.bills)}. Split the rest your way; every week needs enough for essentials.
+            </p>
+            <div className="sg-plan-grid">
+                {goals.map((g, i) => field(g.goal, g.amount,
+                    (v) => setGoals((gs) => gs.map((x, j) => (j === i ? { ...x, amount: v } : x)))))}
+                {field("Buffer for top-ups", buffer, setBuffer)}
+                {weekly.map((w, i) => field(`Week ${i + 1} spending`, w,
+                    (v) => setWeekly((ws) => ws.map((x, j) => (j === i ? v : x)))))}
+            </div>
+            <p className={`sg-chip ${left === 0 ? "sg-chip-good" : "sg-chip-warn"}`} role="status" style={{ marginTop: 12 }}>
+                {left === 0 ? `Adds up to ${inr(plan.salary)}` : left > 0 ? `${inr(left)} left to place` : `${inr(-left)} over the salary`}
+            </p>
+            <div className="sg-row" style={{ marginTop: 12 }}>
+                <button type="submit" className="sg-btn sg-btn-primary" disabled={busy || left !== 0}>Use my plan</button>
+                <button type="button" className="sg-btn sg-btn-quiet" onClick={onCancel} disabled={busy}>Cancel</button>
+            </div>
+        </form>
+    );
+}
+
 export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
     const [salary, setSalary] = useState(wallet.plan?.salary ? String(wallet.plan.salary) : "");
     const [proposal, setProposal] = useState(null);
@@ -62,6 +111,20 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
     const [error, setError] = useState("");
     const [approved, setApproved] = useState(false);
     const [earmarked, setEarmarked] = useState(0);
+    const [editing, setEditing] = useState(false);
+
+    async function saveOwn(split) {
+        setBusy(true);
+        setError("");
+        try {
+            setProposal(await guard("edit-plan", { planId: proposal.planId, ...split }));
+            setEditing(false);
+        } catch (err) {
+            setError(guardError(err));
+        } finally {
+            setBusy(false);
+        }
+    }
 
     async function plan(e) {
         e.preventDefault();
@@ -69,6 +132,7 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
         setError("");
         setApproved(false);
         setEarmarked(0);
+        setEditing(false);
         try {
             setProposal(await guard("payday", { salary: Number(salary) }));
         } catch (err) {
@@ -124,9 +188,15 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
                         <div className="sg-h2">The plan for {inr(proposal.plan.salary)}</div>
                         <span className="sg-chip">{SOURCE_LABEL[proposal.plan.source] || proposal.plan.source}</span>
                     </div>
-                    <PlanView plan={proposal.plan} />
-                    <p className="sg-p" style={{ margin: "12px 0" }}>{proposal.plan.message}</p>
-                    {approved ? (
+                    {editing ? (
+                        <PlanEditor plan={proposal.plan} busy={busy} onSave={saveOwn} onCancel={() => setEditing(false)} />
+                    ) : (
+                        <>
+                            <PlanView plan={proposal.plan} />
+                            <p className="sg-p" style={{ margin: "12px 0" }}>{proposal.plan.message}</p>
+                        </>
+                    )}
+                    {editing ? null : approved ? (
                         <div role="status">
                             <span className="sg-chip sg-chip-good">
                                 <CheckCircle2 size={13} aria-hidden /> Approved: week 1 has moved to your spending account
@@ -142,6 +212,9 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
                         <div className="sg-row">
                             <button type="button" className="sg-btn sg-btn-primary" onClick={approve} disabled={busy}>
                                 Approve this plan
+                            </button>
+                            <button type="button" className="sg-btn" onClick={() => setEditing(true)} disabled={busy}>
+                                Set it yourself
                             </button>
                             <button type="button" className="sg-btn sg-btn-quiet" onClick={plan} disabled={busy}>
                                 Plan again

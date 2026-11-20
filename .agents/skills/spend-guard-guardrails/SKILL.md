@@ -77,9 +77,21 @@ a model can ignore a prompt, but not a check.
 
 ## Access
 
-16. **Backend:** every `/api/v1/guard/**` call needs the `USE_SPEND_GUARD` permission (the USER role only,
-    never the shared DEMO account) and, while this is a prototype, a user id in `guard.allowed-users`.
+16. **Backend:** every `/api/v1/guard/**` call needs the `USE_SPEND_GUARD` permission (the USER role)
+    and, while this is a prototype, a user id in `guard.allowed-users`.
     `GuardController` sets the user id and a fresh tool token itself, overwriting anything the browser sent.
+    **The shared demo** gets in only with a demo token's session (`DemoSession`), on its own path: each
+    visit gets its own Spend Guard id (`demoGuardId`, far above any real user id), `demo: true`, and no
+    tool token, so guard-service can't read FinTwin; whatever it proposes for FinTwin (`record`,
+    `goalPlan`) is dropped (`withoutLinks`); model calls are capped per visit and per day
+    (`DemoGuardLimits`). In guard-service a demo visit is the made-up persona (`data.demo_visit`), kept
+    in memory only (the oldest visits are dropped), and may check any code (scanned, uploaded, typed or a
+    sample) against the made-up persona; no own UPI ID. After Pay: a sample shop's step is a
+    preview (buttons disabled, the `@sample` QR marked "no shop behind it"), and a real code is
+    handed to the visitor's own UPI app while `DEMO_REAL_HANDOFF` is on (default during judging;
+    `0` gives `link: None` and "Demo: nothing is paid"). Money only moves if the visitor approves
+    it with their own PIN, and nothing from a demo is ever recorded in FinTwin. The
+    browser can never set `demo` itself: the backend writes it on every call.
 17. **guard-service:** every path except `/` and `/health` needs the `X-Internal-Key` header, compared in
     constant time. The browser never calls guard-service directly; it always goes through the backend.
 18. **Secrets** (`AI_INTERNAL_KEY`, API keys, JWT secrets, `.env*` files) come from the environment or
@@ -94,6 +106,26 @@ a model can ignore a prompt, but not a check.
     category, a month within one of now, at most 20 goal shares. One transaction per event (external id
     `GUARD:<event id>`). A bank statement row for the same money takes it over, and "I didn't pay" removes
     it only while it is still Spend Guard's.
+19a. **The user can set the plan themselves** (`/guard/edit-plan`, "Set it yourself"). Their split is a
+    new proposal with source `user` and goes through the same `check_plan` as the agent's (adds up to
+    the salary, every week covers essentials, only their own goals); no AI is called. Approving it works
+    the same way.
+19b. **A payment counts only once it's confirmed.** Tapping Pay opens the UPI app and leaves the scan
+    `pending`: nothing comes off the spending account and nothing is recorded. "I paid" (`/guard/confirm`)
+    or the same amount turning up in FinTwin's transactions within `PENDING_DAYS` (3) of it
+    (`pending_match`, settled when the wallet is read) marks it paid; "I didn't pay", or 3 days with no
+    sign of it, marks it `not_paid`. A payment found in the transactions is never recorded a second time,
+    and a failed read decides nothing. Scan history lives on the Scan tab (`ScanHistory.jsx`).
+19c. **The bank statement settles it, and the user has the last word.** A statement import flags a
+    `SPEND_GUARD` transaction dated inside the file's date range that no row matched as
+    `SPEND_GUARD_UNMATCHED` ("not in your statement"); it is never deleted on import, because the
+    user may have paid from another account. The user answers in the scan history or on the
+    Transactions page: "I paid" → `SPEND_GUARD_KEPT` (never asked again); "I didn't pay" →
+    `/guard/undo-paid`: the money goes back to the spending account, the history says not paid, and
+    the backend removes the transaction. "I paid" by mistake can be undone the same way, but only while
+    the transaction is still Spend Guard's: `stillProvisional` is set by the backend, never the
+    browser, and a payment a statement took over (or one found in the transactions) stays paid.
+    A demo visit opens with a sample week of history (`_seed_demo`) and never touches FinTwin.
 20. **Only real payments are recorded:** never a sample shop, a skipped payment, a top-up (that's the
     user's own money moving between their accounts), or anything with the made-up persona. The persona's
     goals never reach real goals.

@@ -195,7 +195,7 @@ const CSS = `
 .footer-link { font-size: 13px; color: rgba(100,116,139,0.7); text-decoration: none; transition: color 0.15s; cursor: pointer; background: none; border: none; font-family: inherit; text-align: left; }
 .footer-link:hover { color: #a78bfa; }
 .footer-bottom { padding-top: 28px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-.footer-copy { font-size: 12px; color: rgba(100,116,139,0.5); font-family: 'DM Mono', monospace; }
+.footer-copy { font-size: 12px; color: #94a3b8; font-family: 'DM Mono', monospace; }
 .footer-legal { display: flex; gap: 20px; }
 
 /* ── Scroll reveal ──────────────── */
@@ -273,23 +273,45 @@ const CSS = `
 .theme-toggle:hover { border-color: rgba(167,139,250,0.45); color: #a78bfa; }
 .inset-panel { background: rgba(0,0,0,0.22); }
 .cta-bg { background: linear-gradient(180deg, #060810 0%, #0a0614 50%, #060810 100%); }
+
+.hero-note { margin-top: 12px; font-size: 13px; color: rgba(148,163,184,0.7); }
+.steps { list-style: none; padding: 0; margin: 36px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.step { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 24px; height: 100%; }
+.step-n { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; margin-bottom: 14px; background: rgba(34,197,94,0.15); color: #4ade80; }
+.gm-card { max-width: 400px; margin: 0 auto; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.09); border-radius: 22px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,0.35); }
+.gm-top { display: flex; justify-content: space-between; align-items: center; }
+.gm-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(251,191,36,0.14); color: #fbbf24; }
+.gm-time { font-size: 12px; color: rgba(148,163,184,0.7); }
+.gm-payee { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; }
+.gm-name { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+.gm-sub { font-size: 13px; color: rgba(148,163,184,0.75); }
+.gm-amount { font-size: 26px; font-weight: 800; color: #f1f5f9; }
+.gm-msg { font-size: 15px; line-height: 1.55; color: rgba(226,232,240,0.9); margin: 14px 0; }
+.new-pill { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #15803d; color: #fff; vertical-align: 2px; margin-right: 2px; font-family: inherit; }
+.lnav-link .new-pill { margin: 0 0 0 4px; }
+.fine-print { font-size: 12px; color: #94a3b8; font-family: 'DM Mono', monospace; }
+.gm-facts { display: flex; gap: 8px; flex-wrap: wrap; }
+.gm-facts span { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(148,163,184,0.14); color: #cbd5e1; }
+.gm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.gm-btn { font-size: 13px; font-weight: 600; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+.gm-primary { background: #22c55e; border-color: #22c55e; color: #052e16; }
+.gm-quiet { border-color: transparent; color: rgba(148,163,184,0.8); }
 `;
 
 // The same stylesheet for light mode, derived colour by colour (landingLightCss.js)
-const LIGHT_CSS = toLight(CSS);
+// Dark mode: faded greys on near-black fall under 4.5:1, so text greys are solid
+const DARK_CSS = CSS
+  .replace(/color: ?rgba\(100,116,139, ?[0-9.]+\)/g, "color: #94a3b8")
+  .replace(/color: ?rgba\(148,163,184, ?0?\.[0-8][0-9]*\)/g, "color: #aab4c3");
+// Small grey text needs a darker grey than the automatic swap gives it
+const LIGHT_CSS = toLight(CSS) + `
+.land.light .gm-facts span { background: #eef2f7; color: #334155; }
+.land.light .footer-copy, .land.light .fine-print { color: #475569; }
+.land.light .section-tag { color: #6d28d9; }
+`;
 
 
 /* ─── Transaction data ─────────────────────────────────────────── */
-const TRANSACTIONS = [
-  { raw: "UPI-NETFLIX.IN@AXISBANK-PAYMT", cat: "Entertainment", emoji: "🎬", amount: "₹649",  color: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
-  { raw: "SWIGGY*ORD*8423748134-MUM",     cat: "Food & Dining",  emoji: "🍕", amount: "₹342",  color: "#4ade80", bg: "rgba(74,222,128,0.12)"  },
-  { raw: "HDFC-NPS-CONTRIBUTION-JAN25",   cat: "Investments",    emoji: "📈", amount: "₹5,000",color: "#fbbf24", bg: "rgba(251,191,36,0.12)"  },
-  { raw: "ATM WDL KOTAK-PUNE 01/24",      cat: "Cash",           emoji: "💵", amount: "₹3,000",color: "#22d3ee", bg: "rgba(34,211,238,0.12)"  },
-  { raw: "LIC-PREMIUM-00238742-ANNUAL",   cat: "Insurance",      emoji: "🛡️", amount: "₹8,400",color: "#f87171", bg: "rgba(248,113,113,0.12)" },
-  { raw: "NEFT-GROWW-MF-SIP-AXISBLUE",   cat: "Mutual Funds",   emoji: "📊", amount: "₹2,500",color: "#4ade80", bg: "rgba(74,222,128,0.12)"  },
-];
-
-/* ─── useScrollReveal hook ─────────────────────────────────────── */
 function useScrollReveal() {
   const ref = useRef(null);
   useEffect(() => {
@@ -306,149 +328,34 @@ function useScrollReveal() {
 }
 
 /* ─── Transaction Theater ──────────────────────────────────────── */
-function TxTheater() {
-  const [states, setStates] = useState(TRANSACTIONS.map((_, i) => i === 0 ? "thinking" : "raw"));
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const cycle = async (idx) => {
-      if (cancelled) return;
-      // show thinking on active
-      setStates(prev => prev.map((s, i) => i === idx ? "thinking" : s));
-      await delay(700);
-      if (cancelled) return;
-      // resolve
-      setStates(prev => prev.map((s, i) => i === idx ? "resolved" : s));
-      await delay(1800);
-      if (cancelled) return;
-      // move to next
-      const next = (idx + 1) % TRANSACTIONS.length;
-      setActiveIdx(next);
-      if (idx === TRANSACTIONS.length - 1) {
-        // reset all to raw, then start again
-        setStates(TRANSACTIONS.map(() => "raw"));
-        await delay(300);
-      }
-      cycle(next);
-    };
-    const t = setTimeout(() => cycle(0), 600);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, []);
-
+// The hero's picture: what a pause looks like (made-up figures)
+function GuardMockup() {
   return (
-    <div className="tx-theater h-el-6">
-      <div className="tx-theater-hdr">
-        <div className="tx-theater-dot" style={{ background: "#f87171" }} />
-        <div className="tx-theater-dot" style={{ background: "#fbbf24" }} />
-        <div className="tx-theater-dot" style={{ background: "#4ade80" }} />
-        <span className="tx-theater-title" style={{ marginLeft: 8 }}>AI Classification · Live</span>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", animation: "pulse-dot 2s ease infinite" }} />
-          <span style={{ fontSize: 11, color: "rgba(74,222,128,0.8)", fontFamily: "'DM Mono', monospace" }}>running</span>
+    <div className="gm-card" role="img" aria-label="Spend Guard pausing a ₹2,400 clothes payment late at night, with its reason and options">
+      <div className="gm-top">
+        <span className="gm-chip">⏸ Pause</span>
+        <span className="gm-time">11:40 PM</span>
+      </div>
+      <div className="gm-payee">
+        <div>
+          <div className="gm-name">Urban Threads</div>
+          <div className="gm-sub">Shopping</div>
         </div>
+        <div className="gm-amount">₹2,400</div>
       </div>
-
-      <div className="tx-list">
-        {TRANSACTIONS.map((tx, i) => {
-          const state = states[i];
-          const isActive = i === activeIdx;
-          return (
-            <div key={i} className={`tx-item${isActive ? " active" : ""}`}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tx-raw" style={{ color: state === "resolved" ? "rgba(148,163,184,0.5)" : "rgba(100,116,139,0.65)", textDecoration: state === "resolved" ? "line-through" : "none", transition: "all 0.3s" }}>
-                  {tx.raw}
-                </div>
-              </div>
-              <div style={{ flexShrink: 0, marginLeft: 8 }}>
-                {state === "raw" && (
-                  <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", fontFamily: "'DM Mono', monospace" }}>—</div>
-                )}
-                {state === "thinking" && (
-                  <div className="tx-thinking">
-                    <div className="tx-dot tx-dot-1" />
-                    <div className="tx-dot tx-dot-2" />
-                    <div className="tx-dot tx-dot-3" />
-                  </div>
-                )}
-                {state === "resolved" && (
-                  <div className="tx-resolved" style={{ animation: "fadeSlideIn 0.35s ease both" }}>
-                    <div className="tx-tag" style={{ background: tx.bg, color: tx.color }}>
-                      <span>{tx.emoji}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700 }}>{tx.cat}</span>
-                    </div>
-                    <div className="tx-amount">{tx.amount}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <p className="gm-msg">This takes your Shopping budget ₹1,500 over, and it's 48% of what's left this week. Your Goa trip would move back about 12 days.</p>
+      <div className="gm-facts">
+        <span>₹2,600 left this week</span><span>4 days to allowance</span>
       </div>
-
-      <div className="tx-theater-footer">
-        <span style={{ fontSize: 14 }}>🤖</span>
-        <span className="tx-ai-tag">AI categorisation · learns from your corrections</span>
+      <div className="gm-actions">
+        <span className="gm-btn gm-primary">Skip it</span>
+        <span className="gm-btn">Wishlist for 2 days</span>
+        <span className="gm-btn gm-quiet">Pay anyway</span>
       </div>
     </div>
   );
 }
 
-function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-/* ─── Score Ring mini component ────────────────────────────────── */
-function ScoreRing({ score = 78, size = 120 }) {
-  const r = (size - 16) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (score / 100) * circ;
-  const color = score >= 80 ? "#4ade80" : score >= 60 ? "#fbbf24" : "#f87171";
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
-      <circle
-        cx={size/2} cy={size/2} r={r} fill="none"
-        stroke={color} strokeWidth={8}
-        strokeLinecap="round"
-        strokeDasharray={circ}
-        strokeDashoffset={offset}
-        className="score-ring-anim"
-        style={{ filter: `drop-shadow(0 0 8px ${color})` }}
-      />
-    </svg>
-  );
-}
-
-/* ─── Animated chat bubbles ─────────────────────────────────────── */
-function ChatMockup() {
-  const msgs = [
-    { role: "user", text: "How much did I spend on food last month?" },
-    { role: "ai",   text: "You spent ₹8,420 on Food & Dining in May — 23% over your ₹6,800 budget. Swiggy & Zomato account for 71%. Want me to set a weekly cap?" },
-    { role: "user", text: "Yes! Also, can I afford a new laptop this month?" },
-    { role: "ai",   text: "After your SIPs, EMIs and projected expenses, you have ~₹14,200 discretionary. A ₹65k laptop via 6-month no-cost EMI (₹10,833/mo) is tight but manageable." },
-  ];
-  const [visible, setVisible] = useState(1);
-  useEffect(() => {
-    let i = 1;
-    const t = setInterval(() => {
-      i++;
-      setVisible(v => Math.min(v + 1, msgs.length));
-      if (i >= msgs.length) clearInterval(t);
-    }, 1400);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="mini-chat" style={{ maxHeight: 220, overflow: "hidden" }}>
-      {msgs.slice(0, visible).map((m, i) => (
-        <div key={i} className={m.role === "user" ? "mini-chat-user" : "mini-chat-ai"} style={{ animation: "chatBubble 0.4s ease both" }}>
-          {m.role === "ai" && <div className="mini-chat-ai-tag">FinTwin Copilot</div>}
-          {m.text}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─── Reveal wrapper ────────────────────────────────────────────── */
 function Reveal({ children, delay = 0, className = "" }) {
   const ref = useScrollReveal();
   return (
@@ -519,13 +426,13 @@ export default function LandingPage() {
 
   return (
     <div className={`land${isDark ? "" : " light"}`}>
-      <style>{isDark ? CSS : LIGHT_CSS}</style>
+      <style>{isDark ? DARK_CSS : LIGHT_CSS}</style>
 
       {/* ── Mobile menu ──────────────────────────────────────── */}
       <div className={`mob-menu${menuOpen ? " open" : ""}`} role="dialog" aria-label="Navigation menu">
-        <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Features">Features</button>
         <button className="mob-link" onClick={() => scrollTo("spend-guard")} aria-label="Go to Spend Guard">Spend Guard</button>
-        <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Security">Security</button>
+        <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Features">Features</button>
+        <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Trust">Trust</button>
         <button className="mob-link" onClick={() => scrollTo("pricing")} aria-label="Go to Pricing">Pricing</button>
         <button className="theme-toggle" onClick={toggleTheme} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
           {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
@@ -551,9 +458,9 @@ export default function LandingPage() {
             <span className="lnav-wordmark">FinTwin<span> AI</span></span>
           </a>
           <div className="lnav-links" role="menubar">
+            <button className="lnav-link" role="menuitem" onClick={() => scrollTo("spend-guard")}>Spend Guard <span className="new-pill">New</span></button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("features")}>Features</button>
-            <button className="lnav-link" role="menuitem" onClick={() => scrollTo("spend-guard")}>Spend Guard</button>
-            <button className="lnav-link" role="menuitem" onClick={() => scrollTo("security")}>Security</button>
+            <button className="lnav-link" role="menuitem" onClick={() => scrollTo("security")}>Trust</button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("pricing")}>Pricing</button>
           </div>
           <div className="lnav-right">
@@ -579,25 +486,24 @@ export default function LandingPage() {
           HERO
       ════════════════════════════════════════════════════════ */}
       <section className="hero" aria-labelledby="hero-heading">
-        {/* Ambient glows */}
         <div className="glow-blob glow-purple" aria-hidden="true" />
         <div className="glow-blob glow-cyan" aria-hidden="true" />
 
         <div className="hero-inner">
-          {/* Left column */}
           <div>
             <div className="hero-badge h-el-1" aria-label="Product highlights">
-              <div className="hero-badge-dot" aria-hidden="true" />
-              Statement import · Encrypted · Built for India
+              <span className="new-pill">New</span>
+              Spend Guard is live · Made for India
             </div>
 
             <h1 className="hero-h1 h-el-2" id="hero-heading">
-              Your money,<br />
-              <span className="grad">finally understood.</span>
+              Pause before<br />
+              <span className="grad">you pay.</span>
             </h1>
 
             <p className="hero-sub h-el-3">
-              FinTwin reads your bank and UPI statements and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Then it helps you pause before the spends you'd regret.
+              FinTwin checks a payment against your budget, your week and your goals before the money leaves.
+              Groceries and bills go straight through. The spends you'd regret get a moment's thought.
             </p>
 
             <div className="hero-ctas h-el-4">
@@ -608,362 +514,68 @@ export default function LandingPage() {
                 </button>
               ) : (
                 <>
-                  <button className="btn-hero" onClick={() => navigate("/register")} aria-label="Create your free FinTwin account">
-                    Get Started — it's free
+                  <button className="btn-hero" onPointerDown={() => prefetchDashboard()} onClick={tryDemo}
+                          disabled={demoStarting} aria-label="Try FinTwin with a demo account, no sign-up">
+                    {demoStarting ? "Opening the demo…" : "Try the live demo"}
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
+                  <button className="btn-hero-ghost" onClick={() => navigate("/register")} aria-label="Create your free FinTwin account">Create a free account</button>
                   <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Log In</button>
-                  <div className="demo-cta">
-                    <div className="demo-cta-text">
-                      <div className="demo-badge"><span className="demo-badge-dot" aria-hidden="true" />Live demo · no sign-up</div>
-                      <div className="demo-cta-title">Not ready to upload your own statement?</div>
-                      <div className="demo-cta-sub">Try a demo account with a full set of sample data: explore the dashboard, build a goal and ask the AI copilot anything. One click.</div>
-                    </div>
-                    <button className="btn-demo" onPointerDown={() => prefetchDashboard()} onClick={tryDemo}
-                            disabled={demoStarting} aria-label="Try FinTwin with a demo account, no sign-up">
-                      {demoStarting ? "Opening the demo…" : "Try the demo →"}
-                    </button>
-                  </div>
                 </>
               )}
             </div>
+            {!isLoggedIn && (
+              <p className="hero-note h-el-4">No sign-up for the demo. Sample data, nothing is paid.</p>
+            )}
 
             <div className="hero-stats h-el-5">
               <div>
-                <div className="hero-stat-val">Beta</div>
-                <div className="hero-stat-label">Early access</div>
+                <div className="hero-stat-val">₹0</div>
+                <div className="hero-stat-label">Money we hold</div>
               </div>
               <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
               <div>
-                <div className="hero-stat-val">0</div>
-                <div className="hero-stat-label">Bank passwords asked</div>
+                <div className="hero-stat-val">5 sec</div>
+                <div className="hero-stat-label">A pause, not a block</div>
               </div>
               <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
               <div>
-                <div className="hero-stat-val">5+</div>
-                <div className="hero-stat-label">AI advisor modes</div>
+                <div className="hero-stat-val">You</div>
+                <div className="hero-stat-label">Make the call</div>
               </div>
             </div>
           </div>
 
-          {/* Right column — Transaction Theater */}
-          <div className="hero-right" aria-label="Live AI transaction classification demo">
-            <TxTheater />
+          <div className="hero-right" aria-label="Example: Spend Guard pausing a payment">
+            <GuardMockup />
           </div>
         </div>
       </section>
 
       {/* ════════════════════════════════════════════════════════
-          PILLAR 1 — Understand your spending
+          WHY
       ════════════════════════════════════════════════════════ */}
-      <section id="features" aria-labelledby="pillar1-heading">
+      <section id="why" aria-labelledby="why-heading">
         <div className="section">
           <Reveal>
-            <div className="section-tag">Pillar 1</div>
-            <h2 className="section-h2" id="pillar1-heading">
-              See exactly where every <span className="gt-gold">₹</span> went.
+            <div className="section-tag">Why FinTwin</div>
+            <h2 className="section-h2" id="why-heading">
+              Paying got instant.<br />
+              <span className="gt-purple">Thinking about it didn't.</span>
             </h2>
             <p className="section-sub">
-              No more end-of-month mystery. FinTwin AI reads your transactions and tells you what you actually spent — in plain language, not bank-statement gibberish.
+              A scan and a PIN, and the money's gone. Budget apps tell you what went wrong at the end of the
+              month. FinTwin helps at the moment it matters: just before you pay.
             </p>
           </Reveal>
-
-          <div className="feat-grid">
-            {/* Card 1 */}
-            <Reveal delay={1}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🤖</div>
-                <div className="feat-card-title">AI auto-categorization</div>
-                <div className="feat-card-desc">
-                  Raw UPI strings like <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#a78bfa" }}>SWIGGY*ORD*8423748134</span> become "🍕 Food · ₹342" automatically. Fix one, and FinTwin remembers that shop next time.
-                </div>
-                <div className="mini-bar-wrap" style={{ marginTop: 18 }}>
-                  {[
-                    { label: "Food",    pct: 68, color: "#4ade80" },
-                    { label: "Travel",  pct: 42, color: "#22d3ee" },
-                    { label: "Shopping",pct: 81, color: "#a78bfa" },
-                    { label: "Bills",   pct: 55, color: "#fbbf24" },
-                  ].map(b => (
-                    <div className="mini-bar-row" key={b.label}>
-                      <span className="mini-bar-label">{b.label}</span>
-                      <div className="mini-bar-track">
-                        <div className="mini-bar-fill" style={{ width: `${b.pct}%`, background: b.color }} />
-                      </div>
-                      <span className="mini-bar-val" style={{ color: b.color }}>{b.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Card 2 */}
-            <Reveal delay={2}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(34,211,238,0.1)" }} aria-hidden="true">🔁</div>
-                <div className="feat-card-title">Recurring expense detection</div>
-                <div className="feat-card-desc">
-                  Netflix, Spotify, gym memberships, cloud storage — FinTwin spots what quietly drains your account every month before you even check.
-                </div>
-                <div className="mini-recurring">
-                  {[
-                    { name: "Netflix", emoji: "🎬", amt: "₹649" },
-                    { name: "Spotify", emoji: "🎵", amt: "₹119" },
-                    { name: "HDFC AMC",emoji: "🏦", amt: "₹250" },
-                    { name: "iCloud+", emoji: "☁️",  amt: "₹75"  },
-                  ].map(r => (
-                    <div className="mini-rec-row" key={r.name}>
-                      <span className="mini-rec-name">{r.emoji} {r.name}</span>
-                      <span className="mini-rec-amt">{r.amt}/mo</span>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 11, color: "rgba(34,211,238,0.7)", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-                    Total: ₹1,093/mo · ₹13,116/yr
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Card 3 */}
-            <Reveal delay={1}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(74,222,128,0.1)" }} aria-hidden="true">📊</div>
-                <div className="feat-card-title">Budget tracking with real insight</div>
-                <div className="feat-card-desc">
-                  Set budgets per category. FinTwin tells you not just that you're over — but why, and what to adjust next month.
-                </div>
-                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                  {[
-                    { cat: "Food & Dining", spent: 8420, budget: 6800, color: "#f87171" },
-                    { cat: "Transport",     spent: 2100, budget: 3000, color: "#4ade80" },
-                    { cat: "Entertainment", spent: 1290, budget: 2000, color: "#4ade80" },
-                  ].map(b => {
-                    const pct = Math.min((b.spent / b.budget) * 100, 100);
-                    const over = b.spent > b.budget;
-                    return (
-                      <div key={b.cat}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                          <span style={{ fontSize: 11, color: "rgba(148,163,184,0.7)" }}>{b.cat}</span>
-                          <span style={{ fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: b.color }}>
-                            ₹{b.spent.toLocaleString("en-IN")} / ₹{b.budget.toLocaleString("en-IN")}
-                          </span>
-                        </div>
-                        <div className="mini-bar-track">
-                          <div className="mini-bar-fill" style={{ width: `${pct}%`, background: b.color, transition: "width 1.2s ease" }} />
-                        </div>
-                        {over && <div style={{ fontSize: 10, color: "#f87171", marginTop: 3, fontFamily: "'DM Mono', monospace" }}>↑ ₹{(b.spent-b.budget).toLocaleString("en-IN")} over budget</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Card 4 */}
-            <Reveal delay={2}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(248,113,113,0.1)" }} aria-hidden="true">🚨</div>
-                <div className="feat-card-title">Anomaly & fraud alerts</div>
-                <div className="feat-card-desc">
-                  AI monitors every transaction pattern. If something looks off — unusual merchant, odd amount, duplicate charge — you hear about it immediately.
-                </div>
-                <div className="mini-anomaly">
-                  <span className="mini-anomaly-icon" aria-hidden="true">⚠️</span>
-                  <div className="mini-anomaly-text">
-                    <strong>Unusual transaction detected:</strong> ₹4,500 to "PAID2VENDOR_3829" — not seen before. Similar to a known phishing pattern. Review?
-                  </div>
-                </div>
-                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <button style={{ flex: 1, padding: "7px 0", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 8, fontSize: 12, color: "#f87171", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Flag</button>
-                  <button style={{ flex: 1, padding: "7px 0", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 12, color: "rgba(148,163,184,0.7)", cursor: "pointer", fontFamily: "inherit" }}>It's fine</button>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════
-          PILLAR 2 — Grow with AI guidance
-      ════════════════════════════════════════════════════════ */}
-      <section aria-labelledby="pillar2-heading">
-        <div className="section" style={{ paddingTop: 0 }}>
-          <Reveal>
-            <div className="section-tag">Pillar 2</div>
-            <h2 className="section-h2" id="pillar2-heading">
-              An AI that knows your goals,<br />
-              <span className="gt-purple">not just your balance.</span>
-            </h2>
-            <p className="section-sub">
-              Five advisor personalities — Savings Coach, Investment Advisor, Budget Analyst, Fraud Analyst, Purchase Advisor — each tuned for a different financial job.
-            </p>
-          </Reveal>
-
-          <div className="feat-grid" style={{ marginTop: 56 }}>
-            {/* AI Copilot chat card */}
-            <Reveal delay={1}>
-              <div className="feat-card" style={{ gridColumn: "1 / -1" }}>
-                <div className="feat-split">
-                  <div>
-                    <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🤖</div>
-                    <div className="feat-card-title">AI Copilot with advisor modes</div>
-                    <div className="feat-card-desc" style={{ marginBottom: 20 }}>
-                      Ask anything about your money in plain language. Five advisor personalities, one chat.
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {["💰 Savings", "📈 Investing", "📋 Budget", "🛡️ Fraud", "🛍️ Purchase"].map(m => (
-                        <span key={m} style={{ fontSize: 12, padding: "5px 12px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: 8, color: "#c4b5fd", fontWeight: 600 }}>{m}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <ChatMockup />
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Score ring card */}
-            <Reveal delay={1}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(74,222,128,0.1)" }} aria-hidden="true">🎯</div>
-                <div className="feat-card-title">Your financial score, explained</div>
-                <div className="feat-card-desc">One real-time score across savings, debt, investments and emergency fund — every point explained.</div>
-                <div className="mini-score-ring" style={{ position: "relative" }}>
-                  <ScoreRing score={78} size={120} />
-                  <div style={{ position: "absolute", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 800, color: "#4ade80", lineHeight: 1 }}>78</span>
-                    <span style={{ fontSize: 10, color: "rgba(100,116,139,0.6)", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>GOOD</span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[{ l: "Savings", v: "A", c: "#4ade80" }, { l: "Debt", v: "B+", c: "#fbbf24" }, { l: "Invest", v: "B", c: "#22d3ee" }].map(s => (
-                    <div key={s.l} style={{ flex: 1, minWidth: 60, textAlign: "center", padding: "8px 4px", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 800, color: s.c }}>{s.v}</div>
-                      <div style={{ fontSize: 10, color: "rgba(100,116,139,0.6)", marginTop: 2 }}>{s.l}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Goal planning card */}
-            <Reveal delay={2}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(251,191,36,0.1)" }} aria-hidden="true">🏁</div>
-                <div className="feat-card-title">AI-generated goal plans</div>
-                <div className="feat-card-desc">Name your goal — house, emergency fund, dream trip — and get a monthly savings plan to reach it.</div>
-                <div className="mini-goal">
-                  {[
-                    { name: "Emergency Fund", emoji: "🏦", pct: 64, color: "#22d3ee"  },
-                    { name: "Goa Trip",       emoji: "✈️",  pct: 38, color: "#a78bfa"  },
-                    { name: "Home Down Pymt", emoji: "🏠",  pct: 12, color: "#fbbf24"  },
-                  ].map(g => (
-                    <div className="mini-goal-row" key={g.name}>
-                      <span className="mini-goal-emoji" aria-hidden="true">{g.emoji}</span>
-                      <div className="mini-goal-info">
-                        <div className="mini-goal-name">{g.name}</div>
-                        <div className="mini-goal-bar-track">
-                          <div className="mini-goal-bar-fill" style={{ width: `${g.pct}%`, background: g.color }} />
-                        </div>
-                      </div>
-                      <span className="mini-goal-pct" style={{ color: g.color }}>{g.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Net worth / investments */}
-            <Reveal delay={1}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(34,211,238,0.1)" }} aria-hidden="true">📈</div>
-                <div className="feat-card-title">Net worth & investment tracking</div>
-                <div className="feat-card-desc">
-                  EPF, mutual funds, FDs, gold, real estate — one net worth number updated daily, from your imported statements and what you add by hand.
-                </div>
-                <div className="inset-panel" style={{ marginTop: 16, padding: 14, borderRadius: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "rgba(100,116,139,0.7)" }}>Total net worth</span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 800, color: "#4ade80" }}>₹18.4L</span>
-                  </div>
-                  {[
-                    { label: "Mutual Funds", val: "₹7.2L",  chg: "+12.4%", c: "#4ade80"  },
-                    { label: "EPF",           val: "₹5.6L",  chg: "+8.1%",  c: "#22d3ee"  },
-                    { label: "FD",            val: "₹3.8L",  chg: "+7.0%",  c: "#fbbf24"  },
-                    { label: "Bank Balance",  val: "₹1.8L",  chg: "—",      c: "#a78bfa"  },
-                  ].map(a => (
-                    <div key={a.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "rgba(148,163,184,0.7)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: a.c, display: "inline-block" }} aria-hidden="true" />
-                        {a.label}
-                      </span>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{a.val}</span>
-                        <span style={{ fontSize: 11, color: a.chg === "—" ? "rgba(100,116,139,0.5)" : "#4ade80", fontFamily: "'DM Mono', monospace" }}>{a.chg}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* Forecast card */}
-            <Reveal delay={2}>
-              <div className="feat-card">
-                <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🔭</div>
-                <div className="feat-card-title">AI spending forecast</div>
-                <div className="feat-card-desc">
-                  Based on your history and scheduled payments, FinTwin projects your month-end balance before you get there — so you can act before it's too late.
-                </div>
-                <div className="inset-panel" style={{ marginTop: 16, padding: "14px 14px 6px", borderRadius: 12 }}>
-                  <div style={{ fontSize: 11, color: "rgba(100,116,139,0.6)", marginBottom: 10, fontFamily: "'DM Mono', monospace" }}>June balance projection</div>
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
-                    {[
-                      { h: 85, label: "W1", color: "#a78bfa",  proj: false },
-                      { h: 65, label: "W2", color: "#a78bfa",  proj: false },
-                      { h: 72, label: "W3", color: "#a78bfa",  proj: false },
-                      { h: 48, label: "W4", color: "#fbbf24",  proj: true  },
-                      { h: 31, label: "EOM", color: "#f87171", proj: true  },
-                    ].map(b => (
-                      <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                        <div style={{ width: "100%", height: `${b.h}%`, borderRadius: "4px 4px 0 0", background: b.proj ? "transparent" : b.color, border: b.proj ? `1px dashed ${b.color}` : "none", opacity: b.proj ? 0.6 : 0.8 }} />
-                        <span style={{ fontSize: 9, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>{b.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 11, color: "#f87171", fontFamily: "'DM Mono', monospace" }}>
-                    ⚠ Projected month-end: ₹4,200 — below your ₹10k safety target
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════
-          PILLAR 3 — Spend Guard: pause before you pay
-      ════════════════════════════════════════════════════════ */}
-      <section id="spend-guard" aria-labelledby="pillar3-heading">
-        <div className="section">
-          <Reveal>
-            <div className="section-tag">Pillar 3 · New</div>
-            <h2 className="section-h2" id="pillar3-heading">
-              Pause before you pay.
-            </h2>
-            <p className="section-sub">
-              UPI made paying instant. Spend Guard gives you a moment to think before the payments you might regret, and stays out of the way for everything else.
-            </p>
-          </Reveal>
-
-          <div className="feat-grid">
+          <div className="feat-grid feat-grid-3">
             {[
-              { icon: "⏸️", bg: "rgba(167,139,250,0.12)", title: "A pause only when it matters",
-                desc: "Groceries and bills go straight through. A late-night splurge or a buy that breaks your budget gets a short pause, explained with your own numbers." },
-              { icon: "📅", bg: "rgba(34,211,238,0.10)", title: "Your salary, planned on payday",
-                desc: "Bills, goals and a safety buffer come first. What's left becomes a weekly allowance, so overspending never eats into your rent." },
-              { icon: "🔄", bg: "rgba(251,191,36,0.10)", title: "Top-ups that think first",
-                desc: "Need more this week? Ask, and Spend Guard checks what you can spare. Money set aside for bills is never touched." },
-              { icon: "🤝", bg: "rgba(74,222,128,0.10)", title: "You always decide",
-                desc: "It suggests, it never blocks. Your own UPI app makes the payment, just like always." },
+              { icon: "☕", bg: "rgba(251,191,36,0.10)", title: "Small spends add up",
+                desc: "₹150 here and ₹400 there is how a month's savings quietly disappear." },
+              { icon: "🌙", bg: "rgba(167,139,250,0.12)", title: "Late nights cost more",
+                desc: "The buys people regret most happen late, on impulse, and in a hurry." },
+              { icon: "🎯", bg: "rgba(34,211,238,0.10)", title: "Goals slip out of sight",
+                desc: "A trip, a phone, an emergency fund: easy to forget at the counter." },
             ].map((c, i) => (
               <Reveal key={c.title} delay={(i % 2) + 1}>
                 <div className="feat-card">
@@ -978,67 +590,123 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════
-          SECURITY SECTION
+          SPEND GUARD: how it works
+      ════════════════════════════════════════════════════════ */}
+      <section id="spend-guard" aria-labelledby="sg-heading">
+        <div className="section">
+          <Reveal>
+            <div className="section-tag"><span className="new-pill">New feature</span> Spend Guard</div>
+            <h2 className="section-h2" id="sg-heading">A second look, in seconds.</h2>
+            <p className="section-sub">
+              Spend Guard sits between the scan and the payment. Most payments go straight through.
+              When one would hurt, it tells you why, in your own numbers.
+            </p>
+          </Reveal>
+          <ol className="steps" aria-label="How Spend Guard works">
+            {[
+              { n: "1", title: "Scan as usual", desc: "Scan the shop's QR code, or enter a UPI ID. If Spend Guard can't tell what a payment is for, it simply asks." },
+              { n: "2", title: "Spend Guard checks", desc: "Your budget, what's left this week, your goals and the time of day, in a few seconds." },
+              { n: "3", title: "You decide", desc: "Pay in Google Pay, skip it, or put it on a 2-day wishlist. PhonePe and Paytm work too." },
+            ].map((st, i) => (
+              <Reveal key={st.n} delay={i + 1}>
+                <li className="step">
+                  <div className="step-n" aria-hidden="true">{st.n}</div>
+                  <div className="feat-card-title">{st.title}</div>
+                  <div className="feat-card-desc">{st.desc}</div>
+                </li>
+              </Reveal>
+            ))}
+          </ol>
+          <div className="feat-grid" style={{ marginTop: 28 }}>
+            {[
+              { icon: "⏸️", bg: "rgba(167,139,250,0.12)", title: "A pause only when it matters",
+                desc: "Essentials and small payments never wait. A buy that breaks your budget gets a short, honest note." },
+              { icon: "📅", bg: "rgba(34,211,238,0.10)", title: "Payday, planned",
+                desc: "Bills, goals and a safety buffer come first. The rest becomes a weekly allowance." },
+              { icon: "🔄", bg: "rgba(251,191,36,0.10)", title: "Top-ups that think first",
+                desc: "Need more this week? Spend Guard checks what you can spare. Bill money is never touched." },
+              { icon: "🤝", bg: "rgba(74,222,128,0.10)", title: "Advice, never a block",
+                desc: "You can always pay anyway. Your UPI app makes every payment, with your PIN." },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={(i % 2) + 1}>
+                <div className="feat-card">
+                  <div className="feat-card-icon" style={{ background: c.bg }} aria-hidden="true">{c.icon}</div>
+                  <div className="feat-card-title">{c.title}</div>
+                  <div className="feat-card-desc">{c.desc}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          FEATURES: the rest of FinTwin
+      ════════════════════════════════════════════════════════ */}
+      <section id="features" aria-labelledby="features-heading">
+        <div className="section">
+          <Reveal>
+            <div className="section-tag">Your money, in one place</div>
+            <h2 className="section-h2" id="features-heading">Everything behind the pause.</h2>
+            <p className="section-sub">
+              Spend Guard knows your budget because FinTwin knows your money. Bring in your bank statements
+              once and get the full picture.
+            </p>
+          </Reveal>
+          <div className="feat-grid">
+            {[
+              { icon: "📊", bg: "rgba(34,211,238,0.10)", title: "See where it goes",
+                desc: "Every rupee sorted into clear categories, month by month." },
+              { icon: "🎯", bg: "rgba(167,139,250,0.12)", title: "Goals that keep up",
+                desc: "Set a target and see when you'll get there, based on what you really save." },
+              { icon: "💬", bg: "rgba(74,222,128,0.10)", title: "Ask about your money",
+                desc: "\"Where did most of it go last month?\" Plain answers from your own data." },
+              { icon: "📈", bg: "rgba(251,191,36,0.10)", title: "Your net worth",
+                desc: "Savings, investments and loans together, so you know where you stand." },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={(i % 2) + 1}>
+                <div className="feat-card">
+                  <div className="feat-card-icon" style={{ background: c.bg }} aria-hidden="true">{c.icon}</div>
+                  <div className="feat-card-title">{c.title}</div>
+                  <div className="feat-card-desc">{c.desc}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          TRUST
       ════════════════════════════════════════════════════════ */}
       <div className="sec-wrap" id="security">
         <section aria-labelledby="security-heading">
           <div className="section">
-            {/* Ambient glow for security */}
-            <div className="glow-blob" style={{ width: 500, height: 500, background: "rgba(34,211,238,0.05)", top: 0, right: -100, position: "absolute", filter: "blur(120px)", pointerEvents: "none" }} aria-hidden="true" />
-
             <Reveal>
-              <div className="section-tag" style={{ color: "#22d3ee" }}>Security</div>
+              <div className="section-tag">Trust</div>
               <h2 className="section-h2" id="security-heading">
-                Your money data stays private.<br />
-                <span className="gt-purple">You stay in control.</span>
+                Your money never leaves your bank.<br />
+                <span className="gt-purple">Your data stays yours.</span>
               </h2>
-              <p className="section-sub">
-                We built FinTwin for people who shouldn't have to choose between useful AI and financial privacy. You don't have to.
-              </p>
             </Reveal>
-
-            <div className="sec-grid">
-              <Reveal delay={1}>
-                <div className="sec-card">
-                  <div className="sec-card-icon" style={{ background: "rgba(34,211,238,0.08)" }} aria-hidden="true">🔐</div>
-                  <div className="sec-card-title">Your data is encrypted</div>
-                  <div className="sec-card-desc">
-                    Every sensitive piece of information — account numbers, balances, transactions — is encrypted before it's stored. Not just the database, but each individual field.
+            <div className="feat-grid feat-grid-3">
+              {[
+                { icon: "🏦", bg: "rgba(34,211,238,0.10)", title: "We never touch your money",
+                  desc: "FinTwin can't hold, move or send money. Every payment happens in your own UPI app." },
+                { icon: "🔒", bg: "rgba(167,139,250,0.12)", title: "Private by default",
+                  desc: "Your data is encrypted, never sold, and yours to export or delete at any time." },
+                { icon: "🔑", bg: "rgba(74,222,128,0.10)", title: "No bank passwords",
+                  desc: "We never ask for them. You bring in your statements; you choose what we see." },
+              ].map((c, i) => (
+                <Reveal key={c.title} delay={(i % 2) + 1}>
+                  <div className="feat-card">
+                    <div className="feat-card-icon" style={{ background: c.bg }} aria-hidden="true">{c.icon}</div>
+                    <div className="feat-card-title">{c.title}</div>
+                    <div className="feat-card-desc">{c.desc}</div>
                   </div>
-                </div>
-              </Reveal>
-
-              <Reveal delay={2}>
-                <div className="sec-card">
-                  <div className="sec-card-icon" style={{ background: "rgba(167,139,250,0.08)" }} aria-hidden="true">🏦</div>
-                  <div className="sec-card-title">No bank passwords, ever</div>
-                  <div className="sec-card-desc">
-                    FinTwin works from the statements you choose to import. It never asks for your bank login or card details.
-                  </div>
-                </div>
-              </Reveal>
-
-              <Reveal delay={1}>
-                <div className="sec-card">
-                  <div className="sec-card-icon" style={{ background: "rgba(74,222,128,0.08)" }} aria-hidden="true">🗑️</div>
-                  <div className="sec-card-title">Delete everything, anytime</div>
-                  <div className="sec-card-desc">
-                    Your data is yours. Delete your account and everything in it from Settings, in one step.
-                  </div>
-                </div>
-              </Reveal>
-
-              <Reveal delay={2}>
-                <div className="sec-card">
-                  <div className="sec-card-icon" style={{ background: "rgba(251,191,36,0.08)" }} aria-hidden="true">📋</div>
-                  <div className="sec-card-title">Full access history</div>
-                  <div className="sec-card-desc">
-                    Every login and action is logged. You can see exactly who accessed your account and when — because it's your data, and you deserve to know.
-                  </div>
-                </div>
-              </Reveal>
+                </Reveal>
+              ))}
             </div>
-
           </div>
         </section>
       </div>
@@ -1063,14 +731,13 @@ export default function LandingPage() {
               <p className="price-desc">Full access to every feature. Free, for now.</p>
               <div className="price-features" role="list">
                 {[
-                  "AI Copilot with 5 advisor personalities",
-                  "Bank & UPI statement import (PDF, Excel, CSV)",
-                  "Auto-categorization & recurring expense detection",
-                  "Financial score + goal planning",
-                  "Anomaly detection & fraud alerts",
-                  "Net worth tracking (EPF, MF, FD, gold)",
-                  "AI spending forecast",
-                  "AES-256 encryption & audit log",
+                  "Spend Guard: a check before every payment",
+                  "Bank and UPI statement import",
+                  "Spending by category, month by month",
+                  "Savings goals and a monthly plan",
+                  "Answers about your money, in plain words",
+                  "Net worth: savings, investments and loans",
+                  "Encrypted, private, and never sold",
                 ].map(f => (
                   <div className="price-feat" key={f} role="listitem">
                     <div className="price-feat-check" aria-hidden="true">✓</div>
@@ -1086,7 +753,7 @@ export default function LandingPage() {
               >
                 {isLoggedIn ? "Open Dashboard" : "Get started — no card required"}
               </button>
-              <p style={{ marginTop: 14, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
+              <p className="fine-print" style={{ marginTop: 14 }}>
                 We'll give you 30 days notice before any pricing changes.
               </p>
             </div>
@@ -1102,11 +769,11 @@ export default function LandingPage() {
         <div className="cta-inner">
           <Reveal>
             <h2 className="cta-h2">
-              Your money has been<br />
-              waiting to be <span className="gt-purple">understood.</span>
+              Spend with a<br />
+              <span className="gt-purple">second thought.</span>
             </h2>
             <p className="cta-sub">
-              Stop guessing and start knowing. Free, private, built for India.
+              Free during beta. Try the live demo in one click, no sign-up needed.
             </p>
             <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
               {isLoggedIn ? (
@@ -1134,7 +801,7 @@ export default function LandingPage() {
                 </>
               )}
             </div>
-            <p style={{ marginTop: 20, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
+            <p className="fine-print" style={{ marginTop: 20 }}>
               Free · No credit card · Delete anytime
             </p>
           </Reveal>
@@ -1154,7 +821,7 @@ export default function LandingPage() {
                 <span className="lnav-wordmark">FinTwin<span> AI</span></span>
               </div>
               <p className="footer-brand-desc">
-                AI-powered personal finance for India. Know your money, and pause before you spend it.
+                Personal finance for India. Pause before you pay, and see where your money goes.
               </p>
             </div>
 
@@ -1194,7 +861,7 @@ export default function LandingPage() {
           </div>
 
           <div className="footer-bottom">
-            <span className="footer-copy">© 2026 FinTwin AI · Built in India · v0.1.0-beta</span>
+            <span className="footer-copy">© 2026 FinTwin AI · Made in India · Beta</span>
             <div className="footer-legal">
               <span className="footer-link" style={{ fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Privacy</span>
               <span className="footer-link" style={{ fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Terms</span>

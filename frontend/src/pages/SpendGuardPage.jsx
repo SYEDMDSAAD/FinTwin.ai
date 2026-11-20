@@ -113,6 +113,7 @@ export default function SpendGuardPage({ onFinTwinChanged }) {
                     {/* Kept mounted so a scan in progress survives a look at the wallet */}
                     <div role="tabpanel" id="sg-panel-scan" aria-labelledby="sg-tab-scan" hidden={tab !== "scan"}>
                         <ScanPanel
+                            wallet={wallet}
                             onWallet={onWallet}
                             onFinTwinChanged={onFinTwinChanged}
                             initial={buying}

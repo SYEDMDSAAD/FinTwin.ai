@@ -97,6 +97,7 @@ public class TransactionController {
                 "duplicates", result.duplicates(),
                 "skipped",    result.skipped(),
                 "reconciled", result.reconciled(),
+                "notInStatement", result.notInStatement(),
                 "success",    true));
     }
 
