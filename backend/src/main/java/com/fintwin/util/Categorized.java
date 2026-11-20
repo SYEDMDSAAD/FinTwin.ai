@@ -22,6 +22,8 @@ public record Categorized(String category, String source) {
     public static final String PAYMENT_PATTERN = "PAYMENT_PATTERN";
     /** Money between the user's own accounts. */
     public static final String SELF_TRANSFER = "SELF_TRANSFER";
+    /** The merchant type a UPI QR code carries (its MCC), read by Spend Guard. */
+    public static final String MERCHANT_CODE = "MERCHANT_CODE";
     /** Nothing matched — left in "Other". */
     public static final String NONE = "NONE";
     /** Card bookkeeping (bill payments), not a guess about the merchant. */

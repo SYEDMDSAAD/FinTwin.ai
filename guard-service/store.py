@@ -1,8 +1,10 @@
 """Where Spend Guard keeps each user's wallet, decisions, wishlist and plans.
 
-GUARD_STORE=firestore uses Firestore (users/{id} holds the wallet, with
-events, wishlist and plans as subcollections). Anything else keeps it in
-memory, which is fine for a laptop and tests and is lost on restart.
+With real FinTwin data (BACKEND_URL set, no GUARD_PERSONA) the records live in
+FinTwin's database, encrypted there (BackendStore). GUARD_STORE=firestore uses
+Firestore (users/{id} holds the wallet, with events, wishlist and plans as
+subcollections). Anything else keeps it in memory, which is fine for a laptop,
+the made-up persona and tests, and is lost on restart.
 
 Both stores have the same methods, so the rest of the service never knows
 which one it has. Ids from the browser are checked by the caller
@@ -11,10 +13,18 @@ which one it has. Ids from the browser are checked by the caller
 Prototype note: the wallet's balances are pretend ("demo": True). FinTwin
 can't see live bank balances; in real use the user's bank enforces the limit.
 """
+import asyncio
 import copy
+import hashlib
+import json
+import logging
 import os
 import uuid
 from datetime import date, timedelta
+
+import backend_api
+
+logger = logging.getLogger(__name__)
 
 
 def _monday(day: date) -> date:
@@ -176,5 +186,81 @@ class FirestoreStore:
         self._doc(uid).delete()
 
 
+class BackendStore(MemoryStore):
+    """MemoryStore whose records are kept in FinTwin, one JSON document per user.
+
+    The first request for a user after a restart reads their document from
+    FinTwin (open); after any request that changed it, the document is written
+    back in the background (save_soon), newest snapshot wins. If FinTwin can't
+    be read, the user's records stay in memory only and are never written back,
+    so a fresh wallet can't overwrite the real one; the next request tries the
+    read again.
+    """
+
+    KEEP_EVENTS = 150
+    KEEP_PLANS = 10
+
+    def __init__(self):
+        super().__init__()
+        self._loaded: set[str] = set()
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._pending: set[asyncio.Task] = set()
+
+    async def open(self, uid, tool_token: str | None) -> None:
+        key = str(uid)
+        if key in self._loaded:
+            return
+        try:
+            got = await asyncio.to_thread(backend_api.get, uid, "/guard-state", tool_token)
+            raw = got.get("state")
+            doc = json.loads(raw) if raw else None
+        except (RuntimeError, ValueError, AttributeError):
+            logger.warning("Spend Guard records couldn't be read from FinTwin; working in memory")
+            return
+        if doc:
+            self._users[key] = {"wallet": doc.get("wallet"), "events": doc.get("events") or {},
+                                "wishlist": doc.get("wishlist") or {}, "plans": doc.get("plans") or {}}
+        self._loaded.add(key)
+
+    def fingerprint(self, uid) -> str:
+        doc = self._users.get(str(uid))
+        return hashlib.sha256(json.dumps(doc, sort_keys=True, default=str).encode()).hexdigest()
+
+    def _document(self, uid) -> dict:
+        u = self._user(uid)
+        events = sorted(u["events"].values(), key=lambda e: e.get("at", ""), reverse=True)[:self.KEEP_EVENTS]
+        plans = sorted(u["plans"].values(), key=lambda p: p.get("created_at", ""), reverse=True)[:self.KEEP_PLANS]
+        return {"version": 1, "wallet": u["wallet"], "events": {e["id"]: e for e in events},
+                "wishlist": u["wishlist"], "plans": {p["id"]: p for p in plans}}
+
+    def save_soon(self, uid, tool_token: str | None, summary) -> None:
+        """Writes the user's document back to FinTwin without holding up the reply.
+        summary() builds the Copilot's figures when the write runs."""
+        if str(uid) not in self._loaded:
+            return
+        task = asyncio.create_task(self._save(uid, tool_token, summary))
+        self._pending.add(task)
+        task.add_done_callback(self._pending.discard)
+
+    async def _save(self, uid, tool_token, summary) -> None:
+        lock = self._locks.setdefault(str(uid), asyncio.Lock())
+        async with lock:
+            try:
+                body = {"state": json.dumps(self._document(uid), default=str, separators=(",", ":")),
+                        "summary": json.dumps(summary(), default=str, separators=(",", ":"))}
+                await asyncio.to_thread(backend_api.put, uid, "/guard-state", tool_token, body)
+            except Exception as e:      # the reply already went out; log and try again next change
+                logger.warning("Spend Guard records couldn't be saved to FinTwin: %s", type(e).__name__)
+
+    async def drain(self) -> None:
+        """Waits for writes still in flight (shutdown, tests)."""
+        while self._pending:
+            await asyncio.gather(*list(self._pending), return_exceptions=True)
+
+
 def make_store():
-    return FirestoreStore() if os.environ.get("GUARD_STORE") == "firestore" else MemoryStore()
+    if os.environ.get("GUARD_STORE") == "firestore":
+        return FirestoreStore()
+    if backend_api.configured() and os.environ.get("GUARD_PERSONA") != "1":
+        return BackendStore()
+    return MemoryStore()

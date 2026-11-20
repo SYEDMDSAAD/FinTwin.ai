@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { percent } from "../utils/money";
 
 function CircleScore({ score }) {
     const radius = 54;
@@ -108,7 +109,7 @@ function FinancialScoreCard({ scoreData }) {
                     {/* Mini stats */}
                     <div style={{ marginTop: 16, width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
                         {[
-                            { label: "Savings Rate",   value: scoreData.savingsRatio + "%",          color: "#4ade80" },
+                            { label: "Savings rate · 3 mo", value: percent(scoreData.savingsRatio), color: Number(scoreData.savingsRatio) < 0 ? "#f87171" : "#4ade80" },
                             { label: "Budget Score",   value: scoreData.budgetDiscipline + "%",       color: "#22d3ee" },
                             { label: "Recurring",      value: scoreData.recurringExpenseCount + " items", color: "#f87171" },
                         ].map(s => (
@@ -140,7 +141,7 @@ function FinancialScoreCard({ scoreData }) {
                                 padding: "10px 14px",
                             }}
                         >
-                            <span>SCORE FACTORS</span>
+                            <span>SCORE FACTORS · LAST 3 MONTHS</span>
                             <ChevronDown
                                 size={16}
                                 strokeWidth={3}

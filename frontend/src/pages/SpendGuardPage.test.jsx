@@ -12,6 +12,7 @@ import * as format from "../components/guard/format";
 vi.mock("../components/guard/format", async (importOriginal) => ({
     ...(await importOriginal()),
     openUpi: vi.fn(),
+    isPhone: vi.fn(() => true),          // a phone unless a test says it's a laptop
 }));
 
 const CAFE = "upi://pay?pa=chaicorner@okicici&pn=Chai%20Corner&mc=5814&cu=INR";
@@ -54,6 +55,7 @@ beforeEach(() => {
     mock = new MockAdapter(API);
     mock.onPost("/guard/wallet").reply(200, WALLET);
     format.openUpi.mockClear();
+    format.isPhone.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -101,6 +103,54 @@ describe("SpendGuardPage", () => {
         await waitFor(() => expect(format.openUpi).toHaveBeenCalledWith(CAFE + "&am=450.00"));
         expect(posted("outcome")).toEqual([{ eventId: "e1", choice: "paid" }]);
         expect(await screen.findByText("Keep this month on track")).toBeInTheDocument();
+
+        // Google Pay didn't open: the same link goes to a backup app instead
+        fireEvent.click(screen.getByRole("button", { name: "PhonePe" }));
+        expect(format.openUpi).toHaveBeenLastCalledWith(CAFE + "&am=450.00", "phonepe");
+        fireEvent.click(screen.getByRole("button", { name: "Paytm" }));
+        expect(format.openUpi).toHaveBeenLastCalledWith(CAFE + "&am=450.00", "paytm");
+        fireEvent.click(screen.getByRole("button", { name: /open google pay again/i }));
+        expect(format.openUpi).toHaveBeenLastCalledWith(CAFE + "&am=450.00");
+        expect(posted("outcome")).toHaveLength(1);                         // switching apps records nothing new
+    });
+
+    it("says a paid payment was added to the transactions, and takes it back if it wasn't paid", async () => {
+        mock.onPost("/guard/check").reply(200, {
+            ...PAUSE, eventId: "e9", decision: "go", message: "", source: "fast_lane", reason: "small",
+        });
+        mock.onPost("/guard/outcome").reply(200, {
+            choice: "paid", link: CAFE + "&am=450.00", toRebalance: 0, recordedTransactionId: 321, wallet: WALLET,
+        });
+        mock.onPost("/guard/unrecord").reply(200, { removed: true });
+        const changed = vi.fn();
+        render(<SpendGuardPage onFinTwinChanged={changed} />);
+        await pasteAndCheck(CAFE, 450);
+        fireEvent.click(await screen.findByRole("button", { name: /^pay/i }));
+
+        expect(await screen.findByText(/Added to your transactions/)).toBeInTheDocument();
+        expect(changed).toHaveBeenCalledTimes(1);               // the dashboard reloads its transactions
+        fireEvent.click(screen.getByRole("button", { name: "I didn't pay" }));
+        expect(await screen.findByText("Taken out of your transactions.")).toBeInTheDocument();
+        expect(changed).toHaveBeenCalledTimes(2);
+        expect(posted("unrecord")).toEqual([{ eventId: "e9" }]);
+    });
+
+    it("checks a typed UPI ID the same way as a scanned code", async () => {
+        mock.onPost("/guard/check").reply(200, { ...PAUSE, eventId: "e7" });
+        render(<SpendGuardPage />);
+        fireEvent.change(await screen.findByLabelText("UPI ID"), { target: { value: "not-an-id" } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("Enter a UPI ID like");
+
+        fireEvent.change(screen.getByLabelText("UPI ID"), { target: { value: "ravi.kumar@okicici" } });
+        fireEvent.change(screen.getByLabelText("Payee name"), { target: { value: "Ravi & Sons" } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+        expect(await screen.findByText("ravi.kumar@okicici")).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText("Amount in rupees"), { target: { value: "650" } });
+        fireEvent.click(screen.getByRole("button", { name: /check before paying/i }));
+
+        await waitFor(() => expect(posted("check")).toEqual([
+            { qr: "upi://pay?pa=ravi.kumar@okicici&pn=Ravi%20%26%20Sons&cu=INR", amount: "650" }]));
     });
 
     it("never opens a UPI app for a made-up sample shop", async () => {
@@ -114,7 +164,7 @@ describe("SpendGuardPage", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Café, ₹450" }));
         fireEvent.click(screen.getByRole("button", { name: /check before paying/i }));
         expect(await screen.findByText("Small payments never wait")).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: /pay ₹450 in your upi app/i }));
+        fireEvent.click(screen.getByRole("button", { name: /pay ₹450 in google pay/i }));
         expect(await screen.findByText("Sample code: nothing to pay")).toBeInTheDocument();
         expect(format.openUpi).not.toHaveBeenCalled();
     });
@@ -270,6 +320,108 @@ describe("SpendGuardPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "Wishlist for 2 days" }));
         expect(await screen.findByText("On your wishlist", {}, { timeout: 3000 })).toBeInTheDocument();
         expect(mock.history.post).toHaveLength(0);                                  // nothing left the browser
+    });
+
+    it("asks what a payment to an unknown payee is for, then checks with the answer", async () => {
+        const FRIEND = "upi://pay?pa=9876543210@ybl&pn=Ravi&cu=INR";
+        mock.onPost("/guard/check").replyOnce(200, {
+            decision: "ask_reason", question: "Spend Guard can't tell who this is or what it's for. What's this payment for?",
+            purposes: ["Food", "Rent", "Paying someone back", "Something else"], source: "rules", reason: null,
+            amount: "2000.00", rupees: 2000, category: "Other", payeeName: "Ravi", payeeUpi: "9876543210@ybl",
+        }).onPost("/guard/check").replyOnce(200, {
+            ...PAUSE, eventId: "e9", decision: "go", message: "", source: "fast_lane", reason: "essential",
+            amount: "2000.00", rupees: 2000, category: "Rent", payeeName: "Ravi", payeeUpi: "9876543210@ybl", budget: null,
+        });
+        render(<SpendGuardPage />);
+        await pasteAndCheck(FRIEND, 2000);
+        expect(await screen.findByText(/what's this payment for\?/i)).toBeInTheDocument();
+        const checkBtn = screen.getByRole("button", { name: /check before paying/i });
+        expect(checkBtn).toBeDisabled();                                    // an answer is needed first
+        fireEvent.click(screen.getByRole("radio", { name: "Rent" }));
+        fireEvent.change(screen.getByLabelText(/in your own words/i), { target: { value: "  November rent  " } });
+        fireEvent.click(checkBtn);
+        expect(await screen.findByText("9876543210@ybl · Rent")).toBeInTheDocument();
+        expect(posted("check")).toEqual([
+            { qr: FRIEND, amount: "2000" },
+            { qr: FRIEND, amount: "2000", purpose: "Rent", reason: "November rent" }]);
+    });
+
+    it("hands every payment to Google Pay, with the payee and amount unchanged", () => {
+        const link = "upi://pay?pa=chaicorner@okicici&pn=Chai%20Corner&mc=5814&cu=INR&am=450.00";
+        const query = link.slice(link.indexOf("?") + 1);
+        expect(format.googlePayLink(link, "Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/131"))
+            .toBe(`intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`);
+        expect(format.googlePayLink(link, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"))
+            .toBe(`gpay://upi/pay?${query}`);
+        expect(format.googlePayLink(link, "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 5))
+            .toBe(`gpay://upi/pay?${query}`);                                   // an iPad
+        expect(format.googlePayLink(link, "Mozilla/5.0 (X11; Linux x86_64)")).toBe(link);
+        expect(format.googlePayLink("upi://pay?pa=a@ok&tn=a#b", "Android")).toContain("tn=a%23b#Intent;");
+        expect(format.googlePayLink("https://evil.example/pay?pa=a@ok", "Android")).toBeNull();
+        expect(format.googlePayLink("intent://x#Intent;package=evil;end", "Android")).toBeNull();
+    });
+
+    it("on a laptop, shows the checked payment as a QR code to scan with the phone", async () => {
+        format.isPhone.mockReturnValue(false);
+        const link = CAFE + "&am=450.00";
+        mock.onPost("/guard/check").reply(200, { ...PAUSE, decision: "go", message: "", source: "fast_lane", reason: "small" });
+        mock.onPost("/guard/outcome").reply(200, { choice: "paid", link, toRebalance: 0, wallet: WALLET });
+        render(<SpendGuardPage />);
+        await pasteAndCheck(CAFE, 450);
+        fireEvent.click(await screen.findByRole("button", { name: /pay ₹450 in google pay/i }));
+        expect(await screen.findByText("Scan to pay with your phone")).toBeInTheDocument();
+        const code = await screen.findByRole("img", { name: "QR code for this payment" });
+        expect(screen.queryByRole("button", { name: "PhonePe" })).not.toBeInTheDocument();   // no app to open here
+
+        // The drawn code scans as exactly the checked payment
+        const side = Number(code.getAttribute("viewBox").split(" ")[2]), scale = 6, w = side * scale;
+        const px = new Uint8ClampedArray(w * w * 4).fill(255);
+        for (const [, x, y] of code.querySelector("path").getAttribute("d").matchAll(/M(\d+) (\d+)h1v1h-1z/g)) {
+            for (let dy = 0; dy < scale; dy += 1) for (let dx = 0; dx < scale; dx += 1) {
+                const i = (((Number(y) * scale + dy) * w) + Number(x) * scale + dx) * 4;
+                px[i] = px[i + 1] = px[i + 2] = 0;
+            }
+        }
+        const { default: jsQR } = await import("jsqr");
+        expect(jsQR(px, w, w)?.data).toBe(link);
+    });
+
+    it("never opens anything on a computer, and draws codes only for UPI payment links", async () => {
+        const real = await vi.importActual("../components/guard/format");
+        expect(real.isPhone("Mozilla/5.0 (Linux; Android 14)")).toBe(true);
+        expect(real.isPhone("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)")).toBe(true);
+        expect(real.isPhone("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 5)).toBe(true);     // an iPad
+        expect(real.isPhone("Mozilla/5.0 (X11; Linux x86_64)", 0)).toBe(false);
+        const before = window.location.href;
+        real.openUpi(CAFE);                                   // jsdom is a computer
+        expect(window.location.href).toBe(before);
+        const { default: PayQr } = await import("../components/guard/PayQr");
+        const { container } = render(<PayQr link="https://evil.example/pay?pa=a@ok" />);
+        await new Promise((r) => setTimeout(r, 50));
+        expect(container.querySelector("svg")).toBeNull();
+    });
+
+    it("offers only PhonePe and Paytm as backups, with the payee and amount unchanged", () => {
+        const link = "upi://pay?pa=chaicorner@okicici&pn=Chai%20Corner&cu=INR&am=450.00";
+        const query = link.slice(link.indexOf("?") + 1);
+        const android = "Mozilla/5.0 (Linux; Android 14)", iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)";
+        expect(format.BACKUP_APPS.map((a) => a.name)).toEqual(["PhonePe", "Paytm"]);
+        expect(format.upiAppLink(link, "phonepe", android)).toBe(`intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`);
+        expect(format.upiAppLink(link, "paytm", android)).toBe(`intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;end`);
+        expect(format.upiAppLink(link, "phonepe", iphone)).toBe(`phonepe://pay?${query}`);
+        expect(format.upiAppLink(link, "paytm", iphone)).toBe(`paytmmp://pay?${query}`);
+        expect(format.upiAppLink(link, "whatsapp", android)).toBeNull();          // only the three apps
+        expect(format.upiAppLink(link, undefined, android)).toBe(format.googlePayLink(link, android));
+    });
+
+    it("asks what an unknown payment is for in mock mode too", async () => {
+        resetMock();
+        const friend = "upi://pay?pa=ravi@sample&pn=Ravi";
+        expect((await mockGuard("check", { qr: friend, amount: 2000 })).decision).toBe("ask_reason");
+        expect((await mockGuard("check", { qr: friend, amount: 2000, purpose: "Made up" })).decision).toBe("ask_reason");
+        expect((await mockGuard("check", { qr: friend, amount: 60 })).reason).toBe("small");
+        const r = await mockGuard("check", { qr: friend, amount: 2000, purpose: "Rent" });
+        expect([r.decision, r.reason, r.category]).toEqual(["go", "essential", "Rent"]);
     });
 
     it("always pauses a bet in mock mode, however small", async () => {

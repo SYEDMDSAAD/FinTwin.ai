@@ -68,8 +68,8 @@ else
 fi
 
 if [ "${1:-}" = "--backend" ]; then
-  step "backend: guard access and role tests"
-  (cd backend && mvn -q test -Dtest='GuardControllerTest,GuardAccessIntegrationTest,RbacIntegrationTest') \
+  step "backend: guard access, role and FinTwin-link tests"
+  (cd backend && mvn -q test -Dtest='GuardControllerTest,GuardAccessIntegrationTest,RbacIntegrationTest,SpendGuardLinksIntegrationTest,GoalMathTest') \
     || failed+=("backend guard tests")
 fi
 

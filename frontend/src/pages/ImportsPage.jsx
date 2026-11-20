@@ -48,7 +48,7 @@ function StepIndicator({ step }) {
 
 // compact: just the import wizard, for embedding in onboarding — no coverage
 // panel, no alert-email setup, no page header.
-export default function ImportsPage({ onImported, compact = false }) {
+export default function ImportsPage({ onImported, onViewTransactions, compact = false }) {
   const [step, setStep] = useState(0);
   const [csvData, setCsvData] = useState(null);
   const [fileName, setFileName] = useState("");
@@ -563,7 +563,12 @@ export default function ImportsPage({ onImported, compact = false }) {
                 {result.reconciled > 0 && <> · {result.reconciled} already added from alert emails, now confirmed by the statement</>}
                 {result.skipped > 0 && <> · {result.skipped} rows could not be read</>}
               </div>
-              <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                {onViewTransactions && (
+                  <button onClick={onViewTransactions} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Check transactions →</button>
+                )}
+                <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 10 }}>

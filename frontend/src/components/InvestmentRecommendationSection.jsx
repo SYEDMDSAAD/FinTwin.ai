@@ -369,7 +369,7 @@ function InvestmentRecommendationSection({
                         PORTFOLIO ALLOCATION
                     </div>
 
-                    <ResponsiveContainer
+                    <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}
                         width="100%"
                         height={260}
                     >

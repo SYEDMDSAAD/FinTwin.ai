@@ -232,11 +232,8 @@ public class AuditAspect {
         String msg = ex.getMessage();
         if (msg == null) return ex.getClass().getSimpleName();
 
-        // Strip anything that looks like an email address
-        msg = msg.replaceAll(
-                "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}",
-                "[EMAIL_REDACTED]"
-        );
+        // Emails, UPI IDs, phone/card/account numbers and credentials
+        msg = com.fintwin.util.PiiRedactor.redact(msg);
 
         // Truncate to a safe length
         return msg.length() > 500 ? msg.substring(0, 500) : msg;

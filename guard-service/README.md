@@ -79,10 +79,12 @@ Hindi or Telugu messages:
 |---|---|
 | `AI_INTERNAL_KEY` | required; the shared key with the backend |
 | `GUARD_PERSONA=1` | use the made-up persona instead of FinTwin's data |
-| `BACKEND_URL` | the FinTwin backend, for `/internal/ai/{userId}/budgets` and `/goals` |
-| `GUARD_STORE=firestore` | keep data in Firestore (default: in memory, lost on restart) |
-| `GOOGLE_GENAI_USE_VERTEXAI=TRUE`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION=global` | Gemini on Vertex AI |
+| `BACKEND_URL` | the FinTwin backend: budgets, goals and categories from `/internal/ai/{userId}/…`, and Spend Guard's own records kept there (`/guard-state`, encrypted) |
+| `GUARD_DATA_CACHE_SECONDS` | how long a user's budgets and goals are reused between scans (default 60; dropped when Spend Guard records a payment or earmarks goals) |
+| `GUARD_STORE=firestore` | keep data in Firestore instead (default: in FinTwin with real data, in memory with the persona) |
+| `GOOGLE_GENAI_USE_VERTEXAI=TRUE`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION=global` | Gemini on Vertex AI (signs in with application-default credentials). Quick 403/429/503 refusals are retried twice (`brain.VERTEX_RETRY`): a free-trial project gets intermittent "requires an eligible paid billing account" 403s on the global endpoint. On a trial project `gemini-3.7-flash` passes 18/21 evals, every miss being such a refusal |
 | `GOOGLE_API_KEY` | Gemini on AI Studio (made-up data only) |
+| `GUARD_MODEL=ollama/qwen2.5:3b`, `OLLAMA_URL` | a model on this machine through Ollama (default `http://127.0.0.1:11434`). Real data is allowed only while `OLLAMA_URL` is a loopback address. Small models get a short last-check note and a stricter top-up answer shape (`prompts.LOCAL_CHECKS`, `schemas.LocalTopupDecision`); on qwen2.5:3b the evals pass 17/21 at about 1 s each |
 | `GUARD_MODEL` | default `gemini-3.8-flash`. Gemini 2.5 models work on AI Studio too (they get a thinking budget instead of a level); Vertex's global endpoint doesn't serve `gemini-2.5-flash` |
 | `GUARD_AI=off` | the fixed rules decide everything |
 | `GUARD_SCAN_SECONDS` and the others in `main.py` | time limits per agent; each request fits inside the backend's 20 s |

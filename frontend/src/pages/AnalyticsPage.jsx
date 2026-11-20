@@ -313,7 +313,7 @@ function BalanceTrendTab({ transactions }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>RUNNING BALANCE OVER TIME</div>
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
@@ -363,7 +363,7 @@ function CashFlowTab({ transactions }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={320}>
         <BarChart data={data} barGap={4} margin={{ top: 20, right: 8, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />

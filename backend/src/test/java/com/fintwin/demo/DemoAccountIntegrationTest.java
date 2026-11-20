@@ -110,6 +110,11 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
         String latest = rows.stream().map(r -> (String) r.get("date")).max(String::compareTo).orElseThrow();
         assertThat(LocalDate.parse(latest)).isAfterOrEqualTo(LocalDate.now(DemoAccountService.INDIA).minusDays(1));
 
+        // The Insurance page isn't empty either
+        ResponseEntity<String> policies = call(token, HttpMethod.GET, "/api/v1/insurance", null);
+        assertThat(policies.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(JSON.readValue(policies.getBody(), List.class)).hasSize(2);
+
         // The visit is recorded, with only the cleaned-up details
         Map<String, Object> session = jdbc.queryForMap(
                 "SELECT visitor_id, device, source FROM demo_sessions ORDER BY started_at DESC LIMIT 1");

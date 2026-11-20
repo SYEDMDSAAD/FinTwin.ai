@@ -4,8 +4,9 @@
  * dashboard only holds the last few months; a year-long chart fetches its own.
  */
 export function monthsNeeded(period, customStart, today = new Date()) {
-    if (period === "This month") return 1;
-    if (period === "Last month") return 2;
+    // One month more than the period itself: the table compares it with the month before
+    if (period === "This month") return 2;
+    if (period === "Last month") return 3;
     if (period === "This year") return today.getMonth() + 1;
     if (period === "Last 12 months") return 12;
     if (period === "All time") return 0;

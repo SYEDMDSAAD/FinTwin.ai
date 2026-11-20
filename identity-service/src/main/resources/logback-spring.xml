@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!-- Every line is masked before it is written: emails, phone numbers,
+       OTPs, passwords and tokens (com.fintwin.identity.logging.MaskedMessageConverter). -->
+  <conversionRule conversionWord="maskedMsg" class="com.fintwin.identity.logging.MaskedMessageConverter"/>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%thread] %logger{36} traceId=%X{traceId:-} - %maskedMsg%n%wEx</pattern>
+    </encoder>
+  </appender>
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

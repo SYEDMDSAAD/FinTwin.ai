@@ -26,8 +26,8 @@ describe("ImportsPage — statement import", () => {
   beforeEach(() => { mock = new MockAdapter(API); });
   afterEach(() => { mock.restore(); });
 
-  async function uploadAndPreview({ card = false } = {}) {
-    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+  async function uploadAndPreview({ card = false, onViewTransactions } = {}) {
+    const { container } = render(<ImportsPage onImported={vi.fn()} onViewTransactions={onViewTransactions} />);
     const input = container.querySelector("#csv-upload");
     fireEvent.change(input, {
       target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
@@ -46,6 +46,25 @@ describe("ImportsPage — statement import", () => {
     expect(screen.getByText(/₹1,250 out/)).toBeInTheDocument();
     expect(screen.getByText(/₹1,20,000 in/)).toBeInTheDocument();
     expect(screen.getAllByText("Auto")).toHaveLength(2);
+  });
+
+  it("offers a way to the transactions once the import is done", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
+    const onViewTransactions = vi.fn();
+    await uploadAndPreview({ onViewTransactions });
+    expect(screen.queryByText("Check transactions →")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Import 2 Transactions"));
+    fireEvent.click(await screen.findByText("Check transactions →"));
+    expect(onViewTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no such button where there is nowhere to go (onboarding)", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
+    await uploadAndPreview();
+    fireEvent.click(screen.getByText("Import 2 Transactions"));
+    await screen.findByText("Import Complete!");
+    expect(screen.queryByText("Check transactions →")).not.toBeInTheDocument();
   });
 
   it("posts normalised rows without a placeholder category", async () => {

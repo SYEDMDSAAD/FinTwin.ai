@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Tags, ChevronDown, Sparkles, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import { storedUserIsDemo } from "../utils/demoGuard";
 import { EDIT_CATEGORIES } from "../constants/categories";
 import { normalizeMerchant as norm } from "../utils/merchant";
 
@@ -51,6 +52,11 @@ export default function SortOther({ onSorted, onBulkChanged }) {
 
     useEffect(() => {
         let alive = true;
+        // The read-only demo can't change rows, so it only loads
+        if (storedUserIsDemo()) {
+            load();
+            return () => { alive = false; };
+        }
         // Rows imported before the rules improved get sorted without a re-import
         API.post("/transactions/recategorize")
             .then(res => { if (alive && res.data?.updated > 0 && onBulkChanged) onBulkChanged(); })

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck, Info, ScanLine, ShieldCheck, Wallet } from "lucide-react";
 import { guard, guardError } from "../services/guardApi";
 import { GUARD_CSS } from "../components/guard/guardCss";
-import { aiStatus } from "../components/guard/format";
+import { aiStatus, inr } from "../components/guard/format";
 import ScanPanel from "../components/guard/ScanPanel";
 import WalletPanel from "../components/guard/WalletPanel";
 import PaydayPanel from "../components/guard/PaydayPanel";
@@ -14,9 +14,9 @@ const TABS = [
 ];
 
 /* Spend Guard (prototype): AI agents that pause before careless spends.
-   FinTwin never holds or moves money. The user's own UPI app pays, and the
+   FinTwin never holds or moves money. Google Pay pays, and the
    balances on these screens are pretend, for the demo. */
-export default function SpendGuardPage() {
+export default function SpendGuardPage({ onFinTwinChanged }) {
     const [tab, setTab] = useState("scan");
     const [wallet, setWallet] = useState(null);
     const [error, setError] = useState("");
@@ -64,13 +64,14 @@ export default function SpendGuardPage() {
     }
 
     const status = wallet ? aiStatus(wallet.ai) : null;
+    const wide = useWideScreen();
 
     return (
         <div className="sg">
             <style>{GUARD_CSS}</style>
             <div className="sg-head">
                 <div>
-                    <div className="sg-eyebrow">AI Suite · Prototype</div>
+                    <div className="sg-eyebrow">New</div>
                     <h1 className="sg-h1">Spend Guard</h1>
                     <p className="sg-sub">Splits your salary on payday, and pauses before a payment you might regret.</p>
                 </div>
@@ -95,8 +96,10 @@ export default function SpendGuardPage() {
                         <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
                         {wallet.mock
                             ? "Mock mode: made-up data, and no AI. Nothing is paid."
-                            : "The balances here are pretend, for the demo. Your own UPI app still moves the money, and you approve every payment there."}
+                            : "The balances here are pretend, for the demo. Google Pay still moves the money, and you approve every payment there."}
                     </p>
+                    <div className="sg-layout">
+                    <div className="sg-main">
                     {/* The ARIA tabs pattern: one tab stop, arrow keys (and Home/End) move between tabs */}
                     <div className="sg-tabs" role="tablist" aria-label="Spend Guard" onKeyDown={onTabKey}>
                         {TABS.map(({ key, label, Icon }) => (
@@ -111,6 +114,7 @@ export default function SpendGuardPage() {
                     <div role="tabpanel" id="sg-panel-scan" aria-labelledby="sg-tab-scan" hidden={tab !== "scan"}>
                         <ScanPanel
                             onWallet={onWallet}
+                            onFinTwinChanged={onFinTwinChanged}
                             initial={buying}
                             onNeedTopup={(amount) => {
                                 setTopupPrefill(amount);
@@ -132,10 +136,67 @@ export default function SpendGuardPage() {
                         )}
                     </div>
                     <div role="tabpanel" id="sg-panel-payday" aria-labelledby="sg-tab-payday" hidden={tab !== "payday"}>
-                        {tab === "payday" && <PaydayPanel wallet={wallet} onWallet={onWallet} />}
+                        {tab === "payday" && (
+                            <PaydayPanel wallet={wallet} onWallet={onWallet} onFinTwinChanged={onFinTwinChanged} />
+                        )}
+                    </div>
+                    </div>
+                    {wide && <WeekAside wallet={wallet} />}
                     </div>
                 </>
             )}
         </div>
+    );
+}
+
+const WIDE = "(min-width: 1100px)";
+
+/** True on screens wide enough for the side panel. It isn't rendered at all on
+    phones, so the page never carries the same figures twice. */
+function useWideScreen() {
+    const [wide, setWide] = useState(() => !!window.matchMedia?.(WIDE).matches);
+    useEffect(() => {
+        const mq = window.matchMedia?.(WIDE);
+        if (!mq) return undefined;
+        const onChange = () => setWide(mq.matches);
+        mq.addEventListener?.("change", onChange);
+        return () => mq.removeEventListener?.("change", onChange);
+    }, []);
+    return wide;
+}
+
+/** Wide screens only: this week's money beside the tabs, so it stays in view (and
+    updates) while you scan and pay, plus how Spend Guard decides. Phones skip it;
+    the Wallet tab has the same figures. */
+function WeekAside({ wallet }) {
+    return (
+        <aside className="sg-aside" aria-label="This week">
+            <div className="sg-card">
+                <div className="sg-hero-label">Left to spend this week</div>
+                <div className="sg-hero">{inr(wallet.balances.spending)}</div>
+                <p className="sg-note" style={{ margin: "4px 0 0" }}>
+                    Weekly allowance {inr(wallet.weekly)} · next one in {wallet.daysToAllowance} day{wallet.daysToAllowance === 1 ? "" : "s"}
+                </p>
+                <div className="sg-tiles sg-tiles-2">
+                    <div className="sg-tile">
+                        <div className="sg-tile-label">Buffer, free for top-ups</div>
+                        <div className="sg-tile-value">{inr(wallet.buffer)}</div>
+                    </div>
+                    <div className="sg-tile">
+                        <div className="sg-tile-label">Saved by pausing</div>
+                        <div className="sg-tile-value">{inr(wallet.savedByPausing)}</div>
+                    </div>
+                </div>
+            </div>
+            <div className="sg-card">
+                <h2 className="sg-h2">How Spend Guard decides</h2>
+                <ul className="sg-rules">
+                    <li>Essentials and small payments go straight through.</li>
+                    <li>A pause only when it matters, explained with your own numbers. Betting always pauses.</li>
+                    <li>Money for bills is never touched.</li>
+                    <li>You always decide. Google Pay pays.</li>
+                </ul>
+            </div>
+        </aside>
     );
 }

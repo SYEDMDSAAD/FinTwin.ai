@@ -1,4 +1,5 @@
 import API from "./api";
+import { storedUserIsDemo } from "../utils/demoGuard";
 
 /* Spend Guard (prototype). The backend's /api/v1/guard/* forwards to the
    guard-service, and the feature stays hidden unless /guard/enabled says yes.
@@ -22,7 +23,8 @@ let cached = { token: null, promise: null };
 export function guardEnabled() {
     if (guardMockOn()) return Promise.resolve(true);
     const token = localStorage.getItem("token");
-    if (!token) return Promise.resolve(false);
+    // The shared demo account never has Spend Guard, so don't ask (the backend would say 403)
+    if (!token || storedUserIsDemo()) return Promise.resolve(false);
     if (cached.token !== token || !cached.promise) {
         cached = {
             token,

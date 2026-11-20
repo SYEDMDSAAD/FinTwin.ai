@@ -460,6 +460,8 @@ public class TransactionService {
 
         Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
         Set<String> existingIds = new HashSet<>(repository.findExternalIdsByUser(user));
+        Set<String> idsBeforeThisFile = Set.copyOf(existingIds);
+        List<Transaction> onRecord = repository.findByUser(user);
         boolean cardDataPresent = isCard || repository.countByUserAndSource(user, ACCOUNT_CARD) > 0;
 
         Map<String, Integer> siblingCounts = new HashMap<>();
@@ -468,15 +470,23 @@ public class TransactionService {
         int duplicates = 0;
         int skipped = 0;
 
-        // Transactions that arrived from alert emails and no statement has
-        // claimed yet. A statement row for the same money replaces them.
-        List<Transaction> fromAlerts = new ArrayList<>(repository.findByUser(user).stream()
+        // Transactions that arrived from alert emails or Spend Guard payments and
+        // no statement has claimed yet. A statement row for the same money
+        // replaces them, keeping any name or category the user fixed.
+        List<Transaction> fromAlerts = new ArrayList<>(onRecord.stream()
                 .filter(t -> t.getExternalId() != null
-                        && t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX))
+                        && (t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX)
+                            || t.getExternalId().startsWith(SpendGuardLinks.EXTERNAL_ID_PREFIX)))
                 .filter(t -> t.getAmount() != null && t.getDate() != null)
                 .toList());
 
-        for (Map<String, Object> row : rows) {
+        // Rows that repeat a payment an earlier statement of this account brought
+        // in under another description (another app or bank's file)
+        Set<Integer> overlapping = overlappingRows(rows, onRecord, idsBeforeThisFile,
+                                                   isCard ? ACCOUNT_CARD : "STATEMENT", accountRef);
+
+        for (int index = 0; index < rows.size(); index++) {
+            Map<String, Object> row = rows.get(index);
             try {
                 // A bulk import carries its own dates; a row without one is not
                 // a transaction that happened today, it is a row we cannot
@@ -530,6 +540,11 @@ public class TransactionService {
                     continue;
                 }
 
+                if (overlapping.contains(index)) {
+                    duplicates++;
+                    continue;
+                }
+
                 Transaction t = new Transaction();
                 t.setDate(date);
                 t.setMerchant(merchant);
@@ -574,7 +589,86 @@ public class TransactionService {
             profileService.saveScoreSnapshot(user);
         }
 
+        if (!overlapping.isEmpty()) {
+            log.info("Statement import: {} rows matched earlier statement rows by date and amount for user #{}",
+                     overlapping.size(), user.getId());
+        }
         return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size());
+    }
+
+    /**
+     * Positions of rows that repeat a payment an earlier statement import of the
+     * same account already holds, described in other words (a UPI app's
+     * "Paid to X" against a bank's "UPI/DR/412233/X/..."), so their exact key
+     * misses. Decided over the whole file, so the result never depends on row
+     * order (banks often list newest first):
+     *   1. rows whose exact key is on record use up their own earlier row;
+     *   2. the rest match an earlier row with the same amount on the same day;
+     *   3. what is still unmatched may match one a day either side, as banks
+     *      post a late-night payment the next day.
+     * Each earlier row is matched once, so two real ₹20 chais on one day stay
+     * two, and only earlier rows inside this file's dates count, so a payment on
+     * the file's first day is never taken for one the day before it.
+     */
+    private static Set<Integer> overlappingRows(List<Map<String, Object>> rows, List<Transaction> onRecord,
+                                                Set<String> idsBefore, String source, String accountRef) {
+        record Row(int index, LocalDate date, double amount, String externalId) {}
+        List<Row> parsed = new ArrayList<>();
+        Map<String, Integer> siblings = new HashMap<>();
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            try {
+                LocalDate date = row.get("date") != null ? DateNormalizer.parseFlexible(row.get("date").toString()) : null;
+                Double amount = StatementImport.parseAmount(row.get("amount"));
+                if (date == null || amount == null || amount == 0.0) continue;
+                String merchant = row.get("merchant") != null && !row.get("merchant").toString().isBlank()
+                        ? row.get("merchant").toString().trim() : "Unknown";
+                Double balance = StatementImport.parseAmount(row.get("balance"));
+                int ordinal = siblings.merge(StatementImport.siblingKey(date, amount, merchant, balance), 1, Integer::sum) - 1;
+                parsed.add(new Row(i, date, amount, StatementImport.externalId(date, amount, merchant, balance, ordinal)));
+            } catch (Exception e) {
+                // the import loop skips and counts this row
+            }
+        }
+        if (parsed.isEmpty()) return Set.of();
+        LocalDate first = parsed.stream().map(Row::date).min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = parsed.stream().map(Row::date).max(LocalDate::compareTo).orElseThrow();
+
+        Map<String, Integer> earlier = new HashMap<>();
+        Map<String, String> earlierKeyById = new HashMap<>();
+        for (Transaction t : onRecord) {
+            if (source.equals(t.getSource()) && t.getDate() != null && t.getAmount() != null
+                    && !t.getDate().isBefore(first) && !t.getDate().isAfter(last)
+                    && t.getExternalId() != null && t.getExternalId().startsWith(StatementImport.EXTERNAL_ID_PREFIX)
+                    && StatementImport.sameAccount(t.getAccountRef(), accountRef)) {
+                String key = StatementImport.overlapKey(t.getDate(), t.getAmount());
+                earlier.merge(key, 1, Integer::sum);
+                earlierKeyById.put(t.getExternalId(), key);
+            }
+        }
+        if (earlier.isEmpty()) return Set.of();
+
+        List<Row> unmatched = new ArrayList<>();
+        for (Row r : parsed) {
+            if (idsBefore.contains(r.externalId())) {
+                String key = earlierKeyById.get(r.externalId());
+                if (key != null) StatementImport.takeOne(earlier, key);
+            } else {
+                unmatched.add(r);
+            }
+        }
+        Set<Integer> out = new HashSet<>();
+        for (Row r : unmatched) {
+            if (StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date(), r.amount()))) out.add(r.index());
+        }
+        for (Row r : unmatched) {
+            if (out.contains(r.index())) continue;
+            if (StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date().minusDays(1), r.amount()))
+                    || StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date().plusDays(1), r.amount()))) {
+                out.add(r.index());
+            }
+        }
+        return out;
     }
 
     /**

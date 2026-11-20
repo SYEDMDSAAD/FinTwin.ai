@@ -37,7 +37,7 @@ function InvestmentsPage() {
                     📈
                 </div>
                 <div>
-                    <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">PHASE 4</div>
+                    <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">INVESTMENTS</div>
                     <h2 className="text-lg font-bold">Investment Portfolio</h2>
                 </div>
             </div>

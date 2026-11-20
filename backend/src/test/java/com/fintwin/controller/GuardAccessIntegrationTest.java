@@ -55,6 +55,8 @@ class GuardAccessIntegrationTest extends AbstractIntegrationTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(resp.getBody()).containsEntry("error", GuardController.NOT_OPEN);
         assertThat(get(token, "enabled").getBody()).containsEntry("enabled", false);
+        // "I didn't pay" is behind the same allowlist
+        assertThat(post(token, "unrecord").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

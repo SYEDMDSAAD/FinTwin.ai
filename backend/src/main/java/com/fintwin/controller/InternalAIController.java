@@ -496,7 +496,30 @@ public class InternalAIController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Invalid or expired tool token"));
         }
+        auditAiRead(userId);
         return null;
+    }
+
+    // Action log for the AI itself: which of a user's data the copilot read,
+    // and when — kept with every other audited action (audit_log, written off
+    // the request thread). Which question it was for is in that exchange's
+    // trace in chat_history, by time.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.audit.AuditService auditService;
+
+    private void auditAiRead(Long userId) {
+        if (auditService == null) return;
+        try {
+            var attrs = (org.springframework.web.context.request.ServletRequestAttributes)
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            String uri = attrs != null ? attrs.getRequest().getRequestURI() : null;
+            String what = uri == null ? "data" : uri.substring(uri.lastIndexOf('/') + 1);
+            auditService.log(userId, "AI_READ", "ai-copilot-tools",
+                    "AI Copilot read the user's " + what + " to answer a question",
+                    null, "fintwin-ai-service", "GET", uri, true, null);
+        } catch (Exception e) {
+            log.warn("Could not audit an AI data read: {}", e.getClass().getSimpleName());
+        }
     }
 
     private String nullSafe(String v) {

@@ -1,4 +1,5 @@
 import GlassCard from "./GlassCard";
+import { lakhs, longDate } from "../utils/money";
 
 function MonthlySummaryCard({ summary }) {
     if (!summary) return null;
@@ -18,27 +19,29 @@ function MonthlySummaryCard({ summary }) {
                 .ms-meta > div { min-width: 0; text-align: center; }
             `}</style>
 
-            <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500 mb-4">
-                MONTHLY SUMMARY
+            {/* These figures cover the last 3 months (this month and the two before it) */}
+            <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500 mb-4"
+                 title={summary.periodFrom ? `Since ${longDate(summary.periodFrom)}` : undefined}>
+                SUMMARY · LAST 3 MONTHS
             </div>
 
             {/* Top 3 numbers */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="text-center">
                     <h3 className="text-lg font-bold text-green-400">
-                        ₹{(summary.income / 100000).toFixed(2)}L
+                        {lakhs(summary.income)}
                     </h3>
                     <p className="text-[11px] text-zinc-500 mt-1">Income</p>
                 </div>
                 <div className="text-center">
                     <h3 className="text-lg font-bold text-red-400">
-                        ₹{(summary.expenses / 100000).toFixed(2)}L
+                        {lakhs(summary.expenses)}
                     </h3>
                     <p className="text-[11px] text-zinc-500 mt-1">Expenses</p>
                 </div>
                 <div className="text-center">
-                    <h3 className="text-lg font-bold text-cyan-400">
-                        ₹{(summary.savings / 100000).toFixed(2)}L
+                    <h3 className={`text-lg font-bold ${summary.savings < 0 ? "text-red-400" : "text-cyan-400"}`}>
+                        {lakhs(summary.savings)}
                     </h3>
                     <p className="text-[11px] text-zinc-500 mt-1">Savings</p>
                 </div>

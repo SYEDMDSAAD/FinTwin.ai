@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useCurrentUser } from "../context/AuthContext";
+import { percent } from "../utils/money";
 
 function Header({ notifications = [], scoreData }) {
   const navigate = useNavigate();
@@ -204,19 +205,34 @@ function Header({ notifications = [], scoreData }) {
   );
 
   // ── Stat badges — inlined JSX, no inner component ──
-  const statBadge = (label, color, bg, border, pad) => (
-    <div style={{
+  const statBadge = (label, color, bg, border, pad, period, title) => (
+    <div title={title} style={{
       textAlign: "center", fontSize: 12, fontWeight: 600,
       color, background: bg, border: `1px solid ${border}`,
       borderRadius: 10, padding: pad, whiteSpace: "nowrap",
+      // on a phone the badges share a row; keep them the same height, text centred
+      ...(isDesktop ? {} : { display: "flex", flexDirection: "column", justifyContent: "center" }),
     }}>
       {label}
+      {period && (
+        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.75, display: isDesktop ? "inline" : "block" }}>
+          {isDesktop ? " · " : ""}{period}
+        </span>
+      )}
     </div>
   );
 
+  // The score's savings rate covers the last 3 months; red when more went out than came in
+  const savingsRate = Number(scoreData?.savingsRatio) || 0;
+  const savingsLabel = `Savings ${percent(savingsRate)}`;
+  const savingsColor = savingsRate < 0 ? "#f87171" : "#4ade80";
+  const savingsBg = savingsRate < 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)";
+  const savingsBorder = savingsRate < 0 ? "rgba(248,113,113,0.2)" : "rgba(74,222,128,0.2)";
+  const savingsTitle = "Share of what came in that you kept, over the last 3 months";
+
   const statsDesktop = (
     <>
-      {statBadge(`Savings ${scoreData?.savingsRatio ?? 0}%`, "#4ade80", "rgba(74,222,128,0.1)", "rgba(74,222,128,0.2)", "5px 14px")}
+      {statBadge(savingsLabel, savingsColor, savingsBg, savingsBorder, "5px 14px", "last 3 months", savingsTitle)}
       {statBadge(`Score ${score}/100`, "#a78bfa", "rgba(167,139,250,0.1)", "rgba(167,139,250,0.2)", "5px 14px")}
       {statBadge(scoreLabel, scoreColor, scoreColor + "18", scoreColor + "30", "5px 14px")}
     </>
@@ -224,7 +240,7 @@ function Header({ notifications = [], scoreData }) {
 
   const statsMobile = (
     <>
-      {statBadge(`Savings ${scoreData?.savingsRatio ?? 0}%`, "#4ade80", "rgba(74,222,128,0.1)", "rgba(74,222,128,0.2)", "6px 4px")}
+      {statBadge(savingsLabel, savingsColor, savingsBg, savingsBorder, "6px 4px", "last 3 months", savingsTitle)}
       {statBadge(`Score ${score}/100`, "#a78bfa", "rgba(167,139,250,0.1)", "rgba(167,139,250,0.2)", "6px 4px")}
       {statBadge(scoreLabel, scoreColor, scoreColor + "18", scoreColor + "30", "6px 4px")}
     </>

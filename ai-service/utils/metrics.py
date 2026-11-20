@@ -77,18 +77,19 @@ GOAL_PLAN_LLM_LATENCY = Histogram(
     buckets=(1.0, 2.5, 5.0, 10.0, 15.0, 20.0, 30.0),
 )
 
-# ── Token usage, every Ollama call ───────────────────────────────────────────
-# The model is self-hosted, so tokens are never billed — they cost CPU time
-# (the 20s deadline), shared capacity (one VM) and context window. These
-# series come from the exact counts Ollama returns with every response,
-# recorded by utils/ollama_client.py. Labelled by feature, never by user: one
-# series per user would grow Prometheus without bound.
+# ── Token usage, every model call ────────────────────────────────────────────
+# Gemini on Vertex AI (the default) bills per token, so these series are the
+# cost meter; on a self-hosted model they measured CPU time and context
+# window instead. They come from the exact counts each provider returns with
+# every response, recorded by its client in utils/ (in Ollama's field names).
+# Labelled by feature, never by user: one series per user would grow
+# Prometheus without bound.
 LLM_FEATURES = ("copilot", "advisor", "coach", "goal_plan", "report",
                 "category_suggest", "investments", "other")
 
 LLM_CALLS = Counter(
     "fintwin_ai_llm_calls_total",
-    "Ollama calls that returned a response, by feature",
+    "Language-model calls that returned a response, by feature",
     ["feature"],
 )
 
@@ -121,7 +122,7 @@ LLM_CONTEXT_FILL = Histogram(
 
 
 def record_llm_usage(feature: str, body: dict, num_ctx: int) -> None:
-    """Record token usage from one non-streaming Ollama response body, in
+    """Record token usage from one model response (Ollama's field names), in
     Prometheus and in the current request's per-user tally (utils/llm_usage.py).
 
     Never raises: a metrics bug must not fail the user's request.

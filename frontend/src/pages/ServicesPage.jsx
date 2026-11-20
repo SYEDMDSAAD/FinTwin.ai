@@ -10,6 +10,7 @@ const GROUPS = [
         label: "OVERVIEW",
         items: [
             { name: "About App", icon: Info,      desc: "What FinTwin does & beta notes" },
+            { name: "Spend Guard", icon: ScanLine, desc: "Pause before you pay", gated: true },
             { name: "Analytics", icon: BarChart3, desc: "Spending trends & breakdowns" },
         ],
     },
@@ -19,7 +20,6 @@ const GROUPS = [
             { name: "AI Intelligence",   icon: Brain,         desc: "Forecasts, alerts & score" },
             { name: "AI Copilot",        icon: MessageSquare, desc: "Chat with your finances" },
             { name: "AI Spending Coach", icon: Zap,           desc: "Personalized coaching" },
-            { name: "Spend Guard",       icon: ScanLine,      desc: "Pause before you pay", gated: true },
         ],
     },
     {

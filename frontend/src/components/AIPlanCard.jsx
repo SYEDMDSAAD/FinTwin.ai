@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "./SafeMarkdown";
 import {
   Sparkles, ListChecks, Flag, Scissors, Clock, AlertTriangle,
   ShieldAlert, ChevronDown,
@@ -184,7 +184,7 @@ function AIPlanCard({ plan, regenerating }) {
   if (!parsed) {
     return shell(
       <div className="text-[15px] leading-7 text-zinc-300">
-        <ReactMarkdown>{plan}</ReactMarkdown>
+        <SafeMarkdown>{plan}</SafeMarkdown>
       </div>
     );
   }

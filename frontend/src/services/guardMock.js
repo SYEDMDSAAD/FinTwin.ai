@@ -14,6 +14,12 @@ const MCC = {
 };
 const ESSENTIAL = new Set(["Groceries", "Health", "Bills", "Rent", "Transport", "Education"]);
 const WAITABLE = new Set(["Shopping", "Entertainment", "Travel", "Other"]);
+// What an unknown payment can be for, and its category (as guard-service's REASON_CATEGORIES)
+const PURPOSES = {
+    Food: "Food", Groceries: "Groceries", Shopping: "Shopping", Bills: "Bills", Rent: "Rent",
+    Transport: "Transport", Travel: "Travel", Health: "Health", Education: "Education",
+    Entertainment: "Entertainment", "Paying someone back": "People", "Something else": "Other",
+};
 const VPA = /^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/;
 
 const inr = (n) => (n < 0 ? "-" : "") + "₹" + Math.abs(Math.round(n)).toLocaleString("en-IN");
@@ -117,12 +123,22 @@ const ACTIONS = {
 
     wallet: () => view(),
 
-    check({ qr, amount }) {
+    check({ qr, amount, purpose }) {
         const q = parseQr(qr);
         const exact = q.am ?? Number(amount);
         if (!(exact > 0)) throw fail("Enter an amount above ₹0.");
         const rupees = Math.round(exact);
-        const category = MCC[q.mc] || "Other";
+        // A payee Spend Guard can't place: ask what it's for, then check with that category
+        const unknown = !MCC[q.mc];
+        const chosen = unknown && Object.hasOwn(PURPOSES, purpose) ? purpose : null;
+        if (unknown && !chosen && rupees >= s.settings.minCheck && rupees <= s.balances.spending) {
+            return {
+                decision: "ask_reason", question: "Spend Guard can't tell who this is or what it's for. What's this payment for?",
+                purposes: Object.keys(PURPOSES), source: "rules", reason: null, amount: exact.toFixed(2), rupees,
+                category: "Other", payeeName: q.pn, payeeUpi: q.pa,
+            };
+        }
+        const category = chosen ? PURPOSES[chosen] : MCC[q.mc] || "Other";
         const [limit0, spent] = BUDGETS[category] || [0, 0];
         const limit = limit0 + (s.adjustments[category] || 0);
         const budget = limit0 ? {

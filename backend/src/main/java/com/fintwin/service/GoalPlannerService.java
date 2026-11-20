@@ -42,6 +42,10 @@ public class GoalPlannerService {
     @Autowired
     private ProfileService profileService;
 
+    // Optional so unit tests that build this service by hand still work
+    @Autowired(required = false)
+    private com.fintwin.repository.GoalEarmarkRepository earmarkRepository;
+
     @Value("${ai.service.url}")
     private String aiServiceUrl;
 
@@ -542,12 +546,29 @@ public class GoalPlannerService {
         Map<Long, Double> allocated = com.fintwin.util.GoalMath.allocateSavings(
                 goals,
                 com.fintwin.util.TransactionMath.netSavingsByMonth(transactions),
-                java.time.YearMonth.now()
+                java.time.YearMonth.now(),
+                earmarksFor(user)
         );
 
         for (FinancialGoal goal : goals) {
             applyProgress(goal, allocated.getOrDefault(goal.getId(), 0.0));
         }
+    }
+
+    /** Money approved Spend Guard salary plans set aside, per month and goal. */
+    private Map<java.time.YearMonth, Map<Long, Double>> earmarksFor(User user) {
+        if (earmarkRepository == null || user.getId() == null) return Map.of();
+        Map<java.time.YearMonth, Map<Long, Double>> out = new java.util.HashMap<>();
+        for (com.fintwin.model.GoalEarmark e : earmarkRepository.findByUser(user)) {
+            if (e.getAmount() == null || e.getGoal() == null) continue;
+            try {
+                out.computeIfAbsent(java.time.YearMonth.parse(e.getMonth()), m -> new java.util.HashMap<>())
+                   .merge(e.getGoal().getId(), e.getAmount().doubleValue(), Double::sum);
+            } catch (java.time.format.DateTimeParseException ignored) {
+                // a malformed month can't be placed; leave it out
+            }
+        }
+        return out;
     }
 
     // Allocation is cross-goal, so recomputing one goal still needs the whole

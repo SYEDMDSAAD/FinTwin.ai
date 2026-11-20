@@ -88,6 +88,12 @@ public class AiServiceConfig {
         RestTemplate rt = new RestTemplate(factory);
         rt.getInterceptors().add((request, body, execution) -> {
             request.getHeaders().set("X-Internal-Key", internalKey);
+            // This request's trace id, which the AI service puts on its own log
+            // lines: one problem can be followed across both services' logs
+            String traceId = org.slf4j.MDC.get("traceId");
+            if (traceId != null && traceId.matches("[0-9a-f]{16,32}")) {
+                request.getHeaders().set("X-Request-Id", traceId);
+            }
             return execution.execute(request, body);
         });
         // Today's allowance, checked before a model-backed call leaves the backend

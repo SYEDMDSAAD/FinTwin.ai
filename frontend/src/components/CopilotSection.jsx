@@ -16,7 +16,7 @@ import {
     CloudOff
 } from "lucide-react";
 
-import ReactMarkdown from "react-markdown";
+import SafeMarkdown from "./SafeMarkdown";
 import { AI_MODE_IDS } from "../constants/aiModes";
 import AnswerRating from "./AnswerRating";
 
@@ -457,9 +457,9 @@ function CopilotSection({
                                             ${proseTheme}
                                         `}
                                     >
-                                        <ReactMarkdown>
+                                        <SafeMarkdown>
                                             {msg.content}
-                                        </ReactMarkdown>
+                                        </SafeMarkdown>
                                     </div>
 
                                 </div>
@@ -751,6 +751,14 @@ function CopilotSection({
                     </div>
 
                 </div>
+
+                <p
+                    data-testid="copilot-ai-notice"
+                    className={`mt-2 text-center text-[11px] ${isDark ? "text-zinc-500" : "text-gray-400"}`}
+                >
+                    FinTwin AI answers money questions from your data and can make mistakes.
+                    It is guidance, not SEBI-registered investment advice.
+                </p>
 
             </div>
 

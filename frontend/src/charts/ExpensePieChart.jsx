@@ -103,7 +103,7 @@ function ExpensePieChart({ data }) {
             </div>
 
             <div className="h-[320px]">
-                <ResponsiveContainer
+                <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}
                     width="100%"
                     height="100%"
                 >

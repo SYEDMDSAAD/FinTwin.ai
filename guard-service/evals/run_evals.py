@@ -1,7 +1,7 @@
 """Runs the scan and top-up agents on made-up cases against the real model.
 
     cd guard-service
-    GOOGLE_API_KEY=... ./venv/bin/python evals/run_evals.py              # all 21 cases
+    GOOGLE_API_KEY=... ./venv/bin/python evals/run_evals.py              # all 23 cases
     ./venv/bin/python evals/run_evals.py --only betting_late,topup_medicine
     ./venv/bin/python evals/run_evals.py --out ~/Documents/FinTwin-Buildathon/evals.json
 
@@ -53,8 +53,12 @@ def build(case: dict):
     events = history(case, now)
     if case["agent"] == "scan":
         qr = rules.parse_upi(case["qr"])
+        # An unknown payee reaches the agent only after the user said what it's for
+        category, _, unknown, purpose = rules.scan_category(qr, None, case.get("purpose"))
         facts, untrusted, allowed = rules.scan_facts(qr=qr, amount=rules.clean_amount(case["amount"]), wallet=w,
-                                                     finances=PERSONA, events=events, now_dt=now)
+                                                     finances=PERSONA, events=events, now_dt=now,
+                                                     category=category, payee_known=not unknown, purpose=purpose,
+                                                     reason=rules.clean_reason(case.get("reason", "")) if purpose else "")
         return agents.prompt(facts, untrusted), lambda a: rules.check_scan(a, facts, allowed)
     facts, allowed = rules.topup_facts(amount=case["amount"], wallet=w, finances=PERSONA, events=events, now_dt=now)
     return (agents.prompt(facts, {"reason": case.get("reason", "")}),

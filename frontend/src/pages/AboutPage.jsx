@@ -1,10 +1,11 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
 import {
     Star, Send, CheckCircle2, Sparkles, FlaskConical, LayoutDashboard, BarChart3, Wallet, Brain, MessageSquare, Zap,
     Target, ShieldCheck, Landmark, TrendingUp, Shield, Upload, FileInput, FileText, Settings,
-    Lock, ArrowRight, MessageCircleWarning,
+    Lock, ArrowRight, MessageCircleWarning, ScanLine,
 } from "lucide-react";
 
 // The landing section: what FinTwin is, that it's a beta, and a map of every
@@ -17,6 +18,9 @@ const GROUPS = [
         items: [
             { name: "Dashboard", icon: LayoutDashboard, color: "#a78bfa",
               text: "Your month at a glance: income, expenses, savings rate, financial score, goals, alerts and next month's expense forecast." },
+            // Only for accounts that have Spend Guard, like the sidebar
+            { name: "Spend Guard", icon: ScanLine, color: "#8b5cf6", gated: true,
+              text: "Pause before you pay. Scan a UPI QR code and Spend Guard checks the payment first, plans your salary on payday and keeps bill money safe." },
             { name: "Analytics", icon: BarChart3, color: "#60a5fa",
               text: "Where the money goes: category breakdowns, a spending heatmap, recurring charges and trends month on month." },
             { name: "Transactions", icon: Wallet, color: "#34d399",
@@ -71,6 +75,7 @@ const card = {
 };
 
 export default function AboutPage({ navigateTo }) {
+    const guardOn = useSpendGuardEnabled();
     return (
         <div style={{ display: "grid", gap: 28 }}>
             {/* Intro, with the beta welcome at the top right */}
@@ -155,7 +160,7 @@ export default function AboutPage({ navigateTo }) {
                 <section key={g.label} aria-label={g.label}>
                     <h2 style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-label)" }}>{g.label}</h2>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                        {g.items.map(({ name, icon: Icon, color, text }) => (
+                        {g.items.filter(i => !i.gated || guardOn).map(({ name, icon: Icon, color, text }) => (
                             <button key={name} type="button" onClick={() => navigateTo(name)}
                                     style={{ ...card, padding: 18, textAlign: "left", cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", gap: 8 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

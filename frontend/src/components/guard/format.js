@@ -58,14 +58,72 @@ export const SAMPLES = [
     { label: "Groceries, ₹1,800", qr: "upi://pay?pa=freshmart@sample&pn=FreshMart&mc=5411", amount: 1800 },
 ];
 
+// The same UPI ID rule guard-service applies (rules.VPA)
+const UPI_ID = /^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/;
+
+/**
+ * A typed UPI ID (and the payee's name, if given) as a plain UPI link, so it
+ * goes through the same check as a scanned code. Only pa, pn and cu: no
+ * merchant code or note can be typed in. Returns null for an invalid UPI ID.
+ */
+export function upiLinkFor(upiId, name = "") {
+    const pa = String(upiId).trim();
+    if (!UPI_ID.test(pa)) return null;
+    const pn = String(name).trim().slice(0, 60);
+    return `upi://pay?pa=${pa}${pn ? `&pn=${encodeURIComponent(pn)}` : ""}&cu=INR`;
+}
+
 export function isSample(link) {
     const p = previewQr(link);
     return Boolean(p && p.pa.toLowerCase().endsWith("@sample"));
 }
 
-/** Hands the payment to the phone's UPI app (GPay, PhonePe, Paytm, a bank app). */
-export function openUpi(link) {
-    window.location.href = link;
+/**
+ * The UPI apps a payment is handed to: Google Pay first, PhonePe and Paytm
+ * as backups when Google Pay isn't there. Android gets an intent for the
+ * app's package (Chrome opens the Play Store if it isn't installed); iPhone
+ * and iPad get the app's own scheme, since iOS sends a plain upi:// link to
+ * whichever app claims it.
+ */
+export const UPI_APPS = [
+    { id: "gpay", name: "Google Pay", android: "com.google.android.apps.nbu.paisa.user", ios: "gpay://upi/pay" },
+    { id: "phonepe", name: "PhonePe", android: "com.phonepe.app", ios: "phonepe://pay" },
+    { id: "paytm", name: "Paytm", android: "net.one97.paytm", ios: "paytmmp://pay" },
+];
+export const BACKUP_APPS = UPI_APPS.filter((a) => a.id !== "gpay");
+
+/**
+ * A upi://pay link aimed at one of UPI_APPS: the same payee, amount and note,
+ * only the app changes. A computer has no UPI app, so the plain link is kept
+ * for copying. Anything that isn't a UPI payment link, or an app not on the
+ * list, gives null.
+ */
+const IOS = (ua, touch) => /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && touch > 1);   // iPadOS says "Mac"
+
+/** A phone or tablet that can have a UPI app. A computer can't, so it gets a QR code to scan instead. */
+export function isPhone(ua = globalThis.navigator?.userAgent || "", touch = globalThis.navigator?.maxTouchPoints || 0) {
+    return /android/i.test(ua) || IOS(ua, touch);
+}
+
+export function upiAppLink(link, appId = "gpay", ua = globalThis.navigator?.userAgent || "",
+                           touch = globalThis.navigator?.maxTouchPoints || 0) {
+    const app = UPI_APPS.find((a) => a.id === appId);
+    if (!app || typeof link !== "string" || !/^upi:\/\/pay\?/i.test(link)) return null;
+    const query = link.slice(link.indexOf("?") + 1).replace(/#/g, "%23");
+    if (/android/i.test(ua)) return `intent://pay?${query}#Intent;scheme=upi;package=${app.android};end`;
+    if (IOS(ua, touch)) return `${app.ios}?${query}`;
+    return link;
+}
+
+export function googlePayLink(link, ua, touch) {
+    return upiAppLink(link, "gpay", ua, touch);
+}
+
+/** On a phone, hands the payment to a UPI app (Google Pay unless the user picked a backup); they approve it there with their PIN. */
+export function openUpi(link, appId = "gpay") {
+    const target = upiAppLink(link, appId);
+    // A computer has no UPI app to open: the page shows the payment as a QR code instead
+    if (target && isPhone()) window.location.href = target;
 }
 
 export function hoursUntil(iso, now = Date.now()) {

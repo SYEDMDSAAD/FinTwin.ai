@@ -173,6 +173,79 @@ def category_for(qr: UpiQr) -> str:
     return MCC_CATEGORY.get(qr.mc, "Other")
 
 
+# Made-up sample shops: never open a UPI app, never become a FinTwin transaction
+SAMPLE_SUFFIX = "@sample"
+
+
+def is_sample(qr: UpiQr) -> bool:
+    return qr.pa.lower().endswith(SAMPLE_SUFFIX)
+
+
+def choose_category(qr: UpiQr, fintwin: tuple[str, str] | None) -> tuple[str, str]:
+    """A scanned payee's category, and how it was chosen. The user's own correction
+    in FinTwin comes first, then the merchant type the QR code carries, then
+    FinTwin's categoriser, else Other. Betting is decided by the merchant code
+    alone (ALWAYS_CHECK_MCC), so no category can take it out of the check."""
+    if fintwin and fintwin[1] == "LEARNED":
+        return fintwin
+    if qr.mc in MCC_CATEGORY:
+        return MCC_CATEGORY[qr.mc], "MERCHANT_CODE"
+    if fintwin and fintwin[0] != "Other" and fintwin[1] != "NONE":
+        return fintwin
+    return "Other", "NONE"
+
+
+# ── A payee Spend Guard can't place: ask the user what it's for ──────────────
+
+# What the user can say a payment is for, when FinTwin can't tell who is being
+# paid. Each option maps to a category here, in code: the model never picks
+# one, so "Rent" goes straight through as an essential and nothing a reason
+# says can change how a payment is categorised.
+REASON_CATEGORIES = {
+    "Food": "Food",
+    "Groceries": "Groceries",
+    "Shopping": "Shopping",
+    "Bills": "Bills",
+    "Rent": "Rent",
+    "Transport": "Transport",
+    "Travel": "Travel",
+    "Health": "Health",
+    "Education": "Education",
+    "Entertainment": "Entertainment",
+    "Paying someone back": "People",
+    "Something else": "Other",
+}
+REASON_QUESTION = "Spend Guard can't tell who this is or what it's for. What's this payment for?"
+_REASON_IDENTIFIERS = re.compile(
+    r"https?://\S+|www\.\S+|upi://\S+|[A-Za-z0-9._-]{2,}@[A-Za-z]{2,}|(?<!\d)\d{10,}(?!\d)", re.IGNORECASE)
+
+
+def payee_unknown(category: str, source: str) -> bool:
+    """FinTwin can't tell what this payment is for: a person, or a payee nothing
+    could place (no correction, no merchant code, nothing the categoriser knows)."""
+    return source == "NONE" or category == "People"
+
+
+def scan_category(qr: UpiQr, fintwin: tuple[str, str] | None,
+                  purpose: str | None) -> tuple[str, str, bool, str | None]:
+    """The category a scan is checked under, how it was chosen, whether FinTwin
+    couldn't place the payee, and the user's purpose when that counts (an
+    unknown payee and an answer from the fixed list; anything else is ignored)."""
+    category, source = choose_category(qr, fintwin)
+    unknown = payee_unknown(category, source) and qr.mc not in ALWAYS_CHECK_MCC
+    purpose = purpose if unknown and purpose in REASON_CATEGORIES else None
+    if purpose:
+        category, source = REASON_CATEGORIES[purpose], "USER_REASON"
+    return category, source, unknown, purpose
+
+
+def clean_reason(text) -> str:
+    """The user's own words about a payment: printable, at most 120 characters,
+    with links, UPI IDs and phone or account numbers taken out. It goes to the
+    model only inside the UNTRUSTED block, like a top-up reason."""
+    return _REASON_IDENTIFIERS.sub("[removed]", clean_text(str(text or ""), 120)).strip()
+
+
 # ── UPI links: the only way money moves, and the user's own app moves it ─────
 
 def handoff_link(qr: UpiQr, amount: Decimal) -> str:
@@ -334,10 +407,11 @@ def clean_message(text, allowed: set[int], limit: int = 240) -> str:
 # ── Scan: pause before paying ────────────────────────────────────────────────
 
 def scan_facts(*, qr: UpiQr, amount: Decimal, wallet: dict, finances, events: list[dict],
-               now_dt: datetime) -> tuple[dict, dict, set[int]]:
+               now_dt: datetime, category: str | None = None, payee_known: bool = True,
+               purpose: str | None = None, reason: str = "") -> tuple[dict, dict, set[int]]:
     """The facts the agent sees, the untrusted text, and the figures a message may quote."""
     amt = rupees(amount)
-    category = category_for(qr)
+    category = category or category_for(qr)
     month = now_dt.strftime("%Y-%m")
     adj = wallet.get("adjustments", {}).get(month, {})
     budget = None
@@ -367,9 +441,15 @@ def scan_facts(*, qr: UpiQr, amount: Decimal, wallet: dict, finances, events: li
         "payee_kind": "merchant" if qr.mc else "person",
         "betting": qr.mc in ALWAYS_CHECK_MCC,
         "language": wallet["settings"].get("language", "English"),
+        # When FinTwin couldn't place the payee, what the user said it's for:
+        # purpose is one of REASON_CATEGORIES (picked in the app, so it's a fact)
+        "payee_known": payee_known,
+        "purpose": purpose if purpose in REASON_CATEGORIES else None,
     }
     # A person's name and note stay out of the model; a shop's name is public
     untrusted = {"shop_name": qr.pn, "note": qr.tn} if qr.mc else {"shop_name": "", "note": ""}
+    if reason:
+        untrusted["reason"] = reason          # the user's own words: data, never instructions
     return facts, untrusted, figures(facts)
 
 

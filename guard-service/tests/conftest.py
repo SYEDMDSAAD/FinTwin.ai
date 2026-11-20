@@ -21,6 +21,7 @@ import rules                                    # noqa: E402
 import usage                                    # noqa: E402
 from samples import NOON                        # noqa: E402
 from store import MemoryStore                   # noqa: E402
+import data                                     # noqa: E402
 
 KEY = {"X-Internal-Key": "test-internal-key"}
 
@@ -59,6 +60,13 @@ class FakeBrain:
 
     def conversation(self, key, state=None):
         return FakeConversation(self, key, state)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_data_cache():
+    data._cache.clear()
+    yield
+    data._cache.clear()
 
 
 @pytest.fixture

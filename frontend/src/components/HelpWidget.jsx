@@ -13,7 +13,7 @@ const FAQ = [
   },
   {
     q: "Where do the AI answers and forecasts come from?",
-    a: "A qwen2.5 model running on FinTwin's own server. Your transactions are never sent to an outside AI provider. Forecasts extrapolate from your own history, so they sharpen once a few months are imported.",
+    a: "From FinTwin's AI, working only on the data you've brought in. Forecasts build on your own history, so they sharpen once a few months are imported.",
   },
   {
     q: "Can I connect my bank account?",

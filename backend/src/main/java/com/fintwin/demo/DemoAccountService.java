@@ -7,6 +7,7 @@ import com.fintwin.repository.BudgetRepository;
 import com.fintwin.repository.ChatHistoryRepository;
 import com.fintwin.repository.FinancialGoalRepository;
 import com.fintwin.repository.FinancialScoreHistoryRepository;
+import com.fintwin.repository.InsurancePolicyRepository;
 import com.fintwin.repository.InvestmentRepository;
 import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.NotificationRepository;
@@ -63,6 +64,7 @@ public class DemoAccountService {
     private final ChatHistoryRepository chats;
     private final NotificationRepository notifications;
     private final FinancialScoreHistoryRepository scores;
+    private final InsurancePolicyRepository policies;
     private final ProfileService profiles;
     private final PasswordEncoder passwords;
     private final TransactionTemplate tx;
@@ -72,8 +74,8 @@ public class DemoAccountService {
                               FinancialGoalRepository goals, AssetRepository assets,
                               LiabilityRepository liabilities, InvestmentRepository investments,
                               ChatHistoryRepository chats, NotificationRepository notifications,
-                              FinancialScoreHistoryRepository scores, ProfileService profiles,
-                              PasswordEncoder passwords, TransactionTemplate tx) {
+                              FinancialScoreHistoryRepository scores, InsurancePolicyRepository policies,
+                              ProfileService profiles, PasswordEncoder passwords, TransactionTemplate tx) {
         this.enabled = enabled;
         this.users = users;
         this.transactions = transactions;
@@ -85,6 +87,7 @@ public class DemoAccountService {
         this.chats = chats;
         this.notifications = notifications;
         this.scores = scores;
+        this.policies = policies;
         this.profiles = profiles;
         this.passwords = passwords;
         this.tx = tx;
@@ -106,7 +109,8 @@ public class DemoAccountService {
             User user = demoUser();
             LocalDate latest = transactions.latestTransactionDate(user.getId());
             LocalDate today = LocalDate.now(INDIA);
-            if (latest == null || latest.isBefore(today.minusDays(1))) rebuild();
+            // Also when it was built before it had insurance policies
+            if (latest == null || latest.isBefore(today.minusDays(1)) || policies.countByUser(user) == 0) rebuild();
         } catch (Exception e) {
             // A demo that fails to build must not take the app down with it
             log.error("Demo account not prepared at startup", e);
@@ -135,6 +139,7 @@ public class DemoAccountService {
             assets.deleteByUser(user);
             liabilities.deleteByUser(user);
             investments.deleteByUser(user);
+            policies.deleteByUser(user);
             notifications.deleteByUser(user);
             scores.deleteByUser(user);
             // Hibernate runs inserts before deletes when it flushes, so without
@@ -148,6 +153,7 @@ public class DemoAccountService {
             assets.saveAll(data.assets());
             liabilities.saveAll(data.liabilities());
             investments.saveAll(data.investments());
+            policies.saveAll(data.insurance());
             goals.saveAll(data.goals(monthlySavings(rows)));
             profiles.saveScoreSnapshot(user);
             log.info("Demo account rebuilt: {} transactions", rows.size());

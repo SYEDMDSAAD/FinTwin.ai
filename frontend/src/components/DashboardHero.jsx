@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Target, Bell, TrendingUp, Star } from "lucide-react";
+import { rupees, percent, longDate, GOOD, BAD } from "../utils/money";
 
 function AnimatedNumber({ value = 0, suffix = "", duration = 1000 }) {
   const [display, setDisplay] = useState(0);
@@ -46,20 +47,27 @@ function ScoreRing({ score = 0 }) {
   );
 }
 
-function DashboardHero({ score = 0, savingsRatio = 0, activeGoals = 0, alerts = 0 }) {
+// allTime: { savings, income, from } over everything on record, or null while loading
+function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 }) {
   const scoreLabel = score >= 80 ? "Excellent" : score >= 60 ? "Good" : "Needs Work";
   const scoreColor = score >= 80 ? "#4ade80" : score >= 60 ? "#fbbf24" : "#f87171";
 
+  const saved = Number(allTime?.savings) || 0;
+  const cameIn = Number(allTime?.income) || 0;
+  const savedColor = saved < 0 ? BAD : GOOD;
+
   const METRICS = [
     {
-      label: "Savings Ratio",
-      value: savingsRatio,
-      suffix: "%",
-      color: "#4ade80",
-      icon: <TrendingUp size={14} color="#4ade80" />,
-      bg: "rgba(74,222,128,0.08)",
-      border: "rgba(74,222,128,0.18)",
-      dur: 900,
+      label: "Saved All Time",
+      text: allTime ? rupees(saved, { plus: true }) : "—",
+      sub: allTime && cameIn > 0 ? `${percent((saved / cameIn) * 100)} of money in` : null,
+      title: allTime?.from ? `Since ${longDate(allTime.from)}, transfers between your own accounts left out` : undefined,
+      color: savedColor,
+      icon: <TrendingUp size={14} color={savedColor} />,
+      bg: savedColor + "14",
+      border: savedColor + "2e",
+      // a rupee amount is wider than the other pills' small numbers
+      minWidth: "clamp(150px, 42vw, 185px)",
     },
     {
       label: "Active Goals",
@@ -72,7 +80,7 @@ function DashboardHero({ score = 0, savingsRatio = 0, activeGoals = 0, alerts = 
       dur: 700,
     },
     {
-      label: "Budget Alerts",
+      label: "Alerts",
       value: alerts,
       suffix: "",
       color: alerts > 0 ? "#f87171" : "#4ade80",
@@ -155,15 +163,18 @@ function DashboardHero({ score = 0, savingsRatio = 0, activeGoals = 0, alerts = 
             {/* ── Right: Metric pills ── */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {METRICS.map((m) => (
-                <div key={m.label} className="metric-pill" style={{ background: m.bg, borderColor: m.border, minWidth: "clamp(100px, 28vw, 130px)", flex: 1 }}>
+                <div key={m.label} className="metric-pill" title={m.title} style={{ background: m.bg, borderColor: m.border, minWidth: m.minWidth || "clamp(100px, 28vw, 130px)", flex: 1 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 9, background: m.color + "20", border: `1px solid ${m.color}30`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {m.icon}
                   </div>
                   <div>
                     <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 3 }}>{m.label.toUpperCase()}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: m.color, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                      <AnimatedNumber value={m.value} suffix={m.suffix} duration={m.dur} />
+                    <div style={{ fontSize: 22, fontWeight: 800, color: m.color, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      {m.text ?? <AnimatedNumber value={m.value} suffix={m.suffix} duration={m.dur} />}
                     </div>
+                    {m.sub && (
+                      <div style={{ fontSize: 10, color: "rgba(148,163,184,0.7)", marginTop: 4, whiteSpace: "nowrap" }}>{m.sub}</div>
+                    )}
                   </div>
                 </div>
               ))}

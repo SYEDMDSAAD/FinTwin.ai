@@ -166,3 +166,14 @@ def test_gemini_2_models_get_a_thinking_budget_instead_of_a_level():
     agent = brain.build_agent("scan", model="gemini-2.5-flash")
     assert agent.planner.thinking_config.thinking_budget == 512
 
+
+
+def test_on_vertex_a_quick_refusal_is_retried_and_elsewhere_it_is_not(monkeypatch):
+    monkeypatch.setattr(brain, "MODEL", "gemini-3.5-flash")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
+    agent = brain.build_agent("scan")
+    assert isinstance(agent.model, brain.Gemini) and agent.model.model == "gemini-3.5-flash"
+    assert set(agent.model.retry_options.http_status_codes) == {403, 429, 503}
+    assert agent.model.retry_options.attempts == 3
+    monkeypatch.delenv("GOOGLE_GENAI_USE_VERTEXAI")
+    assert brain.build_agent("scan").model == "gemini-3.5-flash"          # AI Studio: unchanged

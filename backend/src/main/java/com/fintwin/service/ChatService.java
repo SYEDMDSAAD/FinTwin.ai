@@ -82,6 +82,10 @@ public class ChatService {
         if (message == null || message.isBlank()) {
             return Map.of("reply", "Please enter a message.");
         }
+        // A card number, OTP or someone's UPI ID typed into the chat is never
+        // needed to answer, so it is masked before it is sent to the AI or
+        // kept in the conversation history (see PiiRedactor).
+        message = com.fintwin.util.PiiRedactor.redact(message);
         // A demo visitor: within this visit's and the demo's question allowance
         String demoSession = com.fintwin.demo.DemoSession.current().orElse(null);
         if (demoSession != null) {
@@ -92,7 +96,7 @@ public class ChatService {
         User user = resolveCurrentUser();
         FinancialSummaryDTO summary = aggregator.aggregate(user);
         AIProvider.ChatResult result = callAiProvider(message, mode, summary);
-        String reply = result.reply();
+        String reply = com.fintwin.util.PiiRedactor.redact(result.reply());
         ChatHistory saved = persistExchange(user, message, reply, traceJson(result.trace(), mode));
         // exchangeId lets the client delete this exchange without a reload.
         return saved != null

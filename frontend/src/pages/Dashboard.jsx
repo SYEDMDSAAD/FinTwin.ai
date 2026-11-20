@@ -34,6 +34,7 @@ import CopilotSection from "../components/CopilotSection";
 import AffordabilitySection from "../components/AffordabilitySection";
 
 import BankConnectionSection from "../components/BankConnectionSection";
+import { BANK_LINK_ENABLED } from "../utils/bankLink";
 
 import SkeletonCard from "../components/SkeletonCard";
 
@@ -1384,29 +1385,7 @@ function Dashboard() {
     // Analytics
     // =========================
 
-    const income = transactions
-
-        .filter((t) => t.amount > 0)
-
-        .reduce(
-            (acc, curr) =>
-                acc + curr.amount,
-            0
-        );
-
-    const expenses = transactions
-
-        .filter((t) => t.amount < 0)
-
-        .reduce(
-            (acc, curr) =>
-                acc + curr.amount,
-            0
-        );
-
-    const savings = income + expenses;
-
-    // Current-month income/expenses (for the headline cards — savings above stays all-time)
+    // Current-month income/expenses of the loaded rows: the cards' fallback
     const currentMonthKey =
         `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
@@ -1721,12 +1700,14 @@ function Dashboard() {
 
                         <DashboardHero
                             score={scoreData?.score}
-                            savingsRatio={
-                                income > 0
-                                    ? Math.round(
-                                        (savings / income) * 100
-                                    )
-                                    : 0
+                            allTime={
+                                monthlySummary?.allTimeSavings == null
+                                    ? null
+                                    : {
+                                        savings: monthlySummary.allTimeSavings,
+                                        income: monthlySummary.allTimeIncome,
+                                        from: monthlySummary.allTimeFrom
+                                    }
                             }
                             activeGoals={goals.length}
                             alerts={notifications.length}
@@ -1752,10 +1733,21 @@ function Dashboard() {
 
                         ) : (
 
+                            // This month's figures come from the backend, which leaves
+                            // out transfers between the user's own accounts, the same
+                            // as the trends they're shown with. The sums of the loaded
+                            // rows are only a fallback for an older backend.
                             <AnalyticsCards
-                                income={monthlyIncome}
-                                expenses={monthlyExpenses}
-                                savings={savings}
+                                income={monthlySummary?.monthIncome ?? monthlyIncome}
+                                expenses={monthlySummary?.monthExpenses ?? monthlyExpenses}
+                                savings={monthlySummary?.monthSavings ?? monthlyIncome + monthlyExpenses}
+                                compared={{
+                                    from: monthlySummary?.comparedFrom,
+                                    to: monthlySummary?.comparedTo,
+                                    income: monthlySummary?.comparedIncome,
+                                    expenses: monthlySummary?.comparedExpenses,
+                                    savings: monthlySummary?.comparedSavings
+                                }}
                                 prediction={
                                     forecast?.predictedExpenses || 0
                                 }
@@ -1832,9 +1824,12 @@ function Dashboard() {
                     "Transactions" && (
 
                     <>
-                        <BankConnectionSection
-                            onSynced={fetchTransactions}
-                        />
+                        {/* Bank linking is off during the beta: don't show a box nobody can use */}
+                        {BANK_LINK_ENABLED && (
+                            <BankConnectionSection
+                                onSynced={fetchTransactions}
+                            />
+                        )}
 
                         {/* Import nudge banner */}
                         <div
@@ -2141,7 +2136,8 @@ function Dashboard() {
                 ========================= */}
 
                 {activeSection === "Spend Guard" && (
-                    <SpendGuardPage />
+                    // A recorded payment or earmarked goal changes the rest of the dashboard
+                    <SpendGuardPage onFinTwinChanged={refreshDashboard} />
                 )}
 
                 {/* =========================
@@ -2203,7 +2199,8 @@ function Dashboard() {
                 ========================= */}
 
                 {activeSection === "Imports" && (
-                    <ImportsPage onImported={refreshDashboard} />
+                    <ImportsPage onImported={refreshDashboard}
+                                 onViewTransactions={() => navigateTo("Transactions")} />
                 )}
 
                 {/* =========================

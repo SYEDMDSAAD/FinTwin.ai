@@ -10,11 +10,15 @@ a laptop and in tests, with numbers invented for "Aarav, 24, salary ₹45,000".
 """
 import asyncio
 import copy
+import logging
 import os
+import time
 from dataclasses import asdict, dataclass, field
 
 import backend_api
 from rules import ESSENTIAL
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -84,14 +88,37 @@ def _int(v) -> int:
         return 0
 
 
+async def _read(user_id: int, path: str, tool_token: str | None, params: dict | None = None) -> dict:
+    """One backend read in a thread, logging how long it took (never what it returned)."""
+    started = time.monotonic()
+    try:
+        return await asyncio.to_thread(backend_api.get, user_id, path, tool_token, params)
+    finally:
+        logger.info("FinTwin %s read in %.1fs", path, time.monotonic() - started)
+
+
+# Budgets and goals change slowly, and the goals read recalculates progress from
+# every transaction (1–2 s from here). A copy up to a minute old saves that on
+# each scan; forget() drops it when Spend Guard itself changes either one.
+CACHE_SECONDS = float(os.environ.get("GUARD_DATA_CACHE_SECONDS", "60"))
+_cache: dict[int, tuple[float, "Finances"]] = {}
+
+
+def forget(user_id: int) -> None:
+    _cache.pop(int(user_id), None)
+
+
 async def load(user_id: int, tool_token: str | None) -> Finances:
     """Budgets and goals, read in parallel threads so a slow backend can't stall other requests."""
     if persona_mode():
         return copy.deepcopy(PERSONA)
+    hit = _cache.get(int(user_id))
+    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+        return copy.deepcopy(hit[1])
     try:
         budgets_json, goals_json = await asyncio.gather(
-            asyncio.to_thread(backend_api.get, user_id, "/budgets", tool_token),
-            asyncio.to_thread(backend_api.get, user_id, "/goals", tool_token))
+            _read(user_id, "/budgets", tool_token),
+            _read(user_id, "/goals", tool_token))
         raw_budgets = budgets_json.get("budgets", [])
         raw_goals = goals_json.get("goals", [])
     except (RuntimeError, AttributeError):
@@ -101,4 +128,23 @@ async def load(user_id: int, tool_token: str | None) -> Finances:
     goals = [Goal(str(g.get("title", "Goal"))[:60], _int(g.get("targetAmount")),
                   _int(g.get("savedSoFar")), _int(g.get("monthlyTarget")))
              for g in raw_goals if g.get("status") != "Completed"]
-    return Finances(budgets=budgets, goals=goals)
+    finances = Finances(budgets=budgets, goals=goals)
+    if len(_cache) > 1000:          # a handful of users in practice; never let it grow
+        _cache.clear()
+    _cache[int(user_id)] = (time.monotonic(), finances)     # only good reads are kept
+    return copy.deepcopy(finances)
+
+
+async def categorize(user_id: int, name: str, tool_token: str | None) -> tuple[str, str] | None:
+    """FinTwin's category for a payee name and how it was chosen (LEARNED when the
+    user corrected that payee before), or None in persona mode, for a nameless
+    payee, or when the backend can't be reached. The name goes to FinTwin, never
+    to the model."""
+    if persona_mode() or not name.strip():
+        return None
+    try:
+        got = await _read(user_id, "/categorize", tool_token, {"name": name[:120]})
+    except RuntimeError:
+        return None
+    category, source = str(got.get("category") or ""), str(got.get("source") or "")
+    return (category, source) if category else None

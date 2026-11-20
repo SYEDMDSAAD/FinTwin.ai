@@ -134,7 +134,7 @@ function ForecastCard({
                             text-zinc-500
                         "
                     >
-                        XGBoost Powered
+                        Based on your history
                     </p>
 
                 </div>
@@ -343,7 +343,7 @@ function ForecastCard({
                     h-[180px]
                 ">
 
-                    <ResponsiveContainer
+                    <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}
                         width="100%"
                         height="100%"
                     >

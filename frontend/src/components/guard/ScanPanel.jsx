@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Hand, AlertTriangle, ExternalLink, Copy, RotateCcw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Hand, AlertTriangle, Copy, RotateCcw, ShieldCheck } from "lucide-react";
 import { guard, guardError } from "../../services/guardApi";
 import QrScanner from "./QrScanner";
 import CutsCard from "./CutsCard";
-import { FAST_LANE_REASON, SAMPLES, SOURCE_LABEL, inr, inrExact, isSample, openUpi, previewQr } from "./format";
+import UpiAppChoice from "./UpiAppChoice";
+import { FAST_LANE_REASON, SAMPLES, SOURCE_LABEL, inr, inrExact, isPhone, isSample, openUpi, previewQr, upiLinkFor } from "./format";
 
 // A pause asks for five seconds before "Pay anyway" works: long enough to
 // think, short enough never to trap anyone. Skip and Wishlist work at once.
@@ -30,7 +31,7 @@ function Facts({ result }) {
     return <div className="sg-chips">{chips.map((c) => <span key={c} className="sg-chip">{c}</span>)}</div>;
 }
 
-export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
+export default function ScanPanel({ onWallet, onNeedTopup, initial, onFinTwinChanged }) {
     const [qr, setQr] = useState(null);
     const [amount, setAmount] = useState("");
     const [result, setResult] = useState(null);
@@ -38,6 +39,11 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [wait, setWait] = useState(0);
+    const [typedId, setTypedId] = useState("");
+    const [typedName, setTypedName] = useState("");
+    const [typedError, setTypedError] = useState("");
+    const [purpose, setPurpose] = useState("");      // what an unknown payment is for
+    const [note, setNote] = useState("");
     const handled = useRef(null);
 
     const preview = qr ? previewQr(qr) : null;
@@ -50,13 +56,16 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
         setAfter(null);
         setError("");
         setWait(0);
+        setPurpose("");
+        setNote("");
     }
 
-    async function check(code = qr, typed = amount) {
+    async function check(code = qr, typed = amount, why = null) {
         setBusy(true);
         setError("");
         try {
-            const r = await guard("check", { qr: code, amount: typed === "" ? null : typed });
+            const r = await guard("check", { qr: code, amount: typed === "" ? null : typed,
+                                             ...(why ? { purpose: why.purpose, reason: why.note.trim() } : {}) });
             setResult(r);
             setWait(r.decision === "pause" ? PAUSE_SECONDS : 0);
         } catch (e) {
@@ -83,13 +92,29 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
         return () => clearTimeout(t);
     }, [wait]);
 
+    async function didNotPay() {
+        setBusy(true);
+        setError("");
+        try {
+            const r = await guard("unrecord", { eventId: result.eventId });
+            setAfter((a) => ({ ...a, recorded: r.removed ? "removed" : a.recorded }));
+            if (r.removed) onFinTwinChanged?.();
+        } catch (e) {
+            setError(guardError(e));
+        } finally {
+            setBusy(false);
+        }
+    }
+
     async function choose(choice) {
         setBusy(true);
         setError("");
         try {
             const r = await guard("outcome", { eventId: result.eventId, choice });
-            setAfter({ choice, link: r.link, toRebalance: r.toRebalance || 0 });
+            setAfter({ choice, link: r.link, toRebalance: r.toRebalance || 0,
+                       recorded: r.recordedTransactionId ? "yes" : null });
             onWallet?.(r.wallet);
+            if (r.recordedTransactionId) onFinTwinChanged?.();
             if (choice === "paid" && r.link && !sample) openUpi(r.link);
         } catch (e) {
             setError(guardError(e));
@@ -104,6 +129,17 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
         if (sampleAmount) setAmount(String(sampleAmount));
     }
 
+    function typedPayee(e) {
+        e.preventDefault();
+        const link = upiLinkFor(typedId, typedName);
+        if (!link) {
+            setTypedError("Enter a UPI ID like name@okhdfcbank or 9876543210@ybl.");
+            return;
+        }
+        setTypedError("");
+        pickCode(link);
+    }
+
     // ── Step 1: get a code ───────────────────────────────────────────────────
     if (!qr) {
         return (
@@ -111,13 +147,34 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
                 <div className="sg-card">
                     <div className="sg-h2">Scan before you pay</div>
                     <p className="sg-sub" style={{ margin: "4px 0 14px" }}>
-                        Spend Guard looks at the payment first. Then your own UPI app pays, as usual.
+                        Spend Guard looks at the payment first. Then Google Pay pays, as usual.
                     </p>
                     <QrScanner onCode={(code) => pickCode(code)} />
                 </div>
                 <div className="sg-card">
                     <div className="sg-h2">No QR code to hand?</div>
-                    <p className="sg-sub" style={{ margin: "4px 0 12px" }}>Try a made-up shop. Nothing is paid.</p>
+                    <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
+                        Type the UPI ID you're paying. Spend Guard checks it the same way.
+                    </p>
+                    <form onSubmit={typedPayee} noValidate>
+                        {typedError && <div className="sg-error" role="alert">{typedError}</div>}
+                        <label className="sg-field">
+                            <span className="sg-label">UPI ID</span>
+                            <input className="sg-input" value={typedId} placeholder="name@okhdfcbank"
+                                   autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email"
+                                   onChange={(e) => setTypedId(e.target.value.trim())} aria-label="UPI ID" />
+                        </label>
+                        <label className="sg-field" style={{ marginTop: 10 }}>
+                            <span className="sg-label">Name (optional)</span>
+                            <input className="sg-input" value={typedName} maxLength={60} placeholder="Shop or person"
+                                   onChange={(e) => setTypedName(e.target.value)} aria-label="Payee name" />
+                        </label>
+                        <button type="submit" className="sg-btn sg-btn-primary" style={{ marginTop: 12 }}
+                                disabled={!typedId}>
+                            Continue
+                        </button>
+                    </form>
+                    <p className="sg-sub" style={{ margin: "16px 0 10px" }}>Or try a made-up shop. Nothing is paid.</p>
                     <div className="sg-row">
                         {SAMPLES.map((s) => (
                             <button key={s.label} type="button" className="sg-btn sg-btn-sm" onClick={() => pickCode(s.qr, s.amount)}>
@@ -163,6 +220,46 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
         );
     }
 
+    // ── Step 2b: Spend Guard can't tell who this is, so it asks what it's for ─
+    if (result.decision === "ask_reason") {
+        return (
+            <form className="sg-card" onSubmit={(e) => { e.preventDefault(); check(qr, amount, { purpose, note }); }}>
+                {error && <div className="sg-error" role="alert">{error}</div>}
+                <div className="sg-payee">
+                    <div style={{ minWidth: 0 }}>
+                        <div className="sg-payee-name">{result.payeeName || "UPI payee"}</div>
+                        <div className="sg-payee-upi">{result.payeeUpi}</div>
+                    </div>
+                    <div className="sg-amount">{inrExact(result.amount)}</div>
+                </div>
+                <p className="sg-message" id="sg-reason-question">{result.question}</p>
+                <div className="sg-row" role="radiogroup" aria-labelledby="sg-reason-question">
+                    {(result.purposes || []).map((p) => (
+                        <button key={p} type="button" role="radio" aria-checked={purpose === p}
+                                className={`sg-btn sg-btn-sm${purpose === p ? " sg-btn-primary" : ""}`}
+                                onClick={() => setPurpose(p)}>
+                            {p}
+                        </button>
+                    ))}
+                </div>
+                <label className="sg-field" style={{ marginTop: 12 }}>
+                    <span className="sg-label">In your own words (optional)</span>
+                    <input className="sg-input" value={note} maxLength={120} placeholder="Splitting last night's dinner"
+                           onChange={(e) => setNote(e.target.value)} aria-label="What this payment is for, in your own words" />
+                </label>
+                <p className="sg-sub" style={{ margin: "6px 0 0" }}>
+                    Spend Guard's AI reads this to check the payment. Leave out names and numbers.
+                </p>
+                <div className="sg-row" style={{ marginTop: 14 }}>
+                    <button type="submit" className="sg-btn sg-btn-primary" disabled={busy || !purpose}>
+                        <ShieldCheck size={16} /> {busy ? "Checking…" : "Check before paying"}
+                    </button>
+                    <button type="button" className="sg-btn sg-btn-quiet" onClick={reset} disabled={busy}>Scan a different code</button>
+                </div>
+            </form>
+        );
+    }
+
     // ── Step 3: the decision, then what the user chose ───────────────────────
     const d = DECISION[result.decision] || DECISION.go;
     const sourceText = result.source === "fast_lane"
@@ -191,7 +288,7 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
                 {!after && result.decision === "go" && (
                     <button type="button" className="sg-btn sg-btn-primary sg-btn-block" style={{ marginTop: 14 }}
                             onClick={() => choose("paid")} disabled={busy}>
-                        Pay {inrExact(result.amount)} in your UPI app
+                        Pay {inrExact(result.amount)} in Google Pay
                     </button>
                 )}
                 {!after && result.decision === "pause" && (
@@ -224,22 +321,36 @@ export default function ScanPanel({ onWallet, onNeedTopup, initial }) {
 
             {after?.choice === "paid" && (
                 <div className="sg-card" role="status">
-                    <div className="sg-h2">{sample ? "Sample code: nothing to pay" : "Over to your UPI app"}</div>
-                    <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
-                        {sample
-                            ? "With a real QR code, your UPI app opens here with the payee and amount filled in. You approve it there with your PIN."
-                            : "Your UPI app should open with the payee and amount filled in. You approve it there with your PIN, as usual."}
-                    </p>
+                    <div className="sg-h2">
+                        {sample ? "Sample code: nothing to pay" : isPhone() ? "Over to Google Pay" : "Scan to pay with your phone"}
+                    </div>
+                    {(sample || isPhone()) && (
+                        <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
+                            {sample
+                                ? "With a real QR code, Google Pay opens here with the payee and amount filled in (on a computer, you scan a code with your phone). You approve it there with your PIN."
+                                : "Google Pay should open with the payee and amount filled in. You approve it there with your PIN, as usual."}
+                        </p>
+                    )}
                     {!sample && after.link && (
-                        <div className="sg-row">
-                            <button type="button" className="sg-btn" onClick={() => openUpi(after.link)}>
-                                <ExternalLink size={15} /> Open UPI app again
-                            </button>
+                        <UpiAppChoice link={after.link}>
                             <button type="button" className="sg-btn sg-btn-quiet"
                                     onClick={() => navigator.clipboard?.writeText(after.link)}>
                                 <Copy size={15} /> Copy payment link
                             </button>
+                        </UpiAppChoice>
+                    )}
+                    {after.recorded === "yes" && (
+                        <div className="sg-row" style={{ marginTop: 12, alignItems: "center" }}>
+                            <span className="sg-sub" style={{ flex: 1 }}>
+                                Added to your transactions. Your bank statement replaces it when you import it.
+                            </span>
+                            <button type="button" className="sg-btn sg-btn-quiet" onClick={didNotPay} disabled={busy}>
+                                I didn't pay
+                            </button>
                         </div>
+                    )}
+                    {after.recorded === "removed" && (
+                        <p className="sg-sub" style={{ margin: "12px 0 0" }}>Taken out of your transactions.</p>
                     )}
                 </div>
             )}

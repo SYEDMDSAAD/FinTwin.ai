@@ -148,6 +148,30 @@ def test_a_persons_name_and_upi_id_never_reach_the_model():
     assert "Ravi" not in str(f) and "9876543210" not in str(f) and "rent" not in str(f)
 
 
+def test_a_payee_is_unknown_when_fintwin_cant_place_it_or_its_a_person():
+    assert rules.payee_unknown("Other", "NONE") and rules.payee_unknown("People", "PERSON")
+    assert not rules.payee_unknown("Food", "MERCHANT_CODE") and not rules.payee_unknown("Rent", "LEARNED")
+    # Every purpose maps to a category FinTwin records as it is
+    assert set(rules.REASON_CATEGORIES.values()) <= {
+        "Food", "Groceries", "Shopping", "Entertainment", "Transport", "Travel", "Bills", "Rent",
+        "Health", "Education", "People", "Other"}
+
+
+def test_a_reason_loses_links_upi_ids_and_long_numbers_and_stays_untrusted():
+    assert rules.clean_reason("Dinner with ravi@okaxis, 9876543210, https://x.co/a\x00") == \
+        "Dinner with [removed], [removed], [removed]"
+    assert rules.clean_reason("a" * 500) == "a" * 120 and rules.clean_reason(None) == ""
+    qr = rules.parse_upi(PERSON)
+    f, untrusted, _ = rules.scan_facts(qr=qr, amount=rules.clean_amount(2000), wallet=wallet(), finances=PERSONA,
+                                       events=[], now_dt=NOON, category="Shopping", payee_known=False,
+                                       purpose="Shopping", reason="new shoes")
+    assert (f["payee_known"], f["purpose"], f["category"]) == (False, "Shopping", "Shopping")
+    assert untrusted == {"shop_name": "", "note": "", "reason": "new shoes"} and "new shoes" not in str(f)
+    f, _, _ = rules.scan_facts(qr=qr, amount=rules.clean_amount(2000), wallet=wallet(), finances=PERSONA,
+                               events=[], now_dt=NOON, purpose="Anything")
+    assert f["purpose"] is None                        # only the app's fixed list counts
+
+
 def test_essentials_and_small_payments_skip_the_ai_but_betting_never_does():
     settings = wallet()["settings"]
     qr, _, f, _, _ = scan(GROCER, 1800)
@@ -365,3 +389,11 @@ def test_an_approved_plan_sets_each_weeks_allowance():
     w["plan"] = {"weekly": [5000, 4000, 4000, 4500], "week": 0}
     rules.roll_week(w, date.fromisoformat(w["next_allowance"]))
     assert w["plan"]["week"] == 1 and w["balances"] == {"main": 26000, "spending": 9000}
+
+
+def test_a_typed_upi_id_is_checked_like_a_scanned_code():
+    """The page turns a typed UPI ID into a plain link (format.js upiLinkFor)."""
+    qr = rules.parse_upi("upi://pay?pa=ravi.kumar@okicici&pn=Ravi%20%26%20Sons&cu=INR")
+    assert (qr.pa, qr.pn, qr.mc, qr.am) == ("ravi.kumar@okicici", "Ravi & Sons", "", None)
+    link = rules.handoff_link(qr, Decimal("650"))
+    assert link.startswith(qr.raw) and link.endswith("am=650.00")

@@ -7,6 +7,8 @@ import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.AiToolToken;
 import com.fintwin.security.SecurityUtils;
+import com.fintwin.service.SpendGuardLinks;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -63,12 +65,21 @@ public class GuardController {
     private final String guardUrl;
     private final Set<Long> allowedUsers;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final SpendGuardLinks links;      // null in unit tests that don't need it
 
+    public GuardController(RestTemplate guard, AiToolToken toolTokens, UserRepository users,
+                           String guardUrl, String allowedUsers) {
+        this(guard, toolTokens, users, guardUrl, allowedUsers, null);
+    }
+
+    @Autowired
     public GuardController(@Qualifier("guardRestTemplate") RestTemplate guard,
                            AiToolToken toolTokens,
                            UserRepository users,
                            @Value("${guard.service.url:}") String guardUrl,
-                           @Value("${guard.allowed-users:}") String allowedUsers) {
+                           @Value("${guard.allowed-users:}") String allowedUsers,
+                           SpendGuardLinks links) {
+        this.links = links;
         this.guard = guard;
         this.toolTokens = toolTokens;
         this.users = users;
@@ -80,6 +91,18 @@ public class GuardController {
     @GetMapping("/enabled")
     public Map<String, Object> enabled() {
         return Map.of("enabled", !guardUrl.isEmpty() && allowedUsers.contains(currentUserId()));
+    }
+
+    /** "I didn't pay": takes back the transaction Spend Guard recorded for a payment. */
+    @PostMapping("/unrecord")
+    public ResponseEntity<Map<String, Object>> unrecord(@RequestBody(required = false) Map<String, Object> body) {
+        Long userId = currentUserId();
+        if (!allowedUsers.contains(userId)) {
+            return error(403, NOT_OPEN);
+        }
+        Object eventId = body == null ? null : body.get("eventId");
+        boolean removed = links != null && eventId != null && links.unrecordPayment(userId, eventId.toString());
+        return ResponseEntity.ok(Map.of("removed", removed));
     }
 
     @PostMapping("/{action}")
@@ -104,7 +127,7 @@ public class GuardController {
             @SuppressWarnings("unchecked")
             ResponseEntity<Map<String, Object>> resp = (ResponseEntity<Map<String, Object>>) (ResponseEntity<?>)
                     guard.postForEntity(guardUrl + "/guard/" + action, payload, Map.class);
-            return ResponseEntity.status(resp.getStatusCode()).body(resp.getBody());
+            return ResponseEntity.status(resp.getStatusCode()).body(linkToFinTwin(action, userId, resp.getBody()));
         } catch (AiQuotaExceededException e) {
             return error(429, QUOTA);
         } catch (HttpStatusCodeException e) {
@@ -115,6 +138,31 @@ public class GuardController {
             log.warn("Spend Guard call '{}' failed: {}", action, e.getClass().getSimpleName());
             return isTimeout(e) ? error(504, SLOW) : error(503, OFFLINE);
         }
+    }
+
+    /**
+     * guard-service proposes what should reach the rest of FinTwin; this checks
+     * and writes it for the signed-in user, then tells the page what happened.
+     * A paid payment ("record") becomes a transaction; an approved salary plan
+     * ("goalPlan") earmarks goal money. A failure here never fails the decision.
+     */
+    Map<String, Object> linkToFinTwin(String action, Long userId, Map<String, Object> body) {
+        if (body == null) return null;
+        Map<String, Object> out = new LinkedHashMap<>(body);
+        Object record = out.remove("record");
+        Object goalPlan = out.remove("goalPlan");
+        if (links == null) return out;
+        try {
+            if ("outcome".equals(action) && record instanceof Map<?, ?> r) {
+                out.put("recordedTransactionId", links.recordPayment(userId, r));
+            }
+            if ("approve-plan".equals(action) && goalPlan instanceof Map<?, ?> g) {
+                out.put("goalsEarmarked", links.earmarkGoals(userId, g));
+            }
+        } catch (RuntimeException e) {
+            log.warn("Spend Guard couldn't update FinTwin after '{}': {}", action, e.getClass().getSimpleName());
+        }
+        return out;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

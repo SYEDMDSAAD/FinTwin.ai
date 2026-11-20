@@ -31,6 +31,8 @@ PROMPT_VERSION = "2026-07-21.1"
 # is compute nobody will see. Budget below it, connect time and JSON overhead
 # included.
 LLM_TIMEOUT_S = 15.0
+LLM_ATTEMPTS = 2          # one fresh try when the first message is rejected or won't parse
+RETRY_MIN_SECONDS = 3.0   # don't start a second try with less time than this left
 
 # The coach prompt embeds findings built from real bank narrations and can run
 # well past the old 2048-token default — which Ollama handles by silently
@@ -306,41 +308,55 @@ def generate_spending_coach(transactions):
 
     leakage = estimate_leakage(evidence)
     health = _health(evidence["savingsRate"])
-    recommendations = build_recommendations(evidence, leakage)
+    computed = build_recommendations(evidence, leakage)
+    recommendations = computed
     prompt = _build_prompt(evidence, leakage, health)
     message = ""
 
     # Exactly one result label per generation, decided where the truth is known.
     outcome = "llm_error"
-    try:
-        started = time.monotonic()
+    # A fast model answers in a second or two, so a message the grounding check
+    # rejects (or JSON that won't parse) gets one fresh attempt while the
+    # budget lasts: two independent tries pass far more often than one.
+    deadline = time.monotonic() + LLM_TIMEOUT_S
+    for attempt in range(LLM_ATTEMPTS):
+        remaining = deadline - time.monotonic()
+        if attempt and remaining < RETRY_MIN_SECONDS:
+            break
         try:
-            text = ask(prompt, max_tokens=350,
-                       timeout=LLM_TIMEOUT_S, num_ctx=LLM_NUM_CTX, feature="coach")
-        finally:
-            COACH_LLM_LATENCY.observe(time.monotonic() - started)
+            started = time.monotonic()
+            try:
+                text = ask(prompt, max_tokens=350,
+                           timeout=remaining, num_ctx=LLM_NUM_CTX, feature="coach")
+            finally:
+                COACH_LLM_LATENCY.observe(time.monotonic() - started)
 
-        parsed = _parse_llm_json(text)
-        if not parsed:
-            outcome = "parse_failed"
-            raise ValueError("Parse failed")
+            parsed = _parse_llm_json(text)
+            if not parsed:
+                outcome = "parse_failed"
+                logger.info("Coach answer did not parse (attempt %d)", attempt + 1)
+                continue
 
-        # The model is asked for two tips and the analysis layer supplies the
-        # rest. A 3B model padding to four invents arithmetic and contradicts
-        # itself ("cancel Spotify, it is non-cancellable"); two is what it can
-        # write well, and the computed recommendations are stronger than its
-        # padding because they carry a rupee impact it cannot work out.
-        suggestions = ground_tips(_normalize_tips(parsed.get("tips", [])), prompt)[:2]
-        recommendations = _merge_ai_suggestions(recommendations, suggestions)
+            # The model is asked for two tips and the analysis layer supplies the
+            # rest. A 3B model padding to four invents arithmetic and contradicts
+            # itself ("cancel Spotify, it is non-cancellable"); two is what it can
+            # write well, and the computed recommendations are stronger than its
+            # padding because they carry a rupee impact it cannot work out.
+            suggestions = ground_tips(_normalize_tips(parsed.get("tips", [])), prompt)[:2]
+            recommendations = _merge_ai_suggestions(computed, suggestions)
 
-        message = parsed.get("coachMessage", "")
-        if message and not is_grounded(message, _amounts(prompt), _figure_owners(prompt)):
-            logger.info("Coach message misused the findings, using fallback: %s", message)
-            message = ""
-        outcome = "ai" if message else "rejected"
+            message = parsed.get("coachMessage", "")
+            if message and not is_grounded(message, _amounts(prompt), _figure_owners(prompt)):
+                logger.info("Coach message misused the findings (attempt %d): %s", attempt + 1, message)
+                message = ""
+            outcome = "ai" if message else "rejected"
+            if message:
+                break
 
-    except Exception as e:
-        logger.warning("Spending coach LLM/parse failed, using fallback: %s", e)
+        except Exception as e:
+            # Down or out of time: another attempt wouldn't fare better
+            logger.warning("Spending coach LLM failed, using fallback: %s", e)
+            break
 
     COACH_GENERATIONS.labels(result=outcome).inc()
 

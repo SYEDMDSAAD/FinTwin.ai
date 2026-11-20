@@ -9,6 +9,9 @@ agent can see what it got wrong.
 Where the model runs is set by the standard google-genai variables:
   Vertex AI:  GOOGLE_GENAI_USE_VERTEXAI=TRUE, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION=global
   AI Studio:  GOOGLE_API_KEY  (free tier: made-up data only, enforced in availability())
+Or on this machine, through Ollama:
+  Local:      GUARD_MODEL=ollama/qwen2.5:3b, OLLAMA_URL (default http://127.0.0.1:11434)
+              (real data only while OLLAMA_URL is this machine, enforced in availability())
 """
 import json
 import logging
@@ -17,6 +20,7 @@ import re
 import uuid
 
 from google.adk.agents import LlmAgent
+from google.adk.models.google_llm import Gemini
 from google.adk.planners import BuiltInPlanner
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -24,7 +28,7 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 import usage
-from agents import prompts, schemas, tools
+from agents import ollama_llm, prompts, schemas, tools
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +75,38 @@ class BadAnswer(ValueError):
     """The model answered, but not in the required shape. Sent back to the agent to fix."""
 
 
+def _local(model=None) -> bool:
+    name = model if isinstance(model, str) else (MODEL if model is None else "")
+    return name.startswith(ollama_llm.PREFIX)
+
+
+# Vertex AI on a free-trial project now and then refuses a call with a quick 403
+# ("requires an eligible paid billing account") when the global endpoint routes
+# it to a region that won't serve trial billing; the same call usually goes
+# through on a retry. Busy (429) and unavailable (503) get the same short retry.
+# The refusals come back in well under a second, so two retries fit inside a
+# scan's time budget; past that, the fixed rules decide as usual.
+VERTEX_RETRY = types.HttpRetryOptions(attempts=3, initial_delay=0.2, max_delay=1.0,
+                                      http_status_codes=[403, 429, 503])
+
+
+def _gemini(name: str):
+    """The model for a Gemini name: on Vertex AI, with the short retry above."""
+    return Gemini(model=name, retry_options=VERTEX_RETRY) if _vertex() else name
+
+
 def build_agent(key: str, model=None) -> LlmAgent:
     """model: a model name or an ADK BaseLlm; tests pass a scripted one."""
     name, instruction, schema, thinking, agent_tools, _ = SPECS[key]
+    local = _local(model)
+    if local:
+        model = ollama_llm.OllamaLlm(model=(model or MODEL)[len(ollama_llm.PREFIX):])
+        instruction += prompts.LOCAL_CHECKS.get(key, "")
+        if key == "topup":
+            schema = schemas.LocalTopupDecision
+    name_of_model = model if isinstance(model, str) else MODEL
+    if not local and (model is None or isinstance(model, str)):
+        model = _gemini(model or MODEL)
     return LlmAgent(
         name=name,
         model=model or MODEL,
@@ -85,8 +118,9 @@ def build_agent(key: str, model=None) -> LlmAgent:
             safety_settings=_SAFETY,
             max_output_tokens=2048,
         ),
-        planner=BuiltInPlanner(thinking_config=thinking_config(
-            thinking, model if isinstance(model, str) else MODEL)),
+        # Thinking levels are a Gemini setting; a local model answers without one
+        planner=None if local else BuiltInPlanner(thinking_config=thinking_config(
+            thinking, name_of_model)),
         # One agent per job, never handing the user to another agent
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
@@ -101,6 +135,10 @@ def availability(persona: bool) -> str | None:
     """None when the agents may run for this request, otherwise a short reason why not."""
     if os.environ.get("GUARD_AI", "on").lower() == "off":
         return "ai_off"
+    if _local():
+        # A model on this machine: the data never leaves it. Anywhere else is
+        # treated like any outside service, so it only sees the made-up persona.
+        return None if persona or ollama_llm.is_local() else "needs_vertex_for_real_data"
     if _vertex():
         return None if os.environ.get("GOOGLE_CLOUD_PROJECT") else "ai_not_configured"
     if not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")):
@@ -111,6 +149,8 @@ def availability(persona: bool) -> str | None:
 
 
 def where() -> str:
+    if _local():
+        return "local" if ollama_llm.is_local() else "remote_ollama"
     return "vertex" if _vertex() else "ai_studio"
 
 

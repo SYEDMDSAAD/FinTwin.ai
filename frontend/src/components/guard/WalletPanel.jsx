@@ -2,7 +2,8 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Hand, Heart, ShoppingBag, Zap } from "lucide-react";
 import { guard, guardError } from "../../services/guardApi";
 import CutsCard from "./CutsCard";
-import { SOURCE_LABEL, hoursUntil, inr, openUpi, shortTime } from "./format";
+import UpiAppChoice from "./UpiAppChoice";
+import { SOURCE_LABEL, hoursUntil, inr, isPhone, openUpi, shortTime } from "./format";
 
 const LANGUAGES = ["English", "Hindi", "Hinglish", "Telugu", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali"];
 
@@ -194,9 +195,12 @@ function Topup({ wallet, prefill, onWallet }) {
                     <div className="sg-h2">{inr(moved.amount)} moved to your spending account</div>
                     <p className="sg-sub" style={{ marginTop: 4 }}>
                         {moved.needsUpiId
-                            ? "In the demo the balances move here. Add your spending account's UPI ID in Settings, and next time your UPI app opens to move it for real."
-                            : "Your UPI app should open to pay your own spending account. You approve it there with your PIN."}
+                            ? "In the demo the balances move here. Add your spending account's UPI ID in Settings, and next time Google Pay opens to move it for real."
+                            : isPhone()
+                                ? "Google Pay should open to pay your own spending account. You approve it there with your PIN."
+                                : "Scan the code below with your phone to pay your own spending account. You approve it there with your PIN."}
                     </p>
+                    {moved.link && <div style={{ marginTop: 12 }}><UpiAppChoice link={moved.link} /></div>}
                 </div>
             )}
             {moved?.choice === "paid" && moved.toRebalance > 0 && (

@@ -174,6 +174,18 @@ export const GUARD_CSS = `
   .sg-details > summary { cursor: pointer; list-style: none; font-size: 13px; font-weight: 700; color: var(--sg-ink); }
   .sg-details > summary::-webkit-details-marker { display: none; }
 
+  /* Wide screens: the tabs on the left, this week's money and the rules beside them */
+  .sg-aside { display: none; }
+  .sg-tiles-2 { grid-template-columns: 1fr 1fr; }
+  .sg-rules { margin: 10px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.55; color: var(--sg-ink-2); }
+  .sg-rules li + li { margin-top: 6px; }
+  @media (min-width: 1100px) {
+    .sg { max-width: 1040px; }
+    .sg-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+    .sg-aside { display: block; position: sticky; top: 16px; }
+    .sg-aside > .sg-card + .sg-card { margin-top: 12px; }
+  }
+
   @media (max-width: 480px) {
     .sg-tiles { grid-template-columns: 1fr 1fr; }
     .sg-hero { font-size: 44px; }

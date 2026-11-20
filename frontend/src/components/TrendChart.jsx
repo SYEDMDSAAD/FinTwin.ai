@@ -153,7 +153,7 @@ function TrendChart({ transactions }) {
 
             <div className="w-full h-[280px] min-w-0">
 
-                <ResponsiveContainer
+                <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}
                     width="100%"
                     height="100%"
                 >

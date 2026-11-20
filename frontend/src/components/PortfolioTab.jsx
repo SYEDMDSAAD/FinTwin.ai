@@ -348,7 +348,7 @@ export default function PortfolioTab() {
                 >
                     {detecting
                         ? <><RefreshCw size={14} className="animate-spin" /> Scanning...</>
-                        : <><Landmark size={14} /> Sync from Bank</>
+                        : <><Landmark size={14} /> Find in my transactions</>
                     }
                 </button>
             </div>
@@ -425,7 +425,7 @@ export default function PortfolioTab() {
                     <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] rounded-2xl">
                         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                         <div className="text-[10px] font-bold tracking-[0.1em] text-zinc-500 mb-4">ALLOCATION</div>
-                        <ResponsiveContainer width="100%" height={220}>
+                        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={220}>
                             <PieChart>
                                 <Pie
                                     data={pieData}

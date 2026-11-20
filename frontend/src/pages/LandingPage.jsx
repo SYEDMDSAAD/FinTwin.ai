@@ -388,7 +388,7 @@ function TxTheater() {
 
       <div className="tx-theater-footer">
         <span style={{ fontSize: 14 }}>🤖</span>
-        <span className="tx-ai-tag">qwen2.5 · self-hosted · your data never leaves</span>
+        <span className="tx-ai-tag">AI categorisation · learns from your corrections</span>
       </div>
     </div>
   );
@@ -524,6 +524,7 @@ export default function LandingPage() {
       {/* ── Mobile menu ──────────────────────────────────────── */}
       <div className={`mob-menu${menuOpen ? " open" : ""}`} role="dialog" aria-label="Navigation menu">
         <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Features">Features</button>
+        <button className="mob-link" onClick={() => scrollTo("spend-guard")} aria-label="Go to Spend Guard">Spend Guard</button>
         <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Security">Security</button>
         <button className="mob-link" onClick={() => scrollTo("pricing")} aria-label="Go to Pricing">Pricing</button>
         <button className="theme-toggle" onClick={toggleTheme} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
@@ -551,6 +552,7 @@ export default function LandingPage() {
           </a>
           <div className="lnav-links" role="menubar">
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("features")}>Features</button>
+            <button className="lnav-link" role="menuitem" onClick={() => scrollTo("spend-guard")}>Spend Guard</button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("security")}>Security</button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("pricing")}>Pricing</button>
           </div>
@@ -586,7 +588,7 @@ export default function LandingPage() {
           <div>
             <div className="hero-badge h-el-1" aria-label="Product highlights">
               <div className="hero-badge-dot" aria-hidden="true" />
-              Self-hosted AI · Statement import · AES-256
+              Statement import · Encrypted · Built for India
             </div>
 
             <h1 className="hero-h1 h-el-2" id="hero-heading">
@@ -595,7 +597,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="hero-sub h-el-3">
-              FinTwin AI reads your bank and UPI statements, runs its AI on our own servers, and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Bank linking through RBI's Account Aggregator is in testing.
+              FinTwin reads your bank and UPI statements and builds you one clear picture of where every <span style={{ color: "#fbbf24", fontWeight: 600 }}>₹</span> goes and where it could go. Then it helps you pause before the spends you'd regret.
             </p>
 
             <div className="hero-ctas h-el-4">
@@ -633,8 +635,8 @@ export default function LandingPage() {
               </div>
               <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
               <div>
-                <div className="hero-stat-val">100%</div>
-                <div className="hero-stat-label">Self-hosted AI</div>
+                <div className="hero-stat-val">0</div>
+                <div className="hero-stat-label">Bank passwords asked</div>
               </div>
               <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
               <div>
@@ -673,7 +675,7 @@ export default function LandingPage() {
                 <div className="feat-card-icon" style={{ background: "rgba(167,139,250,0.12)" }} aria-hidden="true">🤖</div>
                 <div className="feat-card-title">AI auto-categorization</div>
                 <div className="feat-card-desc">
-                  Raw UPI strings like <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#a78bfa" }}>SWIGGY*ORD*8423748134</span> become "🍕 Food · ₹342" automatically. Trained on Indian merchants, no manual tagging needed.
+                  Raw UPI strings like <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#a78bfa" }}>SWIGGY*ORD*8423748134</span> become "🍕 Food · ₹342" automatically. Fix one, and FinTwin remembers that shop next time.
                 </div>
                 <div className="mini-bar-wrap" style={{ marginTop: 18 }}>
                   {[
@@ -938,6 +940,44 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════
+          PILLAR 3 — Spend Guard: pause before you pay
+      ════════════════════════════════════════════════════════ */}
+      <section id="spend-guard" aria-labelledby="pillar3-heading">
+        <div className="section">
+          <Reveal>
+            <div className="section-tag">Pillar 3 · New</div>
+            <h2 className="section-h2" id="pillar3-heading">
+              Pause before you pay.
+            </h2>
+            <p className="section-sub">
+              UPI made paying instant. Spend Guard gives you a moment to think before the payments you might regret, and stays out of the way for everything else.
+            </p>
+          </Reveal>
+
+          <div className="feat-grid">
+            {[
+              { icon: "⏸️", bg: "rgba(167,139,250,0.12)", title: "A pause only when it matters",
+                desc: "Groceries and bills go straight through. A late-night splurge or a buy that breaks your budget gets a short pause, explained with your own numbers." },
+              { icon: "📅", bg: "rgba(34,211,238,0.10)", title: "Your salary, planned on payday",
+                desc: "Bills, goals and a safety buffer come first. What's left becomes a weekly allowance, so overspending never eats into your rent." },
+              { icon: "🔄", bg: "rgba(251,191,36,0.10)", title: "Top-ups that think first",
+                desc: "Need more this week? Ask, and Spend Guard checks what you can spare. Money set aside for bills is never touched." },
+              { icon: "🤝", bg: "rgba(74,222,128,0.10)", title: "You always decide",
+                desc: "It suggests, it never blocks. Your own UPI app makes the payment, just like always." },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={(i % 2) + 1}>
+                <div className="feat-card">
+                  <div className="feat-card-icon" style={{ background: c.bg }} aria-hidden="true">{c.icon}</div>
+                  <div className="feat-card-title">{c.title}</div>
+                  <div className="feat-card-desc">{c.desc}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
           SECURITY SECTION
       ════════════════════════════════════════════════════════ */}
       <div className="sec-wrap" id="security">
@@ -949,8 +989,8 @@ export default function LandingPage() {
             <Reveal>
               <div className="section-tag" style={{ color: "#22d3ee" }}>Security</div>
               <h2 className="section-h2" id="security-heading">
-                Your data never crosses a border.<br />
-                <span className="gt-purple">Your AI never leaves our servers.</span>
+                Your money data stays private.<br />
+                <span className="gt-purple">You stay in control.</span>
               </h2>
               <p className="section-sub">
                 We built FinTwin for people who shouldn't have to choose between useful AI and financial privacy. You don't have to.
@@ -971,19 +1011,19 @@ export default function LandingPage() {
               <Reveal delay={2}>
                 <div className="sec-card">
                   <div className="sec-card-icon" style={{ background: "rgba(167,139,250,0.08)" }} aria-hidden="true">🏦</div>
-                  <div className="sec-card-title">Secure bank linking</div>
+                  <div className="sec-card-title">No bank passwords, ever</div>
                   <div className="sec-card-desc">
-                    We connect to your bank accounts through a regulated, consent-based framework. No screen scraping, no storing your passwords — you're always in control.
+                    FinTwin works from the statements you choose to import. It never asks for your bank login or card details.
                   </div>
                 </div>
               </Reveal>
 
               <Reveal delay={1}>
                 <div className="sec-card">
-                  <div className="sec-card-icon" style={{ background: "rgba(74,222,128,0.08)" }} aria-hidden="true">🖥️</div>
-                  <div className="sec-card-title">AI that stays on our servers</div>
+                  <div className="sec-card-icon" style={{ background: "rgba(74,222,128,0.08)" }} aria-hidden="true">🗑️</div>
+                  <div className="sec-card-title">Delete everything, anytime</div>
                   <div className="sec-card-desc">
-                    Our AI runs on our own infrastructure. Your financial data never leaves to any third-party AI service — it stays within our system, always.
+                    Your data is yours. Delete your account and everything in it from Settings, in one step.
                   </div>
                 </div>
               </Reveal>
@@ -1095,7 +1135,7 @@ export default function LandingPage() {
               )}
             </div>
             <p style={{ marginTop: 20, fontSize: 12, color: "rgba(100,116,139,0.5)", fontFamily: "'DM Mono', monospace" }}>
-              Free · No credit card · Runs on our servers
+              Free · No credit card · Delete anytime
             </p>
           </Reveal>
         </div>
@@ -1114,7 +1154,7 @@ export default function LandingPage() {
                 <span className="lnav-wordmark">FinTwin<span> AI</span></span>
               </div>
               <p className="footer-brand-desc">
-                AI-powered personal finance OS for India. Self-hosted AI, statement import, bank-level security. Know your money.
+                AI-powered personal finance for India. Know your money, and pause before you spend it.
               </p>
             </div>
 
@@ -1123,6 +1163,7 @@ export default function LandingPage() {
               <div className="footer-col-title">Product</div>
               <div className="footer-links">
                 <button className="footer-link" onClick={() => scrollTo("features")}>Features</button>
+                <button className="footer-link" onClick={() => scrollTo("spend-guard")}>Spend Guard</button>
                 <button className="footer-link" onClick={() => scrollTo("security")}>Security</button>
                 <button className="footer-link" onClick={() => scrollTo("pricing")}>Pricing</button>
                 <button className="footer-link" onClick={() => navigate(isLoggedIn ? "/dashboard" : "/register")}>{isLoggedIn ? "Dashboard" : "Get started"}</button>

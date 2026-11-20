@@ -14,7 +14,7 @@ from utils import backend_api
 
 logger = logging.getLogger(__name__)
 
-# Ollama/OpenAI-style tool schemas. Kept to five focused tools — small
+# Ollama/OpenAI-style tool schemas. Kept to six focused tools — small
 # models pick the right tool far more reliably from a short list.
 # Holding types as the portfolio stores them.
 PORTFOLIO_TYPES = ["Stocks", "Mutual Fund", "Fixed Deposit", "PPF", "NPS", "Gold",
@@ -156,6 +156,23 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spend_guard",
+            "description": (
+                "Fetch this month in Spend Guard, the feature that pauses before UPI payments "
+                "the user might regret: money saved by pausing (savedByPausingThisMonth), "
+                "payments checked, pauses (by category), skipped or paid anyway after a pause, "
+                "the wishlist, top-ups, what's left to spend this week, and the approved salary "
+                "plan. Use for questions about Spend Guard, pauses, 'how much did pausing save "
+                "me', the wishlist, top-ups or the weekly allowance. 'active': false means "
+                "the user hasn't used Spend Guard yet. The wallet balances are pretend "
+                "(balancesArePretend) — say so if you quote them."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
 ]
 
 
@@ -208,6 +225,8 @@ def execute_tool(name: str, args: dict, user_id: int, tool_token: str | None = N
         elif name == "get_portfolio":
             params = {"type": args["type"]} if args.get("type") in PORTFOLIO_TYPES else None
             result = backend_api.get(f"/{user_id}/portfolio", params, tool_token)
+        elif name == "get_spend_guard":
+            result = backend_api.get(f"/{user_id}/spend-guard", None, tool_token)
         else:
             return json.dumps({"error": f"Unknown tool '{name}'"})
         # ensure_ascii=False: escaped "\u20b9" was copied into answers verbatim

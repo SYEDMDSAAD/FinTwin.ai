@@ -3,6 +3,7 @@ package com.fintwin.demo;
 import com.fintwin.model.Asset;
 import com.fintwin.model.Budget;
 import com.fintwin.model.FinancialGoal;
+import com.fintwin.model.InsurancePolicy;
 import com.fintwin.model.Investment;
 import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
@@ -122,7 +123,28 @@ final class DemoData {
                 investment("Public Provident Fund", "PPF", 48_000, 51_600, 700, null, null));
     }
 
+    /** A health cover and a term plan, one of them renewing within the month. */
+    List<InsurancePolicy> insurance() {
+        return List.of(
+                policy("Health", "Star Health", 14_500, "Annually", 500_000, 21, "Family floater for Riya and her parents"),
+                policy("Term", "LIC", 1_150, "Monthly", 10_000_000, 160, "Term cover till 60"));
+    }
+
     // ── Builders ──────────────────────────────────────────────────────────────
+
+    private InsurancePolicy policy(String type, String provider, double premium, String frequency,
+                                   double sumAssured, int renewsInDays, String notes) {
+        InsurancePolicy p = new InsurancePolicy();
+        p.setType(type);
+        p.setProvider(provider);
+        p.setPremium(String.valueOf((long) premium));
+        p.setFrequency(frequency);
+        p.setSumAssured(String.valueOf((long) sumAssured));
+        p.setRenewalDate(today.plusDays(renewsInDays));
+        p.setNotes(notes);
+        p.setUser(user);
+        return p;
+    }
 
     private void monthly(List<Transaction> out, LocalDate month, int day, String merchant, double amount,
                          String category, String source) {

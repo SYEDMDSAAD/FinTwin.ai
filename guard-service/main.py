@@ -11,6 +11,8 @@ UPI app as the merchant's QR link; a top-up is a link to pay their own
 spending account. The balances here are pretend ("demo": true), so the demo
 can show a full month on stage.
 """
+import asyncio
+import functools
 import hmac
 import json
 import logging
@@ -30,7 +32,7 @@ import rules
 import usage
 from agents import brain as agents
 from flows import consult, decide
-from store import make_store
+from store import BackendStore, make_store
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s - %(message)s")
@@ -106,6 +108,10 @@ class Body(BaseModel):
 class CheckBody(Body):
     qr: str = Field(max_length=2048)
     amount: str | float | int | None = None         # for QR codes without an amount
+    # When Spend Guard asked what an unknown payee is for: one of
+    # rules.REASON_CATEGORIES, and optionally the user's own words
+    purpose: str | None = Field(default=None, max_length=40)
+    reason: str = Field(default="", max_length=120)
 
 
 class OutcomeBody(Body):
@@ -245,6 +251,74 @@ def _view(uid: int, w: dict, now_dt) -> dict:
     }
 
 
+def _saved(w: dict, amount: int, now_dt) -> None:
+    """Money kept by pausing: a running total, and one per month for the Copilot."""
+    w["saved_by_pausing"] = w.get("saved_by_pausing", 0) + amount
+    month = now_dt.strftime("%Y-%m")
+    by_month = w.setdefault("saved_by_month", {})
+    by_month[month] = by_month.get(month, 0) + amount
+
+
+def summary(uid: int) -> dict:
+    """This month in Spend Guard, for FinTwin's Copilot: counts and rupees only,
+    never a payee's name or UPI ID. The balances are the pretend wallet's."""
+    now_dt = rules.now()
+    month = now_dt.strftime("%Y-%m")
+    w = store.wallet(uid, now_dt.date())
+    events = [e for e in store.events(uid) if (e.get("at") or "").startswith(month)]
+    scans = [e for e in events if e["type"] == "scan"]
+    pauses = [e for e in scans if e["decision"] == "pause"]
+    topups = [e for e in events if e["type"] == "topup"]
+    by_category: dict[str, int] = {}
+    for e in pauses:
+        by_category[e.get("category") or "Other"] = by_category.get(e.get("category") or "Other", 0) + 1
+    plan = w.get("plan")
+    return {
+        "month": month,
+        "savedByPausingThisMonth": w.get("saved_by_month", {}).get(month, 0),
+        "savedByPausingTotal": w.get("saved_by_pausing", 0),
+        "paymentsChecked": len(scans),
+        "pauses": len(pauses),
+        "pausesByCategory": by_category,
+        "skippedAfterAPause": sum(1 for e in pauses if e.get("choice") == "skipped"),
+        "paidAnywayAfterAPause": sum(1 for e in pauses if e.get("choice") == "paid"),
+        "putOnTheWishlist": sum(1 for e in events if e.get("choice") == "wishlist"),
+        "wishlistItemsNow": len(store.wishes(uid)),
+        "topUpsAsked": len(topups),
+        "toppedUpRupees": sum(e.get("moved", 0) for e in topups if e.get("choice") == "paid"),
+        "ratedNotWorthIt": sum(1 for e in events if e.get("worth_it") is False),
+        "leftToSpendThisWeek": w["balances"]["spending"],
+        "weeklyAllowance": plan["weekly"][plan.get("week", 0)] if plan else w["weekly"],
+        "bufferForTopUps": w["buffer"],
+        "salaryPlan": ({"salary": plan["salary"], "goals": plan["goals"], "approvedAt": plan["approved_at"]}
+                       if plan and str(plan.get("approved_at", "")).startswith(month) else None),
+        "balancesArePretend": True,
+    }
+
+
+def persisted(handler):
+    """With records kept in FinTwin: reads this user's records before the route
+    runs, and writes them back afterwards if the route changed them."""
+    @functools.wraps(handler)
+    async def run(body, *args, **kwargs):
+        if not isinstance(store, BackendStore):
+            return await handler(body, *args, **kwargs)
+        await store.open(body.userId, body.toolToken)
+        before = store.fingerprint(body.userId)
+        try:
+            return await handler(body, *args, **kwargs)
+        finally:
+            if store.fingerprint(body.userId) != before:
+                store.save_soon(body.userId, body.toolToken, lambda: summary(body.userId))
+    return run
+
+
+@app.on_event("shutdown")
+async def _flush_records():
+    if isinstance(store, BackendStore):
+        await store.drain()
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.post("/guard/hello")
@@ -262,12 +336,14 @@ async def hello(body: Body):
 
 
 @app.post("/guard/wallet")
+@persisted
 async def wallet(body: Body):
     now_dt = rules.now()
     return _view(body.userId, _wallet(body.userId, now_dt), now_dt)
 
 
 @app.post("/guard/check")
+@persisted
 async def check(body: CheckBody):
     """A scanned QR code, before paying: go, pause, or not enough money."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
@@ -275,9 +351,24 @@ async def check(body: CheckBody):
     # A QR code that carries an amount fixes it; otherwise the user types one
     exact = qr.am if qr.am is not None else rules.clean_amount(body.amount)
     w = _wallet(uid, now_dt)
-    finances = await data.load(uid, body.toolToken)
+    finances, fintwin_category = await asyncio.gather(
+        data.load(uid, body.toolToken),
+        data.categorize(uid, qr.pn or qr.pa.split("@")[0], body.toolToken))
+    # FinTwin can't tell who this is: the user says what it's for, and that
+    # (a fixed list, mapped in code) decides the category
+    category, category_source, unknown, purpose = rules.scan_category(qr, fintwin_category, body.purpose)
+    note = rules.clean_reason(body.reason) if purpose else ""
     facts, untrusted, allowed = rules.scan_facts(qr=qr, amount=exact, wallet=w, finances=finances,
-                                                 events=store.events(uid), now_dt=now_dt)
+                                                 events=store.events(uid), now_dt=now_dt,
+                                                 category=category, payee_known=not unknown,
+                                                 purpose=purpose, reason=note)
+    if (unknown and not purpose and facts["week"]["left_after"] >= 0
+            and facts["amount"] >= w["settings"].get("min_check", 100)):
+        # Nothing is decided or kept yet: the app asks, then checks again
+        return {"decision": "ask_reason", "question": rules.REASON_QUESTION,
+                "purposes": list(rules.REASON_CATEGORIES), "source": "rules", "reason": None,
+                "amount": str(exact), "rupees": facts["amount"], "category": facts["category"],
+                "payeeName": qr.pn, "payeeUpi": qr.pa}
     if facts["week"]["left_after"] < 0:
         result = {"decision": "insufficient", "show_wishlist": False,
                   "message": rules.insufficient_message(facts)}
@@ -292,7 +383,8 @@ async def check(body: CheckBody):
             budget_s=_budget("scan", started))
     event_id = store.add_event(uid, {
         "type": "scan", "at": now_dt.isoformat(), "amount": facts["amount"], "exact": str(exact),
-        "category": facts["category"], "payee": qr.pa, "payee_name": qr.pn[:60], "qr": qr.raw,
+        "category": facts["category"], "category_source": category_source, "purpose": purpose,
+        "payee": qr.pa, "payee_name": qr.pn[:60], "qr": qr.raw,
         "decision": result["decision"], "message": result["message"],
         "show_wishlist": result["show_wishlist"], "source": source, "reason": reason,
         "model": agents.MODEL if source == "ai" else None, "ms": _ms(started),
@@ -310,6 +402,7 @@ async def check(body: CheckBody):
 
 
 @app.post("/guard/outcome")
+@persisted
 async def outcome(body: OutcomeBody):
     """What the user chose after a check or a top-up answer. Each one is decided once."""
     uid, now_dt = body.userId, rules.now()
@@ -327,11 +420,20 @@ async def outcome(body: OutcomeBody):
             w["balances"]["spending"] -= e["amount"]
             fields.update(paid_at=now_dt.isoformat(), paid_anyway=e["decision"] == "pause")
             # The merchant's own link, only ever rebuilt from the stored QR code
-            out["link"] = rules.handoff_link(rules.parse_upi(e["qr"]), Decimal(e["exact"]))
+            qr = rules.parse_upi(e["qr"])
+            out["link"] = rules.handoff_link(qr, Decimal(e["exact"]))
             out["toRebalance"] = _over_by(e)
+            # FinTwin records it as a transaction (the backend checks every field);
+            # a statement row for the same money takes it over later. Sample
+            # shops aren't real payments, so they're never recorded.
+            if not rules.is_sample(qr) and not data.persona_mode():
+                data.forget(uid)            # the new transaction changes a budget's spending
+                out["record"] = {"eventId": e["id"], "merchant": (e.get("payee_name") or qr.pa)[:120],
+                                 "amount": e["exact"], "category": e["category"],
+                                 "categorySource": e.get("category_source")}
         elif body.choice == "skipped":
             if e["decision"] == "pause":
-                w["saved_by_pausing"] = w.get("saved_by_pausing", 0) + e["amount"]
+                _saved(w, e["amount"], now_dt)
         else:
             if e["category"] not in rules.WAITABLE:
                 raise rules.GuardError("Only things that can wait go on the wishlist.")
@@ -373,6 +475,7 @@ async def outcome(body: OutcomeBody):
 
 
 @app.post("/guard/topup")
+@persisted
 async def topup(body: TopupBody):
     """A request to move more money into the spending account."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
@@ -407,6 +510,7 @@ async def topup(body: TopupBody):
 
 
 @app.post("/guard/rebalance")
+@persisted
 async def rebalance(body: EventBody):
     """Where an overspend or a top-up comes from this month. Proposes; approve-cuts applies."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
@@ -446,6 +550,7 @@ async def rebalance(body: EventBody):
 
 
 @app.post("/guard/approve-cuts")
+@persisted
 async def approve_cuts(body: EventBody):
     uid, now_dt = body.userId, rules.now()
     e = _event(uid, body.eventId)
@@ -470,6 +575,7 @@ async def approve_cuts(body: EventBody):
 
 
 @app.post("/guard/payday")
+@persisted
 async def payday(body: PaydayBody):
     """Splits a salary into bills, goals, a buffer and four weekly allowances. Proposes only."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
@@ -493,6 +599,7 @@ async def payday(body: PaydayBody):
 
 
 @app.post("/guard/approve-plan")
+@persisted
 async def approve_plan(body: PlanBody):
     uid, now_dt = body.userId, rules.now()
     p = store.plan(uid, rules.valid_id(body.planId))
@@ -513,10 +620,18 @@ async def approve_plan(body: PlanBody):
                  "buffer": p["buffer"], "weekly": weekly, "week": 0, "source": p["source"],
                  "approved_at": now_dt.isoformat()}
     store.save_wallet(uid, w)
-    return {"wallet": _view(uid, w, now_dt)}
+    out = {"wallet": _view(uid, w, now_dt)}
+    # FinTwin earmarks each goal's share for this month (the backend matches the
+    # titles to the user's goals). Made-up persona goals are never sent.
+    if not data.persona_mode() and p["goals"]:
+        data.forget(uid)                    # the earmarks change goal progress
+        out["goalPlan"] = {"month": now_dt.strftime("%Y-%m"),
+                           "goals": [{"goal": g["goal"], "amount": g["amount"]} for g in p["goals"]]}
+    return out
 
 
 @app.post("/guard/regret")
+@persisted
 async def regret(body: RegretBody):
     """"Was it worth it?" The answers teach Spend Guard what this user regrets."""
     uid, now_dt = body.userId, rules.now()
@@ -530,6 +645,7 @@ async def regret(body: RegretBody):
 
 
 @app.post("/guard/wishlist-remove")
+@persisted
 async def wishlist_remove(body: WishBody):
     uid, now_dt = body.userId, rules.now()
     wish_id = rules.valid_id(body.wishId)
@@ -539,7 +655,7 @@ async def wishlist_remove(body: WishBody):
     store.remove_wish(uid, wish_id)
     w = _wallet(uid, now_dt)
     if body.outcome == "dropped":
-        w["saved_by_pausing"] = w.get("saved_by_pausing", 0) + item["amount"]
+        _saved(w, item["amount"], now_dt)
         store.save_wallet(uid, w)
     # Buying runs the item through a normal check, from the QR code stored with it
     buy = {"qr": item["qr"], "amount": item["exact"]} if body.outcome == "bought" and item.get("qr") else None
@@ -547,6 +663,7 @@ async def wishlist_remove(body: WishBody):
 
 
 @app.post("/guard/settings")
+@persisted
 async def settings(body: SettingsBody):
     uid, now_dt = body.userId, rules.now()
     w = _wallet(uid, now_dt)
@@ -571,6 +688,7 @@ async def settings(body: SettingsBody):
 
 
 @app.post("/guard/demo-reset")
+@persisted
 async def demo_reset(body: Body):
     """Starts this user's Spend Guard demo again. Their FinTwin data isn't touched."""
     store.reset(body.userId)

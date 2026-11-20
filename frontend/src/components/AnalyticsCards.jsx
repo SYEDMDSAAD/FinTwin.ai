@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { rupees, percent, dayRange, changeTone, NEUTRAL } from "../utils/money";
 
+// Counts up (or down) to the value; the sign stays in front of the ₹
 function AnimatedNumber({
     value,
-    prefix = "₹",
     duration = 1200
 }) {
 
@@ -10,23 +11,22 @@ function AnimatedNumber({
 
     useEffect(() => {
 
-        let start = 0;
-
-        const step =
-            value / (duration / 16);
+        const target = Number(value) || 0;
+        const steps = Math.max(1, Math.round(duration / 16));
+        let step = 0;
 
         const timer = setInterval(() => {
 
-            start += step;
+            step += 1;
 
-            if (start >= value) {
+            if (step >= steps) {
 
-                setDisplay(value);
+                setDisplay(target);
                 clearInterval(timer);
 
             } else {
 
-                setDisplay(Math.floor(start));
+                setDisplay((target * step) / steps);
 
             }
 
@@ -36,12 +36,7 @@ function AnimatedNumber({
 
     }, [value, duration]);
 
-    return (
-        <span>
-            {prefix}
-            {Math.round(display).toLocaleString("en-IN")}
-        </span>
-    );
+    return <span>{rupees(display)}</span>;
 }
 
 import { motion } from "framer-motion";
@@ -58,35 +53,57 @@ function AnalyticsCards({
     prediction,
     incomeTrend,
     expenseTrend,
-    savingsTrend
+    savingsTrend,
+    compared = {}
 }) {
+
+    // What the change is measured against: the same days of last month
+    const range = dayRange(compared.from, compared.to);
+    const against = range ? `vs ${range}` : "vs last month";
+
+    // The arrow follows the change itself; its colour says whether that's
+    // good: more income or savings is, more spending isn't.
+    const change = (trend, before, goodWhenUp) => {
+        if (before === 0) {
+            return {
+                trend: "—",
+                icon: null,
+                tone: NEUTRAL,
+                title: range ? `Nothing on record for ${range} to compare with` : "Nothing to compare with yet"
+            };
+        }
+        const n = Number(trend) || 0;
+        return {
+            trend: percent(n, { plus: true }),
+            icon: n < 0 ? <ArrowDown size={12} /> : n > 0 ? <ArrowUp size={12} /> : null,
+            tone: changeTone(n, goodWhenUp),
+            title: before == null ? "" : `${rupees(before)} on ${range || "last month"}`
+        };
+    };
 
     const cards = [
         {
             label: "Total Income",
             value: income,
             color: "#4ade80",
-            trend: `${incomeTrend > 0 ? "+" : ""}${incomeTrend}%`,
-            icon: <ArrowUp size={12} />,
-            sub: "vs last month"
+            ...change(incomeTrend, compared.income, true),
+            sub: `This month · ${against}`
         },
 
         {
             label: "Total Expenses",
             value: Math.abs(expenses),
             color: "#f87171",
-            trend: `${expenseTrend > 0 ? "+" : ""}${expenseTrend}%`,
-            icon: <ArrowDown size={12} />,
-            sub: "vs last month"
+            ...change(expenseTrend, compared.expenses, false),
+            sub: `This month · ${against}`
         },
 
         {
             label: "Net Savings",
             value: savings,
             color: "#22d3ee",
-            trend: `${savingsTrend > 0 ? "+" : ""}${savingsTrend}%`,
-            icon: <ArrowUp size={12} />,
-            sub: "all time"
+            ...change(savingsTrend, compared.savings, true),
+            sub: `This month · ${against}`
         },
 
         {
@@ -95,7 +112,9 @@ function AnalyticsCards({
             color: "#a78bfa",
             trend: "AI Forecast",
             icon: <Sparkles size={12} />,
-            sub: "next month"
+            tone: "#a78bfa",
+            title: "",
+            sub: "Next month"
         }
     ];
 
@@ -191,9 +210,11 @@ function AnalyticsCards({
                                 shrink-0
                             "
                             style={{
-                                color: card.color,
-                                backgroundColor: `${card.color}18`
+                                color: card.tone,
+                                backgroundColor: `${card.tone}18`
                             }}
+                            title={card.title || undefined}
+                            data-testid={`trend-${card.label}`}
                         >
                             {card.icon}
                             {card.trend}

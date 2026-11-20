@@ -97,7 +97,15 @@ def forecast_expenses(transactions: list[dict]) -> dict:
         return _response(0, 0, 0, "Forecasting failed due to an unexpected error.")
 
 
+# A trend needs at least this many full months. With fewer, a straight line just
+# repeats the last jump (₹57.6k then ₹79.5k "predicts" ₹1.01 lakh), so the
+# forecast is their average instead.
+_MIN_TREND_POINTS = 3
+
+
 def _predict_next(y: np.ndarray) -> float:
+    if len(y) < _MIN_TREND_POINTS:
+        return float(np.mean(y))
     try:
         from statsforecast.models import AutoTheta
 

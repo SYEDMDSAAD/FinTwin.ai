@@ -56,6 +56,7 @@ services:
       AI_INTERNAL_KEY: ${AI_INTERNAL_KEY:?AI_INTERNAL_KEY is required}
       REDIS_URL:        redis://redis:6379
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      LLM_PROVIDER:    ${LLM_PROVIDER:-ollama}   # this stack ships its own Ollama; gemini needs GOOGLE_CLOUD_PROJECT + credentials
       OLLAMA_URL:      http://ollama:11434/api/generate
       METRICS_TOKEN:   ${METRICS_TOKEN:-local-dev-metrics-token}   # Prometheus sends it to /metrics
     # No `ports:` — only reachable by Spring Boot on the fintwin network

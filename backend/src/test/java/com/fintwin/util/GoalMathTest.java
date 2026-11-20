@@ -158,6 +158,54 @@ class GoalMathTest {
         assertThat(allocated.get(2L)).isEqualTo(10_000.0, within(0.01));
     }
 
+    // ── Earmarks from an approved Spend Guard salary plan ────────────────────
+
+    @Test
+    void anEarmarkedGoalIsFundedFirstAndTheRestSplitsAsUsual() {
+        FinancialGoal travel = goal(1L, 50_000.0, 5_000.0, LocalDate.of(2026, 11, 1), null);
+        FinancialGoal bike   = goal(2L, 50_000.0, 5_000.0, LocalDate.of(2026, 11, 1), null);
+        YearMonth nov = YearMonth.of(2026, 11);
+        Map<YearMonth, Double> saved = Map.of(nov, 10_000.0);
+
+        Map<Long, Double> plain = GoalMath.allocateSavings(List.of(travel, bike), saved, nov);
+        assertThat(plain.get(1L)).isCloseTo(5_000.0, within(0.01));
+
+        Map<Long, Double> marked = GoalMath.allocateSavings(List.of(travel, bike), saved, nov,
+                Map.of(nov, Map.of(1L, 8_000.0)));
+        assertThat(marked.get(1L)).isCloseTo(9_000.0, within(0.01));   // 8,000 first, then half of 2,000
+        assertThat(marked.get(2L)).isCloseTo(1_000.0, within(0.01));
+        assertThat(marked.get(1L) + marked.get(2L)).isCloseTo(10_000.0, within(0.01));
+    }
+
+    @Test
+    void anEarmarkIsAPriorityNotExtraMoney() {
+        FinancialGoal travel = goal(1L, 50_000.0, 5_000.0, LocalDate.of(2026, 11, 1), null);
+        FinancialGoal bike   = goal(2L, 50_000.0, 5_000.0, LocalDate.of(2026, 11, 1), null);
+        YearMonth nov = YearMonth.of(2026, 11);
+
+        // Nothing saved: nothing funded, whatever was earmarked
+        Map<Long, Double> none = GoalMath.allocateSavings(List.of(travel), Map.of(nov, -2_000.0), nov,
+                Map.of(nov, Map.of(1L, 8_000.0)));
+        assertThat(none.get(1L)).isZero();
+
+        // Savings short of the earmarks: each gets the same fraction of its earmark
+        Map<Long, Double> short_ = GoalMath.allocateSavings(List.of(travel, bike), Map.of(nov, 3_000.0), nov,
+                Map.of(nov, Map.of(1L, 4_000.0, 2L, 2_000.0)));
+        assertThat(short_.get(1L)).isCloseTo(2_000.0, within(0.01));
+        assertThat(short_.get(2L)).isCloseTo(1_000.0, within(0.01));
+    }
+
+    @Test
+    void anEarmarkNeverTakesAGoalPastItsTarget() {
+        FinancialGoal small = goal(1L, 3_000.0, 1_000.0, LocalDate.of(2026, 11, 1), null);
+        FinancialGoal other = goal(2L, 50_000.0, 1_000.0, LocalDate.of(2026, 11, 1), null);
+        YearMonth nov = YearMonth.of(2026, 11);
+        Map<Long, Double> got = GoalMath.allocateSavings(List.of(small, other), Map.of(nov, 10_000.0), nov,
+                Map.of(nov, Map.of(1L, 8_000.0)));
+        assertThat(got.get(1L)).isCloseTo(3_000.0, within(0.01));
+        assertThat(got.get(2L)).isCloseTo(7_000.0, within(0.01));
+    }
+
     private static FinancialGoal goal(Long id, Double target, Double monthlyTarget,
                                       LocalDate createdAt, LocalDate completedAt) {
         FinancialGoal g = new FinancialGoal();

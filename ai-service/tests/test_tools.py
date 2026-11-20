@@ -11,7 +11,8 @@ from chatbot.advisor import generate_financial_advice
 
 def test_tool_schemas_are_well_formed():
     names = [t["function"]["name"] for t in tools.TOOLS]
-    assert names == ["get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio"]
+    assert names == ["get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio",
+                     "get_spend_guard"]
     for t in tools.TOOLS:
         assert t["type"] == "function"
         assert "description" in t["function"]
@@ -93,17 +94,19 @@ def test_parameterless_tools_route_to_right_endpoints(mock_get):
     tools.execute_tool("get_goals", {}, user_id=8)
     tools.execute_tool("get_net_worth", {}, user_id=8)
     tools.execute_tool("get_portfolio", {}, user_id=8)
+    tools.execute_tool("get_spend_guard", {}, user_id=8)
     called_paths = [c.args[0] for c in mock_get.call_args_list]
-    assert called_paths == ["/8/budgets", "/8/goals", "/8/networth", "/8/portfolio"]
+    assert called_paths == ["/8/budgets", "/8/goals", "/8/networth", "/8/portfolio", "/8/spend-guard"]
 
 
 @patch("chatbot.tools.backend_api.get")
 def test_every_tool_forwards_the_tool_token(mock_get):
     """The backend refuses a tool call without the token it minted for this user."""
     mock_get.return_value = {}
-    for name in ("get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio"):
+    for name in ("get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio",
+                 "get_spend_guard"):
         tools.execute_tool(name, {}, user_id=8, tool_token="8.999.sig")
-    assert [c.args[2] for c in mock_get.call_args_list] == ["8.999.sig"] * 5
+    assert [c.args[2] for c in mock_get.call_args_list] == ["8.999.sig"] * 6
 
 
 @patch("chatbot.advisor.execute_tool")
@@ -413,3 +416,11 @@ def test_chat_route_returns_the_trace():
         r = TestClient(app_module.app).post("/chat", json={"message": "hi", "mode": "Savings Advisor"},
                                             headers={"x-internal-key": "test-internal-key"})
     assert r.json() == {"success": True, "reply": "ok", "trace": {"path": "tools"}}
+
+
+@patch("chatbot.tools.backend_api.get")
+def test_spend_guard_figures_reach_the_model_as_returned(mock_get):
+    mock_get.return_value = {"active": True, "month": "2026-11", "savedByPausingThisMonth": 1200}
+    out = json.loads(tools.execute_tool("get_spend_guard", {"user_id": 99}, user_id=8, tool_token="t"))
+    assert out["savedByPausingThisMonth"] == 1200
+    assert mock_get.call_args.args[0] == "/8/spend-guard"      # never the model's user id

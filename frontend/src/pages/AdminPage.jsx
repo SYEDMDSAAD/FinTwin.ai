@@ -592,7 +592,7 @@ function PlatformSection() {
 
   const rows = health ? [
     { label:"Database",            ok:true,              detail:"PostgreSQL — connected" },
-    { label:"AI Service (Ollama)", ok:health.aiServiceOnline, detail:health.aiServiceUrl },
+    { label:"AI Service (Gemini)", ok:health.aiServiceOnline, detail:health.aiServiceUrl },
     { label:"JWT Auth",            ok:true,              detail:"HS256 — active" },
     { label:"Field Encryption",    ok:true,              detail:"AES-256/GCM" },
   ] : [];

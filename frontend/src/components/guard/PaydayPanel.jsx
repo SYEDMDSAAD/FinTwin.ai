@@ -55,18 +55,20 @@ export function PlanView({ plan }) {
     );
 }
 
-export default function PaydayPanel({ wallet, onWallet }) {
+export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
     const [salary, setSalary] = useState(wallet.plan?.salary ? String(wallet.plan.salary) : "");
     const [proposal, setProposal] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [approved, setApproved] = useState(false);
+    const [earmarked, setEarmarked] = useState(0);
 
     async function plan(e) {
         e.preventDefault();
         setBusy(true);
         setError("");
         setApproved(false);
+        setEarmarked(0);
         try {
             setProposal(await guard("payday", { salary: Number(salary) }));
         } catch (err) {
@@ -83,6 +85,8 @@ export default function PaydayPanel({ wallet, onWallet }) {
             const r = await guard("approve-plan", { planId: proposal.planId });
             onWallet(r.wallet);
             setApproved(true);
+            setEarmarked(r.goalsEarmarked || 0);
+            if (r.goalsEarmarked > 0) onFinTwinChanged?.();
         } catch (err) {
             setError(guardError(err));
         } finally {
@@ -123,9 +127,17 @@ export default function PaydayPanel({ wallet, onWallet }) {
                     <PlanView plan={proposal.plan} />
                     <p className="sg-p" style={{ margin: "12px 0" }}>{proposal.plan.message}</p>
                     {approved ? (
-                        <span className="sg-chip sg-chip-good" role="status">
-                            <CheckCircle2 size={13} aria-hidden /> Approved: week 1 has moved to your spending account
-                        </span>
+                        <div role="status">
+                            <span className="sg-chip sg-chip-good">
+                                <CheckCircle2 size={13} aria-hidden /> Approved: week 1 has moved to your spending account
+                            </span>
+                            {earmarked > 0 && (
+                                <p className="sg-sub" style={{ margin: "8px 0 0" }}>
+                                    The goal money is set aside in Goals Planner for this month. It counts as
+                                    you actually save it.
+                                </p>
+                            )}
+                        </div>
                     ) : (
                         <div className="sg-row">
                             <button type="button" className="sg-btn sg-btn-primary" onClick={approve} disabled={busy}>

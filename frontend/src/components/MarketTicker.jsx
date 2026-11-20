@@ -31,6 +31,11 @@ export default function MarketTicker() {
 
   useEffect(() => {
     let cancelled = false;
+    let retry = null;
+    // A failed or empty fetch tries again in 10 seconds, not at the next minute
+    const retrySoon = () => {
+      if (!cancelled && !retry) retry = setTimeout(() => { retry = null; fetchAll(); }, 10000);
+    };
     const fetchAll = async () => {
       try {
         const symbols = INDICES.map(i => i.symbol).join(",");
@@ -55,13 +60,15 @@ export default function MarketTicker() {
           };
         });
         setData(merged);
+        if (!Object.keys(bySymbol).length) retrySoon();
       } catch {
         // keep existing data / dashes on failure — don't hide the ticker
+        retrySoon();
       }
     };
     fetchAll();
     const t = setInterval(fetchAll, 60000);
-    return () => { cancelled = true; clearInterval(t); };
+    return () => { cancelled = true; clearInterval(t); clearTimeout(retry); };
   }, []);
 
   const items = [...data, ...data, ...data];

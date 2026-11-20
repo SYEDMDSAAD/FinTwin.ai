@@ -65,7 +65,7 @@ function FinancialScoreChart({ data }) {
 
     return (
         <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis

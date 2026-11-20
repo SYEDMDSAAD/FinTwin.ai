@@ -23,6 +23,14 @@ class TopupDecision(BaseModel):
     message: str = Field(description="One or two short sentences explaining the decision.")
 
 
+class LocalTopupDecision(TopupDecision):
+    """The same answer for small local models, which often leave suggested_amount out:
+    Ollama holds the model to this shape while it writes, so a number is always there.
+    rules.check_topup reads it only for approve_less."""
+    suggested_amount: int = Field(
+        description="Whole rupees. approve_less: the smaller amount to move, below the request. Otherwise 0.")
+
+
 class Cut(BaseModel):
     kind: Literal["category", "next_allowance", "goal"]
     name: str = Field(description="The source's name exactly as written in FACTS.sources.")

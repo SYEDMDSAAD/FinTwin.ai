@@ -28,6 +28,8 @@ const NAV_GROUPS = [
             // what's behind every other item here.
             { name: "About App",    icon: <Info size={17} /> },
             { name: "Dashboard",    icon: <LayoutDashboard size={17} /> },
+            // Near the top: only shown to users the backend has let in
+            { name: "Spend Guard",  icon: <ScanLine size={17} />, gated: true },
             { name: "Analytics",    icon: <BarChart3 size={17} /> },
             { name: "Transactions", icon: <Wallet size={17} /> },
         ],
@@ -38,8 +40,6 @@ const NAV_GROUPS = [
             { name: "AI Intelligence",    icon: <Brain size={17} /> },
             { name: "AI Copilot",         icon: <MessageSquare size={17} /> },
             { name: "AI Spending Coach",  icon: <Zap size={17} /> },
-            // Prototype: only shown to users the backend has let in
-            { name: "Spend Guard",        icon: <ScanLine size={17} />, gated: true },
         ],
     },
     {
