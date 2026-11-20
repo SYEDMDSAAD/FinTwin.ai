@@ -1,13 +1,26 @@
-# What `gcloud run deploy --source .` leaves out of the upload
+# What `gcloud builds submit` / `gcloud run deploy --source` leave out of the
+# upload to Cloud Build. Secrets never leave this machine: the services get
+# their settings as Cloud Run environment variables instead.
 .gcloudignore
-.git
+.git/
 .gitignore
-venv/
-.venv/
-__pycache__/
-**/__pycache__/
-.pytest_cache/
-tests/
-evals/
 .env
 .env.*
+!.env.example
+*.pem
+*.key
+*.p12
+application_default_credentials*.json
+service-account*.json
+
+# Dependencies and build output: rebuilt inside the image
+venv/
+.venv/
+node_modules/
+target/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+evals/results/
