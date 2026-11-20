@@ -1,5 +1,11 @@
 # FinTwin.ai — Full Architecture
 
+> **Current deployment (November 2026):** five services on Google Cloud Run (web, API, identity,
+> Spend Guard's `guard-service`, and the AI service), with Gemini on Vertex AI for every AI feature and
+> PostgreSQL on Supabase. The [README](README.md#architecture) has the up-to-date diagram and the
+> Spend Guard agents. The sections below describe the core design, which is unchanged; references to
+> Ollama, tunnels and Azure are from earlier deployments.
+
 ## Overview
 
 FinTwin.ai is a three-tier fintech application. A React frontend communicates exclusively with a Spring Boot backend, which in turn calls a Python AI service for LLM and ML operations. The backend owns the database and is the single source of truth for all financial data.

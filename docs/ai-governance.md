@@ -140,9 +140,10 @@ These need a decision or a live change:
 5. **Processing region.** Gemini runs on the `global` endpoint. Pinning
    `gemini-3.5-flash-lite` to an Indian region would keep most calls in India.
    `gemini-3.7-flash` is only on `global` today.
-6. **Trial billing** randomly refuses about one Vertex call in three (retried
-   up to six times). Activating the full billing account fixes it; a budget
-   alert on the project would cap surprises.
+6. ~~**Trial billing** randomly refused about one Vertex call in three.~~
+   Fixed 20 Nov 2026: the billing account is now a paid account, and 16 of 16
+   test calls succeeded on both Gemini models. Still open: a budget alert on the
+   project to cap surprises.
 7. Copilot conversations stored **before 20 Nov 2026** were not masked
    retroactively.
 8. A copy of `backend/.env` sits in the Cloud Build source bucket from an
