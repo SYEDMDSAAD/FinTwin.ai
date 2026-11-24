@@ -1,11 +1,11 @@
-import { Bell, LogOut, User, Settings, ChevronDown, Sun, Moon } from "lucide-react";
+import { Bell, LogOut, User, Settings, ChevronDown, Sun, Moon, LifeBuoy } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useCurrentUser } from "../context/AuthContext";
 import { percent } from "../utils/money";
 
-function Header({ notifications = [], scoreData }) {
+function Header({ notifications = [], scoreData, compact = false, onSettings }) {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const [showProfile,      setShowProfile]      = useState(false);
@@ -83,12 +83,12 @@ function Header({ notifications = [], scoreData }) {
         style={{
           width: 42, height: 42, borderRadius: 12,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--bg-card)", border: "1px solid var(--border-card)",
         }}
       >
         {isDark
           ? <Sun  size={17} color="rgba(251,191,36,0.8)" />
-          : <Moon size={17} color="rgba(148,163,184,0.7)" />}
+          : <Moon size={17} color="var(--text-secondary)" />}
       </button>
 
       {/* Notifications */}
@@ -96,13 +96,14 @@ function Header({ notifications = [], scoreData }) {
         <button
           className="hdr-btn"
           onClick={() => { setShowNotifications(v => !v); setShowProfile(false); }}
+          aria-label={`Alerts (${notifications.length})`}
           style={{
             width: 42, height: 42, borderRadius: 12, position: "relative",
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-card)", border: "1px solid var(--border-card)",
           }}
         >
-          <Bell size={17} color="rgba(148,163,184,0.7)" />
+          <Bell size={17} color="var(--text-secondary)" />
           {notifications.length > 0 && (
             <span style={{
               position: "absolute", top: 5, right: 5,
@@ -154,9 +155,10 @@ function Header({ notifications = [], scoreData }) {
         <button
           className="hdr-btn"
           onClick={() => { setShowProfile(v => !v); setShowNotifications(false); }}
+          aria-label="Account menu"
           style={{
             display: "flex", alignItems: "center", gap: 8,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-card)", border: "1px solid var(--border-card)",
             borderRadius: 12, padding: "6px 10px 6px 6px",
           }}
         >
@@ -166,11 +168,15 @@ function Header({ notifications = [], scoreData }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 13, fontWeight: 700, color: "#fff",
           }}>{initial}</div>
-          <div style={{ textAlign: "left" }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", lineHeight: 1, margin: 0 }}>{fullName}</p>
-            <p style={{ fontSize: 10, color: "rgba(148,163,184,0.5)", margin: "2px 0 0", lineHeight: 1 }}>FinTwin User</p>
-          </div>
-          <ChevronDown size={13} color="rgba(148,163,184,0.5)" />
+          {!(compact && !isDesktop) && (
+            <>
+              <div style={{ textAlign: "left" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1, margin: 0 }}>{fullName}</p>
+                <p style={{ fontSize: 10, color: "var(--text-dim)", margin: "2px 0 0", lineHeight: 1 }}>FinTwin User</p>
+              </div>
+              <ChevronDown size={13} color="rgba(148,163,184,0.5)" />
+            </>
+          )}
         </button>
 
         {showProfile && (
@@ -189,8 +195,11 @@ function Header({ notifications = [], scoreData }) {
               <button className="profile-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
                 <User size={14} color="rgba(148,163,184,0.6)" /> Profile
               </button>
-              <button className="profile-item" onClick={() => setShowProfile(false)}>
+              <button className="profile-item" onClick={() => { setShowProfile(false); onSettings?.(); }}>
                 <Settings size={14} color="rgba(148,163,184,0.6)" /> Settings
+              </button>
+              <button className="profile-item" onClick={() => { setShowProfile(false); window.dispatchEvent(new Event("openHelp")); }}>
+                <LifeBuoy size={14} color="rgba(148,163,184,0.6)" /> Help &amp; feedback
               </button>
               <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
               <button className="profile-item" onClick={logout} style={{ color: "#f87171" }}>
@@ -246,11 +255,10 @@ function Header({ notifications = [], scoreData }) {
     </>
   );
 
-  return (
-    <>
+  const styles = (
       <style>{`
         .hdr-btn { transition: background 0.2s ease; cursor: pointer; border: none; }
-        .hdr-btn:hover { background: rgba(255,255,255,0.06) !important; }
+        .hdr-btn:hover { background: rgba(139,92,246,0.08) !important; }
         .hdr-dropdown { animation: dropIn 0.18s ease; }
         @keyframes dropIn { from { opacity:0; transform:translateY(-6px) } to { opacity:1; transform:translateY(0) } }
         .notif-item:hover { background: rgba(255,255,255,0.04) !important; }
@@ -263,6 +271,14 @@ function Header({ notifications = [], scoreData }) {
         }
         .profile-item:hover { background: rgba(255,255,255,0.04); }
       `}</style>
+  );
+
+  // In the shared page header: just the buttons, on every screen
+  if (compact) return <>{styles}{controls}</>;
+
+  return (
+    <>
+      {styles}
 
       <div style={{ marginBottom: 24, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
 

@@ -1,11 +1,10 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
-import { Brain, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
 import DemoBanner from "../components/DemoBanner";
-import SpendGuardCard from "../components/SpendGuardCard";
 
 import { useTheme } from "../context/ThemeContext";
 
@@ -22,7 +21,6 @@ import HelpWidget from "../components/HelpWidget";
 
 import Sidebar from "../components/Sidebar";
 
-import Header from "../components/Header";
 
 
 import AnalyticsCards from "../components/AnalyticsCards";
@@ -68,11 +66,7 @@ from "../components/FinancialGoalsSection";
 import WeeklyReport
 from "../components/WeeklyReport";
 
-import DashboardHero
-from "../components/DashboardHero";
 
-import NetWorthSection
-from "../components/NetWorthSection";
 
 import NetWorthManagement
 from "./NetWorthManagement";
@@ -93,6 +87,7 @@ import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
 import TabHeader from "../components/TabHeader";
+import HomeOverview from "../components/HomeOverview";
 import { normaliseSection, rememberSection } from "../constants/navigation";
 
 function Dashboard() {
@@ -1672,146 +1667,22 @@ function Dashboard() {
 
                 <DemoBanner section={activeSection} onOpenGuard={() => navigateTo("Spend Guard")} />
 
-                <TabHeader activeSection={activeSection} navigateTo={navigateTo} />
+                <TabHeader activeSection={activeSection} navigateTo={navigateTo} notifications={notifications} />
 
                 {activeSection === "Dashboard" && (
-                  <Header
-                    notifications={notifications}
-                    scoreData={scoreData}
-                  />
-                )}
-
-
-
-                
-
-                {/* =========================
-                    Dashboard
-                ========================= */}
-
-                {activeSection ===
-                    "Dashboard" && (
-
-                    <>
-
-                        <DashboardHero
-                            score={scoreData?.score}
-                            allTime={
-                                monthlySummary?.allTimeSavings == null
-                                    ? null
-                                    : {
-                                        savings: monthlySummary.allTimeSavings,
-                                        income: monthlySummary.allTimeIncome,
-                                        from: monthlySummary.allTimeFrom
-                                    }
-                            }
-                            activeGoals={goals.length}
-                            alerts={notifications.length}
-                        />
-
-                        <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />
-
-                        {loading ? (
-
-                            <div className="
-                                grid
-                                grid-cols-1
-                                sm:grid-cols-2
-                                xl:grid-cols-4
-                                gap-6
-                                mb-10
-                            ">
-
-                                <SkeletonCard />
-                                <SkeletonCard />
-                                <SkeletonCard />
-                                <SkeletonCard />
-
-                            </div>
-
-                        ) : (
-
-                            // This month's figures come from the backend, which leaves
-                            // out transfers between the user's own accounts, the same
-                            // as the trends they're shown with. The sums of the loaded
-                            // rows are only a fallback for an older backend.
-                            <AnalyticsCards
-                                income={monthlySummary?.monthIncome ?? monthlyIncome}
-                                expenses={monthlySummary?.monthExpenses ?? monthlyExpenses}
-                                savings={monthlySummary?.monthSavings ?? monthlyIncome + monthlyExpenses}
-                                compared={{
-                                    from: monthlySummary?.comparedFrom,
-                                    to: monthlySummary?.comparedTo,
-                                    income: monthlySummary?.comparedIncome,
-                                    expenses: monthlySummary?.comparedExpenses,
-                                    savings: monthlySummary?.comparedSavings
-                                }}
-                                prediction={
-                                    forecast?.predictedExpenses || 0
-                                }
-
-                                incomeTrend={
-                                    monthlySummary?.incomeTrend || 0
-                                }
-
-                                expenseTrend={
-                                    monthlySummary?.expenseTrend || 0
-                                }
-
-                                savingsTrend={
-                                    monthlySummary?.savingsTrend || 0
-                                }
-                            />
-
-                        )}
-
-                        {/* Financial Score */}
-
-                        <FinancialScoreCard
-                            scoreData={scoreData}
-                        />
-
-                        {/* AI Forecast */}
-
-                        <ForecastCard
-                            forecast={forecast}
-                            monthlyHistory={monthlyHistory}
-                        />
-
-                        {/* Category Forecast */}
-
-                        <CategoryForecastCard
-                            categoryForecast={
-                                categoryForecast
-                            }
-                        />
-
-                        {/* Smart Notifications */}
-
-                        <SmartNotifications
-                            notifications={
-                                notifications
-                            }
-                            setNotifications={setNotifications}
-                        />
-
-                        {/* Monthly Summary */}
-
-                        <MonthlySummaryCard
-                            summary={monthlySummary}
-                        />
-                        
-                        {/* Net Worth */}
-
-                        <NetWorthSection
-                            netWorth={netWorth}
-                            assets={assets}
-                            liabilities={liabilities}
-                        />
-
-                        {/* Credit Score */}
-                        <CreditScoreCard />
-                    </>
+                    <HomeOverview
+                        // From the backend, which leaves out transfers between the
+                        // user's own accounts; the loaded rows are a fallback only
+                        income={monthlySummary?.monthIncome ?? monthlyIncome}
+                        spent={Math.abs(monthlySummary?.monthExpenses ?? monthlyExpenses)}
+                        budgets={budgets}
+                        notifications={notifications}
+                        goals={goals}
+                        scoreData={scoreData}
+                        netWorth={netWorth}
+                        loading={loading}
+                        navigateTo={navigateTo}
+                    />
                 )}
 
                 {/* =========================
@@ -1986,14 +1857,38 @@ function Dashboard() {
 
                 {activeSection ===
                     "Analytics" && (
-
+                    <>
+                    {loading ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+                            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+                        </div>
+                    ) : (
+                        <AnalyticsCards
+                            income={monthlySummary?.monthIncome ?? monthlyIncome}
+                            expenses={monthlySummary?.monthExpenses ?? monthlyExpenses}
+                            savings={monthlySummary?.monthSavings ?? monthlyIncome + monthlyExpenses}
+                            compared={{
+                                from: monthlySummary?.comparedFrom,
+                                to: monthlySummary?.comparedTo,
+                                income: monthlySummary?.comparedIncome,
+                                expenses: monthlySummary?.comparedExpenses,
+                                savings: monthlySummary?.comparedSavings
+                            }}
+                            prediction={forecast?.predictedExpenses || 0}
+                            incomeTrend={monthlySummary?.incomeTrend || 0}
+                            expenseTrend={monthlySummary?.expenseTrend || 0}
+                            savingsTrend={monthlySummary?.savingsTrend || 0}
+                        />
+                    )}
+                    <MonthlySummaryCard summary={monthlySummary} />
+                    <CategoryForecastCard categoryForecast={categoryForecast} />
                     <AnalyticsPage
                         transactions={transactions}
                         recurringExpenses={recurringExpenses}
                         insights={insights}
                         onCategoryChanged={handleCategoryChanged}
                     />
-
+                    </>
                 )}
 
                 {/* =========================
@@ -2016,22 +1911,6 @@ function Dashboard() {
 
                 <>
 
-                    {/* AI Suite header */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                        <div style={{
-                            width: 40, height: 40, borderRadius: 12,
-                            background: "linear-gradient(135deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))",
-                            border: "1px solid rgba(167,139,250,0.3)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                            <Brain size={18} color="#a78bfa" />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>AI SUITE</div>
-                            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>AI Intelligence</h1>
-                        </div>
-                    </div>
-
                     <FinancialScoreCard
                         scoreData={scoreData}
                     />
@@ -2051,6 +1930,8 @@ function Dashboard() {
                     <AnomalyAlerts
                         anomalies={anomalies}
                     />
+
+                    <CreditScoreCard />
 
                 </>
 

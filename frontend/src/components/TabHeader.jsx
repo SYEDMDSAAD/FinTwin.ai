@@ -1,13 +1,14 @@
 import { Sparkles } from "lucide-react";
 import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
 import { COPILOT, tabOf, sectionsOf } from "../constants/navigation";
+import Header from "./Header";
 
 /*
  * The top of every screen: where you are, the few sections of this tab, and
  * the copilot one tap away. On a phone the chips scroll sideways rather than
  * wrapping into a second row.
  */
-export default function TabHeader({ activeSection, navigateTo }) {
+export default function TabHeader({ activeSection, navigateTo, notifications = [] }) {
     const guardOn = useSpendGuardEnabled();
     const tab = tabOf(activeSection);
     const sections = tab ? sectionsOf(tab, guardOn) : [];
@@ -16,9 +17,10 @@ export default function TabHeader({ activeSection, navigateTo }) {
     return (
         <header className="mb-5">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight min-w-0 truncate" style={{ color: "var(--text-primary)" }}>
                     {title}
                 </h1>
+                <div className="flex items-center gap-2 shrink-0">
                 {activeSection !== COPILOT && (
                     <button
                         type="button"
@@ -28,6 +30,9 @@ export default function TabHeader({ activeSection, navigateTo }) {
                         <Sparkles size={14} aria-hidden /> Ask AI
                     </button>
                 )}
+                    {/* Theme, alerts and account: on every screen, not just Home */}
+                    <Header compact notifications={notifications} onSettings={() => navigateTo("Settings")} />
+                </div>
             </div>
 
             {sections.length > 1 && (

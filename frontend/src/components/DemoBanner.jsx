@@ -49,7 +49,8 @@ export default function DemoBanner({ section, onOpenGuard }) {
             </p>
             <button
                 onClick={signUp}
-                className="shrink-0 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)] transition hover:scale-[1.02]"
+                className="shrink-0 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 px-4 py-2 text-sm font-semibold shadow-[0_4px_14px_rgba(139,92,246,0.35)] transition hover:scale-[1.02]"
+                style={{ color: "#fff" }}
             >
                 Sign up and use your own data
             </button>

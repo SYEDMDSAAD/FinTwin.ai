@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HelpCircle, X, Search, MessageCircle, Home, ChevronRight, ChevronDown } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
@@ -43,8 +43,9 @@ const CSS = `
   .help-link-row { padding:10px 12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); cursor:pointer; display:flex; align-items:center; justify-content:space-between; font-size:12px; color:rgba(148,163,184,0.8); font-family:'DM Sans',system-ui,sans-serif; transition:background 0.15s; }
   .help-link-row:hover { background:rgba(167,139,250,0.07); border-color:rgba(167,139,250,0.2); }
   @media (max-width:768px) {
-    .help-float-btn { bottom:76px !important; }
-    .help-panel-wrap { bottom:132px !important; right:12px !important; width:calc(100vw - 24px) !important; }
+    /* phones: no floating button over the content; the account menu opens help */
+    .help-float-btn { display:none !important; }
+    .help-panel-wrap { bottom:88px !important; right:12px !important; width:calc(100vw - 24px) !important; }
   }
 `;
 
@@ -55,6 +56,13 @@ export default function HelpWidget() {
   const [message, setMessage]     = useState("");
   const [sending, setSending]     = useState(false);
   const [openFaq, setOpenFaq]     = useState(null);
+
+  // "Help & feedback" in the account menu opens this panel from anywhere
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener("openHelp", show);
+    return () => window.removeEventListener("openHelp", show);
+  }, []);
 
   const user  = useCurrentUser();
   const email = user.email || "";
@@ -157,6 +165,21 @@ export default function HelpWidget() {
         >
           {/* Top accent */}
           <div style={{ height: 2, background: "linear-gradient(90deg,#a78bfa,#22d3ee)", flexShrink: 0 }} />
+
+          {/* On phones the floating button is hidden, so the panel closes itself */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close help"
+            style={{
+              position: "absolute", top: 12, right: 12, zIndex: 1,
+              width: 32, height: 32, borderRadius: 10, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(148,163,184,0.12)", border: "none",
+            }}
+          >
+            <X size={16} color="rgba(148,163,184,0.9)" />
+          </button>
 
           {/* Content area */}
           <div style={{ flex: 1, overflow: "auto" }}>
