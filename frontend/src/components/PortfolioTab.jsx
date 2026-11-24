@@ -302,12 +302,12 @@ export default function PortfolioTab() {
                         <Wallet size={16} color="#f59e0b" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 3 }}>NET WORTH CONTRIBUTION</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 3 }}>NET WORTH CONTRIBUTION</div>
                         <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                             <span style={{ fontSize: 16, fontWeight: 800, color: "#f59e0b", fontVariantNumeric: "tabular-nums" }}>
                                 ₹{Math.round(nwPortfolio).toLocaleString("en-IN")}
                             </span>
-                            <span style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>
+                            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
                                 of ₹{Math.round(nwTotal).toLocaleString("en-IN")} total net worth
                             </span>
                             <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.12)", borderRadius: 6, padding: "2px 8px" }}>

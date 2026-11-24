@@ -13,12 +13,12 @@ import BottomNav from "../components/BottomNav";
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
   .profile-page * { box-sizing: border-box; }
-  .profile-page { font-family: 'DM Sans', system-ui, sans-serif; color: #e2e8f0; }
+  .profile-page { font-family: 'DM Sans', system-ui, sans-serif; color: var(--text-primary); }
 
   /* ── Stat cards ── */
   .p-stat-card {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.07);
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
     border-radius: 20px;
     padding: 20px;
     position: relative;
@@ -113,7 +113,7 @@ function ProfileStat({ icon, label, value, color = "#a78bfa" }) {
       <div className="p-stat-glow" style={{ background: `linear-gradient(90deg, transparent, ${color}45, transparent)` }} />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>
           {label.toUpperCase()}
         </span>
         <div style={{
@@ -200,9 +200,9 @@ function Profile() {
                     display: "inline-flex", alignItems: "center", gap: 7,
                     marginBottom: 18, padding: "7px 14px",
                     borderRadius: 12,
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    color: "rgba(148,163,184,0.7)", fontSize: 12, fontWeight: 600,
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-floating)",
+                    color: "var(--text-secondary)", fontSize: 12, fontWeight: 600,
                     cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#e2e8f0"; }}
@@ -211,22 +211,22 @@ function Profile() {
                   <ArrowLeft size={13} /> Back to Dashboard
                 </button>
 
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em", marginBottom: 6 }}>ACCOUNT</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", marginBottom: 6 }}>ACCOUNT</div>
                 <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: 0, letterSpacing: "-0.03em" }}>My Profile</h1>
-                <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", margin: "4px 0 0" }}>Manage your FinTwin account and security settings.</p>
+                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0" }}>Manage your FinTwin account and security settings.</p>
               </div>
 
               {/* ── Loading state ── */}
               {!profile ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-                  <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)" }}>Loading Profile...</p>
+                  <p style={{ fontSize: 14, color: "var(--text-dim)" }}>Loading Profile...</p>
                 </div>
               ) : (
 
                 /* ── Hero card ── */
                 <div className="prof-fade-2" style={{
-                  background: "rgba(255,255,255,0.025)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-card)",
                   borderRadius: 22, overflow: "visible", position: "relative",
                 }}>
 
@@ -259,7 +259,7 @@ function Profile() {
                           <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 3px", letterSpacing: "-0.02em" }}>
                             {profile.fullName}
                           </h2>
-                          <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 5px" }}>{profile.email}</p>
+                          <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 5px" }}>{profile.email}</p>
                           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, fontSize: 11, color: "rgba(100,116,139,0.6)" }}>
                             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                               <Calendar size={11} /> Member since {profile.createdAt}
@@ -274,7 +274,7 @@ function Profile() {
                     </div>
 
                     {/* ── Divider ── */}
-                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "20px 0" }} />
+                    <div style={{ height: 1, background: "var(--bg-input)", margin: "20px 0" }} />
 
                     {/* ── Stat cards ── */}
                     <div className="p-stats-grid">
@@ -289,7 +289,7 @@ function Profile() {
 
                       {/* Score card */}
                       <div style={{
-                        background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+                        background: "var(--bg-card)", border: "1px solid var(--border-card)",
                         borderRadius: 18, padding: 22, position: "relative", overflow: "hidden",
                       }}>
                         {/* bottom accent */}
@@ -297,7 +297,7 @@ function Profile() {
 
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
                           <Shield size={13} color="#a78bfa" />
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>FINANCIAL HEALTH SCORE</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>FINANCIAL HEALTH SCORE</span>
                         </div>
 
                         {/* Number + rating inline */}
@@ -310,7 +310,7 @@ function Profile() {
                         </div>
 
                         {/* Progress bar — 6px, rounded */}
-                        <div style={{ height: 6, background: "rgba(255,255,255,0.07)", borderRadius: 99, overflow: "hidden", marginBottom: 14 }}>
+                        <div style={{ height: 6, background: "var(--bg-input)", borderRadius: 99, overflow: "hidden", marginBottom: 14 }}>
                           <div style={{
                             height: "100%", width: `${score}%`,
                             background: `linear-gradient(90deg, ${scoreColor}cc, ${scoreColor})`,
@@ -325,13 +325,13 @@ function Profile() {
 
                       {/* Score history chart */}
                       <div style={{
-                        background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+                        background: "var(--bg-card)", border: "1px solid var(--border-card)",
                         borderRadius: 18, padding: 22, position: "relative", overflow: "hidden",
                       }}>
                         {/* Card header */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                           <div>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 3 }}>AI TRACKING</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 3 }}>AI TRACKING</div>
                             <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>Score History</h3>
                           </div>
                           {/* Green pulsing live badge */}

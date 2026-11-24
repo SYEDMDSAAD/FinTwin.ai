@@ -8,7 +8,6 @@ import ImportsPage from "./ImportsPage";
 describe("ImportsPage", () => {
   it("renders without crashing", () => {
     renderPage(<ImportsPage onImported={vi.fn()} />, { authed: true });
-    expect(screen.getByText("Import Transactions")).toBeInTheDocument();
     expect(screen.getByText("Upload File")).toBeInTheDocument();
   });
 });

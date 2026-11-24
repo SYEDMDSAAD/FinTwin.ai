@@ -58,14 +58,14 @@ function FactorBar({ factor }) {
             {factor.impact} impact · {factor.points}/{factor.maxPoints}
           </span>
         </div>
-        <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
+        <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
           <div style={{
             height: "100%", width: `${pct}%`,
             background: color, borderRadius: 3,
             transition: "width 1s ease",
           }} />
         </div>
-        <div style={{ fontSize: 11, color: "rgba(148,163,184,0.6)", lineHeight: 1.5 }}>{factor.desc}</div>
+        <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>{factor.desc}</div>
       </div>
     </div>
   );
@@ -107,8 +107,8 @@ export default function CreditScoreCard() {
   return (
     <div style={{
       position: "relative", overflow: "hidden",
-      background: "rgba(255,255,255,0.025)",
-      border: "1px solid rgba(255,255,255,0.07)",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border-card)",
       borderRadius: 20, padding: "24px",
       marginBottom: 24,
       fontFamily: "'DM Sans', system-ui, sans-serif",
@@ -122,18 +122,18 @@ export default function CreditScoreCard() {
             <ShieldCheck size={18} color="#22d3ee" />
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em" }}>ESTIMATED SCORE</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em" }}>ESTIMATED SCORE</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>Credit Score</div>
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "rgba(148,163,184,0.4)", fontSize: 13 }}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-dimmer)", fontSize: 13 }}>
           Calculating your score...
         </div>
       ) : error || !data ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "rgba(148,163,184,0.6)", fontSize: 13 }}>
+        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-dim)", fontSize: 13 }}>
           Couldn't load your score right now. Use Recalculate to try again.
         </div>
       ) : (
@@ -204,7 +204,7 @@ export default function CreditScoreCard() {
       )}
 
       {/* Footer */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
         <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Based on your last 3 months of data</span>
         <button
           onClick={fetchScore}

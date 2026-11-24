@@ -70,7 +70,7 @@ export function rollForward(sip, now = new Date()) {
 }
 
 const EMPTY = { fundName: "", amount: "", frequency: "Monthly", nextDebitDate: "", notes: "" };
-const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" };
 
 function SIPCard({ sip, onDelete }) {
   const days = daysUntil(sip.nextDebitDate);
@@ -194,7 +194,7 @@ export default function SIPTracker() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button
               onClick={handleSave}
               disabled={!form.fundName.trim() || !form.amount}
@@ -223,4 +223,4 @@ export default function SIPTracker() {
 }
 
 const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 5 };
-const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "var(--bg-input)", border: "1px solid var(--border-floating)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

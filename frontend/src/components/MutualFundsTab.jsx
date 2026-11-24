@@ -112,7 +112,7 @@ export default function MutualFundsTab() {
         <input
           style={{
             width: "100%", padding: "11px 12px 11px 38px", borderRadius: 12,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-input)", border: "1px solid var(--border-floating)",
             color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
           }}
           placeholder="Search mutual funds (e.g. Parag Parikh, Nifty 50, ELSS)..."
@@ -147,7 +147,7 @@ export default function MutualFundsTab() {
           return (
             <div key={fund.schemeCode} style={{
               position: "relative", overflow: "hidden",
-              background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+              background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)",
               borderRadius: 14, padding: "14px 16px",
               display: "flex", alignItems: "center", gap: 14,
               transition: "background 0.15s",

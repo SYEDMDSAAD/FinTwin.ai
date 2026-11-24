@@ -7,7 +7,7 @@ import GlassCard from "./GlassCard";
 function GoalRow({ goal, accentColor, showPercent }) {
   const pct = Math.round(goal.progressPercent || 0);
   return (
-    <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{goal.title}</span>
         {showPercent ? (
@@ -19,7 +19,7 @@ function GoalRow({ goal, accentColor, showPercent }) {
         )}
       </div>
 
-      <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden", marginTop: 10, marginBottom: 10 }}>
+      <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 4, overflow: "hidden", marginTop: 10, marginBottom: 10 }}>
         <div style={{ height: "100%", width: `${pct}%`, background: accentColor, borderRadius: 4, transition: "width 0.6s ease" }} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, fontSize: 11 }}>
@@ -42,7 +42,7 @@ function GoalRow({ goal, accentColor, showPercent }) {
 // with its name, percentage/Done badge, and full detail.
 function GoalGroupBox({ label, icon, goals, expanded, onToggle, accentColor, showPercent }) {
   return (
-    <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14, background: "rgba(255,255,255,0.015)" }}>
+    <div style={{ border: "1px solid var(--border-floating)", borderRadius: 14, padding: 14, background: "var(--bg-subtle)" }}>
       <button
         type="button"
         onClick={onToggle}

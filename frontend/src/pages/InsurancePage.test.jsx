@@ -6,6 +6,6 @@ import InsurancePage from "./InsurancePage";
 describe("InsurancePage", () => {
   it("renders without crashing", async () => {
     renderPage(<InsurancePage />, { authed: true });
-    expect(await screen.findByText("Insurance")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Add Policy/ })).toBeInTheDocument();
   });
 });

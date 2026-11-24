@@ -1,7 +1,7 @@
 import BudgetCard from "./BudgetCard";
 import BudgetModal from "./BudgetModal";
 import GlassCard from "./GlassCard";
-import { PieChart, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { budgetStatus, sortByUrgency, BUDGET_SAFE, BUDGET_WATCH, BUDGET_OVER } from "../constants/budgetStatus";
 
 const rupees = (v) => `₹${Math.round(v || 0).toLocaleString("en-IN")}`;
@@ -23,40 +23,6 @@ function BudgetSection({ budgets, createBudget, deleteBudget, updateBudget }) {
 
   return (
     <div className="mb-10">
-      {/* Section header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <div
-          style={{
-            width: 40, height: 40, borderRadius: 12, display: "flex", alignItems: "center",
-            justifyContent: "center", background: "rgba(167,139,250,0.10)",
-            border: "1px solid rgba(167,139,250,0.20)", flexShrink: 0,
-          }}
-        >
-          <PieChart size={18} color="#c4b5fd" />
-        </div>
-
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", color: "var(--text-dim)" }}>
-            BUDGETING
-          </div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", margin: 0, lineHeight: 1.3 }}>
-            Budget Manager
-          </h2>
-        </div>
-
-        {budgets.length > 0 && (
-          <span
-            style={{
-              marginLeft: "auto", flexShrink: 0, fontSize: 11, fontWeight: 700,
-              padding: "5px 10px", borderRadius: 999, color: "var(--text-dim)",
-              background: "var(--bg-subtle)", border: "1px solid var(--border-card)",
-            }}
-          >
-            {budgets.length} {budgets.length === 1 ? "budget" : "budgets"}
-          </span>
-        )}
-      </div>
-
       {/* Roll-up — leads the section so the overall picture reads before the detail */}
       {budgets.length > 0 && (
         <GlassCard className="relative overflow-hidden p-5 mb-6">

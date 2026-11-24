@@ -19,11 +19,11 @@ const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
   .nwp * { box-sizing: border-box; }
   .nwp { font-family: 'DM Sans', system-ui, sans-serif; }
-  .nwp-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; transition: all 0.25s; margin-bottom: 14px; }
+  .nwp-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; transition: all 0.25s; margin-bottom: 14px; }
   .nwp-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
   .nwp-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }
-  .nwp-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:11px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); margin-bottom:8px; transition:all 0.15s; }
-  .nwp-row:hover { background:rgba(255,255,255,0.05); }
+  .nwp-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:11px; background:var(--bg-subtle); border:1px solid var(--border-subtle); margin-bottom:8px; transition:all 0.15s; }
+  .nwp-row:hover { background:var(--bg-input); }
   @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
   .fade-up-1 { animation: fadeUp 0.4s ease both; }
   .fade-up-2 { animation: fadeUp 0.4s 0.08s ease both; }
@@ -63,7 +63,7 @@ function NetWorthPage() {
   if (!netWorth) {
     return (
       <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-        <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>Loading Net Worth...</p>
+        <p style={{ fontSize: 13, color: "var(--text-dim)" }}>Loading Net Worth...</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ function NetWorthPage() {
             <Wallet size={18} color="#a78bfa" />
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>OVERVIEW</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>OVERVIEW</div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>Net Worth</h1>
           </div>
         </div>
@@ -102,7 +102,7 @@ function NetWorthPage() {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em", marginBottom: 10 }}>TOTAL NET WORTH</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", marginBottom: 10 }}>TOTAL NET WORTH</div>
               <div style={{ fontSize: 44, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em", fontVariantNumeric: "tabular-nums" }}>
                 {netWorth.netWorth < 0 && <span style={{ color: "#f87171" }}>−</span>}
                 <AnimatedNumber value={Math.abs(netWorth.netWorth)} duration={1400} />
@@ -110,7 +110,7 @@ function NetWorthPage() {
 
               {/* Asset ratio bar */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
-                <div style={{ width: 200, height: 6, background: "rgba(255,255,255,0.07)", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ width: 200, height: 6, background: "var(--bg-input)", borderRadius: 3, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${assetPct}%`, background: "linear-gradient(90deg,#4ade80,#22d3ee)", borderRadius: 3, transition: "width 1.4s ease" }} />
                 </div>
                 <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
@@ -134,7 +134,7 @@ function NetWorthPage() {
             { label: "SAVINGS",     value: netWorth.savings || 0,        color: "#22d3ee", icon: <Landmark size={14} color="#22d3ee" />, dur: 1050 },
             { label: "LIABILITIES", value: totalLiabilities,             color: "#f87171", icon: <CreditCard size={14} color="#f87171" />, dur: 1100 },
           ].map((s) => (
-            <div key={s.label} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden", transition: "all 0.25s",
+            <div key={s.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden", transition: "all 0.25s",
               cursor: s.label === "PORTFOLIO" ? "pointer" : "default" }}
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
               onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
@@ -142,7 +142,7 @@ function NetWorthPage() {
             >
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${s.color}45,transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>{s.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>{s.label}</span>
                 <div style={{ width: 26, height: 26, borderRadius: 7, background: s.color + "18", border: `1px solid ${s.color}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
               </div>
               <div className="nwp-stat-value" style={{ color: s.color }}>
@@ -182,13 +182,13 @@ function NetWorthPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 14 }}>
               {[
-                { label: "Invested",      value: portfolioInvested,    color: "rgba(148,163,184,0.8)" },
+                { label: "Invested",      value: portfolioInvested,    color: "var(--text-secondary)" },
                 { label: "Current Value", value: portfolioValue,       color: "#f59e0b" },
                 { label: "P&L",           value: Math.abs(portfolioPnl), color: portfolioPnl >= 0 ? "#4ade80" : "#f87171",
                   prefix: portfolioPnl >= 0 ? "+" : "−" },
               ].map(c => (
-                <div key={c.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.45)", letterSpacing: "0.08em", marginBottom: 6 }}>{c.label.toUpperCase()}</div>
+                <div key={c.label} style={{ background: "var(--bg-subtle)", borderRadius: 12, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 6 }}>{c.label.toUpperCase()}</div>
                   <div style={{ fontSize: 16, fontWeight: 800, color: c.color, fontVariantNumeric: "tabular-nums" }}>
                     {c.prefix || ""}₹{Math.round(c.value).toLocaleString("en-IN")}
                   </div>
@@ -200,12 +200,12 @@ function NetWorthPage() {
             {netWorth.netWorth > 0 && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>Portfolio as % of net worth</span>
+                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Portfolio as % of net worth</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b" }}>
                     {Math.round((portfolioValue / netWorth.netWorth) * 100)}%
                   </span>
                 </div>
-                <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ height: 6, background: "var(--bg-input)", borderRadius: 4, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${Math.min(100, Math.round((portfolioValue / netWorth.netWorth) * 100))}%`, background: "linear-gradient(90deg,#f59e0b,#fbbf24)", borderRadius: 4, transition: "width 1.2s ease" }} />
                 </div>
               </div>
@@ -232,8 +232,8 @@ function NetWorthPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>📈</div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>Investment Portfolio</p>
-                  <p style={{ fontSize: 11, color: "rgba(148,163,184,0.5)", margin: "2px 0 0" }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>Investment Portfolio</p>
+                  <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "2px 0 0" }}>
                     {portfolioCount} holding{portfolioCount !== 1 ? "s" : ""} · live prices · tap to manage
                   </p>
                 </div>
@@ -261,8 +261,8 @@ function NetWorthPage() {
                    asset.type?.toLowerCase().includes("jewel") ? "💍" : "💼"}
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{asset.name}</p>
-                  <p style={{ fontSize: 11, color: "rgba(148,163,184,0.5)", margin: "2px 0 0" }}>{asset.type}</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{asset.name}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "2px 0 0" }}>{asset.type}</p>
                 </div>
               </div>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
@@ -290,7 +290,7 @@ function NetWorthPage() {
                   {liability.type?.toLowerCase().includes("home") || liability.type?.toLowerCase().includes("mortgage") ? "🏠" : liability.type?.toLowerCase().includes("car") ? "🚗" : liability.type?.toLowerCase().includes("student") ? "🎓" : "💳"}
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", margin: 0 }}>{liability.name}</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{liability.name}</p>
                   <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "2px 0 0" }}>{liability.type}</p>
                 </div>
               </div>

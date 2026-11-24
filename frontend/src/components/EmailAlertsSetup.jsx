@@ -15,7 +15,7 @@ export const GMAIL_FILTER =
 
 export const STATUS_LABEL = {
     IMPORTED:     { text: "Added",               color: "#4ade80" },
-    DUPLICATE:    { text: "Already had it",      color: "rgba(148,163,184,0.7)" },
+    DUPLICATE:    { text: "Already had it",      color: "var(--text-secondary)" },
     UNMATCHED:    { text: "Couldn't read",       color: "#fbbf24" },
     REJECTED:     { text: "Not verified",        color: "#f87171" },
     CONFIRMATION: { text: "Gmail code received", color: "#22d3ee" },
@@ -133,7 +133,7 @@ export default function EmailAlertsSetup() {
                             const s = STATUS_LABEL[e.status] || { text: e.status, color: "#fff" };
                             return (
                                 <li key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12 }}>
-                                    <span style={{ color: "rgba(148,163,184,0.6)", minWidth: 92 }}>
+                                    <span style={{ color: "var(--text-dim)", minWidth: 92 }}>
                                         {new Date(e.receivedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                                     </span>
                                     <span style={{ color: "#fff", flex: 1 }}>{e.account || e.bank || "Email"}</span>
@@ -145,9 +145,9 @@ export default function EmailAlertsSetup() {
                 </div>
             )}
 
-            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
                 {confirmRotate ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 12, color: "rgba(148,163,184,0.75)" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 12, color: "var(--text-secondary)" }}>
                         The current address stops working immediately, and you'll set up forwarding in Gmail again.
                         <button type="button" onClick={rotate} disabled={rotating} style={{ ...LINK_BUTTON, color: "#f87171" }}>
                             {rotating ? "Creating…" : "Yes, new address"}
@@ -179,7 +179,7 @@ function CopyRow({ value, copied, onCopy, label, big, small }) {
             <code style={{
                 flex: 1, minWidth: 0, overflowX: "auto", whiteSpace: "nowrap",
                 padding: big ? "10px 14px" : "9px 12px", borderRadius: 10,
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--bg-input)", border: "1px solid var(--border-floating)",
                 color: "#fff", fontSize: big ? 18 : small ? 11 : 13, letterSpacing: big ? "0.12em" : 0,
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
             }}>{value}</code>
@@ -195,7 +195,7 @@ function CopyRow({ value, copied, onCopy, label, big, small }) {
     );
 }
 
-const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: 20, marginTop: 20 };
-const LABEL = { fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18, padding: 20, marginTop: 20 };
+const LABEL = { fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" };
 const MUTED = { fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55, margin: 0 };
 const LINK_BUTTON = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "#a78bfa", fontSize: 12, fontWeight: 600, fontFamily: "inherit" };

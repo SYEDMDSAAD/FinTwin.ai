@@ -227,16 +227,7 @@ const clean = (text) => text?.replace(/[*#]/g, "").trim();
 
 function Header({ generated, savedAt, loading, onRefresh }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 22, flexWrap: "wrap" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,rgba(167,139,250,0.28),rgba(34,211,238,0.16))", border: "1px solid rgba(167,139,250,0.32)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Brain size={18} color="#a78bfa" />
-        </div>
-        <div>
-          <div className="sc-eyebrow">AI Suite</div>
-          <h1 className="sc-h1">AI Spending Coach</h1>
-        </div>
-      </div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16, marginBottom: generated ? 16 : 0, flexWrap: "wrap" }}>
       {generated && (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {savedAt && (

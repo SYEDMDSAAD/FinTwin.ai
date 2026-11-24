@@ -167,26 +167,6 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
     <>
       <div className="goals-section" style={{ marginBottom: 32 }}>
 
-        {/* ── Page Header ── */}
-        <div className="flex items-center gap-3 mb-6">
-
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/20">
-              <Target size={18} className="text-purple-300" />
-          </div>
-
-          <div>
-
-              <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">
-                  GOALS PLANNER
-              </div>
-
-              <h2 className="text-lg font-bold">
-                  AI Savings Planner
-              </h2>
-
-          </div>
-
-      </div>
 
         {/* ── Portfolio-level summary across every active goal ── */}
         {activeGoals.length > 0 && (
@@ -217,7 +197,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
             }}
           >
             {newGoalOpen ? (
-              <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>NEW GOAL</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>NEW GOAL</span>
             ) : (
               <span style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>Create New Goal</span>
             )}
@@ -531,8 +511,8 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
 
                 {/* Edit form */}
                 {editingGoalId === goal.id && (
-                  <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 16, marginBottom: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 4 }}>EDIT GOAL</div>
+                  <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-card)", borderRadius: 14, padding: 16, marginBottom: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 4 }}>EDIT GOAL</div>
                     <input className="goal-input" value={editTitle} onChange={(e) => setEditTitle(capitalizeFirst(e.target.value))} placeholder="Title" />
                     <input className="goal-input" type="number" value={editTargetAmount} onChange={(e) => setEditTargetAmount(e.target.value)} placeholder="Target amount" />
                     <input className="goal-input" type="number" value={editDurationMonths} onChange={(e) => setEditDurationMonths(e.target.value)} placeholder="Duration (months)" />
@@ -541,7 +521,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                         onClick={async () => { await updateGoal(goal.id, { title: editTitle, targetAmount: Number(editTargetAmount), durationMonths: Number(editDurationMonths) }); setEditingGoalId(null); }}>
                         Save Changes
                       </button>
-                      <button className="g-btn" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(148,163,184,0.7)" }} onClick={() => setEditingGoalId(null)}>
+                      <button className="g-btn" style={{ background: "var(--bg-input)", color: "var(--text-secondary)" }} onClick={() => setEditingGoalId(null)}>
                         Cancel
                       </button>
                     </div>
@@ -582,7 +562,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                               <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{inr(sipTotal)}</div>
                             </div>
                           </div>
-                          <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 4, overflow: "hidden" }}>
                             <div style={{ height: "100%", width: `${sipPct}%`, background: sipPct >= 100 ? "linear-gradient(90deg,#4ade80,#22d3ee)" : "linear-gradient(90deg,#a78bfa,#fbbf24)", borderRadius: 4, transition: "width 0.5s ease" }} />
                           </div>
                           <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 5 }}>
@@ -610,7 +590,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                                 onChange={e => setSIPLinkForm(f => ({ ...f, monthlyAmount: e.target.value }))}
                               />
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setSIPLinkOpen(null)} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "none", color: "rgba(148,163,184,0.5)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                                <button onClick={() => setSIPLinkOpen(null)} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                                 <button
                                   onClick={() => saveSIPLink(goal.id)}
                                   disabled={!sipLinkForm.monthlyAmount}

@@ -256,13 +256,6 @@ function NetWorthManagement({
 
         {/* Page Header */}
         <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:"linear-gradient(135deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))", border:"1px solid rgba(167,139,250,0.3)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <Wallet size={18} color="#a78bfa"/>
-          </div>
-          <div>
-            <div style={{ fontSize:10, fontWeight:700, color:"var(--text-dim)", letterSpacing:"0.1em" }}>WEALTH MANAGEMENT</div>
-            <h1 style={{ fontSize:22, fontWeight:700, color:"var(--text-primary)", margin:0, letterSpacing:"-0.02em" }}>Net Worth</h1>
-          </div>
           <span style={{ marginLeft:"auto", padding:"6px 14px", borderRadius:10, fontSize:12, fontWeight:700,
             color:isHealthy?"#4ade80":"#f87171",
             background:isHealthy?"rgba(74,222,128,0.1)":"rgba(248,113,113,0.1)",

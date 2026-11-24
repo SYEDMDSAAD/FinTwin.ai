@@ -81,8 +81,8 @@ function FinancialScoreChart({ data }) {
                         tickLine={false}
                     />
                     <Tooltip
-                        contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12, fontFamily: "'DM Sans', system-ui, sans-serif" }}
-                        labelStyle={{ color: "rgba(148,163,184,0.7)" }}
+                        contentStyle={{ background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 10, fontSize: 12, fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                        labelStyle={{ color: "var(--text-secondary)" }}
                         itemStyle={{ color: "#a78bfa" }}
                     />
                     <Line

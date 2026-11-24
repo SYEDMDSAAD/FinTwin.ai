@@ -216,8 +216,8 @@ function TrendChart({ transactions }) {
 
                         <Tooltip
                             contentStyle={{
-                                background: "#0e1018",
-                                border: "1px solid rgba(255,255,255,0.1)",
+                                background: "var(--bg-floating)",
+                                border: "1px solid var(--border-floating)",
                                 borderRadius: "12px",
                                 color: "#fff"
                             }}

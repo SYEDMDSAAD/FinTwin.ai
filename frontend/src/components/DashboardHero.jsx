@@ -41,7 +41,7 @@ function ScoreRing({ score = 0 }) {
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1 }}>{score || 0}</span>
-        <span style={{ fontSize: 9, color: "rgba(148,163,184,0.5)", letterSpacing: "0.04em" }}>/100</span>
+        <span style={{ fontSize: 9, color: "var(--text-dim)", letterSpacing: "0.04em" }}>/100</span>
       </div>
     </div>
   );
@@ -106,8 +106,8 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
       <div className="hero-wrap">
         <div style={{
           position: "relative", overflow: "hidden",
-          background: "rgba(255,255,255,0.025)",
-          border: "1px solid rgba(255,255,255,0.07)",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           borderRadius: 22, padding: "clamp(16px, 4vw, 28px) clamp(16px, 4vw, 32px)",
           marginBottom: 0,
         }}>
@@ -124,7 +124,7 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
               <ScoreRing score={score} />
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em", marginBottom: 4 }}>FINANCIAL SCORE</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", marginBottom: 4 }}>FINANCIAL SCORE</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: scoreColor, letterSpacing: "-0.02em", lineHeight: 1 }}>{scoreLabel}</div>
                 <div style={{ marginTop: 8 }}>
                   <span style={{
@@ -140,14 +140,14 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
             </div>
 
             {/* Divider — hidden on mobile */}
-            <div className="hidden sm:block" style={{ width: 1, height: 70, background: "rgba(255,255,255,0.07)", flexShrink: 0 }} />
+            <div className="hidden sm:block" style={{ width: 1, height: 70, background: "var(--bg-input)", flexShrink: 0 }} />
 
             {/* ── Center: Welcome text ── */}
             <div style={{ flex: 1, minWidth: 160 }}>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
                 Welcome Back 👋
               </h2>
-              <p style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", margin: 0, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0, lineHeight: 1.6 }}>
                 Here's your financial snapshot for today.<br />
                 {score >= 80
                   ? "Your finances are in excellent shape. Keep it up!"
@@ -158,7 +158,7 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
             </div>
 
             {/* Divider — hidden on mobile */}
-            <div className="hidden sm:block" style={{ width: 1, height: 70, background: "rgba(255,255,255,0.07)", flexShrink: 0 }} />
+            <div className="hidden sm:block" style={{ width: 1, height: 70, background: "var(--bg-input)", flexShrink: 0 }} />
 
             {/* ── Right: Metric pills ── */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -168,12 +168,12 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
                     {m.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 3 }}>{m.label.toUpperCase()}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 3 }}>{m.label.toUpperCase()}</div>
                     <div style={{ fontSize: 22, fontWeight: 800, color: m.color, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                       {m.text ?? <AnimatedNumber value={m.value} suffix={m.suffix} duration={m.dur} />}
                     </div>
                     {m.sub && (
-                      <div style={{ fontSize: 10, color: "rgba(148,163,184,0.7)", marginTop: 4, whiteSpace: "nowrap" }}>{m.sub}</div>
+                      <div style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 4, whiteSpace: "nowrap" }}>{m.sub}</div>
                     )}
                   </div>
                 </div>

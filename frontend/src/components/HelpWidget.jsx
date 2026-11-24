@@ -40,7 +40,7 @@ const CSS = `
   }
   .help-panel { animation: helpPanelIn 0.2s ease both; }
   .help-tab-btn { flex:1; padding:12px 0; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; font-weight:600; font-family:'DM Sans',system-ui,sans-serif; transition:color 0.2s; }
-  .help-link-row { padding:10px 12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); cursor:pointer; display:flex; align-items:center; justify-content:space-between; font-size:12px; color:rgba(148,163,184,0.8); font-family:'DM Sans',system-ui,sans-serif; transition:background 0.15s; }
+  .help-link-row { padding:10px 12px; border-radius:10px; background:var(--bg-subtle); border:1px solid var(--border-subtle); cursor:pointer; display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--text-secondary); font-family:'DM Sans',system-ui,sans-serif; transition:background 0.15s; }
   .help-link-row:hover { background:rgba(167,139,250,0.07); border-color:rgba(167,139,250,0.2); }
   @media (max-width:768px) {
     /* phones: no floating button over the content; the account menu opens help */
@@ -111,7 +111,7 @@ export default function HelpWidget() {
       {openFaq === f.q && (
         <p style={{
           margin: 0, padding: "10px 12px 12px",
-          fontSize: 12, lineHeight: 1.55, color: "rgba(148,163,184,0.75)",
+          fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)",
           background: "rgba(167,139,250,0.05)",
           border: "1px solid rgba(167,139,250,0.15)", borderTop: "none",
           borderRadius: "0 0 10px 10px",
@@ -155,7 +155,7 @@ export default function HelpWidget() {
             position: "fixed", bottom: 152, right: 24,
             width: 340, maxHeight: 500,
             background: "rgba(10,12,18,0.98)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            border: "1px solid var(--border-floating)",
             borderRadius: 20,
             boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
             zIndex: 200, overflow: "hidden",
@@ -189,7 +189,7 @@ export default function HelpWidget() {
                   <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 3px" }}>
                     Hi {name} 👋
                   </h3>
-                  <p style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", margin: 0 }}>
+                  <p style={{ fontSize: 13, color: "var(--text-dim)", margin: 0 }}>
                     How can we help?
                   </p>
                 </div>
@@ -209,15 +209,15 @@ export default function HelpWidget() {
                 >
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Send us a message</div>
-                    <div style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>A real person reads every message</div>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)" }}>A real person reads every message</div>
                   </div>
                   <ChevronRight size={16} color="#a78bfa" />
                 </div>
 
                 {/* Search */}
                 <div style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.09)",
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-floating)",
                   borderRadius: 10, padding: "9px 14px",
                   display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
                 }}>
@@ -228,7 +228,7 @@ export default function HelpWidget() {
                     placeholder="Search for help..."
                     style={{
                       background: "none", border: "none", outline: "none",
-                      flex: 1, fontSize: 13, color: "#e2e8f0", fontFamily: "inherit",
+                      flex: 1, fontSize: 13, color: "var(--text-primary)", fontFamily: "inherit",
                     }}
                   />
                 </div>
@@ -237,7 +237,7 @@ export default function HelpWidget() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {filteredLinks.map(faqRow)}
                   {filteredLinks.length === 0 && (
-                    <p style={{ fontSize: 12, color: "rgba(148,163,184,0.4)", textAlign: "center", padding: "12px 0" }}>
+                    <p style={{ fontSize: 12, color: "var(--text-dimmer)", textAlign: "center", padding: "12px 0" }}>
                       No results for "{search}"
                     </p>
                   )}
@@ -256,7 +256,7 @@ export default function HelpWidget() {
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
                   Send us a message
                 </h3>
-                <p style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", margin: "0 0 14px" }}>
+                <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 14px" }}>
                   {email
                     ? <>This opens a support ticket. We'll reply to <span style={{ color: "rgba(226,232,240,0.85)" }}>{email}</span>.</>
                     : "Sign in again so we have an email to reply to."}
@@ -266,10 +266,10 @@ export default function HelpWidget() {
                   onChange={e => setMessage(e.target.value)}
                   placeholder="Describe your issue or question..."
                   style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.09)",
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-floating)",
                     borderRadius: 10, padding: 12,
-                    color: "#e2e8f0", fontSize: 13, fontFamily: "inherit",
+                    color: "var(--text-primary)", fontSize: 13, fontFamily: "inherit",
                     resize: "none", height: 100, outline: "none", marginBottom: 12,
                   }}
                 />
@@ -302,7 +302,7 @@ export default function HelpWidget() {
           </div>
 
           {/* Bottom tabs */}
-          <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+          <div style={{ display: "flex", borderTop: "1px solid var(--border-floating)", flexShrink: 0 }}>
             {[
               { id: "home",     label: "Home",     icon: <Home size={16} /> },
               { id: "messages", label: "Messages",  icon: <MessageCircle size={16} /> },

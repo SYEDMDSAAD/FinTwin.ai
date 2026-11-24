@@ -98,7 +98,7 @@ function formatDate(sortableKey, originalDisplay) {
   return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18 };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18 };
 const inputStyle = {
   background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
   borderRadius: 10, padding: "8px 12px", color: "var(--text-primary, #fff)", fontSize: 13,
@@ -307,8 +307,8 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
     <div style={CARD}>
       <style>{`
         .tx-row-grid { display: grid; gap: 0; }
-        .tx-col-headers { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; padding: 8px 24px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .tx-row-desktop { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; align-items: center; padding: 12px 24px; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .tx-col-headers { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; padding: 8px 24px; border-bottom: 1px solid var(--border-subtle); }
+        .tx-row-desktop { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; align-items: center; padding: 12px 24px; border-bottom: 1px solid var(--border-subtle); transition: background 0.15s; }
         .tx-row-desktop.balance { grid-template-columns: 3fr 2fr 2fr 1.5fr 1.5fr; }
         .tx-mobile-card { display: none; padding: 10px 16px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
         .tx-filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -395,7 +395,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
 
       {/* Filter panel */}
       {filtersOpen && (
-        <div style={{ margin: "16px 24px 0", padding: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14 }}>
+        <div style={{ margin: "16px 24px 0", padding: 16, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 14 }}>
           <div className="tx-filter-grid">
             <div>
               <label style={lbl}>Search</label>
@@ -499,8 +499,8 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
             <div key={key}>
               {/* Date group header — label only, no per-day tally */}
               <div style={{
-                padding: "7px 24px", background: "rgba(255,255,255,0.012)",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                padding: "7px 24px", background: "var(--bg-subtle)",
+                borderBottom: "1px solid var(--border-subtle)",
               }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.06em" }}>
                   {formatDate(key, display)}
@@ -610,7 +610,7 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "12px 24px", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "12px 24px", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, color: "var(--text-dimmer)" }}>
           Showing {Math.min(shown, filtered.length)} of {filtered.length}
           {filtered.length !== transactions.length && ` (filtered from ${transactions.length})`}

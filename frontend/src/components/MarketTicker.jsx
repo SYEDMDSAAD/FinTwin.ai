@@ -76,9 +76,9 @@ export default function MarketTicker() {
   return (
     <div style={{
       width: "100%", overflow: "hidden",
-      background: "rgba(255,255,255,0.018)",
-      borderBottom: "1px solid rgba(255,255,255,0.06)",
-      borderTop: "1px solid rgba(255,255,255,0.06)",
+      background: "var(--bg-subtle)",
+      borderBottom: "1px solid var(--border-subtle)",
+      borderTop: "1px solid var(--border-subtle)",
       height: 36, display: "flex", alignItems: "center",
       marginBottom: 20,
       position: "relative",

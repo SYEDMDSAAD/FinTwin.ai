@@ -88,7 +88,7 @@ function AnomalyCard({ anomaly, onDismiss }) {
             {anomaly.merchant}
           </h3>
           {anomaly.category && anomaly.category !== "Multiple" && (
-            <div style={{ fontSize: 11, color: "rgba(148,163,184,0.55)", marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
               {anomaly.category}
             </div>
           )}
@@ -105,7 +105,7 @@ function AnomalyCard({ anomaly, onDismiss }) {
             </div>
           )}
           {anomaly.avgAmount != null && (
-            <div style={{ fontSize: 10, color: "rgba(148,163,184,0.45)", marginTop: 1 }}>
+            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 1 }}>
               avg ₹{Math.round(anomaly.avgAmount)?.toLocaleString("en-IN")}
             </div>
           )}
@@ -114,9 +114,9 @@ function AnomalyCard({ anomaly, onDismiss }) {
 
       {/* Reason */}
       {(anomaly.reason) && (
-        <div style={{ background: "rgba(0,0,0,0.15)", border: "1px solid rgba(255,255,255,0.06)",
+        <div style={{ background: "rgba(0,0,0,0.15)", border: "1px solid var(--border-subtle)",
           borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.45)",
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)",
             letterSpacing: "0.08em", marginBottom: 4 }}>WHAT HAPPENED</div>
           <p style={{ fontSize: 12, color: "#d1d5db", lineHeight: 1.6, margin: 0 }}>
             {anomaly.reason}
@@ -164,8 +164,8 @@ function AnomalyCard({ anomaly, onDismiss }) {
           style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             padding: "5px 12px", borderRadius: 8, cursor: "pointer",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            color: "rgba(148,163,184,0.6)", fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+            background: "var(--bg-input)", border: "1px solid var(--border-floating)",
+            color: "var(--text-dim)", fontSize: 11, fontWeight: 600, fontFamily: "inherit",
             transition: "all 0.15s", opacity: dismissing ? 0.5 : 1,
           }}
           onMouseEnter={e => { if (!dismissing) { e.currentTarget.style.color="#e2e8f0"; e.currentTarget.style.background="rgba(255,255,255,0.08)"; }}}
@@ -220,7 +220,7 @@ function AnomalyAlerts({ anomalies: incoming }) {
               AI ANOMALY DETECTION
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#4ade80", margin: 0 }}>No Anomalies Detected</h2>
-            <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", margin: "4px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0 0" }}>
               Your spending patterns look normal across all categories and merchants.
             </p>
           </div>
@@ -255,8 +255,8 @@ function AnomalyAlerts({ anomalies: incoming }) {
               {highCount} high risk
             </span>
           )}
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.6)", background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 10px" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", background: "var(--bg-input)",
+            border: "1px solid var(--border-floating)", borderRadius: 8, padding: "4px 10px" }}>
             {anomalies.length} total
           </span>
         </div>

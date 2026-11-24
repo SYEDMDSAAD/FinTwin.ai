@@ -12,17 +12,16 @@ function QuickEntryDropdown({
     const [open, setOpen] = useState(false);
 
     const card = {
-        background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: 18,
-        marginBottom: 16,
+        background: "var(--bg-card)",
+        border: "1px solid var(--border-card)",
+        borderRadius: 16,
         overflow: "hidden",
     };
 
     const inputStyle = {
         flex: 1,
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--bg-input)",
+        border: "1px solid var(--border-floating)",
         borderRadius: 10,
         padding: "10px 14px",
         color: "#fff",
@@ -47,15 +46,15 @@ function QuickEntryDropdown({
                     padding: "14px 20px",
                     background: "transparent",
                     border: "none",
-                    color: "#fff",
+                    color: "var(--text-primary)",
                     cursor: "pointer",
                     fontFamily: "inherit",
                 }}
             >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Plus size={15} color="#a78bfa" />
-                    <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-label, #71717a)" }}>
-                        ADD MANUAL ENTRY
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                        Add a transaction
                     </span>
                 </div>
                 <ChevronDown

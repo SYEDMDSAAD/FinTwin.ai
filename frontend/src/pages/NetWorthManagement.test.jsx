@@ -20,6 +20,6 @@ describe("NetWorthManagement", () => {
       />,
       { authed: true }
     );
-    expect(screen.getByText("Net Worth")).toBeInTheDocument();
+    expect(screen.getByText("NET WORTH")).toBeInTheDocument();
   });
 });

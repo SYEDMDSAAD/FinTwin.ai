@@ -1,5 +1,6 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Upload } from "lucide-react";
+import { Button } from "../components/ui";
 import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
@@ -1700,57 +1701,27 @@ function Dashboard() {
                             />
                         )}
 
-                        {/* Import nudge banner */}
-                        <div
-                            onClick={() => {
-                                localStorage.setItem("activeSection", "Imports");
-                                window.dispatchEvent(new Event("dashboardNav"));
-                            }}
-                            style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "14px 18px", marginBottom: 12, borderRadius: 14, cursor: "pointer",
-                                background: "rgba(34,211,238,0.05)", border: "1px solid rgba(34,211,238,0.15)",
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(34,211,238,0.09)"; e.currentTarget.style.borderColor = "rgba(34,211,238,0.28)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(34,211,238,0.05)"; e.currentTarget.style.borderColor = "rgba(34,211,238,0.15)"; }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                                    📂
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>
-                                        Have a bank statement or CSV?
-                                    </div>
-                                    <div style={{ fontSize: 11, color: "rgba(148,163,184,0.6)" }}>
-                                        Import transactions in bulk — supports CSV, Excel and PDF statements
-                                    </div>
-                                </div>
+                        {/* Add one by hand, or bring a whole statement in */}
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
+                            <div className="flex-1 min-w-0">
+                            <QuickEntryDropdown
+                                incomeText={incomeText}
+                                setIncomeText={setIncomeText}
+                                addIncome={addIncome}
+                                expenseText={expenseText}
+                                setExpenseText={setExpenseText}
+                                addExpense={addExpense}
+                            />
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#22d3ee", flexShrink: 0 }}>
-                                Import file <span style={{ fontSize: 14 }}>→</span>
-                            </div>
+                            <Button variant="secondary" size="lg" icon={Upload} onClick={() => navigateTo("Imports")} className="shrink-0">
+                                Import a statement
+                            </Button>
                         </div>
 
-                        <QuickEntryDropdown
-                            incomeText={incomeText}
-                            setIncomeText={setIncomeText}
-                            addIncome={addIncome}
-                            expenseText={expenseText}
-                            setExpenseText={setExpenseText}
-                            addExpense={addExpense}
-                        />
-
-                        <div role="note" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "-8px 0 20px", padding: "12px 16px", borderRadius: 12, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                            <Sparkles size={15} color="#a78bfa" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
-                            <span style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-                                Day-to-day transactions are messy — a shop name or a UPI ID doesn't always say what you bought.
-                                FinTwin puts each one in its most probable category, but it won't always be right. If you spot a
-                                transaction in the wrong category, change it: FinTwin remembers your choice for that merchant, and
-                                it helps us improve.
-                            </span>
-                        </div>
+                        <p role="note" className="flex items-start gap-2 mb-4 text-caption text-ink-3">
+                            <Sparkles size={13} aria-hidden className="text-accent shrink-0 mt-0.5" />
+                            Categories are FinTwin's best guess. If one is wrong, change it: FinTwin remembers your choice for that merchant.
+                        </p>
 
                         {/* Outside the loading swap so it never unmounts and refetches */}
                         <SortOther

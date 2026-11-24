@@ -32,7 +32,7 @@ function NetWorthSection({ netWorth }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
         .nw-section { font-family: 'DM Sans', system-ui, sans-serif; margin-bottom: 32px; }
-        .nw-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; transition: all 0.25s; }
+        .nw-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; transition: all 0.25s; }
         .nw-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
         .nw-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }
         .nw-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
@@ -46,14 +46,14 @@ function NetWorthSection({ netWorth }) {
             <Wallet size={16} color="#a78bfa" />
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>WEALTH TRACKER</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>WEALTH TRACKER</div>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Net Worth Tracker</h2>
           </div>
         </div>
 
         {/* Main net worth hero */}
         <div style={{
-          background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+          background: "var(--bg-card)", border: "1px solid var(--border-card)",
           borderRadius: 20, padding: 28, marginBottom: 14, position: "relative", overflow: "hidden",
         }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: isHealthy ? "linear-gradient(90deg,transparent,rgba(74,222,128,0.5),transparent)" : "linear-gradient(90deg,transparent,rgba(248,113,113,0.5),transparent)" }} />
@@ -61,16 +61,16 @@ function NetWorthSection({ netWorth }) {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em", marginBottom: 10 }}>TOTAL NET WORTH</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", marginBottom: 10 }}>TOTAL NET WORTH</div>
               <div style={{ fontSize: 40, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {netWorth.netWorth < 0 && <span style={{ color: "#f87171" }}>−</span>}
                 <AnimatedNumber value={Math.abs(netWorth.netWorth)} />
               </div>
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ height: 6, width: 180, background: "rgba(255,255,255,0.07)", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: 6, width: 180, background: "var(--bg-input)", borderRadius: 3, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${assetPct}%`, background: "linear-gradient(90deg,#4ade80,#22d3ee)", borderRadius: 3, transition: "width 1.2s ease" }} />
                 </div>
-                <span style={{ fontSize: 11, color: "rgba(148,163,184,0.5)" }}>{assetPct}% assets</span>
+                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{assetPct}% assets</span>
               </div>
             </div>
             <div style={{
@@ -94,7 +94,7 @@ function NetWorthSection({ netWorth }) {
             <div key={s.label} className="nw-card">
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${s.color}40,transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>{s.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>{s.label}</span>
                 <div style={{ width: 26, height: 26, borderRadius: 7, background: s.color + "18", border: `1px solid ${s.color}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
               </div>
               <div style={{ fontSize: "clamp(14px, 3.5vw, 22px)", fontWeight: 800, color: s.color, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>

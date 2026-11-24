@@ -41,7 +41,7 @@ function IndexCard({ idx }) {
   return (
     <div style={{
       position: "relative", overflow: "hidden",
-      background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+      background: "var(--bg-card)", border: "1px solid var(--border-card)",
       borderRadius: 16, padding: "16px 20px", flex: 1, minWidth: 160,
       borderTop: `3px solid ${idx.color}`,
     }}>
@@ -198,7 +198,7 @@ export default function USStocksTab() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button
               onClick={handleSave}
               disabled={!form.name.trim() || !form.buyPrice}
@@ -221,7 +221,7 @@ export default function USStocksTab() {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                 {["Name","Ticker","Units","Buy Price","Current","Value","P&L",""].map(h => (
                   <th key={h} style={{ textAlign: h === "P&L" || h === "Value" ? "right" : "left", padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
@@ -235,7 +235,7 @@ export default function USStocksTab() {
                 const pct = invested ? (pnl / invested * 100).toFixed(1) : 0;
                 const pos = pnl >= 0;
                 return (
-                  <tr key={h.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  <tr key={h.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                     <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 600, color: "#fff" }}>{h.name}</td>
                     <td style={{ padding: "11px 12px" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 5, padding: "2px 7px" }}>{h.ticker || "—"}</span>
@@ -265,4 +265,4 @@ export default function USStocksTab() {
 }
 
 const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 5 };
-const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "var(--bg-input)", border: "1px solid var(--border-floating)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

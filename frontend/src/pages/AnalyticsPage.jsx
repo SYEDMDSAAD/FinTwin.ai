@@ -20,7 +20,7 @@ const CATEGORIES = [
   { name: "Communication/PC",    icon: "💻", color: "#38bdf8" },
   { name: "Financial Expenses",  icon: "💰", color: "#4ade80" },
   { name: "Investments",         icon: "📈", color: "#a3e635" },
-  { name: "Others",              icon: "📦", color: "#94a3b8" },
+  { name: "Others",              icon: "📦", color: "var(--text-dim)" },
   { name: "Unknown",             icon: "❓", color: "#6b7280" },
 ];
 
@@ -101,7 +101,7 @@ function FilterPanel({ filters, setFilters, open }) {
   return (
     <div style={{
       margin: "0 0 16px", padding: 16,
-      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+      background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)",
       borderRadius: 14, fontFamily: "'DM Sans', system-ui, sans-serif",
     }}>
       <style>{`
@@ -240,8 +240,8 @@ function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Sans', system-ui" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>Category</th>
+            <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" }}>Category</th>
               <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#a78bfa" }}>{periodLabel}</th>
               <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "var(--text-dim)" }}>{prevLabel}</th>
             </tr>
@@ -251,8 +251,8 @@ function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
             <tr style={{ background: "rgba(74,222,128,0.04)" }}>
               <td colSpan={3} style={{ padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#4ade80", letterSpacing: "0.08em" }}>TOTAL INCOME</td>
             </tr>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              <td style={{ padding: "10px 16px 10px 32px", fontSize: 13, color: "rgba(148,163,184,0.7)", display: "flex", alignItems: "center", gap: 8 }}>
+            <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <td style={{ padding: "10px 16px 10px 32px", fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
                 <span>💵</span> Income
               </td>
               <td style={{ textAlign: "right", padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#4ade80" }}>{fmt(totalIncCur)}</td>
@@ -268,7 +268,7 @@ function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
               const prevAmt = (prevMap[cat.name]?.expense) || 0;
               if (curAmt === 0 && prevAmt === 0) return null;
               return (
-                <tr key={cat.name} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                <tr key={cat.name} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                   <td style={{ padding: "9px 16px 9px 32px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 14 }}>{cat.icon}</span>
@@ -281,7 +281,7 @@ function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
               );
             })}
             {/* Totals row */}
-            <tr style={{ borderTop: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
+            <tr style={{ borderTop: "1px solid var(--border-floating)", background: "var(--bg-subtle)" }}>
               <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#fff" }}>Net (Income – Expense)</td>
               <td style={{ textAlign: "right", padding: "12px 16px", fontSize: 13, fontWeight: 700, color: totalIncCur - totalExpCur >= 0 ? "#4ade80" : "#f87171" }}>
                 {fmt(totalIncCur - totalExpCur)}
@@ -312,14 +312,14 @@ function BalanceTrendTab({ transactions }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>RUNNING BALANCE OVER TIME</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>RUNNING BALANCE OVER TIME</div>
       <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
           <YAxis tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
           <Tooltip
-            contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 }}
+            contentStyle={{ background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 10, fontSize: 12 }}
             formatter={v => [`₹${v.toLocaleString("en-IN")}`, "Balance"]}
           />
           <Line type="monotone" dataKey="balance" stroke="#a78bfa" strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
@@ -362,7 +362,7 @@ function CashFlowTab({ transactions }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
       <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={320}>
         <BarChart data={data} barGap={4} margin={{ top: 20, right: 8, left: -5, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -377,7 +377,7 @@ function CashFlowTab({ transactions }) {
           />
           <Tooltip
             cursor={{ fill: "rgba(255,255,255,0.04)" }}
-            contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 }}
+            contentStyle={{ background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 10, fontSize: 12 }}
             formatter={(v, n) => [`₹${v.toLocaleString("en-IN")}`, n === "income" ? "Income" : "Expenses"]}
           />
           <Legend formatter={v => v === "income" ? "Money In" : "Money Out"} />
@@ -473,7 +473,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
           <BarChart3 size={18} color="#a78bfa" />
         </div>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em" }}>OVERVIEW</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em" }}>OVERVIEW</div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>Analytics</h2>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -502,8 +502,8 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "10px 16px", marginBottom: 16,
-            background: "rgba(255,255,255,0.018)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border-subtle)",
             borderRadius: 14,
           }}>
             <button onClick={() => navigatePeriod(-1)} style={navBtnStyle}><ChevronLeft size={16} /></button>
@@ -549,7 +549,7 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
           </div>
 
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 2, marginBottom: 0, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderBottom: "none", borderRadius: "14px 14px 0 0", padding: "8px 8px 0", overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 2, marginBottom: 0, background: "var(--bg-card)", border: "1px solid var(--border-card)", borderBottom: "none", borderRadius: "14px 14px 0 0", padding: "8px 8px 0", overflow: "hidden" }}>
             {TABS.map(tab => (
               <button
                 key={tab}
@@ -570,8 +570,8 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
 
           {/* Tab content */}
           <div style={{
-            background: "rgba(255,255,255,0.025)",
-            border: "1px solid rgba(255,255,255,0.07)",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             borderTop: "none",
             borderRadius: "0 0 14px 14px",
             padding: 20,

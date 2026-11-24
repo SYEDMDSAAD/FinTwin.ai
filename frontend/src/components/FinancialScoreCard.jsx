@@ -53,13 +53,13 @@ function FactorBar({ factor }) {
                         {factor.impact} impact · {factor.points}/{factor.maxPoints}
                     </span>
                 </div>
-                <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
+                <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
                     <div style={{
                         height: "100%", width: `${pct}%`, background: color,
                         borderRadius: 3, transition: "width 1s ease",
                     }} />
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(148,163,184,0.6)", lineHeight: 1.5 }}>{factor.desc}</div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>{factor.desc}</div>
             </div>
         </div>
     );
@@ -113,8 +113,8 @@ function FinancialScoreCard({ scoreData }) {
                             { label: "Budget Score",   value: scoreData.budgetDiscipline + "%",       color: "#22d3ee" },
                             { label: "Recurring",      value: scoreData.recurringExpenseCount + " items", color: "#f87171" },
                         ].map(s => (
-                            <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <span style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{s.label}</span>
+                            <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-subtle)" }}>
+                                <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{s.label}</span>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</span>
                             </div>
                         ))}

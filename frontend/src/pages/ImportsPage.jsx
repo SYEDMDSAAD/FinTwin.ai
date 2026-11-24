@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileText, Check } from "lucide-react";
+import { FileText, Check } from "lucide-react";
 import API from "../services/api";
 import toast from "react-hot-toast";
 import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize, guessAccountLabel } from "../services/statementParser";
@@ -210,22 +210,11 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
   };
 
   const headers = csvData?.headers || [];
-  const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: 24 };
+  const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18, padding: 24 };
 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 720 }}>
       {!compact && <>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Upload size={18} color="#a78bfa" />
-        </div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em" }}>SYSTEM</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>Import Transactions</h2>
-        </div>
-      </div>
-
       <DataCoverage refreshKey={coverageKey} />
       </>}
 
@@ -235,8 +224,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
       {step === 0 && (
         <div style={CARD}>
           <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent)", borderRadius: 18 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 14 }}>STEP 1 — UPLOAD STATEMENT</div>
-          <p style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", lineHeight: 1.6, marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 14 }}>STEP 1 — UPLOAD STATEMENT</div>
+          <p style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6, marginBottom: 20 }}>
             Download your bank or credit-card statement from net banking — PDF, Excel or CSV — and upload it here. We'll find the table and guess the columns; you can correct them in the next step. Uploading the same statement twice is safe — rows already imported are skipped.
           </p>
 
@@ -266,7 +255,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
               <label htmlFor="statement-password" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 6 }}>
                 {lockedFile.name} is password-protected
               </label>
-              <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 10px", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 10px", lineHeight: 1.5 }}>
                 Banks usually build it from your name, date of birth or customer ID — the email the statement came with says which. It's used once to open the file and never saved.
               </p>
               <div style={{ display: "flex", gap: 8 }}>
@@ -293,8 +282,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
             </form>
           )}
 
-          <div style={{ marginTop: 20, padding: 16, background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 12, fontSize: 12, color: "rgba(148,163,184,0.6)" }}>
-            💡 For a single receipt or payment screenshot, use <strong style={{ color: "#22d3ee" }}>OCR Uploads</strong> in the sidebar instead.
+          <div style={{ marginTop: 20, padding: 16, background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 12, fontSize: 12, color: "var(--text-dim)" }}>
+            💡 For a single receipt or payment screenshot, use <strong style={{ color: "#22d3ee" }}>Receipts</strong> (next to Add data) instead.
           </div>
         </div>
       )}
@@ -302,15 +291,15 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
       {/* Step 1: Column mapping */}
       {step === 1 && csvData && (
         <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 2 — MAP COLUMNS</div>
-          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 2 — MAP COLUMNS</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
             File: <strong style={{ color: "#a78bfa" }}>{fileName}</strong> · {csvData.rows.length} rows detected
             {csvData.preambleLines > 0 && <> · skipped {csvData.preambleLines} header lines</>}
           </div>
 
           {/* Account type — card statements invert the meaning of credits */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>THIS STATEMENT IS FROM</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 8 }}>THIS STATEMENT IS FROM</div>
             <div style={{ display: "flex", gap: 8 }}>
               {[
                 { value: "BANK", label: "Bank account", hint: "Savings or current account" },
@@ -346,11 +335,11 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
               onChange={e => setAccount(e.target.value)}
               style={inp}
             />
-            <div style={{ fontSize: 11, color: "rgba(148,163,184,0.45)", marginTop: 5 }}>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 5 }}>
               Keeps each account's months separate, and matches this statement to that account's alert emails.
             </div>
             {UPI_APPS.test(account) && (
-              <div role="note" style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.25)", fontSize: 12, color: "rgba(148,163,184,0.75)", lineHeight: 1.55 }}>
+              <div role="note" style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.25)", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
                 <strong style={{ color: "#fbbf24" }}>UPI app statement.</strong> Its payments also appear in the statement of the bank account they were paid from.
                 Import either this or that bank's statement for the same months — not both — or UPI spending is counted twice.
               </div>
@@ -359,7 +348,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
 
           {/* Bank format toggle */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 8 }}>AMOUNT FORMAT</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 8 }}>AMOUNT FORMAT</div>
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => setDebitCreditMode(false)}
@@ -471,13 +460,13 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
 
           {/* Sample row preview */}
           {csvData.rows.length > 0 && (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, padding: 14, marginBottom: 16, overflowX: "auto" }}>
+            <div style={{ background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, marginBottom: 16, overflowX: "auto" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 8 }}>SAMPLE ROW (FIRST ROW)</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {headers.map(h => (
                   <div key={h} style={{ minWidth: 120 }}>
                     <div style={{ fontSize: 9, color: "var(--text-dim)", marginBottom: 2, fontWeight: 700 }}>{h}</div>
-                    <div style={{ fontSize: 12, color: "#fff", background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: "4px 8px" }}>{csvData.rows[0][h] || "—"}</div>
+                    <div style={{ fontSize: 12, color: "#fff", background: "var(--bg-input)", borderRadius: 6, padding: "4px 8px" }}>{csvData.rows[0][h] || "—"}</div>
                   </div>
                 ))}
               </div>
@@ -485,20 +474,20 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
           )}
 
           {!debitCreditMode && (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 12, color: "rgba(148,163,184,0.7)", cursor: "pointer" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 12, color: "var(--text-secondary)", cursor: "pointer" }}>
               <input type="checkbox" checked={flipSign} onChange={e => setFlipSign(e.target.checked)} />
               Spending shows as positive numbers in this file (common on card statements) — flip the signs
             </label>
           )}
 
           {debitCreditMode && (
-            <div style={{ marginBottom: 16, padding: "10px 14px", background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: 10, fontSize: 12, color: "rgba(148,163,184,0.6)" }}>
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: 10, fontSize: 12, color: "var(--text-dim)" }}>
               Debit values → <strong style={{ color: "#f87171" }}>expense (−)</strong> &nbsp;·&nbsp; Credit values → <strong style={{ color: "#4ade80" }}>income (+)</strong>. Rows where both are empty or zero are skipped.
             </div>
           )}
 
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setStep(0)} style={{ flex: 0, padding: "10px 18px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+            <button onClick={() => setStep(0)} style={{ flex: 0, padding: "10px 18px", borderRadius: 12, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-dim)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
             <button
               disabled={!canProceed}
               onClick={buildPreview}
@@ -513,8 +502,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
       {/* Step 2: Preview & import */}
       {step === 2 && (
         <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 3 — PREVIEW & IMPORT</div>
-          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 6 }}>STEP 3 — PREVIEW & IMPORT</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
             {(() => {
               const sum = summarize(built.rows);
               const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -529,7 +518,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
           <div style={{ overflowX: "auto", marginBottom: 20 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                   {["Date","Merchant","Amount","Category"].map(h => (
                     <th key={h} style={{ textAlign: "left", padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" }}>{h}</th>
                   ))}
@@ -537,8 +526,8 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
               </thead>
               <tbody>
                 {built.rows.slice(0, 10).map((row, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                    <td style={{ padding: "9px 12px", fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{row.date}</td>
+                  <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                    <td style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-dim)" }}>{row.date}</td>
                     <td style={{ padding: "9px 12px", fontSize: 13, color: "#fff" }}>{row.merchant}</td>
                     <td style={{ padding: "9px 12px", fontSize: 13, fontWeight: 700, color: row.amount >= 0 ? "#4ade80" : "#f87171" }}>
                       {row.amount >= 0 ? "+" : ""}₹{Math.abs(row.amount).toLocaleString("en-IN")}
@@ -558,7 +547,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>Import Complete!</div>
-              <div style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", marginBottom: 20 }}>
+              <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 20 }}>
                 {result.imported} transactions imported
                 {result.duplicates > 0 && <> · {result.duplicates} already imported earlier, skipped</>}
                 {result.reconciled > 0 && <> · {result.reconciled} already added from alert emails or Spend Guard, now confirmed by the statement</>}
@@ -569,12 +558,12 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
                 {onViewTransactions && (
                   <button onClick={onViewTransactions} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Check transactions →</button>
                 )}
-                <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
+                <button onClick={reset} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-dim)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Import Another File</button>
               </div>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setStep(1)} style={{ flex: 0, padding: "10px 18px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "rgba(148,163,184,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+              <button onClick={() => setStep(1)} style={{ flex: 0, padding: "10px 18px", borderRadius: 12, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-dim)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
               <button
                 onClick={doImport}
                 disabled={importing}
@@ -592,5 +581,5 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
   );
 }
 
-const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 6 };
-const inp = { width: "100%", padding: "9px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", appearance: "none" };
+const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 6 };
+const inp = { width: "100%", padding: "9px 12px", borderRadius: 10, background: "var(--bg-input)", border: "1px solid var(--border-floating)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", appearance: "none" };

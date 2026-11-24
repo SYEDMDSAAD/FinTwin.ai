@@ -25,7 +25,7 @@ const TABS = [
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
   .sp-root * { box-sizing:border-box; }
-  .sp-otp-box { width:46px; height:54px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); color:#e2e8f0; font-size:20px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
+  .sp-otp-box { width:46px; height:54px; border-radius:12px; background:var(--bg-input); border:1px solid var(--border-floating); color:var(--text-primary); font-size:20px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
   .sp-otp-box:focus { border-color:rgba(167,139,250,0.5); box-shadow:0 0 0 3px rgba(167,139,250,0.07); }
   @keyframes spOverlayIn { from{opacity:0} to{opacity:1} }
   @keyframes spModalIn { from{opacity:0;transform:translateY(20px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
@@ -33,24 +33,24 @@ const CSS = `
   .sp-modal  { animation:spModalIn  0.25s ease both; }
   .sp-root { font-family:'DM Sans',system-ui,sans-serif; }
   .sp-tab-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 14px; border-radius:12px; border:none; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; text-align:left; transition:all 0.15s; }
-  .sp-tab-btn:hover { background:rgba(255,255,255,0.05); }
+  .sp-tab-btn:hover { background:var(--bg-input); }
   .sp-tab-btn.active { background:rgba(167,139,250,0.12); color:#a78bfa; }
   .sp-row { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; gap:10px; }
-  .sp-row + .sp-row { border-top:1px solid rgba(255,255,255,0.06); }
-  .sp-action-btn { padding:8px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:rgba(148,163,184,0.8); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s; white-space:nowrap; flex-shrink:0; }
-  .sp-action-btn:hover { background:rgba(255,255,255,0.08); color:#e2e8f0; }
+  .sp-row + .sp-row { border-top:1px solid var(--border-subtle); }
+  .sp-action-btn { padding:8px 16px; border-radius:10px; border:1px solid var(--border-floating); background:var(--bg-input); color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:all 0.15s; white-space:nowrap; flex-shrink:0; }
+  .sp-action-btn:hover { background:var(--bg-input); color:var(--text-primary); }
   .sp-action-btn.danger { background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.2); color:#f87171; }
   .sp-action-btn.danger:hover { background:#f87171; color:#fff; border-color:#f87171; }
   .sp-action-btn.primary { background:rgba(167,139,250,0.12); border-color:rgba(167,139,250,0.3); color:#a78bfa; }
   .sp-action-btn.primary:hover { background:rgba(167,139,250,0.2); }
   .sp-toggle { width:46px; height:26px; border-radius:99px; border:none; cursor:pointer; position:relative; transition:background 0.3s; flex-shrink:0; }
   .sp-toggle-thumb { position:absolute; top:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform 0.3s; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
-  .sp-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; overflow:hidden; margin-bottom:16px; }
-  .sp-card-label { padding:12px 20px 10px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; font-weight:700; letter-spacing:0.1em; color:rgba(148,163,184,0.5); }
-  .sp-ai-card { padding:14px 16px; border-radius:14px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); cursor:pointer; transition:all 0.15s; }
+  .sp-card { background:var(--bg-card); border:1px solid var(--border-card); border-radius:16px; overflow:hidden; margin-bottom:16px; }
+  .sp-card-label { padding:12px 20px 10px; border-bottom:1px solid var(--border-subtle); font-size:10px; font-weight:700; letter-spacing:0.1em; color:var(--text-dim); }
+  .sp-ai-card { padding:14px 16px; border-radius:14px; border:1px solid var(--border-floating); background:var(--bg-subtle); cursor:pointer; transition:all 0.15s; }
   .sp-ai-card.selected { background:rgba(167,139,250,0.1); border-color:rgba(167,139,250,0.35); }
-  .sp-ai-card:hover:not(.selected) { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); }
-  .sp-conn-card { padding:16px 20px; border-radius:14px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; gap:14px; }
+  .sp-ai-card:hover:not(.selected) { background:var(--bg-input); border-color:rgba(255,255,255,0.12); }
+  .sp-conn-card { padding:16px 20px; border-radius:14px; background:var(--bg-card); border:1px solid var(--border-card); display:flex; align-items:center; gap:14px; }
   @media (max-width: 640px) {
     .sp-layout { flex-direction: column !important; }
     .sp-sidebar {
@@ -180,7 +180,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
     >
       <div
         className="sp-modal"
-        style={{ width: "100%", maxWidth: 440, background: "rgba(10,12,18,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, overflow: "hidden", boxShadow: "0 40px 100px rgba(0,0,0,0.8)" }}
+        style={{ width: "100%", maxWidth: 440, background: "rgba(10,12,18,0.98)", border: "1px solid var(--border-floating)", borderRadius: 24, overflow: "hidden", boxShadow: "0 40px 100px rgba(0,0,0,0.8)" }}
       >
         {/* Header */}
         <div style={{ height: 2, background: "linear-gradient(90deg,#a78bfa,#22d3ee)" }} />
@@ -193,12 +193,12 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
               <h3 style={{ fontSize: 17, fontWeight: 800, color: "#fff", margin: 0 }}>
                 {phase === "disable" ? "Disable 2FA" : "Set up 2FA"}
               </h3>
-              <p style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", margin: 0 }}>
+              <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0 }}>
                 {phase === "disable" ? "Enter your current authenticator code" : "Scan QR with your authenticator app"}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(148,163,184,0.5)", padding: 4 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", padding: 4 }}>
             <X size={20} />
           </button>
         </div>
@@ -208,7 +208,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
           {phase === "setup" && (
             <>
               {qrLoading ? (
-                <div style={{ textAlign: "center", padding: "32px 0", color: "rgba(148,163,184,0.4)", fontSize: 13 }}>
+                <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-dimmer)", fontSize: 13 }}>
                   Generating QR code…
                 </div>
               ) : qrData ? (
@@ -218,9 +218,9 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
                       <img src={`data:image/png;base64,${qrData.qrCodeBase64}`} alt="2FA QR code" width={120} height={120} style={{ display: "block" }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 6 }}>SETUP KEY</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 6 }}>SETUP KEY</div>
                       <div
-                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#a78bfa", letterSpacing: "0.12em", wordBreak: "break-all", marginBottom: 8 }}
+                        style={{ background: "var(--bg-input)", border: "1px solid var(--border-floating)", borderRadius: 10, padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#a78bfa", letterSpacing: "0.12em", wordBreak: "break-all", marginBottom: 8 }}
                       >
                         {qrData.secret}
                       </div>
@@ -230,7 +230,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 10 }}>
                     ENTER THE 6-DIGIT CODE TO CONFIRM
                   </div>
                   <OTPInputs />
@@ -243,7 +243,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
                   </button>
                 </>
               ) : (
-                <button onClick={loadSetup} style={{ width: "100%", padding: 13, borderRadius: 13, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={loadSetup} style={{ width: "100%", padding: 13, borderRadius: 13, border: "1px solid var(--border-floating)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                   Retry
                 </button>
               )}
@@ -253,7 +253,7 @@ function TwoFAModal({ enabled, onClose, onSuccess }) {
           {/* Disable phase */}
           {phase === "disable" && (
             <>
-              <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", marginBottom: 20, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 20, lineHeight: 1.6 }}>
                 Open your authenticator app and enter the current 6-digit code to confirm.
               </p>
               <OTPInputs />
@@ -391,21 +391,14 @@ export default function SettingsPage({ navigateTo }) {
 
       <div className="sp-root" style={{ maxWidth: 900, fontFamily: "'DM Sans',system-ui,sans-serif" }}>
 
-        {/* Page header */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.12em", marginBottom: 6 }}>PREFERENCES</div>
-          <h2 style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.03em", margin: 0 }}>Settings</h2>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0 0" }}>Manage your account and preferences</p>
-        </div>
-
         {/* Two-column layout */}
         <div className="sp-layout" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
 
           {/* Left sidebar nav */}
           <div className="sp-sidebar" style={{
             width: 200, flexShrink: 0,
-            background: "rgba(255,255,255,0.025)",
-            border: "1px solid rgba(255,255,255,0.07)",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             borderRadius: 16, padding: 8,
           }}>
             {TABS.map(({ id, label, Icon }) => (
@@ -747,7 +740,7 @@ export default function SettingsPage({ navigateTo }) {
                     ))}
                   </div>
 
-                  <div style={{ fontSize: 11, color: "var(--text-label)", padding: "10px 16px", background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 11, color: "var(--text-label)", padding: "10px 16px", background: "var(--bg-subtle)", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
                     Pro plan with advanced AI models and priority support coming soon.
                   </div>
                 </div>
@@ -764,7 +757,7 @@ export default function SettingsPage({ navigateTo }) {
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>v1.0.0</span>
                   </div>
                 </div>
-                <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border-subtle)", display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button className="sp-action-btn" style={{ fontSize: 12 }} onClick={() => window.open('/privacy-policy', '_blank')}>
                     Privacy Policy <ChevronRight size={12} style={{ display: "inline", verticalAlign: "middle" }} />
                   </button>

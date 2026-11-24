@@ -41,7 +41,7 @@ class ErrorBoundary extends Component {
                     <h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem", fontWeight: 600 }}>
                         Something went wrong
                     </h2>
-                    <p style={{ color: "#94a3b8", marginBottom: "2rem", maxWidth: "400px" }}>
+                    <p style={{ color: "var(--text-dim)", marginBottom: "2rem", maxWidth: "400px" }}>
                         This page ran into an error. Your other data is safe.
                         {this.state.error && (
                             <span style={{ display: "block", marginTop: "0.5rem", fontSize: "0.8rem" }}>
@@ -69,7 +69,7 @@ class ErrorBoundary extends Component {
                             style={{
                                 padding: "0.6rem 1.5rem",
                                 background: "transparent",
-                                color: "#94a3b8",
+                                color: "var(--text-dim)",
                                 border: "1px solid #334155",
                                 borderRadius: "8px",
                                 cursor: "pointer",

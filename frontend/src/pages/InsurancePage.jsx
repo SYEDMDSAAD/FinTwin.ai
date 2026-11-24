@@ -100,7 +100,7 @@ function AddModal({ onClose, onSave, saving }) {
   const [form, setForm] = useState(EMPTY);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ width: "100%", maxWidth: 460, background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: 24, position: "relative" }}>
+      <div style={{ width: "100%", maxWidth: 460, background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 20, padding: 24, position: "relative" }}>
         <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(34,211,238,0.4),transparent)", borderRadius: 20 }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Add Insurance Policy</h3>
@@ -141,7 +141,7 @@ function AddModal({ onClose, onSave, saving }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
           <button
             disabled={!form.provider.trim() || saving}
             onClick={() => { if (form.provider.trim()) onSave(form); }}
@@ -204,16 +204,7 @@ export default function InsurancePage() {
 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={18} color="#22d3ee" />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.12em" }}>PROTECTION</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>Insurance</h2>
-          </div>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 16 }}>
         <button
           onClick={() => setShowAdd(true)}
           style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
@@ -259,7 +250,7 @@ export default function InsurancePage() {
 
 function SummaryCard({ label, value, color, icon }) {
   return (
-    <div style={{ position: "relative", overflow: "hidden", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "16px 18px" }}>
+    <div style={{ position: "relative", overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 14, padding: "16px 18px" }}>
       <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: `linear-gradient(90deg,transparent,${color}30,transparent)` }} />
       <div style={{ fontSize: 18, marginBottom: 8 }}>{icon}</div>
       <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 4 }}>{label.toUpperCase()}</div>
@@ -269,4 +260,4 @@ function SummaryCard({ label, value, color, icon }) {
 }
 
 const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 6 };
-const inp = { width: "100%", padding: "9px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const inp = { width: "100%", padding: "9px 12px", borderRadius: 10, background: "var(--bg-input)", border: "1px solid var(--border-floating)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

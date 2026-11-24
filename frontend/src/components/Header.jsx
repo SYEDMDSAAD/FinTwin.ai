@@ -121,12 +121,12 @@ function Header({ notifications = [], scoreData, compact = false, onSettings }) 
           <div className="hdr-dropdown" style={{
             position: "fixed", right: 16, top: 72,
             width: "min(360px, calc(100vw - 32px))",
-            background: "#0e1018", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-floating)", border: "1px solid var(--border-floating)",
             borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             zIndex: 200, overflow: "hidden",
           }}>
-            <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(148,163,184,0.6)", letterSpacing: "0.08em" }}>AI NOTIFICATIONS</span>
+            <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" }}>AI NOTIFICATIONS</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#f87171", background: "rgba(248,113,113,0.12)", borderRadius: 6, padding: "2px 8px" }}>{notifications.length} Alerts</span>
             </div>
             <div style={{ maxHeight: 320, overflowY: "auto", padding: "8px" }}>
@@ -139,7 +139,7 @@ function Header({ notifications = [], scoreData, compact = false, onSettings }) 
                     borderLeft: `3px solid ${c.dot}`, marginBottom: 6, cursor: "default",
                   }}>
                     <span style={{ fontSize: 14, lineHeight: 1.5 }}>{notifIcon(n.type)}</span>
-                    <p style={{ fontSize: 12, color: "#e2e8f0", lineHeight: 1.5, margin: 0 }}>{n.message}</p>
+                    <p style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.5, margin: 0 }}>{n.message}</p>
                   </div>
                 );
               }) : (
@@ -183,13 +183,13 @@ function Header({ notifications = [], scoreData, compact = false, onSettings }) 
           <div className="hdr-dropdown" style={{
             position: "fixed", right: 16, top: 72,
             width: "min(240px, calc(100vw - 32px))",
-            background: "#0e1018", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--bg-floating)", border: "1px solid var(--border-floating)",
             borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             zIndex: 200, overflow: "hidden",
           }}>
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: 0 }}>{fullName}</p>
-              <p style={{ fontSize: 11, color: "rgba(148,163,184,0.5)", margin: "3px 0 0" }}>{email}</p>
+              <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "3px 0 0" }}>{email}</p>
             </div>
             <div style={{ padding: "6px" }}>
               <button className="profile-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
@@ -201,7 +201,7 @@ function Header({ notifications = [], scoreData, compact = false, onSettings }) 
               <button className="profile-item" onClick={() => { setShowProfile(false); window.dispatchEvent(new Event("openHelp")); }}>
                 <LifeBuoy size={14} color="rgba(148,163,184,0.6)" /> Help &amp; feedback
               </button>
-              <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+              <div style={{ height: 1, background: "var(--bg-input)", margin: "4px 0" }} />
               <button className="profile-item" onClick={logout} style={{ color: "#f87171" }}>
                 <LogOut size={14} color="#f87171" /> Logout
               </button>
@@ -261,15 +261,15 @@ function Header({ notifications = [], scoreData, compact = false, onSettings }) 
         .hdr-btn:hover { background: rgba(139,92,246,0.08) !important; }
         .hdr-dropdown { animation: dropIn 0.18s ease; }
         @keyframes dropIn { from { opacity:0; transform:translateY(-6px) } to { opacity:1; transform:translateY(0) } }
-        .notif-item:hover { background: rgba(255,255,255,0.04) !important; }
+        .notif-item:hover { background: var(--bg-input) !important; }
         .profile-item {
           display: flex; align-items: center; gap: 12px;
           width: 100%; padding: 12px 16px;
           background: none; border: none;
-          color: #e2e8f0; font-size: 13px; font-family: inherit;
+          color: var(--text-primary); font-size: 13px; font-family: inherit;
           cursor: pointer; transition: background 0.15s; text-align: left;
         }
-        .profile-item:hover { background: rgba(255,255,255,0.04); }
+        .profile-item:hover { background: var(--bg-input); }
       `}</style>
   );
 

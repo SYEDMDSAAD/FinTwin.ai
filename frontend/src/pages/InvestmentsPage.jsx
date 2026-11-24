@@ -31,16 +31,6 @@ function InvestmentsPage() {
         <div className="mb-10">
             <MarketTicker />
 
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/20">
-                    📈
-                </div>
-                <div>
-                    <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">INVESTMENTS</div>
-                    <h2 className="text-lg font-bold">Investment Portfolio</h2>
-                </div>
-            </div>
 
             {/* Tab bar */}
             <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/10 overflow-x-auto" style={{ scrollbarWidth: "none" }}>

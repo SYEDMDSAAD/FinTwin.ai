@@ -54,7 +54,7 @@ export default function DataCoverage({ refreshKey = 0 }) {
         <section aria-label="Your data" style={CARD}>
             <div style={LABEL}>YOUR DATA</div>
             {accounts.length === 0 ? (
-                <p style={{ fontSize: 13, color: "rgba(148,163,184,0.6)", margin: 0, lineHeight: 1.6 }}>
+                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: 0, lineHeight: 1.6 }}>
                     No accounts yet. Import a statement below, or forward your bank's alert emails, and each
                     account will show here with how up to date it is.
                 </p>
@@ -65,7 +65,7 @@ export default function DataCoverage({ refreshKey = 0 }) {
                         const t = TONES[d.tone];
                         const KindIcon = c.card ? CreditCard : Landmark;
                         return (
-                            <li key={c.account} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                            <li key={c.account} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
                                 <KindIcon size={16} color="rgba(148,163,184,0.6)" aria-hidden />
                                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#fff", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {c.account}
@@ -82,5 +82,5 @@ export default function DataCoverage({ refreshKey = 0 }) {
     );
 }
 
-const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 18, padding: 20, marginBottom: 20 };
-const LABEL = { fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18, padding: 20, marginBottom: 20 };
+const LABEL = { fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 };
