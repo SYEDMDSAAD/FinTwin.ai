@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, Target, TrendingUp, Gauge } from "lucide-react";
-import { rupees, GOOD, BAD } from "../utils/money";
+import { rupees } from "../utils/money";
 import { headline, attentionItems } from "../utils/home";
+import { Card, SectionHeader, Stat, Button, cx } from "./ui";
 import SpendGuardCard from "./SpendGuardCard";
 
 /*
@@ -13,29 +14,21 @@ import SpendGuardCard from "./SpendGuardCard";
  */
 
 const TONE = {
-    danger: { color: BAD, Icon: AlertTriangle },
-    warning: { color: "#fbbf24", Icon: AlertTriangle },
-    success: { color: GOOD, Icon: CheckCircle2 },
-    info: { color: "#22d3ee", Icon: Info },
+    danger: { cls: "text-bad", Icon: AlertTriangle },
+    warning: { cls: "text-warn", Icon: AlertTriangle },
+    success: { cls: "text-good", Icon: CheckCircle2 },
+    info: { cls: "text-info", Icon: Info },
 };
-
-const card = "rounded-2xl border";
-const cardStyle = { background: "var(--bg-card)", borderColor: "var(--border-card)" };
 
 function Tile({ icon: Icon, label, value, note, onClick }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`${card} p-4 text-left flex flex-col gap-1 hover:border-violet-400/50 transition-colors min-w-0`}
-            style={cardStyle}
-        >
-            <span className="flex items-center gap-1.5 text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                <Icon size={14} aria-hidden className="text-violet-500" /> {label}
-            </span>
-            <span className="text-[19px] font-bold tracking-tight truncate" style={{ color: "var(--text-primary)" }}>{value}</span>
-            {note && <span className="text-[12px] truncate" style={{ color: "var(--text-dim)" }}>{note}</span>}
-        </button>
+        <Card onClick={onClick} className="min-w-0">
+            <Stat
+                label={<span className="inline-flex items-center gap-1.5"><Icon size={14} aria-hidden className="text-accent" /> {label}</span>}
+                value={value}
+                note={note}
+            />
+        </Card>
     );
 }
 
@@ -56,71 +49,69 @@ export default function HomeOverview({
     const active = goals.filter((g) => !g.completed);
     const topGoal = [...active]
         .sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0))[0];
+    const barTone = head.share >= 1 ? "bg-bad" : head.share >= 0.8 ? "bg-warn" : "bg-accent";
 
     return (
         <div className="max-w-5xl grid gap-4 lg:grid-cols-2">
             {/* The number */}
-            <section className={`${card} p-5 md:p-6`} style={cardStyle} aria-label={head.label}>
-                <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{head.label}</p>
+            <Card pad="lg" aria-label={head.label}>
                 {loading ? (
-                    <div className="h-10 w-48 mt-2 rounded-lg animate-pulse bg-violet-500/10" />
+                    <>
+                        <p className="text-caption font-medium text-ink-2">{head.label}</p>
+                        <div className="h-10 w-48 mt-2 rounded-control animate-pulse bg-accent-soft" />
+                    </>
                 ) : (
-                    <p className="mt-1 text-[36px] md:text-[42px] font-bold tracking-tight leading-tight"
-                       style={{ color: negative ? BAD : "var(--text-primary)" }}>
-                        {rupees(head.value)}
-                    </p>
+                    <Stat size="lg" label={head.label} value={rupees(head.value)} tone={negative ? "bad" : undefined} />
                 )}
-                <p className="mt-1 text-[13px]" style={{ color: "var(--text-dim)" }}>{head.note}</p>
+                <p className="mt-1 text-small text-ink-3">{head.note}</p>
 
                 {head.share != null && (
-                    <div className="mt-4 h-2 rounded-full overflow-hidden bg-violet-500/10" aria-hidden>
-                        <div className="h-full rounded-full transition-all"
-                             style={{ width: `${Math.round(head.share * 100)}%`, background: head.share >= 1 ? BAD : head.share >= 0.8 ? "#fbbf24" : "#8b5cf6" }} />
+                    <div className="mt-4 h-2 rounded-full overflow-hidden bg-accent-soft" aria-hidden>
+                        <div className={cx("h-full rounded-full transition-all", barTone)}
+                             style={{ width: `${Math.round(head.share * 100)}%` }} />
                     </div>
                 )}
 
-                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                    <span>In <b style={{ color: "var(--text-primary)" }}>{rupees(income)}</b></span>
-                    <span>Out <b style={{ color: "var(--text-primary)" }}>{rupees(spent)}</b></span>
-                    <button type="button" onClick={() => navigateTo("Analytics")}
-                            className="ml-auto inline-flex items-center gap-0.5 font-medium text-violet-500">
+                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-small text-ink-2">
+                    <span>In <b className="text-ink">{rupees(income)}</b></span>
+                    <span>Out <b className="text-ink">{rupees(spent)}</b></span>
+                    <Button variant="ghost" size="sm" className="ml-auto -mr-2" onClick={() => navigateTo("Analytics")}>
                         Details <ChevronRight size={14} aria-hidden />
-                    </button>
+                    </Button>
                 </div>
-            </section>
+            </Card>
 
             {/* What needs you */}
-            <section className={`${card} p-2`} style={cardStyle} aria-label="Needs your attention">
-                <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                    <h2 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Needs your attention</h2>
-                    {notifications.length > 0 && (
-                        <button type="button" onClick={() => navigateTo("AI Intelligence")} className="text-[13px] font-medium text-violet-500">
-                            See all
-                        </button>
+            <Card pad="sm" aria-label="Needs your attention">
+                <SectionHeader
+                    className="px-2 pt-1 mb-1 items-center"
+                    title="Needs your attention"
+                    action={notifications.length > 0 && (
+                        <Button variant="ghost" size="sm" onClick={() => navigateTo("AI Intelligence")}>See all</Button>
                     )}
-                </div>
+                />
                 {items.length === 0 ? (
-                    <p className="flex items-center gap-2 px-3 py-3 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <CheckCircle2 size={16} aria-hidden style={{ color: GOOD }} /> Nothing needs you right now
+                    <p className="flex items-center gap-2 px-2 py-3 text-small text-ink-2">
+                        <CheckCircle2 size={16} aria-hidden className="text-good" /> Nothing needs you right now
                     </p>
                 ) : (
                     <ul>
                         {items.map((it, i) => {
-                            const { color, Icon } = TONE[it.tone] || TONE.info;
+                            const { cls, Icon } = TONE[it.tone] || TONE.info;
                             return (
                                 <li key={i}>
                                     <button type="button" onClick={() => navigateTo(it.to)}
-                                            className="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-violet-500/[0.06]">
-                                        <Icon size={16} aria-hidden className="shrink-0 mt-0.5" style={{ color }} />
-                                        <span className="flex-1 text-[13px] leading-snug" style={{ color: "var(--text-primary)" }}>{it.text}</span>
-                                        <ChevronRight size={15} aria-hidden className="shrink-0 mt-0.5" style={{ color: "var(--text-dim)" }} />
+                                            className="w-full flex items-start gap-3 px-2 py-2.5 rounded-control text-left hover:bg-accent-soft">
+                                        <Icon size={16} aria-hidden className={cx("shrink-0 mt-0.5", cls)} />
+                                        <span className="flex-1 text-small text-ink">{it.text}</span>
+                                        <ChevronRight size={15} aria-hidden className="shrink-0 mt-0.5 text-ink-3" />
                                     </button>
                                 </li>
                             );
                         })}
                     </ul>
                 )}
-            </section>
+            </Card>
 
             <div className="lg:col-span-2 empty:hidden [&>*]:mb-0">
                 <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />

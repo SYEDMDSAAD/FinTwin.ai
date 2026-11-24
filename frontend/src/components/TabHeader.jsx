@@ -17,7 +17,7 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
     return (
         <header className="mb-5">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight min-w-0 truncate" style={{ color: "var(--text-primary)" }}>
+                <h1 className="text-title md:text-[26px] text-ink min-w-0 truncate">
                     {title}
                 </h1>
                 <div className="flex items-center gap-2 shrink-0">
@@ -25,7 +25,7 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
                     <button
                         type="button"
                         onClick={() => navigateTo(COPILOT)}
-                        className="md:hidden inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold border border-violet-500/30 bg-violet-500/10 text-violet-500"
+                        className="md:hidden inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small font-semibold bg-accent-soft text-accent"
                     >
                         <Sparkles size={14} aria-hidden /> Ask AI
                     </button>
@@ -51,12 +51,11 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
                                 role="tab"
                                 aria-selected={active}
                                 onClick={() => navigateTo(s.name)}
-                                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium border transition-colors ${
+                                className={`shrink-0 rounded-full px-3.5 py-1.5 text-small font-medium border transition-colors ${
                                     active
-                                        ? "bg-violet-600 border-violet-600"
-                                        : "hover:border-violet-400/50"
+                                        ? "bg-accent-strong border-transparent text-accent-on"
+                                        : "bg-surface border-line text-ink-2 hover:border-line-strong"
                                 }`}
-                                style={active ? { color: "#fff" } : { borderColor: "var(--border-card)", color: "var(--text-secondary)", background: "var(--bg-card)" }}
                             >
                                 {s.label}
                             </button>
