@@ -33,7 +33,8 @@ export default function DemoBanner({ section, onOpenGuard }) {
             className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-purple-400/25 bg-purple-500/[0.08] px-4 py-3 text-sm"
         >
             <Sparkles size={16} className="shrink-0 text-purple-400" aria-hidden />
-            <p className="min-w-0 flex-1 text-zinc-300">
+            {/* min width: on a phone the button wraps below instead of squeezing the text to a word per line */}
+            <p className="min-w-[12rem] flex-1 basis-[16rem] text-zinc-300">
                 <span className="font-semibold text-white">You're exploring a demo account</span>
                 {" "}with sample data. Look around and ask the copilot anything; nothing here is real or can be changed.
                 {section !== "Spend Guard" && onOpenGuard && (
