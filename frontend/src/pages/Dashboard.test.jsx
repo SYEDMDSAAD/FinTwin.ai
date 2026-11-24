@@ -8,7 +8,9 @@ describe("Dashboard", () => {
 
   it("renders the sidebar nav without crashing", async () => {
     renderPage(<Dashboard />, { route: "/dashboard", authed: true });
-    // Sidebar starts collapsed — nav items show as icons with a title tooltip, not text.
-    expect(await screen.findByTitle("Dashboard")).toBeInTheDocument();
+    // The four tabs, with Home open by default
+    const nav = await screen.findAllByRole("navigation", { name: "Main" });
+    expect(nav.length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Home" })[0]).toHaveAttribute("aria-current", "page");
   });
 });

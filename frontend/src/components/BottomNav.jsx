@@ -1,109 +1,72 @@
-import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { LayoutDashboard, Wallet, LayoutGrid, ScanLine } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
+import { TABS, SPEND_GUARD, tabOf, entryOf } from "../constants/navigation";
 
-const PRIMARY_TABS = [
-    { name: "Dashboard",    icon: LayoutDashboard },
-    { name: "Transactions", icon: Wallet },
-    { name: "Services",     icon: LayoutGrid },
-];
-// Spend Guard's scanner is used at the shop counter, so on phones it gets a tab
-const GUARD_TAB = { name: "Spend Guard", label: "Scan", icon: ScanLine };
-
+/*
+ * The phone's tab bar: the same four tabs as the desktop sidebar. Spend Guard
+ * is used at the shop counter, so when it's on for this user its scanner sits
+ * in the middle, one tap from anywhere.
+ */
 function BottomNav({ activeSection, setActiveSection }) {
     const guardOn = useSpendGuardEnabled();
-    const tabs = guardOn ? [PRIMARY_TABS[0], PRIMARY_TABS[1], GUARD_TAB, PRIMARY_TABS[2]] : PRIMARY_TABS;
-    const [isLight, setIsLight] = useState(
-        () => document.documentElement.dataset.theme === "light"
-    );
+    const current = tabOf(activeSection);
+    const scanning = activeSection === SPEND_GUARD;
 
-    useEffect(() => {
-        const obs = new MutationObserver(() => {
-            setIsLight(document.documentElement.dataset.theme === "light");
-        });
-        obs.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ["data-theme"],
-        });
-        return () => obs.disconnect();
-    }, []);
+    const tabButton = (tab) => {
+        const Icon = tab.icon;
+        const active = current?.id === tab.id && !scanning;
+        return (
+            <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSection(entryOf(tab, guardOn))}
+                aria-current={active ? "page" : undefined}
+                className="flex-1 h-full flex flex-col items-center justify-center gap-0.5"
+            >
+                <Icon size={21} aria-hidden className={active ? "text-violet-500" : ""}
+                      style={active ? undefined : { color: "var(--text-dim)" }} />
+                <span className={`text-[11px] ${active ? "font-semibold text-violet-500" : ""}`}
+                      style={active ? undefined : { color: "var(--text-dim)" }}>
+                    {tab.label}
+                </span>
+            </button>
+        );
+    };
 
-    const dimColor    = isLight ? "rgba(30,41,59,0.45)"  : "rgba(148,163,184,0.50)";
-    const activeColor = "#a78bfa";
-
-    // Section names that should light up the "Services" tab even though they're
-    // not the tab's own activeSection value (everything except Dashboard/Transactions).
-    const isServicesActive = activeSection !== "Dashboard" && activeSection !== "Transactions"
-        && !(guardOn && activeSection === GUARD_TAB.name);
-
-    // Tab bar is portalled to document.body so it is never trapped inside an
-    // overflow:hidden ancestor (iOS Safari position:fixed fix).
     const nav = (
-        <div
+        <nav
+            aria-label="Main"
+            className="fixed inset-x-0 bottom-0 z-[60] flex items-stretch border-t px-1"
             style={{
-                position: "fixed",
-                bottom: 0, left: 0, right: 0,
-                zIndex: 60,
-                display: "flex",
-                alignItems: "center",
-                height: 64,
-                paddingLeft: 4,
-                paddingRight: 4,
+                height: "calc(64px + env(safe-area-inset-bottom, 0px))",
                 paddingBottom: "env(safe-area-inset-bottom, 0px)",
-                background: isLight ? "#ffffff" : "#090b11",
-                borderTop: `1px solid ${isLight ? "rgba(15,23,42,0.07)" : "rgba(255,255,255,0.05)"}`,
+                background: "var(--bg-sidebar)",
+                borderColor: "var(--border-sidebar)",
             }}
         >
-            {tabs.map(({ name, label, icon: Icon }) => {
-                const active = name === "Services" ? isServicesActive : activeSection === name;
-                return (
+            {TABS.slice(0, 2).map(tabButton)}
+            {guardOn && (
+                <div className="flex-1 flex items-start justify-center">
                     <button
-                        key={name}
-                        onClick={() => setActiveSection(name)}
-                        style={{
-                            flex: 1,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 2,
-                            height: "100%",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                        }}
+                        type="button"
+                        onClick={() => setActiveSection(SPEND_GUARD)}
+                        aria-label="Scan and pay"
+                        aria-current={scanning ? "page" : undefined}
+                        className="-mt-5 w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_18px_rgba(124,58,237,0.45)] ring-4"
+                        style={{ color: "#fff", "--tw-ring-color": "var(--bg-sidebar)" }}
                     >
-                        <div style={{
-                            width: 36, height: 32, borderRadius: 10,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            background: active ? "rgba(167,139,250,0.15)" : "transparent",
-                            transition: "background 0.15s",
-                        }}>
-                            <Icon size={19} color={active ? activeColor : dimColor} />
-                        </div>
-                        <span style={{
-                            fontSize: 10.5,
-                            fontWeight: active ? 600 : 400,
-                            color: active ? activeColor : (isLight ? "rgba(51,65,85,0.55)" : "rgba(148,163,184,0.50)"),
-                            transition: "color 0.15s",
-                        }}>
-                            {label || name}
-                        </span>
+                        <ScanLine size={24} aria-hidden />
                     </button>
-                );
-            })}
-        </div>
+                </div>
+            )}
+            {TABS.slice(2).map(tabButton)}
+        </nav>
     );
 
-    // Portal to document.body: escapes any overflow:hidden ancestors
-    // so position:fixed works correctly on iOS Safari when page scrolls.
-    // The md:hidden wrapper ensures this never shows on desktop (≥768px).
-    return createPortal(
-        <div className="md:hidden">{nav}</div>,
-        document.body
-    );
+    // Portalled to <body> so no overflow:hidden ancestor traps position:fixed
+    // (iOS Safari). md:hidden keeps it off desktop.
+    return createPortal(<div className="md:hidden">{nav}</div>, document.body);
 }
 
 export default BottomNav;

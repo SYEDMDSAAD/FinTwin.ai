@@ -1,220 +1,81 @@
-import { useState, memo, useMemo } from "react";
-import {
-    LayoutDashboard,
-    Wallet,
-    Upload,
-    Brain,
-    BarChart3,
-    FileText,
-    Settings,
-    TrendingUp,
-    Target,
-    Landmark,
-    MessageSquare,
-    Zap,
-    ShieldCheck,
-    Shield,
-    FileInput,
-    Info,
-    ScanLine,
-} from "lucide-react";
+import { memo } from "react";
+import { ScanLine, Sparkles } from "lucide-react";
 import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
+import { TABS, COPILOT, SPEND_GUARD, tabOf, entryOf } from "../constants/navigation";
 
-const NAV_GROUPS = [
-    {
-        label: "OVERVIEW",
-        items: [
-            // First, and the default landing section: what the app is and
-            // what's behind every other item here.
-            { name: "About App",    icon: <Info size={17} /> },
-            { name: "Dashboard",    icon: <LayoutDashboard size={17} /> },
-            // Near the top: only shown to users the backend has let in
-            { name: "Spend Guard",  icon: <ScanLine size={17} />, gated: true, isNew: true },
-            { name: "Analytics",    icon: <BarChart3 size={17} /> },
-            { name: "Transactions", icon: <Wallet size={17} /> },
-        ],
-    },
-    {
-        label: "AI SUITE",
-        items: [
-            { name: "AI Intelligence",    icon: <Brain size={17} /> },
-            { name: "AI Copilot",         icon: <MessageSquare size={17} /> },
-            { name: "AI Spending Coach",  icon: <Zap size={17} /> },
-        ],
-    },
-    {
-        label: "FINANCE",
-        items: [
-            { name: "Goals Planner", icon: <Target size={17} /> },
-            { name: "Budgeting",     icon: <ShieldCheck size={17} /> },
-            { name: "Net Worth",     icon: <Landmark size={17} /> },
-            { name: "Investments",   icon: <TrendingUp size={17} /> },
-            { name: "Insurance",     icon: <Shield size={17} /> },
-        ],
-    },
-    {
-        label: "SYSTEM",
-        items: [
-            { name: "OCR Uploads",        icon: <Upload size={17} /> },
-            { name: "Imports",            icon: <FileInput size={17} /> },
-            { name: "Executive Reports",  icon: <FileText size={17} /> },
-            { name: "Settings",           icon: <Settings size={17} /> },
-        ],
-    },
-];
-
-const NavItem = memo(function NavItem({ item, active, expanded, onClick }) {
-    return (
-        <div
-            onClick={onClick}
-            title={!expanded ? item.name : undefined}
-            className={`
-                relative flex items-center gap-3 px-3 py-2.5
-                rounded-xl cursor-pointer select-none
-                transition-all duration-150 mb-0.5 group
-                ${active
-                    ? "bg-violet-500/10 border border-violet-500/20 text-white"
-                    : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100 border border-transparent"
-                }
-            `}
-        >
-            {/* Active bar */}
-            <div className={`
-                absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full
-                bg-gradient-to-b from-violet-400 to-cyan-400
-                transition-opacity duration-150
-                ${active ? "opacity-100" : "opacity-0"}
-            `} />
-
-            {/* Icon */}
-            <div className={`
-                w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                transition-colors duration-150
-                ${active
-                    ? "bg-violet-500/15 text-violet-300"
-                    : "bg-white/[0.04] text-zinc-400 group-hover:bg-white/[0.07] group-hover:text-zinc-200"
-                }
-            `}>
-                {item.icon}
-            </div>
-
-            {/* Label */}
-            {expanded && (
-                <span className="text-[13px] font-medium leading-none whitespace-nowrap overflow-hidden">
-                    {item.name}
-                </span>
-            )}
-            {item.isNew && expanded && (
-                <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider"
-                      style={{ background: "#15803d", color: "#fff" }}>New</span>
-            )}
-            {item.isNew && !expanded && (
-                <span aria-hidden className="absolute top-1 right-1 h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />
-            )}
-
-            {/* Tooltip for collapsed */}
-            {!expanded && (
-                <div className="
-                    pointer-events-none absolute left-full ml-3 z-50
-                    px-2.5 py-1.5 rounded-lg text-xs font-medium
-                    bg-[#1a1d27] border border-white/10 text-zinc-100
-                    shadow-xl whitespace-nowrap
-                    opacity-0 group-hover:opacity-100
-                    translate-x-1 group-hover:translate-x-0
-                    transition-all duration-150
-                ">
-                    {item.name}
-                </div>
-            )}
-        </div>
-    );
-});
-
+/*
+ * Desktop navigation: the same four tabs as the phone's bottom bar, so the app
+ * has one map everywhere. Sections inside a tab are chosen in the page header
+ * (TabHeader), not here, which keeps this to six things at most.
+ */
 function Sidebar({ activeSection, setActiveSection }) {
-    const [expanded, setExpanded] = useState(false);
     const guardOn = useSpendGuardEnabled();
-    const groups = useMemo(() => NAV_GROUPS.map((g) => ({
-        ...g, items: g.items.filter((item) => !item.gated || guardOn),
-    })), [guardOn]);
-
-    // Pre-build stable click handlers so NavItem (memo'd) never re-renders from inline arrows
-    const clickHandlers = useMemo(() => {
-        const h = {};
-        NAV_GROUPS.forEach(g => g.items.forEach(item => {
-            h[item.name] = () => setActiveSection(item.name);
-        }));
-        return h;
-    }, [setActiveSection]);
-
-    const triggerAnimation = () => {
-        document.body.classList.add("sidebar-animating");
-        setTimeout(() => document.body.classList.remove("sidebar-animating"), 300);
-    };
+    const current = tabOf(activeSection);
 
     return (
-        <div
-            onMouseEnter={() => { triggerAnimation(); setExpanded(true); }}
-            onMouseLeave={() => { triggerAnimation(); setExpanded(false); }}
-            className={`
-                relative min-h-screen hidden md:flex flex-col shrink-0
-                bg-[#090B11] border-r border-white/[0.05]
-                transition-all duration-250 ease-out overflow-hidden
-                ${expanded ? "w-[220px]" : "w-[68px]"}
-            `}
+        <nav
+            aria-label="Main"
+            className="relative hidden md:flex flex-col shrink-0 w-[216px] min-h-screen border-r"
             style={{ background: "var(--bg-sidebar)", borderColor: "var(--border-sidebar)" }}
         >
-            {/* Subtle left-edge gradient */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/[0.05] to-transparent" />
-
-            {/* ── Logo ── */}
-            <div className="flex items-center gap-3 px-3.5 py-5 shrink-0">
-                <div className="
-                    w-9 h-9 rounded-xl shrink-0
-                    bg-gradient-to-br from-violet-500 to-cyan-400
-                    flex items-center justify-center
-                    text-white text-sm font-black tracking-tight
-                    shadow-lg shadow-violet-500/20
-                ">
+            <div className="flex items-center gap-3 px-5 pt-6 pb-5">
+                <div className="w-9 h-9 rounded-xl shrink-0 bg-gradient-to-br from-violet-500 to-cyan-400 flex items-center justify-center text-white text-sm font-black shadow-lg shadow-violet-500/20">
                     F
                 </div>
-                {expanded && (
-                    <div className="overflow-hidden">
-                        <p className="text-[13px] font-bold text-white leading-none tracking-tight">FinTwin AI</p>
-                        <p className="text-[10px] text-zinc-500 leading-none mt-1 tracking-widest">FINANCIAL OS</p>
-                    </div>
-                )}
+                <p className="text-[15px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>FinTwin AI</p>
             </div>
 
-            {/* ── Nav ── */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
-                {groups.map((group) => (
-                    <div key={group.label} className="mb-5">
-                        {expanded && (
-                            <p className="text-[10px] font-semibold tracking-widest text-zinc-600 px-3 mb-1.5 uppercase">
-                                {group.label}
-                            </p>
-                        )}
-                        {!expanded && <div className="h-px bg-white/[0.04] mx-2 mb-2" />}
-                        {group.items.map((item) => (
-                            <NavItem
-                                key={item.name}
-                                item={item}
-                                active={activeSection === item.name}
-                                expanded={expanded}
-                                onClick={clickHandlers[item.name]}
-                            />
-                        ))}
-                    </div>
-                ))}
-            </div>
-
-            {/* ── Bottom version ── */}
-            {expanded && (
-                <div className="px-4 py-4 border-t border-white/[0.05] shrink-0">
-                    <p className="text-[10px] text-zinc-600 tracking-widest">v1.0.0 · BETA</p>
+            {guardOn && (
+                <div className="px-3 pb-4">
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection(SPEND_GUARD)}
+                        aria-current={activeSection === SPEND_GUARD ? "page" : undefined}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-semibold bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_4px_14px_rgba(139,92,246,0.35)] hover:brightness-110 transition"
+                        style={{ color: "#fff" }}
+                    >
+                        <ScanLine size={16} aria-hidden /> Scan &amp; pay
+                    </button>
                 </div>
             )}
-        </div>
+
+            <ul className="flex-1 px-3 space-y-1">
+                {TABS.map((tab) => {
+                    const active = current?.id === tab.id;
+                    const Icon = tab.icon;
+                    return (
+                        <li key={tab.id}>
+                            <button
+                                type="button"
+                                onClick={() => setActiveSection(entryOf(tab, guardOn))}
+                                aria-current={active ? "page" : undefined}
+                                className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors ${
+                                    active ? "bg-violet-500/10" : "hover:bg-violet-500/[0.06]"
+                                }`}
+                                style={{ color: active ? undefined : "var(--text-secondary)" }}
+                            >
+                                <Icon size={18} aria-hidden className={active ? "text-violet-500" : ""} />
+                                <span className={active ? "text-violet-500 font-semibold" : ""}>{tab.label}</span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+
+            <div className="px-3 pb-5">
+                <button
+                    type="button"
+                    onClick={() => setActiveSection(COPILOT)}
+                    aria-current={activeSection === COPILOT ? "page" : undefined}
+                    className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium border transition-colors ${
+                        activeSection === COPILOT ? "border-violet-500/40 bg-violet-500/10" : "hover:bg-violet-500/[0.06]"
+                    }`}
+                    style={{ borderColor: activeSection === COPILOT ? undefined : "var(--border-card)", color: "var(--text-secondary)" }}
+                >
+                    <Sparkles size={18} aria-hidden className="text-violet-500" /> Ask Copilot
+                </button>
+            </div>
+        </nav>
     );
 }
 

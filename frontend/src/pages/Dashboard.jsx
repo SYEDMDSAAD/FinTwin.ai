@@ -92,8 +92,8 @@ import SortOther from "../components/SortOther";
 import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
-import ServicesPage from "./ServicesPage";
-import AboutPage from "./AboutPage";
+import TabHeader from "../components/TabHeader";
+import { normaliseSection, rememberSection } from "../constants/navigation";
 
 function Dashboard() {
 
@@ -149,16 +149,15 @@ function Dashboard() {
     const [activeSection,
         setActiveSection] =
         useState(() => {
-            const saved = localStorage.getItem("activeSection");
-            // Discover moved into Investments; Today became About App
-            if (saved === "Discover") return "Investments";
-            if (!saved || saved === "Today") return "About App";
-            return saved;
+            // Old names (About App, Services, Discover…) map onto the four tabs
+            return normaliseSection(localStorage.getItem("activeSection"));
         });
 
     const [, startTransition] = useTransition();
-    const navigateTo = useCallback((section) => {
+    const navigateTo = useCallback((requested) => {
+        const section = normaliseSection(requested);
         localStorage.setItem("activeSection", section);
+        rememberSection(section);
         startTransition(() => setActiveSection(section));
     }, []);
 
@@ -166,7 +165,7 @@ function Dashboard() {
     useEffect(() => {
         const handler = () => {
             const section = localStorage.getItem("activeSection");
-            if (section) startTransition(() => setActiveSection(section));
+            if (section) startTransition(() => setActiveSection(normaliseSection(section)));
         };
         window.addEventListener("dashboardNav", handler);
         return () => window.removeEventListener("dashboardNav", handler);
@@ -1662,7 +1661,7 @@ function Dashboard() {
                     p-4
                     md:p-6
                     xl:p-10
-                    pb-20
+                    pb-28
                     md:pb-6
                     xl:pb-10
                     overflow-y-auto
@@ -1673,6 +1672,8 @@ function Dashboard() {
 
                 <DemoBanner section={activeSection} onOpenGuard={() => navigateTo("Spend Guard")} />
 
+                <TabHeader activeSection={activeSection} navigateTo={navigateTo} />
+
                 {activeSection === "Dashboard" && (
                   <Header
                     notifications={notifications}
@@ -1680,13 +1681,7 @@ function Dashboard() {
                   />
                 )}
 
-                {/* =========================
-                    About App — the landing section
-                ========================= */}
 
-                {activeSection === "About App" && (
-                    <AboutPage navigateTo={navigateTo} />
-                )}
 
                 
 
@@ -2215,13 +2210,7 @@ function Dashboard() {
                     <SettingsPage navigateTo={navigateTo} />
                 )}
 
-                {/* =========================
-                    Services (mobile nav hub)
-                ========================= */}
 
-                {activeSection === "Services" && (
-                    <ServicesPage navigateTo={navigateTo} />
-                )}
 
             </div>
 

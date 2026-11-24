@@ -563,14 +563,14 @@ describe("Spend Guard in the navigation", () => {
         mock.onGet("/guard/enabled").reply(200, { enabled: false });
         renderSidebar();
         await waitFor(() => expect(mock.history.get).toHaveLength(1));
-        expect(screen.queryByTitle("Spend Guard")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Scan & pay/ })).not.toBeInTheDocument();
     });
 
     it("appears for a user who's allowed in", async () => {
         localStorage.setItem("token", "t");
         mock.onGet("/guard/enabled").reply(200, { enabled: true });
         const { container } = renderSidebar();
-        expect(await within(container).findByTitle("Spend Guard")).toBeInTheDocument();
+        expect(await within(container).findByRole("button", { name: /Scan & pay/ })).toBeInTheDocument();
     });
 
     it("stays hidden when the backend says no or the check fails", async () => {
@@ -578,7 +578,7 @@ describe("Spend Guard in the navigation", () => {
         mock.onGet("/guard/enabled").reply(403);
         renderSidebar();
         await waitFor(() => expect(mock.history.get).toHaveLength(1));
-        expect(screen.queryByTitle("Spend Guard")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Scan & pay/ })).not.toBeInTheDocument();
     });
 
     it("shows for the demo account when the backend opens it", async () => {
@@ -586,7 +586,7 @@ describe("Spend Guard in the navigation", () => {
         localStorage.setItem("user", JSON.stringify({ role: "DEMO" }));
         mock.onGet("/guard/enabled").reply(200, { enabled: true, demo: true });
         const { container } = renderSidebar();
-        expect(await within(container).findByTitle("Spend Guard")).toBeInTheDocument();
+        expect(await within(container).findByRole("button", { name: /Scan & pay/ })).toBeInTheDocument();
         localStorage.removeItem("user");
     });
 });
