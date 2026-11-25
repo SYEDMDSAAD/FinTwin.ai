@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
 import { GoogleLogin } from "@react-oauth/google";
+import { isNativeApp, nativeGoogleIdToken } from "../native";
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowLeft, AlertOctagon, MessageSquare, X, User } from "lucide-react";
 
 const CSS = `
@@ -243,6 +244,13 @@ function Login() {
       await goToLanding(res.data.role);
     } catch { toast.error("Google Login Failed"); }
   };
+  // Android app: the phone's Google account picker instead of Google's web button
+  const handleNativeGoogle = async () => {
+    try {
+      const credential = await nativeGoogleIdToken();
+      if (credential) await handleGoogleLogin({ credential });
+    } catch { toast.error("Google Login Failed"); }
+  };
   const openTicket = (prefillEmail = "") => { setTicketDefaultEmail(prefillEmail); setShowTicket(true); };
 
   const handleForgotPassword = async () => {
@@ -468,7 +476,15 @@ function Login() {
               </div>
 
               <div style={{ display:"flex", justifyContent:"center", marginBottom:24 }}>
-                <GoogleLogin onSuccess={handleGoogleLogin} onError={() => toast.error("Google Login Failed")} theme="filled_black" shape="pill" size="large" width="320"/>
+                {isNativeApp() ? (
+                  <button type="button" onClick={handleNativeGoogle}
+                    style={{ width:320, maxWidth:"100%", padding:"12px 20px", borderRadius:999, border:"none", background:"#1f1f1f", color:"#fff", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+                    <span aria-hidden="true" style={{ width:20, height:20, borderRadius:"50%", background:"#fff", color:"#4285F4", fontWeight:800, fontSize:13, display:"inline-flex", alignItems:"center", justifyContent:"center" }}>G</span>
+                    Continue with Google
+                  </button>
+                ) : (
+                  <GoogleLogin onSuccess={handleGoogleLogin} onError={() => toast.error("Google Login Failed")} theme="filled_black" shape="pill" size="large" width="320"/>
+                )}
               </div>
 
               <div style={{ display:"flex", flexDirection:"column", gap:10, alignItems:"center" }}>
