@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, X, TrendingUp, TrendingDown } from "lucide-react";
+import { apiUrl } from "../services/apiOrigin";
 
 const INDICES = [
   { label: "S&P 500",   symbol: "^GSPC", color: "#4ade80" },
@@ -21,7 +22,7 @@ function IndexCard({ idx }) {
     const fetch_ = async () => {
       try {
         const res = await fetch(
-          `/api/v1/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`,
+          apiUrl(`/api/v1/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`),
           { signal: AbortSignal.timeout(10000) }
         );
         const quotes = await res.json();
@@ -78,7 +79,7 @@ export default function USStocksTab() {
     setRefreshing(true);
     try {
       const res = await fetch(
-        `/api/v1/market/quotes?symbols=${encodeURIComponent(tickers.join(","))}`,
+        apiUrl(`/api/v1/market/quotes?symbols=${encodeURIComponent(tickers.join(","))}`),
         { signal: AbortSignal.timeout(10000) }
       );
       const quotes = await res.json();

@@ -13,6 +13,9 @@ import { installDemoToastGuard } from "./utils/demoGuard";
 // rather than that plus the page's own "Failed to …"
 installDemoToastGuard();
 
+import { installNativeHandlers } from "./native";
+installNativeHandlers();
+
 import { AuthProvider }
     from "./context/AuthContext";
 

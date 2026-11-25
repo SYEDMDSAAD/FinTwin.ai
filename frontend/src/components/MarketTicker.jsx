@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { apiUrl } from "../services/apiOrigin";
 
 const INDICES = [
   { label: "NIFTY 50",   symbol: "^NSEI",    color: "#a78bfa" },
@@ -40,7 +41,7 @@ export default function MarketTicker() {
       try {
         const symbols = INDICES.map(i => i.symbol).join(",");
         const res = await fetch(
-          `/api/v1/market/quotes?symbols=${encodeURIComponent(symbols)}`,
+          apiUrl(`/api/v1/market/quotes?symbols=${encodeURIComponent(symbols)}`),
           { signal: AbortSignal.timeout(10000) }
         );
         const quotes = await res.json();
