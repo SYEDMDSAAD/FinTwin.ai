@@ -82,6 +82,23 @@ class NotificationBudgetAlertTest {
     }
 
     @Test
+    void exactlyAtTheLimitIsntExceeded_andRentPaidInFullIsQuiet() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+        var food = budgetAlerts(food(), List.of(tx(today.withDayOfMonth(1), -9_000)));
+        assertThat(food).hasSize(1);
+        assertThat(food.get(0)).doesNotContain("exceeded").contains("100%");
+
+        Budget rent = new Budget();
+        rent.setCategory("Rent");
+        rent.setLimitAmount(17_500.0);
+        Transaction paid = tx(today.withDayOfMonth(1), -17_500);
+        paid.setCategory("Rent");
+        when(budgets.findByUser(any())).thenReturn(List.of(rent));
+        assertThat(service.generateNotifications().stream().map(NotificationDTO::getMessage)
+                .filter(m -> m.startsWith("Rent"))).isEmpty();
+    }
+
+    @Test
     void aBudgetThatStartsNextMonthIsQuiet() {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         Budget food = food();

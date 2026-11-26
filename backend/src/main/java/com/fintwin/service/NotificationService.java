@@ -83,7 +83,11 @@ public class NotificationService {
             double pct = (spent / budget.getLimitAmount()) * 100;
             long overshoot = Math.round(spent - budget.getLimitAmount());
 
-            if (pct >= 100) {
+            // Rent or a bill paid in full is done for the month, not an alert
+            boolean fixedCost = com.fintwin.util.PlanDraftMath.isFixedCost(budget.getCategory());
+            if (fixedCost && overshoot <= 0) continue;
+
+            if (overshoot > 0) {
                 notifications.add(new NotificationDTO("danger",
                         budget.getCategory() + " budget exceeded — ₹" + fmt(overshoot)
                         + " over the ₹" + fmt(Math.round(budget.getLimitAmount()))
