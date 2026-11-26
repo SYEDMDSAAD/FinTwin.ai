@@ -59,7 +59,9 @@ MCC_CATEGORY = {
                      "5941", "5944", "5945", "5999"], "Shopping"),
 }
 # Never paused, never wait on the AI
-ESSENTIAL = {"Groceries", "Health", "Bills", "Rent", "Transport", "Education"}
+# (with the other names FinTwin and imported statements use for the same things)
+ESSENTIAL = {"Groceries", "Health", "Bills", "Rent", "Transport", "Education",
+             "Housing", "Healthcare", "Medical", "Utilities", "Fuel"}
 # Things that can sit on a 48-hour wishlist (not food at a counter)
 WAITABLE = {"Shopping", "Entertainment", "Travel", "Other"}
 # Betting and gambling: never the fast lane, and always paused, whatever the amount

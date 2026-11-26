@@ -28,7 +28,13 @@ public final class PlanDraftMath {
 
     /** Kept at what they cost: cutting rent or a bill on paper saves nothing. */
     public static final Set<String> ESSENTIAL = Set.of(
-            "Rent", "Bills", "EMI", "Health", "Education", "Groceries", "Insurance", "Transport");
+            "Rent", "Bills", "EMI", "Health", "Education", "Groceries", "Insurance", "Transport",
+            // the other names in use for the same things
+            "Housing", "Healthcare", "Medical", "Utilities", "Fuel", "Loan");
+
+    static boolean isEssential(String category) {
+        return ESSENTIAL.stream().anyMatch(e -> e.equalsIgnoreCase(category));
+    }
 
     /** Not spending: money moved, saved or repaid elsewhere. */
     static final Set<String> NOT_SPENDING = Set.of(
@@ -87,7 +93,7 @@ public final class PlanDraftMath {
                 double typical = median(perMonth);
                 typicalTotal += typical;
                 if (typical < MIN_BUDGET) continue;
-                boolean essential = ESSENTIAL.contains(e.getKey());
+                boolean essential = isEssential(e.getKey());
                 double suggested = essential ? roundUp(typical, 100) : roundNearest(typical * (1 - EVERYDAY_TRIM), 100);
                 String key = limitKeys.get(e.getKey().toLowerCase(Locale.ROOT));
                 Double current = key == null ? null : currentLimits.get(key);

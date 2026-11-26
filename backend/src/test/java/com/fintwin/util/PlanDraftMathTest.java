@@ -89,6 +89,22 @@ class PlanDraftMathTest {
     }
 
     @Test
+    void housingAndHealthcareAreEssentialsUnderTheirOtherNames() {
+        assertThat(PlanDraftMath.isEssential("Housing")).isTrue();
+        assertThat(PlanDraftMath.isEssential("healthcare")).isTrue();
+        assertThat(PlanDraftMath.isEssential("Utilities")).isTrue();
+        assertThat(PlanDraftMath.isEssential("Shopping")).isFalse();
+
+        List<Transaction> all = new ArrayList<>();
+        for (String m : new String[]{"2026-08", "2026-09", "2026-10"}) {
+            all.add(tx(m + "-03", "LANDLORD", -17_500, "Housing"));
+        }
+        var housing = PlanDraftMath.draft(all, Map.of(), TODAY).budgets().get(0);
+        assertThat(housing.essential()).isTrue();
+        assertThat(housing.suggested()).isEqualTo(17_500);   // not cut by 10%
+    }
+
+    @Test
     void aFirstMonthThatStartsLateIsLeftOut() {
         List<Transaction> all = new ArrayList<>(List.of(
                 tx("2026-08-20", "SWIGGY", -500, "Food"),          // SMS read began mid-August

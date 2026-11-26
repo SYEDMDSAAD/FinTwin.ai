@@ -420,3 +420,8 @@ def test_a_typed_upi_id_is_checked_like_a_scanned_code():
     assert (qr.pa, qr.pn, qr.mc, qr.am) == ("ravi.kumar@okicici", "Ravi & Sons", "", None)
     link = rules.handoff_link(qr, Decimal("650"))
     assert link.startswith(qr.raw) and link.endswith("am=650.00")
+
+
+def test_other_names_for_essentials_are_locked_too():
+    for name in ("Housing", "Healthcare", "Utilities"):
+        assert name in rules.ESSENTIAL
