@@ -1,328 +1,150 @@
-import { Bell, LogOut, User, Settings, ChevronDown, Sun, Moon, LifeBuoy } from "lucide-react";
+import { Bell, LogOut, User, Settings, Moon, Sun, LifeBuoy, AlertTriangle, AlertOctagon, CheckCircle2, Info } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useCurrentUser } from "../context/AuthContext";
-import { percent } from "../utils/money";
+import { cx } from "./ui";
 
-function Header({ notifications = [], scoreData, compact = false, onSettings }) {
-  const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
-  const [showProfile,      setShowProfile]      = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  // single JS breakpoint so controls only render in ONE DOM location
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.innerWidth >= 768
-  );
-  const profileRef = useRef(null);
-  const notifRef   = useRef(null);
+/*
+ * The top-right of every screen: alerts and the account menu. Theme lives in
+ * the account menu (and Settings), not as a permanent button.
+ */
 
-  const userData = useCurrentUser();
-  const fullName = userData.fullName || "User";
-  const email    = userData.email    || "";
-  const initial  = fullName.charAt(0).toUpperCase();
+const NOTE = {
+    danger:  { icon: AlertOctagon, tone: "text-bad bg-bad-soft" },
+    warning: { icon: AlertTriangle, tone: "text-warn bg-warn-soft" },
+    success: { icon: CheckCircle2, tone: "text-good bg-good-soft" },
+    info:    { icon: Info, tone: "text-info bg-info-soft" },
+};
 
-  const greeting =
-    new Date().getHours() < 12 ? "Good Morning"
-    : new Date().getHours() < 18 ? "Good Afternoon"
-    : "Good Evening";
+function IconButton({ label, onClick, children }) {
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className="relative w-10 h-10 rounded-full flex items-center justify-center text-ink-2 hover:bg-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+            {children}
+        </button>
+    );
+}
 
-  const logout = () => {
-    const wasDemo = userData.role === "DEMO";
-    // Keep the anonymous visitor id, or a returning visitor counts as new
-    const visitor = localStorage.getItem("fintwin_visitor");
-    localStorage.clear();
-    if (visitor) localStorage.setItem("fintwin_visitor", visitor);
-    sessionStorage.removeItem("splashShown");
-    // Leaving the demo goes back to the landing page, not to a login form
-    navigate(wasDemo ? "/" : "/login");
-  };
+function Menu({ children, width = "w-[min(340px,calc(100vw-32px))]" }) {
+    return (
+        <div className={cx("fixed right-4 top-16 z-[200] rounded-card border border-line bg-surface-raised shadow-raised overflow-hidden", width)}>
+            {children}
+        </div>
+    );
+}
 
-  // outside-click → close dropdowns
-  useEffect(() => {
-    const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target))
-        setShowProfile(false);
-      if (notifRef.current && !notifRef.current.contains(e.target))
-        setShowNotifications(false);
+function MenuItem({ icon: Icon, onClick, danger, children }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cx("w-full flex items-center gap-3 px-4 py-3 text-body text-left hover:bg-surface-hover", danger ? "text-bad" : "text-ink")}
+        >
+            <Icon size={18} aria-hidden className={danger ? "text-bad" : "text-ink-3"} />
+            {children}
+        </button>
+    );
+}
+
+function Header({ notifications = [], onSettings }) {
+    const navigate = useNavigate();
+    const { isDark, toggleTheme } = useTheme();
+    const [open, setOpen] = useState(null); // "alerts" | "account" | null
+    const ref = useRef(null);
+
+    const user = useCurrentUser();
+    const fullName = user.fullName || "You";
+    const initial = fullName.charAt(0).toUpperCase();
+
+    useEffect(() => {
+        const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(null); };
+        document.addEventListener("mousedown", close);
+        return () => document.removeEventListener("mousedown", close);
+    }, []);
+
+    const logout = () => {
+        const wasDemo = user.role === "DEMO";
+        // Keep the anonymous visitor id, or a returning visitor counts as new
+        const visitor = localStorage.getItem("fintwin_visitor");
+        localStorage.clear();
+        if (visitor) localStorage.setItem("fintwin_visitor", visitor);
+        sessionStorage.removeItem("splashShown");
+        // Leaving the demo goes back to the landing page, not to a login form
+        navigate(wasDemo ? "/" : "/login");
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
-  // track breakpoint so controls live in exactly one DOM node
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const onChange = (e) => setIsDesktop(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+    const toggle = (which) => setOpen((o) => (o === which ? null : which));
+    const count = notifications.length;
 
-  const notifColor = (type) =>
-    type === "danger"  ? { bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.2)", dot: "#f87171" }
-    : type === "warning" ? { bg: "rgba(251,191,36,0.07)",  border: "rgba(251,191,36,0.2)",  dot: "#fbbf24" }
-    : type === "success" ? { bg: "rgba(74,222,128,0.07)",  border: "rgba(74,222,128,0.2)",  dot: "#4ade80" }
-    : { bg: "rgba(34,211,238,0.07)", border: "rgba(34,211,238,0.2)", dot: "#22d3ee" };
+    return (
+        <div ref={ref} className="flex items-center gap-1 shrink-0">
+            <IconButton label={`Alerts (${count})`} onClick={() => toggle("alerts")}>
+                <Bell size={20} aria-hidden />
+                {count > 0 && (
+                    <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-bad text-[10px] font-semibold leading-4 text-center text-accent-on num">
+                        {count > 9 ? "9+" : count}
+                    </span>
+                )}
+            </IconButton>
 
-  const notifIcon = (type) =>
-    type === "danger" ? "🚨" : type === "warning" ? "⚠️" : type === "success" ? "✅" : "💡";
+            <button
+                type="button"
+                aria-label="Account menu"
+                onClick={() => toggle("account")}
+                className="w-10 h-10 rounded-full flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+                <span className="w-8 h-8 rounded-full bg-accent-soft text-accent text-small font-semibold flex items-center justify-center">
+                    {initial}
+                </span>
+            </button>
 
-  const score      = scoreData?.score ?? 0;
-  const scoreColor = score >= 80 ? "#4ade80" : score >= 60 ? "#fbbf24" : "#f87171";
-  const scoreLabel = score >= 80 ? "Excellent" : score >= 60 ? "Good" : "Needs Improvement";
+            {open === "alerts" && (
+                <Menu>
+                    <div className="px-4 pt-4 pb-2 flex items-baseline justify-between">
+                        <p className="text-heading text-ink">Alerts</p>
+                        <p className="text-caption text-ink-3">{count === 1 ? "1 alert" : `${count} alerts`}</p>
+                    </div>
+                    <ul className="max-h-[60vh] overflow-y-auto pb-2">
+                        {count === 0 && <li className="px-4 py-6 text-small text-ink-3 text-center">You're all caught up.</li>}
+                        {notifications.map((n, i) => {
+                            const { icon: Icon, tone } = NOTE[n.type] || NOTE.info;
+                            return (
+                                <li key={i} className="flex gap-3 px-4 py-3 border-t border-line first:border-t-0">
+                                    <span className={cx("shrink-0 w-8 h-8 rounded-full flex items-center justify-center", tone)}>
+                                        <Icon size={16} aria-hidden />
+                                    </span>
+                                    <p className="text-small text-ink leading-snug">{n.message}</p>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </Menu>
+            )}
 
-  // ── Controls — inlined JSX, single instance, refs attach to exactly one element ──
-  const controls = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-
-      {/* Theme toggle */}
-      <button
-        className="hdr-btn"
-        onClick={toggleTheme}
-        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        style={{
-          width: 42, height: 42, borderRadius: 12,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "var(--bg-card)", border: "1px solid var(--border-card)",
-        }}
-      >
-        {isDark
-          ? <Sun  size={17} color="rgba(251,191,36,0.8)" />
-          : <Moon size={17} color="var(--text-secondary)" />}
-      </button>
-
-      {/* Notifications */}
-      <div style={{ position: "relative" }} ref={notifRef}>
-        <button
-          className="hdr-btn"
-          onClick={() => { setShowNotifications(v => !v); setShowProfile(false); }}
-          aria-label={`Alerts (${notifications.length})`}
-          style={{
-            width: 42, height: 42, borderRadius: 12, position: "relative",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "var(--bg-card)", border: "1px solid var(--border-card)",
-          }}
-        >
-          <Bell size={17} color="var(--text-secondary)" />
-          {notifications.length > 0 && (
-            <span style={{
-              position: "absolute", top: 5, right: 5,
-              width: 14, height: 14, borderRadius: "50%",
-              background: "#f87171", border: "2px solid #080a0f",
-              fontSize: 8, fontWeight: 800, color: "#fff",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {notifications.length > 9 ? "9+" : notifications.length}
-            </span>
-          )}
-        </button>
-
-        {showNotifications && (
-          <div className="hdr-dropdown" style={{
-            position: "fixed", right: 16, top: 72,
-            width: "min(360px, calc(100vw - 32px))",
-            background: "var(--bg-floating)", border: "1px solid var(--border-floating)",
-            borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-            zIndex: 200, overflow: "hidden",
-          }}>
-            <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" }}>AI NOTIFICATIONS</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#f87171", background: "rgba(248,113,113,0.12)", borderRadius: 6, padding: "2px 8px" }}>{notifications.length} Alerts</span>
-            </div>
-            <div style={{ maxHeight: 320, overflowY: "auto", padding: "8px" }}>
-              {notifications.length > 0 ? notifications.map((n, i) => {
-                const c = notifColor(n.type);
-                return (
-                  <div key={i} className="notif-item" style={{
-                    display: "flex", gap: 10, padding: "10px 12px", borderRadius: 10,
-                    background: c.bg, border: "1px solid " + c.border,
-                    borderLeft: `3px solid ${c.dot}`, marginBottom: 6, cursor: "default",
-                  }}>
-                    <span style={{ fontSize: 14, lineHeight: 1.5 }}>{notifIcon(n.type)}</span>
-                    <p style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.5, margin: 0 }}>{n.message}</p>
-                  </div>
-                );
-              }) : (
-                <p style={{ fontSize: 12, color: "var(--text-dim)", padding: "12px 8px", textAlign: "center" }}>No notifications</p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Profile */}
-      <div style={{ position: "relative" }} ref={profileRef}>
-        <button
-          className="hdr-btn"
-          onClick={() => { setShowProfile(v => !v); setShowNotifications(false); }}
-          aria-label="Account menu"
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            background: "var(--bg-card)", border: "1px solid var(--border-card)",
-            borderRadius: 12, padding: "6px 10px 6px 6px",
-          }}
-        >
-          <div style={{
-            width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-            background: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 13, fontWeight: 700, color: "#fff",
-          }}>{initial}</div>
-          {!(compact && !isDesktop) && (
-            <>
-              <div style={{ textAlign: "left" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1, margin: 0 }}>{fullName}</p>
-                <p style={{ fontSize: 10, color: "var(--text-dim)", margin: "2px 0 0", lineHeight: 1 }}>FinTwin User</p>
-              </div>
-              <ChevronDown size={13} color="rgba(148,163,184,0.5)" />
-            </>
-          )}
-        </button>
-
-        {showProfile && (
-          <div className="hdr-dropdown" style={{
-            position: "fixed", right: 16, top: 72,
-            width: "min(240px, calc(100vw - 32px))",
-            background: "var(--bg-floating)", border: "1px solid var(--border-floating)",
-            borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-            zIndex: 200, overflow: "hidden",
-          }}>
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: 0 }}>{fullName}</p>
-              <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "3px 0 0" }}>{email}</p>
-            </div>
-            <div style={{ padding: "6px" }}>
-              <button className="profile-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
-                <User size={14} color="rgba(148,163,184,0.6)" /> Profile
-              </button>
-              <button className="profile-item" onClick={() => { setShowProfile(false); onSettings?.(); }}>
-                <Settings size={14} color="rgba(148,163,184,0.6)" /> Settings
-              </button>
-              <button className="profile-item" onClick={() => { setShowProfile(false); window.dispatchEvent(new Event("openHelp")); }}>
-                <LifeBuoy size={14} color="rgba(148,163,184,0.6)" /> Help &amp; feedback
-              </button>
-              <div style={{ height: 1, background: "var(--bg-input)", margin: "4px 0" }} />
-              <button className="profile-item" onClick={logout} style={{ color: "#f87171" }}>
-                <LogOut size={14} color="#f87171" /> Logout
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-    </div>
-  );
-
-  // ── Stat badges — inlined JSX, no inner component ──
-  const statBadge = (label, color, bg, border, pad, period, title) => (
-    <div title={title} style={{
-      textAlign: "center", fontSize: 12, fontWeight: 600,
-      color, background: bg, border: `1px solid ${border}`,
-      borderRadius: 10, padding: pad, whiteSpace: "nowrap",
-      // on a phone the badges share a row; keep them the same height, text centred
-      ...(isDesktop ? {} : { display: "flex", flexDirection: "column", justifyContent: "center" }),
-    }}>
-      {label}
-      {period && (
-        <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.75, display: isDesktop ? "inline" : "block" }}>
-          {isDesktop ? " · " : ""}{period}
-        </span>
-      )}
-    </div>
-  );
-
-  // The score's savings rate covers the last 3 months; red when more went out than came in
-  const savingsRate = Number(scoreData?.savingsRatio) || 0;
-  const savingsLabel = `Savings ${percent(savingsRate)}`;
-  const savingsColor = savingsRate < 0 ? "#f87171" : "#4ade80";
-  const savingsBg = savingsRate < 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)";
-  const savingsBorder = savingsRate < 0 ? "rgba(248,113,113,0.2)" : "rgba(74,222,128,0.2)";
-  const savingsTitle = "Share of what came in that you kept, over the last 3 months";
-
-  const statsDesktop = (
-    <>
-      {statBadge(savingsLabel, savingsColor, savingsBg, savingsBorder, "5px 14px", "last 3 months", savingsTitle)}
-      {statBadge(`Score ${score}/100`, "#a78bfa", "rgba(167,139,250,0.1)", "rgba(167,139,250,0.2)", "5px 14px")}
-      {statBadge(scoreLabel, scoreColor, scoreColor + "18", scoreColor + "30", "5px 14px")}
-    </>
-  );
-
-  const statsMobile = (
-    <>
-      {statBadge(savingsLabel, savingsColor, savingsBg, savingsBorder, "6px 4px", "last 3 months", savingsTitle)}
-      {statBadge(`Score ${score}/100`, "#a78bfa", "rgba(167,139,250,0.1)", "rgba(167,139,250,0.2)", "6px 4px")}
-      {statBadge(scoreLabel, scoreColor, scoreColor + "18", scoreColor + "30", "6px 4px")}
-    </>
-  );
-
-  const styles = (
-      <style>{`
-        .hdr-btn { transition: background 0.2s ease; cursor: pointer; border: none; }
-        .hdr-btn:hover { background: rgba(139,92,246,0.08) !important; }
-        .hdr-dropdown { animation: dropIn 0.18s ease; }
-        @keyframes dropIn { from { opacity:0; transform:translateY(-6px) } to { opacity:1; transform:translateY(0) } }
-        .notif-item:hover { background: var(--bg-input) !important; }
-        .profile-item {
-          display: flex; align-items: center; gap: 12px;
-          width: 100%; padding: 12px 16px;
-          background: none; border: none;
-          color: var(--text-primary); font-size: 13px; font-family: inherit;
-          cursor: pointer; transition: background 0.15s; text-align: left;
-        }
-        .profile-item:hover { background: var(--bg-input); }
-      `}</style>
-  );
-
-  // In the shared page header: just the buttons, on every screen
-  if (compact) return <>{styles}{controls}</>;
-
-  return (
-    <>
-      {styles}
-
-      <div style={{ marginBottom: 24, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-
-        {/* Row 1 — LIVE date (always) + controls on desktop */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#4ade80", animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 11, color: "rgba(74,222,128,0.8)", fontWeight: 600, letterSpacing: "0.06em" }}>LIVE</span>
-            <span style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.04em" }}>
-              {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-            </span>
-          </div>
-          {/* Controls: desktop — top-right */}
-          {isDesktop && controls}
+            {open === "account" && (
+                <Menu width="w-[min(260px,calc(100vw-32px))]">
+                    <div className="px-4 py-3 border-b border-line">
+                        <p className="text-heading text-ink truncate">{fullName}</p>
+                        {user.email && <p className="text-caption text-ink-3 truncate">{user.email}</p>}
+                    </div>
+                    <div className="py-1">
+                        <MenuItem icon={User} onClick={() => { setOpen(null); navigate("/profile"); }}>Profile</MenuItem>
+                        <MenuItem icon={Settings} onClick={() => { setOpen(null); onSettings?.(); }}>Settings</MenuItem>
+                        <MenuItem icon={isDark ? Sun : Moon} onClick={toggleTheme}>{isDark ? "Light mode" : "Dark mode"}</MenuItem>
+                        <MenuItem icon={LifeBuoy} onClick={() => { setOpen(null); window.dispatchEvent(new Event("openHelp")); }}>Help and feedback</MenuItem>
+                    </div>
+                    <div className="py-1 border-t border-line">
+                        <MenuItem icon={LogOut} onClick={logout} danger>Log out</MenuItem>
+                    </div>
+                </Menu>
+            )}
         </div>
-
-        {/* Row 2 — Greeting + stats (desktop) or greeting + controls (mobile) */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <h1 style={{
-            fontSize: "clamp(18px, 3vw, 28px)", fontWeight: 700, color: "#fff",
-            letterSpacing: "-0.03em", lineHeight: 1.2, margin: 0, minWidth: 0,
-          }}>
-            {greeting},{" "}
-            <span style={{ backgroundImage: "linear-gradient(135deg, #a78bfa, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {fullName}
-            </span>{" "}👋
-          </h1>
-
-          {isDesktop
-            ? <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>{statsDesktop}</div>
-            : controls
-          }
-        </div>
-
-        {/* Stats: mobile — full-width grid below */}
-        {!isDesktop && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
-            {statsMobile}
-          </div>
-        )}
-
-      </div>
-    </>
-  );
+    );
 }
 
 export default Header;

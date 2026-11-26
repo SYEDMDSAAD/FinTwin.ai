@@ -6,15 +6,15 @@ const VALUE_TONE = { good: "text-good", bad: "text-bad", warn: "text-warn" };
 export default function Stat({ label, value, note, tone, size = "md", className }) {
     return (
         <div className={cx("min-w-0", className)}>
-            <p className="text-caption font-medium text-ink-2">{label}</p>
+            <p className="text-small text-ink-3">{label}</p>
             <p className={cx(
-                "font-bold tracking-tight truncate",
-                size === "lg" ? "text-display mt-1" : "text-[20px] leading-tight mt-0.5",
+                "num truncate",
+                size === "hero" ? "text-hero mt-1" : size === "lg" ? "text-display mt-1" : "text-[22px] leading-tight font-[650] tracking-[-0.02em] mt-0.5",
                 VALUE_TONE[tone] || "text-ink",
             )}>
                 {value}
             </p>
-            {note && <p className="text-caption text-ink-3 mt-0.5 truncate">{note}</p>}
+            {note && <p className="text-small text-ink-3 mt-1 truncate">{note}</p>}
         </div>
     );
 }

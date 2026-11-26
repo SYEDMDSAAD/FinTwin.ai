@@ -49,22 +49,33 @@ export function headline({ income, spent, budgets = [], now = new Date() }) {
 
 const RANK = { danger: 0, warning: 1, info: 2, success: 3 };
 
-/** At most `max` things that need the user, budgets first, worst first. */
+/**
+ * At most `max` things that need the user, budgets first, worst first.
+ * Each item: { tone, title, detail, to } (text = both, for plain lists).
+ * Skips budgets that haven't started yet and rent or bills paid in full, and
+ * an alert that only repeats a budget already listed.
+ */
 export function attentionItems({ budgets = [], notifications = [], max = 3 }) {
     const items = [];
+    const listed = [];
     for (const b of budgets) {
         const limit = Number(b.limit) || 0;
         const spent = Number(b.spent) || 0;
-        if (limit <= 0) continue;
+        if (limit <= 0 || b.startsOn) continue;
+        if (b.fixedCost && spent <= limit) continue;
         if (spent > limit) {
-            items.push({ tone: "danger", text: `${b.category}: ${rupees(spent - limit)} over your ${rupees(limit)} budget`, to: "Budgeting" });
+            items.push({ tone: "danger", title: b.category, detail: `${rupees(spent - limit)} over your ${rupees(limit)} budget`, to: "Budgeting" });
+            listed.push(String(b.category).toLowerCase());
         } else if (spent >= 0.8 * limit) {
-            items.push({ tone: "warning", text: `${b.category}: ${rupees(limit - spent)} left of ${rupees(limit)}`, to: "Budgeting" });
+            items.push({ tone: "warning", title: b.category, detail: `${rupees(limit - spent)} left of ${rupees(limit)}`, to: "Budgeting" });
+            listed.push(String(b.category).toLowerCase());
         }
     }
+    const repeats = (msg) => listed.some((c) => msg.toLowerCase().startsWith(c + " ") && /budget/i.test(msg));
     const notes = [...notifications]
-        .filter((n) => n?.message)
+        .filter((n) => n?.message && !repeats(n.message))
         .sort((a, b) => (RANK[a.type] ?? 2) - (RANK[b.type] ?? 2))
-        .map((n) => ({ tone: n.type || "info", text: n.message, to: "AI Intelligence" }));
-    return [...items, ...notes].slice(0, max);
+        .map((n) => ({ tone: n.type || "info", title: n.message, detail: null, to: "AI Intelligence" }));
+    items.sort((a, b) => (RANK[a.tone] ?? 2) - (RANK[b.tone] ?? 2));
+    return [...items, ...notes].slice(0, max).map((it) => ({ ...it, text: it.detail ? `${it.title}: ${it.detail}` : it.title }));
 }

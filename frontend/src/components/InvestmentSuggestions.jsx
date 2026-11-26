@@ -88,14 +88,14 @@ export default function InvestmentSuggestions({ onAdded }) {
     };
 
     return (
-        <section aria-label="Possible investments" style={{ background: "var(--bg-card)", border: "1px solid rgba(34,211,238,0.3)", borderRadius: 16, padding: open ? 18 : "12px 18px", marginBottom: 18 }}>
+        <section aria-label="Possible investments" style={{ background: "var(--bg-card)", border: "1px solid var(--info-soft)", borderRadius: 16, padding: open ? 18 : "12px 18px", marginBottom: 18 }}>
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 aria-expanded={open}
                 style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
             >
-                <Sparkles size={16} color="#22d3ee" aria-hidden />
+                <Sparkles size={16} color="var(--info)" aria-hidden />
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
                     {inr(total)} across {payments} {payments === 1 ? "payment" : "payments"} looks like investing
                 </span>
@@ -121,7 +121,7 @@ export default function InvestmentSuggestions({ onAdded }) {
                                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                         {item.name}
                                     </div>
-                                    <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                                         {item.type} · {inr(item.investedAmount)}
                                         {item.payments > 1 ? ` · ${item.payments} payments` : ""}
                                         {onDate(item.purchaseDate) ? ` · since ${onDate(item.purchaseDate)}` : ""}
@@ -142,14 +142,14 @@ export default function InvestmentSuggestions({ onAdded }) {
                                     type="button"
                                     disabled={busy === item.name}
                                     onClick={() => add(item)}
-                                    style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                                    style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,var(--info),#0891b2)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
                                 >
                                     <Plus size={12} aria-hidden /> {busy === item.name ? "Adding…" : "Add to portfolio"}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setHidden(h => new Set(h).add(item.name))}
-                                    style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--border-card)", background: "var(--bg-subtle)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                    style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                                 >
                                     Not an investment
                                 </button>

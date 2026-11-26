@@ -1,12 +1,9 @@
 import { useState, useMemo } from "react";
 import { parseGoalText } from "../utils/goalText";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { Target, Zap, Edit2, Trash2, RefreshCw, Link, Trophy, ChevronDown, Sparkles, CalendarClock, Wallet, TrendingUp, Plus } from "lucide-react";
+import { Target, Pencil, Trash2, RefreshCw, Link, Trophy, ChevronDown, Plus, Check } from "lucide-react";
 import AIPlanCard from "./AIPlanCard";
-import GlassCard from "./GlassCard";
-import GoalsOverviewCard from "./GoalsOverviewCard";
-import AnimatedDots from "./AnimatedDots";
+import { Button, Badge, Progress, SectionHeader, EmptyState, cx } from "./ui";
 
 const SIP_LINKS_KEY = "fintwin-goal-sip-links";
 function getSIPLinks() { try { return JSON.parse(localStorage.getItem(SIP_LINKS_KEY)) || {}; } catch { return {}; } }
@@ -27,15 +24,6 @@ function capitalizeFirst(s) {
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
 
-// Compact form for the summary tiles, where the exact rupee is noise.
-function compactINR(n) {
-  const v = Math.round(Number(n) || 0);
-  if (v >= 1e7) return `₹${(v / 1e7).toFixed(v >= 1e8 ? 0 : 1)}Cr`;
-  if (v >= 1e5) return `₹${(v / 1e5).toFixed(v >= 1e6 ? 0 : 1)}L`;
-  if (v >= 1e3) return `₹${(v / 1e3).toFixed(v >= 1e4 ? 0 : 1)}K`;
-  return `₹${v}`;
-}
-
 // createdAt + durationMonths gives the deadline the AI plan is written against;
 // showing it turns an abstract "24m" into a date the user can actually plan for.
 function deadline(goal) {
@@ -52,21 +40,17 @@ function deadline(goal) {
   };
 }
 
-const HEALTHY = ["Excellent", "On Track", "Good"];
-
-function StatTile({ icon, label, value, color }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${color}18`, color }}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">{label}</div>
-        <div className="truncate text-[15px] font-bold" style={{ color }}>{value}</div>
-      </div>
-    </div>
-  );
+// "8 months left", "3 years left", "2 years 6 months left"
+function timeLeft(due) {
+  const m = due.monthsLeft;
+  if (m < 0) return `overdue since ${due.label}`;
+  if (m === 0) return "due this month";
+  if (m < 24) return `${m} month${m === 1 ? "" : "s"} left`;
+  const y = Math.floor(m / 12), r = m % 12;
+  return r ? `${y} years ${r} month${r === 1 ? "" : "s"} left` : `${y} years left`;
 }
+
+const HEALTHY = ["Excellent", "On Track", "Good"];
 
 function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, regenerateGoal, completeGoal }) {
 
@@ -101,11 +85,12 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
   const [sipLinkOpen, setSIPLinkOpen] = useState(null);
   const [sipLinkForm, setSIPLinkForm] = useState({ fundName: "", monthlyAmount: "" });
 
-  const [newGoalOpen, setNewGoalOpen] = useState(true);
-  const [collapsedGoalIds, setCollapsedGoalIds] = useState(new Set());
+  // null until the user taps it: open by default only when there's no goal yet
+  const [newGoalChoice, setNewGoalOpen] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
 
-  const toggleGoalCollapsed = (id) => {
-    setCollapsedGoalIds(prev => {
+  const toggleExpanded = (id) => {
+    setExpandedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -174,509 +159,259 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
     if (e.key === "Enter" && canCreate && !creatingGoal) handleSubmit();
   };
 
-  const healthColor = (h) =>
-    h === "Excellent" || h === "On Track" ? "#4ade80"
-    : h === "Good" ? "#22d3ee"
-    : h === "Moderate" ? "#fbbf24"
-    : "#f87171";
+  const newGoalOpen = newGoalChoice ?? activeGoals.length === 0;
+  const completedGoals = (goals || []).filter(g => g.completed);
+  const totalPct = summary.target > 0 ? (summary.saved / summary.target) * 100 : 0;
+
+  const healthTone = (h) =>
+    h === "Excellent" || h === "On Track" || h === "Good" ? "good" : h === "Moderate" ? "warn" : "bad";
+
+  const startEdit = (goal) => {
+    setEditingGoalId(goal.id);
+    setEditTitle(goal.title);
+    setEditTargetAmount(goal.targetAmount);
+    setEditDurationMonths(goal.durationMonths);
+  };
 
   return (
-    <>
-      <div className="goals-section" style={{ marginBottom: 32 }}>
+    <div className="max-w-2xl mb-8">
+      {/* The number: what's put away towards every active goal */}
+      {activeGoals.length > 0 && (
+        <section aria-label="Your goals" className="px-1 mb-8">
+          <p className="text-small text-ink-3">Saved towards your goals</p>
+          <p className="text-hero text-ink num mt-1">{inr(summary.saved)}</p>
+          <p className="mt-2 text-body text-ink-2">
+            of <span className="num">{inr(summary.target)}</span> across {activeGoals.length} {activeGoals.length === 1 ? "goal" : "goals"}
+            {" · "}<span className="num">{inr(summary.monthly)}</span> a month keeps them on time
+          </p>
+          <Progress className="mt-5" value={totalPct} label="Share of all goals saved" />
+        </section>
+      )}
 
+      {/* New goal */}
+      <div className="mb-6 rounded-card bg-surface border border-line">
+        <button type="button" onClick={() => setNewGoalOpen(!newGoalOpen)} aria-expanded={newGoalOpen}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+          <span className="shrink-0 w-10 h-10 rounded-full bg-accent-soft text-accent flex items-center justify-center"><Plus size={18} aria-hidden /></span>
+          <span className="flex-1 text-body font-medium text-ink">New goal</span>
+          <ChevronDown size={18} aria-hidden className={cx("shrink-0 text-ink-3 transition-transform", newGoalOpen && "rotate-180")} />
+        </button>
 
-        {/* ── Portfolio-level summary across every active goal ── */}
-        {activeGoals.length > 0 && (
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
-            <StatTile icon={<Target size={15} />} label="Active goals" value={activeGoals.length} color="#a78bfa" />
-            <StatTile icon={<Wallet size={15} />} label="Total target" value={compactINR(summary.target)} color="#e2e8f0" />
-            <StatTile icon={<TrendingUp size={15} />} label="Saved so far" value={compactINR(summary.saved)} color="#22d3ee" />
-            <StatTile icon={<CalendarClock size={15} />} label="Needed / month" value={compactINR(summary.monthly)} color="#4ade80" />
+        {newGoalOpen && (
+          <div className="px-4 pb-4 space-y-3">
+            {/* Say it in a sentence */}
+            <form onSubmit={fillFromSentence} className="flex gap-2">
+              <input className={INPUT} placeholder={'"Goa trip in March, 40k"'} aria-label="Describe your goal"
+                     value={sentence} onChange={(e) => setSentence(e.target.value)} />
+              <Button type="submit" variant="secondary" disabled={!sentence.trim()} className="shrink-0">Fill in</Button>
+            </form>
+
+            <div className="flex flex-wrap gap-2">
+              {GOAL_PRESETS.map(p => (
+                <button key={p.label} type="button" onClick={() => applyPreset(p)}
+                        className="h-8 px-3 rounded-full bg-surface-sunken text-small font-medium text-ink-2 hover:text-ink">
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2" onKeyDown={handleFormKeyDown}>
+              <input className={cx(INPUT, "col-span-2")} placeholder="Goal name" aria-label="Goal name" value={title} onChange={(e) => setTitle(capitalizeFirst(e.target.value))} />
+              <input className={INPUT} type="number" inputMode="numeric" placeholder="Target ₹" aria-label="Target amount" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+              <input className={INPUT} type="number" inputMode="numeric" placeholder="Months" aria-label="Duration in months" value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} />
+            </div>
+
+            <p className="text-small text-ink-3 min-h-[20px]">
+              {previewMonthly
+                ? <>You'd need <span className="font-semibold text-ink num">{inr(previewMonthly)}</span> a month for {durationMonths} months.</>
+                : "Add a target and months to see the monthly amount."}
+            </p>
+
+            <Button size="lg" onClick={handleSubmit} disabled={creatingGoal || !canCreate}>
+              {creatingGoal ? "Creating your goal and plan…" : "Create goal"}
+            </Button>
           </div>
         )}
+      </div>
 
-        {/* ── Goals Overview (completed + ongoing, collapsible) ── */}
-        <GoalsOverviewCard goals={goals} />
+      {activeGoals.length === 0 && !creatingGoal && (
+        <EmptyState icon={Target} title="No active goals yet"
+                    body="Name what you're saving for and FinTwin builds a month-by-month plan around your real spending." />
+      )}
 
-        {/* ── Create Goal ── */}
-        <GlassCard className="relative overflow-hidden p-6 mb-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl">
-
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-          <button
-            type="button"
-            onClick={() => setNewGoalOpen(o => !o)}
-            aria-expanded={newGoalOpen}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              width: "100%", background: "none", border: "none", padding: 0,
-              cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-              marginBottom: newGoalOpen ? 14 : 0,
-            }}
-          >
-            {newGoalOpen ? (
-              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em" }}>NEW GOAL</span>
-            ) : (
-              <span style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>Create New Goal</span>
-            )}
-            <ChevronDown size={18} style={{ color: "var(--text-primary)", flexShrink: 0, transition: "transform 0.2s ease", transform: newGoalOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-          </button>
-
-          {newGoalOpen && (
-            <>
-              {/* Say it in a sentence */}
-              <form onSubmit={fillFromSentence} className="mb-4 flex gap-2">
-                <input
-                  className="goal-input flex-1"
-                  placeholder={'Describe it: "Goa trip in March, 40k"'}
-                  aria-label="Describe your goal"
-                  value={sentence}
-                  onChange={(e) => setSentence(e.target.value)}
-                />
-                <button type="submit" className="g-btn" disabled={!sentence.trim()} style={{ whiteSpace: "nowrap" }}>
-                  Fill in
-                </button>
-              </form>
-
-              {/* Presets — fastest path from "I should save" to a real goal */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {GOAL_PRESETS.map(p => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => applyPreset(p)}
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-zinc-400 transition-all duration-200 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-300"
-                  >
-                    <Plus size={11} /> {p.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3" onKeyDown={handleFormKeyDown}>
-                <input className="goal-input col-span-2 md:col-span-1" placeholder="Goal title (e.g. Emergency Fund)" value={title} onChange={(e) => setTitle(capitalizeFirst(e.target.value))} />
-                <input className="goal-input" type="number" placeholder="Target amount (₹)" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
-                <input className="goal-input" type="number" placeholder="Duration (months)" value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} />
-              </div>
-
-              <div className="mb-4 min-h-[18px] text-xs">
-                {previewMonthly ? (
-                  <span className="text-zinc-500">
-                    You'd need <span className="font-bold text-cyan-400">{inr(previewMonthly)}</span> per month for {durationMonths} months.
-                  </span>
-                ) : (
-                  <span className="text-zinc-600">Enter a target and duration to preview the monthly amount.</span>
-                )}
-              </div>
-
-              <button
-                className="g-btn"
-                disabled={creatingGoal || !canCreate}
-                onClick={handleSubmit}
-                style={{
-                  position: "relative", overflow: "hidden",
-                  background: canCreate && !creatingGoal ? "linear-gradient(135deg, #a78bfa, #7c3aed)" : "var(--bg-subtle)",
-                  color: canCreate && !creatingGoal ? "#fff" : "var(--text-dim)",
-                }}
-              >
-                <AnimatePresence mode="wait">
-                  {creatingGoal ? (
-                    <motion.span key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ display: "flex" }}>
-                        <Sparkles size={14} />
-                      </motion.span>
-                      <span>Creating your goal<AnimatedDots /></span>
-                    </motion.span>
-                  ) : (
-                    <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Zap size={14} />
-                      Create AI Goal
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-                {creatingGoal && (
-                  <motion.span
-                    style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)" }}
-                    animate={{ x: ["-100%", "100%"] }}
-                    transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-                  />
-                )}
+      {/* Active goals */}
+      <div className="space-y-3">
+        {activeGoals.map((goal) => {
+          const progress = Math.round(goal.progressPercent || 0);
+          const open = expandedIds.has(goal.id);
+          const due = deadline(goal);
+          const left = Math.max(0, (goal.targetAmount || 0) - (goal.expectedSaved || 0));
+          const linked = sipLinks[goal.id];
+          const sipAmt = parseFloat(linked?.monthlyAmount) || 0;
+          const sipTotal = sipAmt * (goal.durationMonths || 12);
+          const sipPct = goal.targetAmount > 0 ? Math.min(Math.round(sipTotal / goal.targetAmount * 100), 100) : 0;
+          return (
+            <article key={goal.id} className="rounded-card bg-surface border border-line">
+              <button type="button" onClick={() => toggleExpanded(goal.id)} aria-expanded={open}
+                      aria-label={`${goal.title}, ${progress}%`} className="w-full text-left px-4 pt-4 pb-3.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="min-w-0 truncate text-heading text-ink">{goal.title}</h3>
+                  <Badge tone={healthTone(goal.goalHealth)}>{goal.goalHealth}</Badge>
+                  <span className="ml-auto text-body font-semibold text-ink num shrink-0">{progress}%</span>
+                  <ChevronDown size={16} aria-hidden className={cx("shrink-0 text-ink-3 transition-transform", open && "rotate-180")} />
+                </div>
+                <p className="mt-1 text-small text-ink-3 num">
+                  {inr(goal.expectedSaved)} of {inr(goal.targetAmount)}
+                  {due && <> · {timeLeft(due)}</>}
+                </p>
+                <Progress className="mt-3" value={progress} tone={progress >= 100 ? "good" : "accent"} label={`${goal.title} progress`} />
               </button>
-            </>
-          )}
-        </GlassCard>
 
-        {/* ── Empty state ── */}
-        {activeGoals.length === 0 && !creatingGoal && (
-          <GlassCard className="relative overflow-hidden border border-white/10 bg-white/[0.03] p-10 text-center backdrop-blur-xl">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-purple-500/20 bg-purple-500/10">
-              <Target size={22} className="text-purple-300" />
-            </div>
-            <h3 className="mb-1 text-base font-bold">No active goals yet</h3>
-            <p className="mx-auto mb-5 max-w-sm text-sm text-zinc-500">
-              Name what you're saving for and FinTwin will build a month-by-month plan around your actual spending.
-            </p>
-            <button
-              type="button"
-              onClick={() => setNewGoalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-purple-500/20 bg-purple-500/10 px-4 py-2 text-sm font-semibold text-purple-300 transition-all duration-200 hover:bg-purple-500/20"
-            >
-              <Zap size={14} /> Create your first goal
-            </button>
-          </GlassCard>
-        )}
-
-        {/* ── Goals Grid ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {activeGoals.map((goal) => {
-            const progress = Math.round(goal.progressPercent || 0);
-            const hc = healthColor(goal.goalHealth);
-            const isCollapsed = collapsedGoalIds.has(goal.id);
-            const due = deadline(goal);
-            return (
-              <motion.div
-                key={goal.id}
-                layout
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                className="self-start"
-              >
-              <GlassCard className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl hover:border-purple-500/20 transition-all duration-300">
-
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                {/* Top row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-bold text-white mb-1.5 truncate">
-                      {goal.title}
-                    </h3>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                          className="text-[10px] font-bold px-2 py-1 rounded-md"
-                          style={{ color: hc, backgroundColor: `${hc}18` }}
-                      >
-                        {goal.goalHealth}
-                      </span>
-
-                      {due && (
-                        <span className="flex items-center gap-1 rounded-md bg-white/[0.04] px-2 py-1 text-[10px] font-semibold text-zinc-400">
-                          <CalendarClock size={10} />
-                          {due.monthsLeft > 0
-                            ? `${due.monthsLeft}m left · ${due.label}`
-                            : due.monthsLeft === 0 ? `Due this month` : `Overdue since ${due.label}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-
-                    <button
-                        onClick={() => toggleGoalCollapsed(goal.id)}
-                        aria-label={isCollapsed ? "Expand goal details" : "Collapse goal details"}
-                        aria-expanded={!isCollapsed}
-                        title={isCollapsed ? "Expand" : "Collapse"}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-all duration-200"
-                    >
-                        <ChevronDown size={14} style={{ transition: "transform 0.2s ease", transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)" }} />
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            setEditingGoalId(goal.id);
-                            setEditTitle(goal.title);
-                            setEditTargetAmount(goal.targetAmount);
-                            setEditDurationMonths(goal.durationMonths);
-                            setCollapsedGoalIds(prev => {
-                              const next = new Set(prev);
-                              next.delete(goal.id);
-                              return next;
-                            });
-                        }}
-                        aria-label="Edit goal"
-                        title="Edit goal"
-                        className="w-9 h-9 rounded-lg flex items-center justify-center bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20 transition-all duration-200"
-                    >
-                        <Edit2 size={14} />
-                    </button>
-
-                    <button
-                        onClick={() => setConfirmDeleteId(goal.id)}
-                        aria-label="Delete goal"
-                        title="Delete goal"
-                        className="w-9 h-9 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 transition-all duration-200"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-
-                </div>
-                </div>
-
-                {/* Delete confirmation */}
-                <AnimatePresence>
+              {open && (
+                <div className="border-t border-line">
                   {confirmDeleteId === goal.id && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/25 bg-red-500/[0.07] px-4 py-3">
-                        <span className="text-xs text-red-200">
-                          Delete <strong>{goal.title}</strong>? Its AI plan can't be recovered.
-                        </span>
+                    <div className="m-4 p-3 rounded-control bg-surface-sunken">
+                      <p className="text-small text-ink">Delete <strong>{goal.title}</strong>? Its plan can't be recovered.</p>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" variant="danger" disabled={deletingGoalId === goal.id}
+                                onClick={async () => {
+                                  setDeletingGoalId(goal.id);
+                                  try { await deleteGoal(goal.id); setConfirmDeleteId(null); } finally { setDeletingGoalId(null); }
+                                }}>
+                          {deletingGoalId === goal.id ? "Deleting…" : "Delete"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {progress >= 100 && (
+                    <div className="px-4 pt-4">
+                      <Button size="lg" icon={Trophy} disabled={completingGoalId === goal.id}
+                              onClick={async () => {
+                                setCompletingGoalId(goal.id);
+                                try { await completeGoal(goal.id); } finally { setCompletingGoalId(null); }
+                              }}>
+                        {completingGoalId === goal.id ? "Marking complete…" : "Mark as complete"}
+                      </Button>
+                    </div>
+                  )}
+
+                  <ul className="divide-y divide-line">
+                    {[
+                      ["Left to save", inr(left)],
+                      ["Needed each month", inr(goal.monthlyTarget)],
+                      ["You save each month", inr(goal.availableSavings)],
+                      ["Chance of making it", `${goal.successProbability ?? 0}%`],
+                      due && ["Target date", due.label],
+                    ].filter(Boolean).map(([label, value]) => (
+                      <li key={label} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <span className="text-body text-ink-2">{label}</span>
+                        <span className="text-body font-semibold text-ink num">{value}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {editingGoalId === goal.id && (
+                    <div className="mx-4 mb-4 p-3 rounded-control bg-surface-sunken space-y-2">
+                      <input className={cx(INPUT, "bg-surface")} value={editTitle} onChange={(e) => setEditTitle(capitalizeFirst(e.target.value))} placeholder="Goal name" aria-label="Goal name" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input className={cx(INPUT, "bg-surface")} type="number" inputMode="numeric" value={editTargetAmount} onChange={(e) => setEditTargetAmount(e.target.value)} placeholder="Target ₹" aria-label="Target amount" />
+                        <input className={cx(INPUT, "bg-surface")} type="number" inputMode="numeric" value={editDurationMonths} onChange={(e) => setEditDurationMonths(e.target.value)} placeholder="Months" aria-label="Duration in months" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={async () => { await updateGoal(goal.id, { title: editTitle, targetAmount: Number(editTargetAmount), durationMonths: Number(editDurationMonths) }); setEditingGoalId(null); }}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingGoalId(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="px-4 pt-1">
+                    <AIPlanCard plan={goal.aiPlan} regenerating={loadingGoalId === goal.id} />
+                  </div>
+
+                  {/* A SIP put towards this goal */}
+                  <div className="px-4 pb-1">
+                    {linked ? (
+                      <div className="mb-3 p-3 rounded-control bg-surface-sunken">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-small text-ink-3">Linked SIP</p>
+                            <p className="text-body text-ink truncate">{linked.fundName || "SIP"}</p>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => removeSIPLink(goal.id)} className="-mr-2">Remove</Button>
+                        </div>
+                        <p className="mt-1 text-small text-ink-2 num">
+                          {inr(sipAmt)} a month · {inr(sipTotal)} by the end · covers {sipPct}%
+                        </p>
+                        <Progress className="mt-2" value={sipPct} tone={sipPct >= 100 ? "good" : "accent"} label="Share covered by the SIP" />
+                        <p className="mt-1.5 text-small text-ink-3">
+                          {sipPct >= 100 ? "The SIP alone covers this goal." : `${inr((goal.targetAmount || 0) - sipTotal)} more from other savings.`}
+                        </p>
+                      </div>
+                    ) : sipLinkOpen === goal.id ? (
+                      <div className="mb-3 p-3 rounded-control bg-surface-sunken space-y-2">
+                        <input className={cx(INPUT, "bg-surface")} placeholder="Fund name" aria-label="Fund name"
+                               value={sipLinkForm.fundName} onChange={e => setSIPLinkForm(f => ({ ...f, fundName: e.target.value }))} />
+                        <input type="number" inputMode="numeric" className={cx(INPUT, "bg-surface")} placeholder="Monthly SIP ₹" aria-label="Monthly SIP amount"
+                               value={sipLinkForm.monthlyAmount} onChange={e => setSIPLinkForm(f => ({ ...f, monthlyAmount: e.target.value }))} />
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:bg-white/5"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            disabled={deletingGoalId === goal.id}
-                            onClick={async () => {
-                              setDeletingGoalId(goal.id);
-                              try {
-                                await deleteGoal(goal.id);
-                                setConfirmDeleteId(null);
-                              } finally {
-                                setDeletingGoalId(null);
-                              }
-                            }}
-                            className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/30 disabled:opacity-60"
-                          >
-                            {deletingGoalId === goal.id ? "Deleting..." : "Delete"}
-                          </button>
+                          <Button size="sm" onClick={() => saveSIPLink(goal.id)} disabled={!sipLinkForm.monthlyAmount}>Link SIP</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setSIPLinkOpen(null)}>Cancel</Button>
                         </div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Amount + Progress */}
-                <div style={{ marginBottom: 16 }}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-zinc-500">
-                      {inr(goal.expectedSaved)} / {inr(goal.targetAmount)}
-                    </span>
-                    <span className="text-xs font-bold text-purple-400">
-                      {progress}%
-                    </span>
+                    ) : null}
                   </div>
-                  <div
-                    className="w-full h-2 bg-white/5 rounded-full overflow-hidden"
-                    role="progressbar"
-                    aria-valuenow={progress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`${goal.title} progress`}
-                >
 
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(progress, 100)}%` }}
-                        transition={{ duration: 0.7, ease: "easeOut" }}
-                        className="h-full rounded-full bg-gradient-to-r from-purple-500 via-violet-500 to-cyan-400"
-                    />
-
+                  <div className="flex flex-wrap gap-2 px-4 pb-4">
+                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => startEdit(goal)}>Edit</Button>
+                    <Button size="sm" variant="secondary" icon={RefreshCw} disabled={loadingGoalId === goal.id}
+                            onClick={async () => {
+                              setLoadingGoalId(goal.id);
+                              try { await regenerateGoal(goal.id); } finally { setLoadingGoalId(null); }
+                            }}>
+                      {loadingGoalId === goal.id ? "Rewriting…" : "New plan"}
+                    </Button>
+                    {!linked && sipLinkOpen !== goal.id && (
+                      <Button size="sm" variant="secondary" icon={Link}
+                              onClick={() => { setSIPLinkOpen(goal.id); setSIPLinkForm({ fundName: "", monthlyAmount: "" }); }}>
+                        Link SIP
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" icon={Trash2} className="text-bad ml-auto" onClick={() => setConfirmDeleteId(goal.id)} aria-label="Delete goal">
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-                  {progress < 100 && (
-                    <div className="mt-2 text-[11px] text-zinc-500">
-                      {inr((goal.targetAmount || 0) - (goal.expectedSaved || 0))} to go
-                    </div>
-                  )}
-                </div>
-
-                {!isCollapsed && (
-                <>
-                {/* Mark complete — only once the goal has genuinely hit 100% */}
-                {progress >= 100 && (
-                  <button
-                    disabled={completingGoalId === goal.id}
-                    onClick={async () => {
-                      setCompletingGoalId(goal.id);
-                      try {
-                        await completeGoal(goal.id);
-                      } finally {
-                        setCompletingGoalId(null);
-                      }
-                    }}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      width: "100%", padding: "10px 0", borderRadius: 12, marginBottom: 16,
-                      border: "1px solid rgba(74,222,128,0.3)",
-                      background: completingGoalId === goal.id ? "rgba(74,222,128,0.08)" : "rgba(74,222,128,0.15)",
-                      color: "#4ade80", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                    }}
-                  >
-                    <Trophy size={14} />
-                    {completingGoalId === goal.id ? "Marking Complete..." : "Mark Goal as Complete"}
-                  </button>
-                )}
-
-                {/* Meta */}
-                <div className="grid grid-cols-2 gap-3 my-5">
-
-                  <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                      <p className="text-[10px] text-zinc-500 uppercase">Success</p>
-                      <p className="text-green-400 font-bold">{goal.successProbability}%</p>
-                  </div>
-
-                  <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                      <p className="text-[10px] text-zinc-500 uppercase">Duration</p>
-                      <p className="text-white font-bold">{goal.durationMonths}m</p>
-                  </div>
-
-                  <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                      <p className="text-[10px] text-zinc-500 uppercase">Monthly</p>
-                      <p className="text-cyan-400 font-bold">{inr(goal.monthlyTarget)}</p>
-                  </div>
-
-                  <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                      <p className="text-[10px] text-zinc-500 uppercase">Savings</p>
-                      <p className="text-purple-400 font-bold">{inr(goal.availableSavings)}</p>
-                  </div>
-
-              </div>
-
-                {/* Edit form */}
-                {editingGoalId === goal.id && (
-                  <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-card)", borderRadius: 14, padding: 16, marginBottom: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 4 }}>EDIT GOAL</div>
-                    <input className="goal-input" value={editTitle} onChange={(e) => setEditTitle(capitalizeFirst(e.target.value))} placeholder="Title" />
-                    <input className="goal-input" type="number" value={editTargetAmount} onChange={(e) => setEditTargetAmount(e.target.value)} placeholder="Target amount" />
-                    <input className="goal-input" type="number" value={editDurationMonths} onChange={(e) => setEditDurationMonths(e.target.value)} placeholder="Duration (months)" />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button className="g-btn" style={{ background: "rgba(74,222,128,0.2)", color: "#4ade80" }}
-                        onClick={async () => { await updateGoal(goal.id, { title: editTitle, targetAmount: Number(editTargetAmount), durationMonths: Number(editDurationMonths) }); setEditingGoalId(null); }}>
-                        Save Changes
-                      </button>
-                      <button className="g-btn" style={{ background: "var(--bg-input)", color: "var(--text-secondary)" }} onClick={() => setEditingGoalId(null)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* AI Plan */}
-                <AIPlanCard plan={goal.aiPlan} regenerating={loadingGoalId === goal.id} />
-
-                {/* SIP Link */}
-                {(() => {
-                  const linked = sipLinks[goal.id];
-                  const sipAmt = parseFloat(linked?.monthlyAmount) || 0;
-                  const sipTotal = sipAmt * (goal.durationMonths || 12);
-                  const sipPct = goal.targetAmount > 0 ? Math.min(Math.round(sipTotal / goal.targetAmount * 100), 100) : 0;
-                  return (
-                    <div style={{ marginBottom: 14 }}>
-                      {linked ? (
-                        <div style={{ background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 12, padding: "12px 14px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(167,139,250,0.6)", letterSpacing: "0.08em", marginBottom: 3 }}>LINKED SIP</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{linked.fundName || "SIP Investment"}</div>
-                            </div>
-                            <button onClick={() => removeSIPLink(goal.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(248,113,113,0.5)", fontSize: 11, fontFamily: "inherit" }}>Remove</button>
-                          </div>
-                          <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
-                            <div>
-                              <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600 }}>MONTHLY SIP</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: "#a78bfa" }}>{inr(sipAmt)}</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600 }}>COVERS GOAL</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: sipPct >= 100 ? "#4ade80" : "#fbbf24" }}>{sipPct}%</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600 }}>SIP TOTAL</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{inr(sipTotal)}</div>
-                            </div>
-                          </div>
-                          <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 4, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${sipPct}%`, background: sipPct >= 100 ? "linear-gradient(90deg,#4ade80,#22d3ee)" : "linear-gradient(90deg,#a78bfa,#fbbf24)", borderRadius: 4, transition: "width 0.5s ease" }} />
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 5 }}>
-                            {sipPct >= 100 ? "✓ SIP alone will fully fund this goal" : `Need ${inr((goal.targetAmount || 0) - sipTotal)} more from manual savings`}
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          {sipLinkOpen === goal.id ? (
-                            <div style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.12)", borderRadius: 12, padding: 14 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(167,139,250,0.6)", letterSpacing: "0.08em", marginBottom: 10 }}>LINK A SIP TO THIS GOAL</div>
-                              <input
-                                className="goal-input"
-                                style={{ marginBottom: 8 }}
-                                placeholder="Fund name (e.g. Parag Parikh Flexi Cap)"
-                                value={sipLinkForm.fundName}
-                                onChange={e => setSIPLinkForm(f => ({ ...f, fundName: e.target.value }))}
-                              />
-                              <input
-                                type="number"
-                                className="goal-input"
-                                style={{ marginBottom: 10 }}
-                                placeholder="Monthly SIP amount (₹)"
-                                value={sipLinkForm.monthlyAmount}
-                                onChange={e => setSIPLinkForm(f => ({ ...f, monthlyAmount: e.target.value }))}
-                              />
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setSIPLinkOpen(null)} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                                <button
-                                  onClick={() => saveSIPLink(goal.id)}
-                                  disabled={!sipLinkForm.monthlyAmount}
-                                  style={{ flex: 1, padding: "7px 0", borderRadius: 9, border: "none", background: "rgba(167,139,250,0.15)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: sipLinkForm.monthlyAmount ? "pointer" : "not-allowed", opacity: sipLinkForm.monthlyAmount ? 1 : 0.5, fontFamily: "inherit" }}
-                                >
-                                  Link SIP
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => { setSIPLinkOpen(goal.id); setSIPLinkForm({ fundName: "", monthlyAmount: "" }); }}
-                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "1px solid rgba(167,139,250,0.2)", background: "rgba(167,139,250,0.06)", color: "#a78bfa", fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 10, fontFamily: "inherit" }}
-                            >
-                              <Link size={12} /> Link Investment / SIP
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Regenerate */}
-                <button
-                      disabled={loadingGoalId === goal.id}
-                      onClick={async () => {
-                          setLoadingGoalId(goal.id);
-
-                          try {
-                              await regenerateGoal(goal.id);
-                          } finally {
-                              setLoadingGoalId(null);
-                          }
-                      }}
-                      className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200 ${
-                              loadingGoalId === goal.id
-                              ? "bg-white/5 border-white/10 text-zinc-500"
-                              : "bg-purple-500/10 border-purple-500/20 text-purple-300 hover:bg-purple-500/20"
-                          }`}
-                  >
-                  <RefreshCw size={13} style={{ animation: loadingGoalId === goal.id ? "spin 1s linear infinite" : "none" }} />
-                  {loadingGoalId === goal.id ? "Regenerating..." : "Regenerate AI Plan"}
-                </button>
-                </>
-                )}
-              </GlassCard>
-              </motion.div>
-            );
-          })}
-        </div>
-
+              )}
+            </article>
+          );
+        })}
       </div>
-    </>
+
+      {completedGoals.length > 0 && (
+        <section aria-label="Completed goals" className="mt-8">
+          <SectionHeader title="Completed" />
+          <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+            {completedGoals.map(g => (
+              <li key={g.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="shrink-0 w-8 h-8 rounded-full bg-good-soft text-good flex items-center justify-center"><Check size={16} aria-hidden /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-body text-ink truncate">{g.title}</span>
+                  {g.completedAt && <span className="block text-small text-ink-3">Done {g.completedAt}</span>}
+                </span>
+                <span className="text-body font-semibold text-ink num">{inr(g.targetAmount)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
   );
 }
+
+const INPUT = "flex-1 min-w-0 w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent";
 
 export default FinancialGoalsSection;

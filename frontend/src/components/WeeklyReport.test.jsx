@@ -53,7 +53,7 @@ describe("WeeklyReport", () => {
     expect(await screen.findByText("Leakage compounds")).toBeInTheDocument();
     expect(screen.getByText("Automate the leak")).toBeInTheDocument();
     expect(screen.getByText("Food dominates outflow")).toBeInTheDocument();
-    expect(screen.getAllByText("high").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("High").length).toBeGreaterThan(0);
   });
 
   it("surfaces a failure instead of rendering an empty report", async () => {
@@ -84,10 +84,10 @@ describe("WeeklyReport", () => {
     mock.onGet("/reports/weekly").reply(200, REPORT);
     await generate();
 
-    expect(await screen.findByText("MONTH OVER MONTH")).toBeInTheDocument();
+    expect(await screen.findByText("Month over month")).toBeInTheDocument();
     expect(screen.getAllByText("May vs April 2026").length).toBeGreaterThan(0);
     expect(screen.getByText("+6.9%")).toBeInTheDocument();
-    expect(screen.getByText("-5%")).toBeInTheDocument();
+    expect(screen.getByText("−5%")).toBeInTheDocument();
   });
 
   it("reads a report cached in the older prose-string shape", async () => {

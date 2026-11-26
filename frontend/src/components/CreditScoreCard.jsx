@@ -1,72 +1,32 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, ChevronDown } from "lucide-react";
+import { RefreshCw, ChevronDown } from "lucide-react";
 import API from "../services/api";
+import { SectionHeader, Badge, Button, Progress } from "./ui";
 
 const SCORE_BANDS = [
-  { label: "Poor",      min: 300, max: 549, color: "#f87171" },
-  { label: "Fair",      min: 550, max: 649, color: "#fbbf24" },
-  { label: "Good",      min: 650, max: 749, color: "#4ade80" },
-  { label: "Very Good", min: 750, max: 799, color: "#22d3ee" },
-  { label: "Excellent", min: 800, max: 900, color: "#a78bfa" },
+  { label: "Poor",      min: 300, max: 549, tone: "bad" },
+  { label: "Fair",      min: 550, max: 649, tone: "warn" },
+  { label: "Good",      min: 650, max: 749, tone: "good" },
+  { label: "Very good", min: 750, max: 799, tone: "good" },
+  { label: "Excellent", min: 800, max: 900, tone: "good" },
 ];
 
-// Fallback only — the backend sends authoritative `band` and `bandColor`
-// with the score; the local table exists for gauge geometry and for older
-// responses that lack them.
+// Fallback only — the backend sends the authoritative `band` with the score;
+// the local table is for the gauge and for older responses that lack it.
 function getBand(score) {
   return SCORE_BANDS.find(b => score >= b.min && score <= b.max) || SCORE_BANDS[0];
 }
 
+/** 300 to 900 on one line, a dot where the score sits. */
 function ScoreGauge({ score }) {
-  const min = 300, max = 900, range = max - min;
-  const pct = Math.min(Math.max((score - min) / range, 0), 1);
-  const band = getBand(score);
-
+  const pct = Math.min(Math.max((score - 300) / 600, 0), 1) * 100;
   return (
-    <div style={{ position: "relative", marginBottom: 16 }}>
-      <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden", gap: 2 }}>
-        {SCORE_BANDS.map(b => (
-          <div key={b.label} style={{ flex: 1, background: b.color + "30", borderRadius: 4 }} />
-        ))}
+    <div className="mt-4" aria-hidden>
+      <div className="relative h-1.5 rounded-full bg-gradient-to-r from-[var(--bad)] via-[var(--warn)] to-[var(--good)] opacity-80">
+        <span className="absolute -top-[5px] w-4 h-4 rounded-full bg-surface border-[3px] border-ink transition-[left] duration-700"
+              style={{ left: `calc(${pct}% - 8px)` }} />
       </div>
-      <div style={{
-        position: "absolute", top: -2, left: `calc(${pct * 100}% - 8px)`,
-        width: 16, height: 16, borderRadius: "50%",
-        background: band.color, border: "3px solid #080a0f",
-        boxShadow: `0 0 10px ${band.color}80`,
-        transition: "left 0.8s cubic-bezier(0.34,1.56,0.64,1)",
-      }} />
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-        {SCORE_BANDS.map(b => (
-          <span key={b.label} style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 600 }}>{b.label}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FactorBar({ factor }) {
-  const pct = factor.maxPoints > 0 ? (factor.points / factor.maxPoints) * 100 : 0;
-  const color = factor.status === "good" ? "#4ade80" : factor.status === "warning" ? "#fbbf24" : factor.status === "poor" ? "#f87171" : "#94a3b8";
-
-  return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{factor.label}</span>
-          <span style={{ fontSize: 10, color: "var(--text-dim)" }}>
-            {factor.impact} impact · {factor.points}/{factor.maxPoints}
-          </span>
-        </div>
-        <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
-          <div style={{
-            height: "100%", width: `${pct}%`,
-            background: color, borderRadius: 3,
-            transition: "width 1s ease",
-          }} />
-        </div>
-        <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>{factor.desc}</div>
-      </div>
+      <div className="mt-2 flex justify-between text-caption text-ink-3 num"><span>300</span><span>900</span></div>
     </div>
   );
 }
@@ -104,122 +64,62 @@ export default function CreditScoreCard() {
     color: data?.bandColor ?? fallback.color,
   };
 
+  const tone = (SCORE_BANDS.find(x => x.label.toLowerCase() === String(band.label).toLowerCase()) || fallback).tone;
   return (
-    <div style={{
-      position: "relative", overflow: "hidden",
-      background: "var(--bg-card)",
-      border: "1px solid var(--border-card)",
-      borderRadius: 20, padding: "24px",
-      marginBottom: 24,
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-    }}>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.4), transparent)" }} />
-
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={18} color="#22d3ee" />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em" }}>ESTIMATED SCORE</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>Credit Score</div>
-          </div>
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-dimmer)", fontSize: 13 }}>
-          Calculating your score...
-        </div>
-      ) : error || !data ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-dim)", fontSize: 13 }}>
-          Couldn't load your score right now. Use Recalculate to try again.
-        </div>
-      ) : (
-        <>
-          {/* Score + Gauge */}
-          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 20 }}>
-            <div style={{ textAlign: "center", flexShrink: 0 }}>
-              <div style={{ fontSize: 52, fontWeight: 900, color: band.color, letterSpacing: "-0.04em", lineHeight: 1, filter: `drop-shadow(0 0 12px ${band.color}50)` }}>
-                {score}
-              </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginTop: 4 }}>out of 900</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: "inline-block", fontSize: 13, fontWeight: 700,
-                color: band.color, background: band.color + "15",
-                border: `1px solid ${band.color}30`, borderRadius: 8, padding: "4px 12px",
-                marginBottom: 10,
-              }}>
-                {band.label}
+    <section aria-label="Credit score" className="max-w-2xl mb-8">
+      <SectionHeader title="Credit score" subtitle="An estimate from your own data" />
+      <div className="rounded-card bg-surface border border-line">
+        <div className="p-5">
+          {loading ? (
+            <div className="h-16 rounded-control animate-pulse bg-surface-sunken" />
+          ) : error || !data ? (
+            <p className="text-small text-ink-3">Couldn't work out your score right now. Try again in a moment.</p>
+          ) : (
+            <>
+              <div className="flex items-end justify-between gap-3">
+                <p className="text-display text-ink num">{score}<span className="text-heading text-ink-3 font-medium"> / 900</span></p>
+                <Badge tone={tone}>{band.label}</Badge>
               </div>
               <ScoreGauge score={score} />
-            </div>
-          </div>
-
-          {/* Score Factors — collapsible on mobile, always expanded on desktop */}
-          {data?.factors?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <button
-                type="button"
-                onClick={() => setFactorsOpen(o => !o)}
-                className="lg:pointer-events-none lg:!bg-transparent lg:!border-0 lg:!p-0 lg:!rounded-none"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  width: "100%", cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 11, fontWeight: 800, color: "var(--text-primary)",
-                  letterSpacing: "0.1em", marginBottom: 12,
-                  background: "var(--bg-subtle)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                }}
-              >
-                <span>SCORE FACTORS</span>
-                <ChevronDown
-                  size={16}
-                  strokeWidth={3}
-                  className="lg:hidden"
-                  style={{ transition: "transform 0.2s ease", transform: factorsOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                />
-              </button>
-              <div
-                className="lg:!flex"
-                style={{ display: factorsOpen ? "flex" : "none", flexDirection: "column", gap: 14 }}
-              >
-                {data.factors.map(f => <FactorBar key={f.label} factor={f} />)}
-              </div>
-            </div>
+            </>
           )}
-        </>
-      )}
+        </div>
 
-      {/* Disclaimer — required: this is an internal estimate, not a bureau score */}
-      {data?.disclaimer && (
-        <p style={{ fontSize: 10.5, color: "var(--text-dim)", lineHeight: 1.5, margin: "0 0 12px", fontStyle: "italic" }}>
-          {data.disclaimer}
-        </p>
-      )}
+        {data?.factors?.length > 0 && (
+          <>
+            <button type="button" onClick={() => setFactorsOpen(o => !o)} aria-expanded={factorsOpen}
+                    className="w-full flex items-center justify-between px-5 py-3.5 border-t border-line text-left">
+              <span className="text-body text-ink">What affects it</span>
+              <ChevronDown size={18} aria-hidden className={`text-ink-3 transition-transform ${factorsOpen ? "rotate-180" : ""}`} />
+            </button>
+            {factorsOpen && (
+              <ul className="divide-y divide-line border-t border-line">
+                {data.factors.map(f => {
+                  const pct = f.maxPoints > 0 ? (f.points / f.maxPoints) * 100 : 0;
+                  const t = f.status === "good" ? "good" : f.status === "warning" ? "warn" : f.status === "poor" ? "bad" : "accent";
+                  return (
+                    <li key={f.label} className="px-5 py-3.5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-body text-ink">{f.label}</span>
+                        <span className="text-small text-ink-3 num shrink-0">{f.points} of {f.maxPoints}</span>
+                      </div>
+                      <Progress className="mt-2" value={pct} tone={t} label={f.label} />
+                      {f.desc && <p className="mt-2 text-small text-ink-3">{f.desc}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
 
-      {/* Footer */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
-        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Based on your last 3 months of data</span>
-        <button
-          onClick={fetchScore}
-          disabled={checking}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.25)",
-            background: "rgba(34,211,238,0.08)", color: "#22d3ee",
-            fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-          }}
-        >
-          <RefreshCw size={12} className={checking ? "animate-spin" : ""} />
-          {checking ? "Recalculating..." : "Recalculate"}
-        </button>
+        <div className="px-5 pt-3 pb-2 border-t border-line">
+          <p className="text-caption text-ink-3">{data?.disclaimer || "Based on your last 3 months. Not a bureau score."}</p>
+          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={fetchScore} disabled={checking} className="-ml-3 mt-1">
+            {checking ? "Checking…" : "Refresh"}
+          </Button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

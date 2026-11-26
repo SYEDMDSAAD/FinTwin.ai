@@ -22,7 +22,7 @@ const inr = (n, digits = 0) =>
         : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: digits, minimumFractionDigits: digits });
 
 const pct = (n) => (n === null || n === undefined ? "—" : `${n > 0 ? "+" : ""}${Number(n).toFixed(2)}%`);
-const tone = (n) => (n > 0 ? "#4ade80" : n < 0 ? "#f87171" : "var(--text-secondary)");
+const tone = (n) => (n > 0 ? "var(--good)" : n < 0 ? "var(--bad)" : "var(--text-secondary)");
 const shortDate = (iso) =>
     iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—";
 
@@ -34,7 +34,7 @@ const INPUT = {
 };
 const SMALL_BTN = {
     display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 11px", borderRadius: 10,
-    border: "1px solid var(--border-card)", background: "var(--bg-subtle)", color: "var(--text-primary)",
+    border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-primary)",
     fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
 };
 
@@ -66,7 +66,7 @@ export default function DiscoverPage() {
     return (
         <div style={{ maxWidth: 960 }}>
             <div style={{ marginBottom: 18 }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>Discover</h2>
+                <h2 style={{ fontSize: 20, fontWeight: 650, color: "var(--text-primary)", margin: 0 }}>Discover</h2>
                 <p style={{ ...MUTED, margin: "4px 0 0" }}>
                     IPOs, mutual funds and stocks you can invest in — prices, NAVs and past returns. Information, not advice: past returns don't promise future ones.
                 </p>
@@ -81,8 +81,8 @@ export default function DiscoverPage() {
                         onClick={() => setTab(t.id)}
                         style={{
                             ...SMALL_BTN, padding: "8px 14px", fontSize: 13,
-                            background: tab === t.id ? "rgba(167,139,250,0.15)" : "var(--bg-subtle)",
-                            borderColor: tab === t.id ? "rgba(167,139,250,0.5)" : "var(--border-card)",
+                            background: tab === t.id ? "var(--accent-soft)" : "var(--bg-input)",
+                            borderColor: tab === t.id ? "var(--accent)" : "var(--border-card)",
                         }}
                     >
                         <t.icon size={14} aria-hidden /> {t.label}
@@ -141,7 +141,7 @@ export function IposTab({ onTrack }) {
                 if (rows.length === 0) return null;
                 return (
                     <section key={g.status} aria-label={g.title}>
-                        <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.06em", margin: "0 0 10px", textTransform: "uppercase" }}>
+                        <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-dim)", margin: "0 0 10px" }}>
                             {g.title}
                         </h3>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
@@ -169,7 +169,7 @@ function IpoCard({ ipo, onTrack }) {
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{ipo.name}</div>
                     <div style={MUTED}>{ipo.symbol ? `NSE: ${ipo.symbol}` : "Symbol after listing"}</div>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 999, border: "1px solid var(--border-card)", color: "var(--text-secondary)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 8px", borderRadius: 999, border: "1px solid var(--border-card)", color: "var(--text-secondary)" }}>
                     {ipo.category}
                 </span>
             </div>
@@ -185,7 +185,7 @@ function IpoCard({ ipo, onTrack }) {
 
             {listed && ipo.currentPrice != null && (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
-                    <span style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)" }}>{inr(ipo.currentPrice, 2)}</span>
+                    <span style={{ fontSize: 18, fontWeight: 650, color: "var(--text-primary)" }}>{inr(ipo.currentPrice, 2)}</span>
                     {ipo.gainPct != null && (
                         <span style={{ fontSize: 13, fontWeight: 700, color: tone(ipo.gainPct) }}>{pct(ipo.gainPct)} vs issue</span>
                     )}
@@ -213,7 +213,7 @@ function IpoCard({ ipo, onTrack }) {
 function Fact({ label, value }) {
     return (
         <div>
-            <dt style={{ color: "var(--text-secondary)", fontSize: 11 }}>{label}</dt>
+            <dt style={{ color: "var(--text-secondary)", fontSize: 12 }}>{label}</dt>
             <dd style={{ margin: 0, color: "var(--text-primary)", fontWeight: 600 }}>{value}</dd>
         </div>
     );
@@ -238,7 +238,7 @@ export function FundsTab({ watchlist, isFollowed, follow, unfollow, onAdd }) {
         <div>
             {watchlist.length > 0 && (
                 <section aria-label="Funds you follow" style={{ ...CARD, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-label)", marginBottom: 8 }}>FUNDS YOU FOLLOW</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>Funds you follow</div>
                     {watchlist.map(w => (
                         <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
                             <button type="button" onClick={() => setOpen(open === w.symbol ? null : w.symbol)}
@@ -271,7 +271,7 @@ export function FundsTab({ watchlist, isFollowed, follow, unfollow, onAdd }) {
                             </button>
                             <div style={{ textAlign: "right" }}>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{inr(f.nav, 2)}</div>
-                                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>NAV · {f.nav_date}</div>
+                                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>NAV · {f.nav_date}</div>
                             </div>
                         </div>
                         {open === f.code && <FundDetails key={f.code} code={f.code} />}
@@ -309,12 +309,12 @@ function FundDetails({ code }) {
     const r = d.returns || {};
     const has = Object.keys(r).length > 0;
     return (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-card)" }}>
             {has ? (
                 <div style={{ display: "flex", gap: 18 }}>
                     {["1y", "3y", "5y"].map(k => (
                         <div key={k}>
-                            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{k.replace("y", " yr")}{k !== "1y" ? " / yr" : ""}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{k.replace("y", " yr")}{k !== "1y" ? " / yr" : ""}</div>
                             <div style={{ fontSize: 14, fontWeight: 700, color: r[k] == null ? "var(--text-secondary)" : tone(r[k]) }}>{pct(r[k])}</div>
                         </div>
                     ))}
@@ -322,7 +322,7 @@ function FundDetails({ code }) {
             ) : (
                 <p style={{ ...MUTED, margin: 0 }}>Past returns are unavailable right now — the NAV above is current.</p>
             )}
-            <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "8px 0 0" }}>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "8px 0 0" }}>
                 Trailing returns from NAV history (3 and 5 years annualised). Scheme code {d.code}{d.isin ? ` · ISIN ${d.isin}` : ""}.
             </p>
         </div>
@@ -353,7 +353,7 @@ export function StocksTab({ watchlist, isFollowed, follow, unfollow, onAdd }) {
     return (
         <div>
             <section aria-label="Your watchlist" style={{ ...CARD, marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-label)", marginBottom: 8 }}>YOUR WATCHLIST</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>Your watchlist</div>
                 {watchlist.length === 0 ? (
                     <p style={{ ...MUTED, margin: 0 }}>Search below and follow stocks to see their live prices here.</p>
                 ) : (
@@ -361,14 +361,14 @@ export function StocksTab({ watchlist, isFollowed, follow, unfollow, onAdd }) {
                         {watchlist.map(w => {
                             const q = quoteFor(w.symbol);
                             return (
-                                <li key={w.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border-subtle)" }}>
+                                <li key={w.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border-card)" }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{w.name}</div>
-                                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{w.symbol}</div>
+                                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{w.symbol}</div>
                                     </div>
                                     <div style={{ textAlign: "right" }}>
                                         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{q?.price != null ? inr(q.price, 2) : "—"}</div>
-                                        <div style={{ fontSize: 11, fontWeight: 600, color: tone(q?.changePct) }}>{q?.changePct != null ? `${pct(q.changePct)} today` : ""}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: tone(q?.changePct) }}>{q?.changePct != null ? `${pct(q.changePct)} today` : ""}</div>
                                     </div>
                                     <button type="button" style={SMALL_BTN}
                                             onClick={() => onAdd({ type: "Stocks", name: w.name, tickerCode: w.symbol.replace(/\.(NS|BO)$/, "") })}>
@@ -481,13 +481,13 @@ export function AddHoldingModal({ prefill, onClose }) {
                         <input style={field} value={form.tickerCode} onChange={set("tickerCode")} />
                     </label>
                 ) : null}
-                <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 14px", lineHeight: 1.5 }}>
                     {isIpo
                         ? "Until it lists this holding is worth what you applied with. Once listed, add the NSE symbol and shares to track the live price against the issue price."
                         : "With units and the code, FinTwin values this at the live price when you refresh your portfolio."}
                 </p>
                 <button type="button" onClick={save} disabled={saving || !form.name.trim() || !form.investedAmount}
-                        style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+                        style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
                     {saving ? "Saving…" : "Save to portfolio"}
                 </button>
             </div>

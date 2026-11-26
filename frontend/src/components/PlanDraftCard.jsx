@@ -78,10 +78,10 @@ export default function PlanDraftCard({ hasBudgets, onApplied }) {
     const startsLater = draft.newBudgetsStart && draft.newBudgetsStart > today && kept.some((r) => r.currentLimit == null);
 
     return (
-        <Card tone="accent" className="mb-6">
+        <Card className="mb-6">
             <div className="flex items-start gap-3">
-                <div className="shrink-0 rounded-control bg-accent-soft p-2 text-accent">
-                    <Sparkles size={20} aria-hidden="true" />
+                <div className="shrink-0 w-10 h-10 rounded-full bg-accent-soft text-accent flex items-center justify-center">
+                    <Sparkles size={18} aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <h2 className="text-heading text-ink">

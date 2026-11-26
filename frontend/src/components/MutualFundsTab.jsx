@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Star, RefreshCw, Bookmark } from "lucide-react";
 
 const CAT_COLORS = {
-  "Large Cap": "#22d3ee", "Mid Cap": "#a78bfa", "Small Cap": "#fbbf24",
-  "ELSS": "#4ade80", "Debt": "#94a3b8", "Hybrid": "#f472b6",
-  "Index": "#38bdf8", "Flexi Cap": "#fb923c",
+  "Large Cap": "var(--info)", "Mid Cap": "var(--accent)", "Small Cap": "var(--warn)",
+  "ELSS": "var(--good)", "Debt": "var(--text-dim)", "Hybrid": "#f472b6",
+  "Index": "var(--info)", "Flexi Cap": "#fb923c",
 };
 
 const WATCHLIST_KEY = "fintwin-mf-watchlist";
@@ -108,12 +108,12 @@ export default function MutualFundsTab() {
     <div>
       {/* Search */}
       <div style={{ position: "relative", marginBottom: 20 }}>
-        <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-label)" }} />
+        <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
         <input
           style={{
             width: "100%", padding: "11px 12px 11px 38px", borderRadius: 12,
-            background: "var(--bg-input)", border: "1px solid var(--border-floating)",
-            color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+            background: "var(--bg-input)", border: "1px solid var(--border-card)",
+            color: "var(--text-primary)", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
           }}
           placeholder="Search mutual funds (e.g. Parag Parikh, Nifty 50, ELSS)..."
           value={query}
@@ -123,7 +123,7 @@ export default function MutualFundsTab() {
       </div>
 
       {showingWatchlist && (
-        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 12 }}>
           WATCHLIST ({watchlist.length})
         </div>
       )}
@@ -141,76 +141,76 @@ export default function MutualFundsTab() {
         {display.map(fund => {
           const nav = navCache[fund.schemeCode];
           const cat = categoryFromName(fund.schemeName);
-          const catColor = CAT_COLORS[cat] || "#94a3b8";
+          const catColor = CAT_COLORS[cat] || "var(--text-dim)";
           const watched = isWatched(fund.schemeCode);
 
           return (
             <div key={fund.schemeCode} style={{
               position: "relative", overflow: "hidden",
-              background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)",
+              background: "var(--bg-input)", border: "1px solid var(--border-card)",
               borderRadius: 14, padding: "14px 16px",
               display: "flex", alignItems: "center", gap: 14,
               transition: "background 0.15s",
             }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--bg-input)"}
+              onMouseLeave={e => e.currentTarget.style.background = "var(--bg-input)"}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1.4, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.4, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {fund.schemeName}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: catColor, background: catColor+"15", border: `1px solid ${catColor}25`, borderRadius: 5, padding: "1px 7px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: catColor, background: catColor+"15", border: `1px solid ${catColor}25`, borderRadius: 5, padding: "1px 7px" }}>
                     {cat}
                   </span>
-                  <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Code: {fund.schemeCode}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Code: {fund.schemeCode}</span>
                 </div>
               </div>
 
               {/* NAV & returns */}
               <div style={{ display: "flex", gap: 20, flexShrink: 0, alignItems: "center" }}>
                 {nav?.error ? (
-                  <div style={{ fontSize: 11, color: "#f87171", textAlign: "right" }}>NAV unavailable</div>
+                  <div style={{ fontSize: 12, color: "var(--bad)", textAlign: "right" }}>NAV unavailable</div>
                 ) : nav ? (
                   <>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>NAV</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>₹{nav.nav}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>NAV</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>₹{nav.nav}</div>
                     </div>
                     {nav.ret1y && (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>1Y</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: parseFloat(nav.ret1y) >= 0 ? "#4ade80" : "#f87171" }}>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>1Y</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: parseFloat(nav.ret1y) >= 0 ? "var(--good)" : "var(--bad)" }}>
                           {parseFloat(nav.ret1y) >= 0 ? "+" : ""}{nav.ret1y}%
                         </div>
                       </div>
                     )}
                     {nav.ret3y && (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>3Y CAGR</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: parseFloat(nav.ret3y) >= 0 ? "#4ade80" : "#f87171" }}>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, marginBottom: 2 }}>3Y CAGR</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: parseFloat(nav.ret3y) >= 0 ? "var(--good)" : "var(--bad)" }}>
                           {parseFloat(nav.ret3y) >= 0 ? "+" : ""}{nav.ret3y}%
                         </div>
                       </div>
                     )}
                   </>
                 ) : (
-                  <div style={{ fontSize: 11, color: "var(--text-dimmer)", textAlign: "right" }}>Loading NAV...</div>
+                  <div style={{ fontSize: 12, color: "var(--text-dimmer)", textAlign: "right" }}>Loading NAV...</div>
                 )}
 
                 <button
                   onClick={() => toggleWatch(fund)}
                   style={{
                     width: 34, height: 34, borderRadius: 9, cursor: "pointer",
-                    background: watched ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.04)",
-                    color: watched ? "#fbbf24" : "var(--text-dim)",
+                    background: watched ? "var(--warn-soft)" : "var(--bg-input)",
+                    color: watched ? "var(--warn)" : "var(--text-dim)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "all 0.2s", flexShrink: 0,
-                    border: `1px solid ${watched ? "rgba(251,191,36,0.3)" : "rgba(255,255,255,0.08)"}`,
+                    border: `1px solid ${watched ? "var(--warn-soft)" : "var(--border-card)"}`,
                   }}
                   title={watched ? "Remove from watchlist" : "Add to watchlist"}
                 >
-                  {watched ? <Star size={14} fill="#fbbf24" /> : <Bookmark size={14} />}
+                  {watched ? <Star size={14} fill="var(--warn)" /> : <Bookmark size={14} />}
                 </button>
               </div>
             </div>

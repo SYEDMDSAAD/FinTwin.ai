@@ -15,23 +15,24 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
     const title = tab ? tab.label : "Copilot";
 
     return (
-        <header className="mb-5">
+        <header className="mb-6 pt-1">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-title md:text-[26px] text-ink min-w-0 truncate">
+                <h1 className="text-[28px] leading-tight font-[650] tracking-[-0.03em] md:text-[30px] text-ink min-w-0 truncate">
                     {title}
                 </h1>
-                <div className="flex items-center gap-2 shrink-0">
-                {activeSection !== COPILOT && (
-                    <button
-                        type="button"
-                        onClick={() => navigateTo(COPILOT)}
-                        className="md:hidden inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small font-semibold bg-accent-soft text-accent"
-                    >
-                        <Sparkles size={14} aria-hidden /> Ask AI
-                    </button>
-                )}
-                    {/* Theme, alerts and account: on every screen, not just Home */}
-                    <Header compact notifications={notifications} onSettings={() => navigateTo("Settings")} />
+                <div className="flex items-center gap-1 shrink-0">
+                    {activeSection !== COPILOT && (
+                        <button
+                            type="button"
+                            onClick={() => navigateTo(COPILOT)}
+                            aria-label="Ask AI"
+                            className="md:hidden w-10 h-10 rounded-full flex items-center justify-center text-accent hover:bg-surface transition-colors"
+                        >
+                            <Sparkles size={20} aria-hidden />
+                        </button>
+                    )}
+                    {/* Alerts and account: on every screen, not just Home */}
+                    <Header notifications={notifications} onSettings={() => navigateTo("Settings")} />
                 </div>
             </div>
 
@@ -39,7 +40,7 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
                 <div
                     role="tablist"
                     aria-label={`${title} sections`}
-                    className="mt-3 -mx-4 px-4 md:mx-0 md:px-0 flex gap-2 overflow-x-auto"
+                    className="mt-4 -mx-4 px-4 md:mx-0 md:px-0 flex gap-1 overflow-x-auto"
                     style={{ scrollbarWidth: "none" }}
                 >
                     {sections.map((s) => {
@@ -51,10 +52,10 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
                                 role="tab"
                                 aria-selected={active}
                                 onClick={() => navigateTo(s.name)}
-                                className={`shrink-0 rounded-full px-3.5 py-1.5 text-small font-medium border transition-colors ${
+                                className={`shrink-0 h-9 rounded-full px-4 text-small font-medium transition-colors ${
                                     active
-                                        ? "bg-accent-strong border-transparent text-accent-on"
-                                        : "bg-surface border-line text-ink-2 hover:border-line-strong"
+                                        ? "bg-ink text-surface"
+                                        : "text-ink-2 hover:bg-surface"
                                 }`}
                             >
                                 {s.label}

@@ -154,7 +154,6 @@ export default function SplashScreen({ isDataReady, onComplete }) {
         backgroundSize: "300% 300%",
         animation: "splashBgShimmer 8s ease infinite",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: "'DM Sans', system-ui, sans-serif",
         opacity: fadingOut ? 0 : 1,
         transition: fadingOut ? "opacity 600ms ease" : "none",
         pointerEvents: fadingOut ? "none" : "auto",

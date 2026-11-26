@@ -47,23 +47,23 @@ export function parsePlan(markdown) {
 const MILESTONE = /^Month\s+(\d+)\s+—\s+(₹[\d,]+)\s+saved\s+\((\d+)%\)$/;
 
 const SECTION_META = {
-  "Do this now": { icon: ListChecks, color: "#a78bfa" },
-  "Milestones": { icon: Flag, color: "#22d3ee" },
-  "Where the money comes from": { icon: Scissors, color: "#4ade80" },
-  "The honest timeline": { icon: Clock, color: "#fbbf24" },
-  "Watch out": { icon: AlertTriangle, color: "#fbbf24" },
-  "Biggest risk": { icon: ShieldAlert, color: "#f87171" },
+  "Do this now": { icon: ListChecks, color: "var(--accent)" },
+  "Milestones": { icon: Flag, color: "var(--accent)" },
+  "Where the money comes from": { icon: Scissors, color: "var(--good)" },
+  "The honest timeline": { icon: Clock, color: "var(--warn)" },
+  "Watch out": { icon: AlertTriangle, color: "var(--warn)" },
+  "Biggest risk": { icon: ShieldAlert, color: "var(--bad)" },
 };
-const DEFAULT_META = { icon: Sparkles, color: "#a78bfa" };
+const DEFAULT_META = { icon: Sparkles, color: "var(--accent)" };
 
 // Only **bold** is emitted by the planner, and only around figures worth
 // pulling out of the sentence. Split rather than inject: the plan is model
 // output, and it never becomes markup.
-function Inline({ text, accent }) {
+function Inline({ text }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) =>
     part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i} style={{ color: accent, fontWeight: 700 }}>
+      <strong key={i} className="text-ink" style={{ fontWeight: 600 }}>
         {part.slice(2, -2)}
       </strong>
     ) : (
@@ -75,7 +75,7 @@ function Inline({ text, accent }) {
 function MilestoneTrack({ items }) {
   const parsed = items.map(item => item.match(MILESTONE));
   if (parsed.some(m => !m)) {
-    return <BulletList items={items} accent="#22d3ee" />;
+    return <BulletList items={items} accent="var(--accent)" />;
   }
   return (
     <ol className="m-0 list-none space-y-0 p-0">
@@ -89,15 +89,15 @@ function MilestoneTrack({ items }) {
             <div className="flex flex-col items-center pt-1.5">
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: last ? "#4ade80" : "#22d3ee" }}
+                style={{ background: last ? "var(--good)" : "var(--accent)" }}
               />
-              {!last && <span className="w-px flex-1 bg-white/10" />}
+              {!last && <span className="w-px flex-1 bg-line" />}
             </div>
             <div className={`flex min-w-0 flex-1 items-baseline justify-between gap-3 ${last ? "" : "pb-3"}`}>
-              <span className="text-[13px] text-zinc-400">Month {month}</span>
+              <span className="text-small text-ink-2">Month {month}</span>
               <span className="flex items-baseline gap-2">
-                <span className="text-[13px] font-bold text-zinc-200">{amount}</span>
-                <span className="text-[11px] tabular-nums text-zinc-500">{share}%</span>
+                <span className="text-small font-semibold text-ink num">{amount}</span>
+                <span className="text-caption num text-ink-3">{share}%</span>
               </span>
             </div>
           </li>
@@ -116,8 +116,8 @@ function BulletList({ items, accent }) {
             className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: accent, opacity: 0.7 }}
           />
-          <span className="text-[13.5px] leading-6 text-zinc-300">
-            <Inline text={item} accent={accent} />
+          <span className="text-small leading-6 text-ink-2">
+            <Inline text={item} />
           </span>
         </li>
       ))}
@@ -130,10 +130,9 @@ function Section({ title, items }) {
   return (
     <div>
       <div
-        className="mb-2.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em]"
-        style={{ color }}
+        className="mb-2 flex items-center gap-1.5 text-small font-semibold text-ink"
       >
-        <Icon size={11} /> {title}
+        <Icon size={14} style={{ color }} aria-hidden /> {title}
       </div>
       {title === "Milestones"
         ? <MilestoneTrack items={items} />
@@ -155,14 +154,14 @@ function AIPlanCard({ plan, regenerating }) {
   const [expanded, setExpanded] = useState(false);
 
   const header = (
-    <div className="mb-3 flex items-center gap-1.5 text-[10px] font-bold tracking-[0.1em] text-purple-400/70">
-      <Sparkles size={11} /> AI PLAN
+    <div className="mb-2 flex items-center gap-1.5 text-small text-ink-3">
+      <Sparkles size={14} className="text-accent" aria-hidden /> Your plan
     </div>
   );
 
   const shell = (children) => (
     <div
-      className="mb-4 rounded-xl border border-purple-500/15 bg-white/[0.02] p-4 transition-opacity duration-300"
+      className="mb-4 rounded-control bg-surface-sunken p-4 transition-opacity duration-300"
       style={{ opacity: regenerating ? 0.45 : 1 }}
       aria-busy={regenerating || undefined}
     >
@@ -173,8 +172,8 @@ function AIPlanCard({ plan, regenerating }) {
 
   if (!plan) {
     return shell(
-      <div className="text-sm text-zinc-500">
-        No plan generated yet — hit “Regenerate AI Plan” below.
+      <div className="text-small text-ink-3">
+        No plan yet. Tap “New plan” below.
       </div>
     );
   }
@@ -183,7 +182,7 @@ function AIPlanCard({ plan, regenerating }) {
   // structured planner. Rendered as they always were.
   if (!parsed) {
     return shell(
-      <div className="text-[15px] leading-7 text-zinc-300">
+      <div className="text-body leading-relaxed text-ink-2">
         <SafeMarkdown>{plan}</SafeMarkdown>
       </div>
     );
@@ -195,7 +194,7 @@ function AIPlanCard({ plan, regenerating }) {
   return shell(
     <>
       {parsed.headline && (
-        <p className="mb-4 text-[15px] font-semibold leading-6 text-zinc-100">
+        <p className="mb-4 text-body font-medium leading-6 text-ink">
           {parsed.headline}
         </p>
       )}
@@ -210,9 +209,9 @@ function AIPlanCard({ plan, regenerating }) {
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-purple-300 transition-colors hover:text-purple-200"
+          className="mt-3 flex items-center gap-1.5 text-small font-semibold text-accent"
         >
-          Show full plan — {hidden} more section{hidden > 1 ? "s" : ""}
+          Show full plan, {hidden} more section{hidden > 1 ? "s" : ""}
           <ChevronDown size={12} />
         </button>
       )}
@@ -220,7 +219,7 @@ function AIPlanCard({ plan, regenerating }) {
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500 transition-colors hover:text-zinc-300"
+          className="mt-3 flex items-center gap-1.5 text-small font-semibold text-ink-3"
         >
           Show less
           <ChevronDown size={12} style={{ transform: "rotate(180deg)" }} />

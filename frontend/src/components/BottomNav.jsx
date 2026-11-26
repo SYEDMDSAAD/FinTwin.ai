@@ -24,10 +24,8 @@ function BottomNav({ activeSection, setActiveSection }) {
                 aria-current={active ? "page" : undefined}
                 className="flex-1 h-full flex flex-col items-center justify-center gap-0.5"
             >
-                <Icon size={21} aria-hidden className={active ? "text-violet-500" : ""}
-                      style={active ? undefined : { color: "var(--text-dim)" }} />
-                <span className={`text-[11px] ${active ? "font-semibold text-violet-500" : ""}`}
-                      style={active ? undefined : { color: "var(--text-dim)" }}>
+                <Icon size={22} strokeWidth={active ? 2.2 : 1.8} aria-hidden className={active ? "text-ink" : "text-ink-3"} />
+                <span className={`text-[11px] ${active ? "font-semibold text-ink" : "font-medium text-ink-3"}`}>
                     {tab.label}
                 </span>
             </button>
@@ -53,8 +51,7 @@ function BottomNav({ activeSection, setActiveSection }) {
                         onClick={() => setActiveSection(SPEND_GUARD)}
                         aria-label="Scan and pay"
                         aria-current={scanning ? "page" : undefined}
-                        className="-mt-5 w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_6px_18px_rgba(124,58,237,0.45)] ring-4"
-                        style={{ color: "#fff", "--tw-ring-color": "var(--bg-sidebar)" }}
+                        className="mt-2 w-12 h-12 rounded-full flex items-center justify-center bg-accent-strong text-accent-on focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                     >
                         <ScanLine size={24} aria-hidden />
                     </button>

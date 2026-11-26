@@ -192,11 +192,11 @@ export default function QrScanner({ onCode, disabled = false }) {
                     </button>
                 ) : (
                     <button type="button" className="sg-btn sg-btn-primary" onClick={startCamera} disabled={disabled}>
-                        <Camera size={16} /> Scan a UPI QR
+                        <Camera size={16} /> Scan QR
                     </button>
                 )}
                 <button type="button" className="sg-btn" onClick={() => fileRef.current?.click()} disabled={disabled}>
-                    <ImageUp size={16} /> Upload a photo
+                    <ImageUp size={16} /> Upload photo
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={fromPhoto} aria-label="QR code photo" />
                 <button type="button" className="sg-btn sg-btn-quiet" onClick={() => setPasting((v) => !v)} disabled={disabled}>

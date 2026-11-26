@@ -85,6 +85,6 @@ describe("EmailAlertsSetup", () => {
   it("says plainly when the server hasn't switched the feature on", async () => {
     mock.onGet("/email-alerts").reply(200, { enabled: false });
     render(<EmailAlertsSetup />);
-    expect(await screen.findByText(/isn't switched on for this FinTwin server/)).toBeInTheDocument();
+    expect(await screen.findByText(/Coming soon: forward your bank's alert emails/)).toBeInTheDocument();
   });
 });

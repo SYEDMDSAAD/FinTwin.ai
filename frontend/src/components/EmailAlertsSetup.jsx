@@ -14,11 +14,11 @@ export const GMAIL_FILTER =
     "from:(hdfcbank.net OR hdfcbank.com OR icicibank.com OR sbi.co.in OR sbicard.com OR axisbank.com OR kotak.com OR bank.in)";
 
 export const STATUS_LABEL = {
-    IMPORTED:     { text: "Added",               color: "#4ade80" },
+    IMPORTED:     { text: "Added",               color: "var(--good)" },
     DUPLICATE:    { text: "Already had it",      color: "var(--text-secondary)" },
-    UNMATCHED:    { text: "Couldn't read",       color: "#fbbf24" },
-    REJECTED:     { text: "Not verified",        color: "#f87171" },
-    CONFIRMATION: { text: "Gmail code received", color: "#22d3ee" },
+    UNMATCHED:    { text: "Couldn't read",       color: "var(--warn)" },
+    REJECTED:     { text: "Not verified",        color: "var(--bad)" },
+    CONFIRMATION: { text: "Gmail code received", color: "var(--accent)" },
 };
 
 const POLL_MS = 15_000;
@@ -76,7 +76,7 @@ export default function EmailAlertsSetup() {
             <section aria-label="Bank alert emails" style={CARD}>
                 <Header />
                 <p style={MUTED}>
-                    Forwarding bank alert emails isn't switched on for this FinTwin server yet. Statement imports work in the meantime.
+                    Coming soon: forward your bank's alert emails and each payment shows up by itself. Until then, add a statement above.
                 </p>
             </section>
         );
@@ -92,7 +92,7 @@ export default function EmailAlertsSetup() {
                 Only alerts signed by a bank's own mail servers are read.
             </p>
 
-            <div style={{ ...LABEL, marginBottom: 6 }}>YOUR FORWARDING ADDRESS</div>
+            <div style={{ ...LABEL, marginBottom: 6 }}>Your forwarding address</div>
             <CopyRow value={state.address} copied={copied === "address"} onCopy={() => copy(state.address, "address")} label="Copy address" />
 
             <ol style={{ margin: "16px 0 0", paddingLeft: 18, display: "grid", gap: 12, fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55 }}>
@@ -127,16 +127,16 @@ export default function EmailAlertsSetup() {
 
             {recent.length > 0 && (
                 <div style={{ marginTop: 20 }}>
-                    <div style={{ ...LABEL, marginBottom: 8 }}>RECENT ALERTS</div>
+                    <div style={{ ...LABEL, marginBottom: 8 }}>Recent alerts</div>
                     <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
                         {recent.slice(0, 8).map((e, i) => {
-                            const s = STATUS_LABEL[e.status] || { text: e.status, color: "#fff" };
+                            const s = STATUS_LABEL[e.status] || { text: e.status, color: "var(--text-primary)" };
                             return (
                                 <li key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12 }}>
                                     <span style={{ color: "var(--text-dim)", minWidth: 92 }}>
                                         {new Date(e.receivedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                                     </span>
-                                    <span style={{ color: "#fff", flex: 1 }}>{e.account || e.bank || "Email"}</span>
+                                    <span style={{ color: "var(--text-primary)", flex: 1 }}>{e.account || e.bank || "Email"}</span>
                                     <span style={{ color: s.color, fontWeight: 600 }} title={e.detail || ""}>{s.text}</span>
                                 </li>
                             );
@@ -145,11 +145,11 @@ export default function EmailAlertsSetup() {
                 </div>
             )}
 
-            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border-card)" }}>
                 {confirmRotate ? (
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 12, color: "var(--text-secondary)" }}>
                         The current address stops working immediately, and you'll set up forwarding in Gmail again.
-                        <button type="button" onClick={rotate} disabled={rotating} style={{ ...LINK_BUTTON, color: "#f87171" }}>
+                        <button type="button" onClick={rotate} disabled={rotating} style={{ ...LINK_BUTTON, color: "var(--bad)" }}>
                             {rotating ? "Creating…" : "Yes, new address"}
                         </button>
                         <button type="button" onClick={() => setConfirmRotate(false)} style={LINK_BUTTON}>Cancel</button>
@@ -166,9 +166,9 @@ export default function EmailAlertsSetup() {
 
 function Header() {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <Mail size={16} color="#22d3ee" aria-hidden />
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: 0 }}>Bank alert emails</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <span style={{ width: 40, height: 40, borderRadius: 99, background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Mail size={18} aria-hidden /></span>
+            <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>Bank alert emails</h3>
         </div>
     );
 }
@@ -178,16 +178,16 @@ function CopyRow({ value, copied, onCopy, label, big, small }) {
         <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
             <code style={{
                 flex: 1, minWidth: 0, overflowX: "auto", whiteSpace: "nowrap",
-                padding: big ? "10px 14px" : "9px 12px", borderRadius: 10,
-                background: "var(--bg-input)", border: "1px solid var(--border-floating)",
-                color: "#fff", fontSize: big ? 18 : small ? 11 : 13, letterSpacing: big ? "0.12em" : 0,
+                padding: big ? "10px 14px" : "10px 12px", borderRadius: "var(--radius-control)",
+                background: "var(--bg-input)", border: "1px solid transparent",
+                color: "var(--text-primary)", fontSize: big ? 18 : small ? 11 : 13, letterSpacing: big ? "0.08em" : 0,
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
             }}>{value}</code>
             <button type="button" onClick={onCopy} aria-label={label} title={label} style={{
-                padding: "0 12px", borderRadius: 10, cursor: "pointer",
-                background: copied ? "rgba(74,222,128,0.12)" : "rgba(167,139,250,0.12)",
-                border: `1px solid ${copied ? "rgba(74,222,128,0.35)" : "rgba(167,139,250,0.3)"}`,
-                color: copied ? "#4ade80" : "#a78bfa",
+                padding: "0 14px", borderRadius: 999, cursor: "pointer",
+                background: copied ? "var(--good-soft)" : "var(--accent-soft)",
+                border: "none",
+                color: copied ? "var(--good)" : "var(--accent)",
             }}>
                 {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
@@ -195,7 +195,7 @@ function CopyRow({ value, copied, onCopy, label, big, small }) {
     );
 }
 
-const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18, padding: 20, marginTop: 20 };
-const LABEL = { fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em" };
-const MUTED = { fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55, margin: 0 };
-const LINK_BUTTON = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "#a78bfa", fontSize: 12, fontWeight: 600, fontFamily: "inherit" };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: "var(--radius-card)", padding: 20, marginTop: 8 };
+const LABEL = { fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" };
+const MUTED = { fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: 0 };
+const LINK_BUTTON = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 13, fontWeight: 600, fontFamily: "inherit" };

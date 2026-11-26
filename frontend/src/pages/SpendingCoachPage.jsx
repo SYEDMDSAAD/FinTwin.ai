@@ -25,148 +25,120 @@ const SEGMENTS = [
 ];
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
-
   .sc * { box-sizing: border-box; }
   .sc {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    margin-bottom: 32px;
+    margin-bottom: 32px; max-width: 42rem;
 
-    --sc-surface: #0d0f17;
-    --sc-card: rgba(255,255,255,0.025);
-    --sc-card-hover: rgba(255,255,255,0.045);
-    --sc-border: rgba(255,255,255,0.08);
-    --sc-border-strong: rgba(255,255,255,0.14);
-    --sc-ink: #e8eaf0;
-    --sc-ink-2: rgba(203,213,225,0.78);
-    --sc-ink-3: rgba(148,163,184,0.62);
-    --sc-accent: #a78bfa;
-    --sc-accent-soft: rgba(167,139,250,0.12);
-    --sc-good: #4ade80;
-    --sc-warn: #fbbf24;
-    --sc-crit: #f87171;
-    --sc-track: rgba(255,255,255,0.07);
-  }
-  :root[data-theme="light"] .sc {
-    --sc-surface: #ffffff;
-    --sc-card: #ffffff;
-    --sc-card-hover: #fbfaff;
-    --sc-border: rgba(109,40,217,0.13);
-    --sc-border-strong: rgba(109,40,217,0.24);
-    --sc-ink: #0f172a;
-    --sc-ink-2: rgba(30,41,59,0.82);
-    --sc-ink-3: rgba(51,65,85,0.62);
-    --sc-accent: #7c3aed;
-    --sc-accent-soft: rgba(124,58,237,0.09);
-    --sc-good: #0ca30c;
-    --sc-warn: #b45309;
-    --sc-crit: #d03b3b;
-    --sc-track: rgba(15,23,42,0.08);
+    --sc-surface: var(--bg-card);
+    --sc-card: var(--bg-card);
+    --sc-card-hover: var(--bg-card-hover);
+    --sc-border: var(--border-card);
+    --sc-border-strong: var(--border-card-hover);
+    --sc-ink: var(--text-primary);
+    --sc-ink-2: var(--text-secondary);
+    --sc-ink-3: var(--text-dim);
+    --sc-accent: var(--accent);
+    --sc-accent-soft: var(--accent-soft);
+    --sc-good: var(--good);
+    --sc-warn: var(--warn);
+    --sc-crit: var(--bad);
+    --sc-track: var(--bg-input);
   }
 
   .sc-card {
     background: var(--sc-card);
     border: 1px solid var(--sc-border);
-    border-radius: 18px;
-    padding: 20px;
-  }
-  :root[data-theme="light"] .sc-card {
-    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(109,40,217,0.06);
+    border-radius: var(--radius-card);
+    padding: 18px;
   }
 
   .sc-eyebrow {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.11em;
-    text-transform: uppercase; color: var(--sc-ink-3);
+    font-size: 13px; font-weight: 500; color: var(--sc-ink-3);
   }
-  .sc-h1 { font-size: 22px; font-weight: 700; color: var(--sc-ink); margin: 0; letter-spacing: -0.02em; }
-  .sc-h2 { font-size: 13px; font-weight: 700; color: var(--sc-ink); margin: 0; letter-spacing: -0.01em; }
+  .sc-h1 { font-size: 22px; font-weight: 650; color: var(--sc-ink); margin: 0; letter-spacing: -0.02em; }
+  .sc-h2 { font-size: 16px; font-weight: 600; color: var(--sc-ink); margin: 0; letter-spacing: -0.01em; }
 
   .sc-btn {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px; border-radius: 10px; cursor: pointer;
-    font-family: inherit; font-size: 12px; font-weight: 700;
-    border: 1px solid var(--sc-border-strong);
-    background: var(--sc-accent-soft); color: var(--sc-accent);
-    transition: background 0.15s, transform 0.15s;
+    min-height: 36px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    border: none; background: var(--sc-track); color: var(--sc-ink);
+    transition: filter 0.15s;
   }
-  .sc-btn:hover { transform: translateY(-1px); }
+  .sc-btn:hover { filter: brightness(0.97); }
   /* Scoped away from the primary button: an unscoped .sc-btn:hover outranks
      .sc-btn-primary on specificity and repaints the gradient with the card
      colour, leaving white text on a white button. */
   .sc-btn:not(.sc-btn-primary):hover { background: var(--sc-card-hover); }
   .sc-btn-primary {
-    padding: 13px 26px; font-size: 14px; border: none; border-radius: 12px;
-    background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff;
+    min-height: 48px; padding: 12px 24px; font-size: 15px; border: none;
+    background: var(--accent-strong); color: var(--on-accent);
   }
-  .sc-btn-primary:hover {
-    background: linear-gradient(135deg, #b39dfb, #8b4bf0);
-    box-shadow: 0 6px 18px rgba(124,58,237,0.35);
-  }
+  .sc-btn-primary:hover { filter: brightness(1.08); }
 
   /* ── KPI row ─────────────────────────────────────────────── */
-  .sc-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+  .sc-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
   .sc-kpi-label { display: flex; align-items: center; gap: 7px; margin-bottom: 14px; }
   .sc-kpi-value {
-    font-size: 28px; font-weight: 700; color: var(--sc-ink);
+    font-size: 28px; font-weight: 650; color: var(--sc-ink);
     letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums;
   }
   /* Exactly one hero figure on the page. */
-  .sc-hero-value { font-size: 48px; font-weight: 800; letter-spacing: -0.035em; }
-  .sc-kpi-sub { font-size: 11px; color: var(--sc-ink-3); margin-top: 7px; line-height: 1.5; }
+  .sc-hero-value { font-size: 44px; font-weight: 650; letter-spacing: -0.035em; }
+  .sc-kpi-sub { font-size: 13px; color: var(--sc-ink-3); margin-top: 7px; line-height: 1.5; }
 
   /* ── Segmented meter ─────────────────────────────────────── */
-  .sc-meter { display: flex; gap: 2px; height: 8px; margin-top: 16px; }
+  .sc-meter { display: flex; gap: 2px; height: 6px; margin-top: 16px; }
   .sc-meter-seg:first-child { border-radius: 4px 0 0 4px; }
   .sc-meter-seg:last-child  { border-radius: 0 4px 4px 0; }
   .sc-meter-seg:only-child  { border-radius: 4px; }
   .sc-meter-track { flex: 1; background: var(--sc-track); border-radius: 4px; }
   .sc-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 12px; }
-  .sc-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sc-ink-3); }
+  .sc-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sc-ink-3); }
   .sc-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
   .sc-legend-value { color: var(--sc-ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 
   /* ── Caveats ─────────────────────────────────────────────── */
-  .sc-caveats { border-left: 3px solid var(--sc-warn); margin-bottom: 14px; }
-  .sc-caveat { display: flex; gap: 9px; font-size: 12px; color: var(--sc-ink-2); line-height: 1.6; }
+  .sc-caveats { background: var(--warn-soft); border: none; margin-bottom: 12px; }
+  .sc-caveat { display: flex; gap: 9px; font-size: 13px; color: var(--sc-ink-2); line-height: 1.6; }
   .sc-caveat + .sc-caveat { margin-top: 9px; }
 
   /* ── Insights ────────────────────────────────────────────── */
   .sc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .sc-insight {
-    display: flex; gap: 11px; padding: 14px 15px; border-radius: 12px;
-    background: var(--sc-accent-soft); border: 1px solid var(--sc-border);
+    display: flex; gap: 11px; padding: 14px 15px; border-radius: 14px;
+    background: var(--sc-track); border: none;
     transition: background 0.15s;
   }
   .sc-insight:hover { background: var(--sc-card-hover); }
-  .sc-insight-title { font-size: 12.5px; font-weight: 700; color: var(--sc-ink); line-height: 1.45; }
-  .sc-insight-detail { font-size: 11.5px; color: var(--sc-ink-3); line-height: 1.6; margin-top: 4px; }
+  .sc-insight-title { font-size: 15px; font-weight: 500; color: var(--sc-ink); line-height: 1.45; }
+  .sc-insight-detail { font-size: 13px; color: var(--sc-ink-3); line-height: 1.6; margin-top: 4px; }
 
   /* ── Recommendations ─────────────────────────────────────── */
   .sc-rec { display: flex; gap: 14px; padding: 16px 0; border-top: 1px solid var(--sc-border); }
   .sc-rec:first-child { border-top: none; padding-top: 4px; }
   .sc-rank {
-    flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px;
     display: flex; align-items: center; justify-content: center;
     background: var(--sc-accent-soft); color: var(--sc-accent);
-    font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+    font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums;
   }
   .sc-rec-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .sc-rec-action { font-size: 13.5px; font-weight: 700; color: var(--sc-ink); letter-spacing: -0.01em; }
-  .sc-rec-why { font-size: 12px; color: var(--sc-ink-2); line-height: 1.65; margin-top: 6px; }
+  .sc-rec-action { font-size: 15px; font-weight: 600; color: var(--sc-ink); letter-spacing: -0.01em; }
+  .sc-rec-why { font-size: 14px; color: var(--sc-ink-2); line-height: 1.65; margin-top: 6px; }
   .sc-rec-evidence {
-    font-size: 10.5px; color: var(--sc-ink-3); margin-top: 8px;
-    font-family: 'DM Mono', ui-monospace, monospace; letter-spacing: 0.01em;
+    font-size: 12px; color: var(--sc-ink-3); margin-top: 8px; font-variant-numeric: tabular-nums;
   }
   .sc-impact {
     margin-left: auto; flex-shrink: 0; text-align: right;
-    font-size: 15px; font-weight: 800; color: var(--sc-ink);
+    font-size: 15px; font-weight: 650; color: var(--sc-ink);
     letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
   }
-  .sc-impact-unit { font-size: 10px; font-weight: 600; color: var(--sc-ink-3); display: block; margin-top: 1px; }
+  .sc-impact-unit { font-size: 12px; font-weight: 600; color: var(--sc-ink-3); display: block; margin-top: 1px; }
   .sc-chip {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
-    letter-spacing: 0.03em; border: 1px solid var(--sc-border);
+    padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    border: none;
     color: var(--sc-ink-3); background: var(--sc-track);
   }
 
@@ -179,7 +151,7 @@ const CSS = `
 
   .sc-footer {
     display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 16px;
-    font-size: 11px; color: var(--sc-ink-3);
+    font-size: 12px; color: var(--sc-ink-3);
   }
 
   @media (max-width: 900px) {
@@ -272,7 +244,7 @@ function SpendingCoachPage() {
         <style>{CSS}</style>
         <div className="sc" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 16 }}>
           <div className="sc-pulse" style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--sc-accent-soft)", border: "1px solid var(--sc-border-strong)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Brain size={26} color="#a78bfa" className="sc-spin" />
+            <Brain size={26} color="var(--accent)" className="sc-spin" />
           </div>
           <p style={{ fontSize: 13, color: "var(--sc-ink-3)" }}>Analysing your transactions…</p>
         </div>
@@ -286,17 +258,16 @@ function SpendingCoachPage() {
         <style>{CSS}</style>
         <div className="sc">
           <Header generated={generated} savedAt={savedAt} loading={loading} onRefresh={fetchCoach} />
-          <div className="sc-card" style={{ padding: "60px 40px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(167,139,250,0.09) 0%,transparent 70%)", pointerEvents: "none" }} />
-            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--sc-accent-soft)", border: "1px solid var(--sc-border-strong)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-              <Brain size={30} color="#a78bfa" />
+          <div className="sc-card" style={{ padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--sc-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <Brain size={24} color="var(--accent)" />
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--sc-ink)", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+            <h2 style={{ fontSize: 20, fontWeight: 650, color: "var(--sc-ink)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>
               Find what your money is doing
             </h2>
-            <p style={{ fontSize: 13, color: "var(--sc-ink-3)", margin: "0 0 28px", lineHeight: 1.7 }}>
-              We read every transaction in your last three months — recurring charges,<br />
-              one-off spikes, category drift — then rank what is worth acting on.
+            <p style={{ fontSize: 15, color: "var(--sc-ink-2)", margin: "0 auto 24px", lineHeight: 1.5, maxWidth: 380 }}>
+              FinTwin reads your last three months: recurring charges, one-off spikes and
+              categories that drift. Then it ranks what's worth acting on.
             </p>
             <button className="sc-btn sc-btn-primary" onClick={fetchCoach}>
               <Zap size={16} /> Analyse my spending

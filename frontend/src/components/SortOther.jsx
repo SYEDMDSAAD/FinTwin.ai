@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Tags, ChevronDown, Sparkles, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import { Button } from "./ui";
 import { storedUserIsDemo } from "../utils/demoGuard";
 import { EDIT_CATEGORIES } from "../constants/categories";
 import { normalizeMerchant as norm } from "../utils/merchant";
@@ -91,70 +92,71 @@ export default function SortOther({ onSorted, onBulkChanged }) {
     const shown = expanded ? groups : groups.slice(0, 6);
 
     return (
-        <section aria-label="Sort out Other" style={{ background: "var(--bg-card)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 16, padding: open ? 18 : "12px 18px", margin: "16px 0" }}>
+        <section aria-label="Sort out Other" className="mb-6 rounded-card bg-surface border border-line">
             <button
                 type="button"
                 onClick={toggleOpen}
                 aria-expanded={open}
                 aria-controls="sort-other-list"
-                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
             >
-                <Tags size={16} color="#fbbf24" aria-hidden />
-                <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
-                    {inr(total)} in {count} {count === 1 ? "payment is" : "payments is"} still "Other"
+                <span className="shrink-0 w-10 h-10 rounded-full bg-warn-soft text-warn flex items-center justify-center"><Tags size={18} aria-hidden /></span>
+                <span className="min-w-0 flex-1">
+                    <span className="block text-body text-ink">{inr(total)} still in "Other"</span>
+                    <span className="block text-small text-ink-3">
+                        {count} {count === 1 ? "payment" : "payments"} · {groups.length} {groups.length === 1 ? "payee" : "payees"} to sort
+                    </span>
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
-                    {open ? "Hide" : `Sort ${groups.length} ${groups.length === 1 ? "payee" : "payees"}`}
-                </span>
-                <ChevronDown size={16} color="var(--text-secondary)" aria-hidden
-                             style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+                <ChevronDown size={18} aria-hidden className={`shrink-0 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
 
-            {open && <div id="sort-other-list" style={{ marginTop: 10 }}>
-            <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.55 }}>
-                Pick a category for each payee. It applies to all their payments and to future ones, so your budgets and trends stay accurate.
+            {open && <div id="sort-other-list" className="border-t border-line">
+            <p className="px-4 pt-3 text-small text-ink-3">
+                Pick a category for each payee. It applies to their past and future payments.
                 {suggesting && <span role="status"> Getting suggestions…</span>}
             </p>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-                {shown.map(g => (
-                    <li key={g.sampleId} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <div style={{ flex: "1 1 180px", minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.payee}</div>
-                            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                                {g.count} {g.count === 1 ? "payment" : "payments"} · {inr(g.total)}
-                            </div>
+            <ul className="divide-y divide-line">
+                {shown.map(g => {
+                    const guess = suggestions?.[norm(g.merchant)];
+                    return (
+                    <li key={g.sampleId} className="px-4 py-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-body text-ink truncate">{g.payee}</span>
+                            <span className="text-small text-ink-3 num shrink-0">{g.count} · {inr(g.total)}</span>
                         </div>
-                        {suggestions?.[norm(g.merchant)] && (
-                            <button
-                                type="button"
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {guess && (
+                                <button
+                                    type="button"
+                                    disabled={busy === g.sampleId}
+                                    onClick={() => sort(g, guess)}
+                                    aria-label={`Accept ${guess} for ${g.payee}`}
+                                    title="FinTwin's guess from the payee's name"
+                                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-accent-soft text-accent text-small font-medium disabled:opacity-50">
+                                    <Sparkles size={14} aria-hidden /> {guess} <Check size={14} aria-hidden />
+                                </button>
+                            )}
+                            <select
+                                aria-label={`Category for ${g.payee}`}
+                                defaultValue=""
                                 disabled={busy === g.sampleId}
-                                onClick={() => sort(g, suggestions[norm(g.merchant)])}
-                                aria-label={`Accept ${suggestions[norm(g.merchant)]} for ${g.payee}`}
-                                title="FinTwin's guess from the payee's name — check it before accepting"
-                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 10, border: "1px solid rgba(167,139,250,0.4)", background: "rgba(167,139,250,0.12)", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600 }}>
-                                <Sparkles size={12} color="#a78bfa" aria-hidden />
-                                <span style={{ color: "var(--text-primary)" }}>{suggestions[norm(g.merchant)]}</span>
-                                <Check size={13} color="#a78bfa" aria-hidden />
-                            </button>
-                        )}
-                        <select
-                            aria-label={`Category for ${g.payee}`}
-                            defaultValue=""
-                            disabled={busy === g.sampleId}
-                            onChange={e => e.target.value && sort(g, e.target.value)}
-                            style={{ flex: "0 0 160px", padding: "7px 10px", borderRadius: 10, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 12, fontFamily: "inherit" }}
-                        >
-                            <option value="">{suggestions?.[norm(g.merchant)] ? "Something else…" : "Choose category…"}</option>
-                            {CHOICES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                                onChange={e => e.target.value && sort(g, e.target.value)}
+                                className="h-9 rounded-full bg-surface-sunken border border-transparent px-3 text-small text-ink"
+                            >
+                                <option value="">{guess ? "Something else" : "Choose category"}</option>
+                                {CHOICES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
                     </li>
-                ))}
+                    );
+                })}
             </ul>
             {groups.length > 6 && (
-                <button type="button" onClick={() => setExpanded(x => !x)}
-                        style={{ marginTop: 12, background: "none", border: "none", padding: 0, cursor: "pointer", color: "#a78bfa", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
-                    {expanded ? "Show fewer" : `Show all ${groups.length} payees`}
-                </button>
+                <div className="px-2 pb-2">
+                    <Button variant="ghost" size="sm" onClick={() => setExpanded(x => !x)}>
+                        {expanded ? "Show fewer" : `Show all ${groups.length} payees`}
+                    </Button>
+                </div>
             )}
             </div>}
         </section>

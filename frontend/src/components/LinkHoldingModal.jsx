@@ -77,8 +77,8 @@ export default function LinkHoldingModal({ holding, onClose, onLinked, onOther }
     const label = { display: "block", fontSize: 12, color: "var(--text-secondary)" };
     const chip = (on) => ({
         display: "flex", alignItems: "center", gap: 6, flex: 1, padding: "10px 12px", borderRadius: 12, cursor: "pointer",
-        border: `1px solid ${on ? "rgba(167,139,250,0.55)" : "var(--border-card)"}`,
-        background: on ? "rgba(167,139,250,0.14)" : "var(--bg-subtle)", color: "var(--text-primary)",
+        border: `1px solid ${on ? "var(--accent)" : "var(--border-card)"}`,
+        background: on ? "var(--accent-soft)" : "var(--bg-input)", color: "var(--text-primary)",
         fontSize: 13, fontWeight: 600, fontFamily: "inherit",
     });
 
@@ -129,7 +129,7 @@ export default function LinkHoldingModal({ holding, onClose, onLinked, onOther }
                                         <button type="button" onClick={() => setPicked({ symbol, name: r.name })}
                                                 style={{ width: "100%", textAlign: "left", padding: "9px 10px", borderRadius: 10, border: "none", background: "none", cursor: "pointer", fontFamily: "inherit" }}>
                                             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{r.name}</div>
-                                            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                                                 {kind === "FUND" ? `${r.amc} · NAV ${inr(r.nav, 2)}` : `${r.symbol} · ${r.exchange}`}
                                             </div>
                                         </button>
@@ -142,13 +142,13 @@ export default function LinkHoldingModal({ holding, onClose, onLinked, onOther }
 
                 {picked && (
                     <div style={{ display: "grid", gap: 12 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "var(--bg-subtle)", border: "1px solid var(--border-card)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "var(--bg-input)", border: "1px solid var(--border-card)" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{picked.name}</div>
-                                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{picked.symbol}</div>
+                                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{picked.symbol}</div>
                             </div>
                             <button type="button" onClick={() => { setPicked(null); setPreview(null); }}
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#a78bfa", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
                                 Change
                             </button>
                         </div>
@@ -171,23 +171,23 @@ export default function LinkHoldingModal({ holding, onClose, onLinked, onOther }
 
                         {!preview ? (
                             <button type="button" disabled={!ready || busy === "preview"} onClick={runPreview}
-                                    style={{ padding: 11, borderRadius: 12, border: "1px solid rgba(167,139,250,0.4)", background: "rgba(167,139,250,0.12)", cursor: ready ? "pointer" : "default", fontFamily: "inherit", fontSize: 13, fontWeight: 700 }}>
-                                <span style={{ color: "#a78bfa" }}>{busy === "preview" ? "Looking up prices…" : "Show today's value"}</span>
+                                    style={{ padding: 11, borderRadius: 12, border: "none", background: "var(--accent-soft)", cursor: ready ? "pointer" : "default", fontFamily: "inherit", fontSize: 13, fontWeight: 700 }}>
+                                <span style={{ color: "var(--accent)" }}>{busy === "preview" ? "Looking up prices…" : "Show today's value"}</span>
                             </button>
                         ) : (
-                            <div role="status" style={{ padding: 14, borderRadius: 12, background: "var(--bg-subtle)", border: "1px solid var(--border-card)" }}>
+                            <div role="status" style={{ padding: 14, borderRadius: 12, background: "var(--bg-input)", border: "1px solid var(--border-card)" }}>
                                 <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6 }}>
                                     On {longDate(preview.purchaseDate)}, {inr(preview.amount)} bought{" "}
                                     <strong style={{ color: "var(--text-primary)" }}>{Number(preview.units).toLocaleString("en-IN", { maximumFractionDigits: 4 })} {kind === "FUND" ? "units" : "shares"}</strong>{" "}
                                     at {inr(preview.purchasePrice, 2)}.
                                 </div>
                                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
-                                    <span style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>{inr(preview.currentValue)}</span>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: preview.gain >= 0 ? "#4ade80" : "#f87171" }}>
+                                    <span style={{ fontSize: 22, fontWeight: 650, color: "var(--text-primary)" }}>{inr(preview.currentValue)}</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: preview.gain >= 0 ? "var(--good)" : "var(--bad)" }}>
                                         {preview.gain >= 0 ? "+" : "−"}{inr(Math.abs(preview.gain))} ({preview.gainPct >= 0 ? "+" : ""}{preview.gainPct}%)
                                     </span>
                                 </div>
-                                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
+                                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
                                     Today's {kind === "FUND" ? "NAV" : "price"}: {inr(preview.currentPrice, 2)}
                                 </div>
                             </div>
@@ -195,7 +195,7 @@ export default function LinkHoldingModal({ holding, onClose, onLinked, onOther }
 
                         {preview && (
                             <button type="button" onClick={save} disabled={busy === "save"}
-                                    style={{ padding: 12, borderRadius: 12, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                    style={{ padding: 12, borderRadius: 12, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                                 {busy === "save" ? "Saving…" : "Save to my portfolio"}
                             </button>
                         )}

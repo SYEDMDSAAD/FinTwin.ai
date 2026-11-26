@@ -71,7 +71,6 @@ export default function SpendGuardPage({ onFinTwinChanged }) {
             <style>{GUARD_CSS}</style>
             <div className="sg-head">
                 <div>
-                    <div className="sg-eyebrow">New</div>
                     <h1 className="sg-h1">Spend Guard</h1>
                     <p className="sg-sub">Splits your salary on payday, and pauses before a payment you might regret.</p>
                 </div>

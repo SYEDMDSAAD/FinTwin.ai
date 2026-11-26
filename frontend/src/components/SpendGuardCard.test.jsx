@@ -20,9 +20,8 @@ describe("SpendGuardCard", () => {
         const onOpen = vi.fn();
         render(<SpendGuardCard onOpen={onOpen} />);
         expect(await screen.findByText("₹3,550")).toBeInTheDocument();
-        expect(screen.getByText("3 days to your next allowance")).toBeInTheDocument();
+        expect(screen.getByText("3 days to your next allowance · 1 paused this week")).toBeInTheDocument();
         expect(screen.getByText("₹1,200")).toBeInTheDocument();
-        expect(screen.getByText("1 paused this week")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: /open spend guard/i }));
         expect(onOpen).toHaveBeenCalled();
         expect(guardApi.guard).toHaveBeenCalledWith("wallet");

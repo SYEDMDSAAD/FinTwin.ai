@@ -1,272 +1,90 @@
-import { useState, useEffect } from "react";
-import { rupees, percent, dayRange, changeTone, NEUTRAL } from "../utils/money";
+import { ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { rupees, percent, dayRange, changeTone, GOOD, BAD } from "../utils/money";
+import { cx } from "./ui";
 
-// Counts up (or down) to the value; the sign stays in front of the ₹
-function AnimatedNumber({
-    value,
-    duration = 1200
-}) {
+/*
+ * This month at a glance: what was saved as the one big number, then money
+ * in, money out and next month's prediction as rows. Each change is measured
+ * against the same days of last month.
+ */
 
-    const [display, setDisplay] = useState(0);
+const toneOf = (hex) => (hex === GOOD ? "good" : hex === BAD ? "bad" : "neutral");
+const TONE_CLASS = { good: "text-good", bad: "text-bad", neutral: "text-ink-3" };
 
-    useEffect(() => {
-
-        const target = Number(value) || 0;
-        const steps = Math.max(1, Math.round(duration / 16));
-        let step = 0;
-
-        const timer = setInterval(() => {
-
-            step += 1;
-
-            if (step >= steps) {
-
-                setDisplay(target);
-                clearInterval(timer);
-
-            } else {
-
-                setDisplay((target * step) / steps);
-
-            }
-
-        }, 16);
-
-        return () => clearInterval(timer);
-
-    }, [value, duration]);
-
-    return <span>{rupees(display)}</span>;
+function Trend({ id, c }) {
+    return (
+        <span data-testid={`trend-${id}`} data-tone={c.tone} title={c.title}
+              className={cx("inline-flex items-center gap-0.5 text-small font-medium num", TONE_CLASS[c.tone])}>
+            {c.icon}{c.trend}
+        </span>
+    );
 }
 
-import { motion } from "framer-motion";
-import {
-    ArrowUp,
-    ArrowDown,
-    Sparkles
-} from "lucide-react";
-
-function AnalyticsCards({
-    income,
-    expenses,
-    savings,
-    prediction,
-    incomeTrend,
-    expenseTrend,
-    savingsTrend,
-    compared = {}
-}) {
-
-    // What the change is measured against: the same days of last month
+function AnalyticsCards({ income, expenses, savings, prediction, incomeTrend, expenseTrend, savingsTrend, compared = {} }) {
     const range = dayRange(compared.from, compared.to);
     const against = range ? `vs ${range}` : "vs last month";
 
-    // The arrow follows the change itself; its colour says whether that's
+    // The arrow follows the change itself; the colour says whether that's
     // good: more income or savings is, more spending isn't.
     const change = (trend, before, goodWhenUp) => {
         if (before === 0) {
             return {
                 trend: "—",
                 icon: null,
-                tone: NEUTRAL,
-                title: range ? `Nothing on record for ${range} to compare with` : "Nothing to compare with yet"
+                tone: "neutral",
+                title: range ? `Nothing on record for ${range} to compare with` : "Nothing to compare with yet",
             };
         }
         const n = Number(trend) || 0;
         return {
             trend: percent(n, { plus: true }),
-            icon: n < 0 ? <ArrowDown size={12} /> : n > 0 ? <ArrowUp size={12} /> : null,
-            tone: changeTone(n, goodWhenUp),
-            title: before == null ? "" : `${rupees(before)} on ${range || "last month"}`
+            icon: n < 0 ? <ArrowDown size={13} aria-hidden /> : n > 0 ? <ArrowUp size={13} aria-hidden /> : null,
+            tone: toneOf(changeTone(n, goodWhenUp)),
+            title: before == null ? "" : `${rupees(before)} on ${range || "last month"}`,
         };
     };
 
-    const cards = [
-        {
-            label: "Total Income",
-            value: income,
-            color: "#4ade80",
-            ...change(incomeTrend, compared.income, true),
-            sub: `This month · ${against}`
-        },
-
-        {
-            label: "Total Expenses",
-            value: Math.abs(expenses),
-            color: "#f87171",
-            ...change(expenseTrend, compared.expenses, false),
-            sub: `This month · ${against}`
-        },
-
-        {
-            label: "Net Savings",
-            value: savings,
-            color: "#22d3ee",
-            ...change(savingsTrend, compared.savings, true),
-            sub: `This month · ${against}`
-        },
-
-        {
-            label: "Predicted Expense",
-            value: prediction || 0,
-            color: "#a78bfa",
-            trend: "AI Forecast",
-            icon: <Sparkles size={12} />,
-            tone: "#a78bfa",
-            title: "",
-            sub: "Next month"
-        }
+    const saved = change(savingsTrend, compared.savings, true);
+    const rows = [
+        { id: "Total Income", label: "Money in", value: income, c: change(incomeTrend, compared.income, true) },
+        { id: "Total Expenses", label: "Money out", value: Math.abs(expenses), c: change(expenseTrend, compared.expenses, false) },
     ];
 
     return (
+        <section aria-label="This month" className="max-w-2xl mb-8">
+            <div className="px-1">
+                <p className="text-small text-ink-3">{savings < 0 ? "Overspent this month" : "Saved this month"}</p>
+                <p className={cx("text-hero num mt-1", savings < 0 ? "text-bad" : "text-ink")}>{rupees(savings)}</p>
+                <p className="mt-2 flex items-center gap-2 text-small text-ink-3">
+                    <Trend id="Net Savings" c={saved} />
+                    <span>{`This month · ${against}`}</span>
+                </p>
+            </div>
 
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="
-                grid
-                grid-cols-2
-                xl:grid-cols-4
-                gap-3
-                sm:gap-4
-                mb-8
-            "
-        >
-
-            {cards.map((card, index) => (
-
-                <div
-                    key={card.label}
-                    className="
-                        relative
-                        overflow-hidden
-                        rounded-2xl
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                        p-4
-                        sm:p-5
-                        md:p-6
-                        transition-all
-                        duration-300
-                        hover:-translate-y-1
-                        hover:border-white/20
-                        hover:bg-white/[0.05]
-                    "
-                >
-
-                    {/* Top Glow */}
-
-                    <div
-                        className="
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-gradient-to-r
-                            from-transparent
-                            via-white/20
-                            to-transparent
-                        "
-                    />
-
-                    <div className="
-                        flex
-                        justify-between
-                        items-start
-                        mb-4
-                        sm:mb-5
-                    ">
-
-                        <span
-                            className="
-                                text-[10px]
-                                sm:text-[11px]
-                                uppercase
-                                tracking-wide
-                                sm:tracking-widest
-                                text-zinc-500
-                                font-semibold
-                            "
-                        >
-                            {card.label}
+            <ul className="mt-6 rounded-card bg-surface border border-line divide-y divide-line">
+                {rows.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                        <span className="min-w-0">
+                            <span className="block text-body text-ink">{r.label}</span>
+                            <span className="block text-small text-ink-3">{`This month · ${against}`}</span>
                         </span>
-
-                        <div
-                            className="
-                                flex
-                                items-center
-                                gap-1
-                                px-1.5
-                                py-0.5
-                                sm:px-2
-                                sm:py-1
-                                rounded-md
-                                text-[9px]
-                                sm:text-[10px]
-                                font-bold
-                                shrink-0
-                            "
-                            style={{
-                                color: card.tone,
-                                backgroundColor: `${card.tone}18`
-                            }}
-                            title={card.title || undefined}
-                            data-testid={`trend-${card.label}`}
-                        >
-                            {card.icon}
-                            {card.trend}
-                        </div>
-
-                    </div>
-
-                    <h2
-                        className="
-                            text-xl
-                            sm:text-2xl
-                            md:text-3xl
-                            font-bold
-                            text-white
-                            tracking-tight
-                            tabular-nums
-                        "
-                    >
-                        <AnimatedNumber
-                            value={Math.round(Number(card.value) || 0)}
-                            duration={1000 + index * 200}
-                        />
-                    </h2>
-
-                    <p
-                        className="
-                            text-xs
-                            text-zinc-500
-                            mt-2
-                        "
-                    >
-                        {card.sub}
-                    </p>
-
-                    <div
-                        className="
-                            absolute
-                            bottom-0
-                            left-0
-                            right-0
-                            h-[2px]
-                        "
-                        style={{
-                            background: `linear-gradient(90deg, transparent, ${card.color}, transparent)`
-                        }}
-                    />
-
-                </div>
-
-            ))}
-
-        </motion.div>
+                        <span className="text-right shrink-0">
+                            <span className="block text-body font-semibold text-ink num">{rupees(r.value)}</span>
+                            <Trend id={r.id} c={r.c} />
+                        </span>
+                    </li>
+                ))}
+                <li className="flex items-center justify-between gap-3 px-4 py-3.5">
+                    <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-body text-ink">
+                            Predicted spending <Sparkles size={14} aria-hidden className="text-accent" />
+                        </span>
+                        <span className="block text-small text-ink-3">Next month</span>
+                    </span>
+                    <span className="shrink-0 text-body font-semibold text-ink num">{rupees(prediction || 0)}</span>
+                </li>
+            </ul>
+        </section>
     );
 }
 

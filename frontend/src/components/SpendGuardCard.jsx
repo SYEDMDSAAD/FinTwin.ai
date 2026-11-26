@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 import { guard, guardEnabled } from "../services/guardApi";
+import { Button } from "./ui";
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
 
@@ -35,69 +36,41 @@ export default function SpendGuardCard({ onOpen }) {
     const pauses = thisWeek.filter((e) => e.decision === "pause").length;
     const days = wallet.daysToAllowance;
     const stats = [
-        { label: "Spending money left", value: inr(wallet.balances?.spending),
+        { label: "Spending money left", short: "Left this week", value: inr(wallet.balances?.spending),
           note: days == null ? "this week" : `${days} day${days === 1 ? "" : "s"} to your next allowance` },
-        { label: "Saved by pausing", value: inr(wallet.savedByPausing), note: "payments you skipped or put off" },
-        { label: "Payments checked", value: String(thisWeek.length), note: `${pauses} paused this week` },
+        { label: "Saved by pausing", short: "Saved", value: inr(wallet.savedByPausing), note: "payments you skipped or put off" },
+        { label: "Payments checked", short: "Checked", value: String(thisWeek.length), note: `${pauses} paused this week` },
     ];
 
+    const used = wallet.recent?.length > 0;
     return (
-        <section className="sgc" aria-labelledby="sg-dash-title">
-            <style>{CSS}</style>
-            <div className="sgc-top">
-                <div className="sgc-head">
-                    <div className="sgc-icon"><ShieldCheck size={20} aria-hidden /></div>
-                    <div style={{ minWidth: 0 }}>
-                        <h2 id="sg-dash-title" className="sgc-title">Spend Guard <span className="sgc-new">New feature</span></h2>
-                        <p className="sgc-sub">
-                            Checks a payment before you pay, against your budget, your week and your goals,
-                            and pauses only when it matters.
-                        </p>
-                    </div>
+        <section aria-labelledby="sg-dash-title" className="rounded-card bg-surface border border-line p-4 md:p-5">
+            <div className="flex items-start gap-3">
+                <span className="shrink-0 w-10 h-10 rounded-full bg-accent-soft text-accent flex items-center justify-center">
+                    <ShieldCheck size={18} aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <h2 id="sg-dash-title" className="text-heading text-ink">Spend Guard</h2>
+                    <p className="text-small text-ink-3 mt-0.5">
+                        {used
+                            ? [stats[0].note, stats[2].note].join(" · ")
+                            : "Scan a QR before you pay. It pauses only when it matters."}
+                    </p>
                 </div>
-                <button type="button" className="sgc-btn" onClick={onOpen}>
-                    {wallet.recent?.length ? "Open Spend Guard" : "Try Spend Guard"} <ArrowRight size={16} aria-hidden />
-                </button>
             </div>
-            <div className="sgc-stats">
-                {stats.map((s) => (
-                    <div key={s.label} className="sgc-stat">
-                        <div className="sgc-label">{s.label}</div>
-                        <div className="sgc-value">{s.value}</div>
-                        <div className="sgc-note">{s.note}</div>
-                    </div>
-                ))}
-            </div>
+            {used && (
+                <dl className="mt-4 grid grid-cols-3 divide-x divide-line rounded-control bg-surface-sunken py-3">
+                    {stats.map((s) => (
+                        <div key={s.label} className="px-3 min-w-0">
+                            <dt className="text-caption text-ink-3 truncate">{s.short}</dt>
+                            <dd className="text-heading text-ink num mt-0.5 truncate">{s.value}</dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
+            <Button variant="secondary" className="mt-4 w-full" onClick={onOpen}>
+                {used ? "Open Spend Guard" : "Try Spend Guard"} <ArrowRight size={16} aria-hidden />
+            </Button>
         </section>
     );
 }
-
-// Dark by default; the light theme (the app's default) swaps the tokens
-const CSS = `
-  .sgc { --sgc-ink: #f8fafc; --sgc-sub: #cbd5e1; --sgc-muted: #94a3b8; --sgc-accent: #4ade80;
-         --sgc-bg: linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,211,238,0.06));
-         --sgc-border: rgba(34,197,94,0.25); --sgc-tile: rgba(255,255,255,0.04); --sgc-tile-border: rgba(255,255,255,0.08);
-         position: relative; overflow: hidden; margin-bottom: 24px; background: var(--sgc-bg);
-         border: 1px solid var(--sgc-border); border-radius: 22px;
-         padding: clamp(16px, 4vw, 24px) clamp(16px, 4vw, 28px); }
-  :root[data-theme="light"] .sgc { --sgc-ink: #0f172a; --sgc-sub: #334155; --sgc-muted: #475569; --sgc-accent: #15803d;
-         --sgc-bg: linear-gradient(135deg, #f0fdf4, #ecfeff); --sgc-border: #bbf7d0;
-         --sgc-tile: #ffffff; --sgc-tile-border: #dcfce7; }
-  .sgc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .sgc-head { display: flex; gap: 12px; align-items: flex-start; min-width: 0; flex: 1 1 280px; }
-  .sgc-icon { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center;
-              background: rgba(34,197,94,0.15); color: var(--sgc-accent); }
-  .sgc-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--sgc-ink); }
-  .sgc-new { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
-             text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: #15803d; color: #fff; vertical-align: 3px; }
-  .sgc-sub { margin: 4px 0 0; font-size: 14px; color: var(--sgc-sub); line-height: 1.5; }
-  .sgc-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; border: none;
-             cursor: pointer; font-weight: 600; font-size: 14px; background: #15803d; color: #fff; }
-  .sgc-btn:hover { background: #166534; }
-  .sgc-btn:focus-visible { outline: 2px solid var(--sgc-accent); outline-offset: 2px; }
-  .sgc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 18px; }
-  .sgc-stat { padding: 12px 14px; border-radius: 14px; background: var(--sgc-tile); border: 1px solid var(--sgc-tile-border); }
-  .sgc-label { font-size: 12px; color: var(--sgc-muted); }
-  .sgc-value { font-size: 22px; font-weight: 800; color: var(--sgc-ink); margin-top: 4px; }
-  .sgc-note { font-size: 12px; color: var(--sgc-muted); margin-top: 2px; }
-`;

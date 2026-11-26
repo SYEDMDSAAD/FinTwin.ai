@@ -31,7 +31,7 @@ function NetWorthSection({ netWorth }) {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
-        .nw-section { font-family: 'DM Sans', system-ui, sans-serif; margin-bottom: 32px; }
+        .nw-section { font-family:inherit; margin-bottom: 32px; }
         .nw-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; transition: all 0.25s; }
         .nw-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
         .nw-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }

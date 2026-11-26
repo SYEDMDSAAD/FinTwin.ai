@@ -1,10 +1,13 @@
 // One place for budget thresholds. The card used to colour its bar at 90/70,
 // label its warning box at 80, and take "exceeded" from the backend — three
 // different ideas of "in trouble" on the same card.
-export const BUDGET_SAFE = "#4ade80";
-export const BUDGET_WATCH = "#fbbf24";
-export const BUDGET_OVER = "#f87171";
-export const BUDGET_UPCOMING = "#94a3b8";
+export const BUDGET_SAFE = "var(--good)";
+export const BUDGET_WATCH = "var(--warn)";
+export const BUDGET_OVER = "var(--bad)";
+export const BUDGET_UPCOMING = "var(--text-dim)";
+
+/** The ui kit tone for each status key. */
+export const BUDGET_TONE = { over: "bad", watch: "warn", paid: "good", safe: "good", upcoming: "neutral" };
 
 /** "1 Dec" from "2026-12-01". */
 export function startsLabel(iso) {

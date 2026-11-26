@@ -7,8 +7,9 @@ import SIPTracker from "../components/SIPTracker";
 import MutualFundsTab from "../components/MutualFundsTab";
 import USStocksTab from "../components/USStocksTab";
 import MarketTicker from "../components/MarketTicker";
+import { Button, cx } from "../components/ui";
 
-const TABS = ["My Portfolio", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];
+const TABS = ["My Portfolio", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];  // labels are also the keys
 
 function InvestmentsPage() {
     const [activeTab, setActiveTab] = useState("My Portfolio");
@@ -32,17 +33,17 @@ function InvestmentsPage() {
             <MarketTicker />
 
 
-            {/* Tab bar */}
-            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/10 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {/* Tab bar: the same pills as the section tabs above */}
+            <div role="tablist" aria-label="Investments" className="flex gap-1 mb-6 -mx-1 px-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                 {TABS.map((tab) => (
                     <button
                         key={tab}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                            activeTab === tab
-                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                : "text-zinc-400 hover:text-zinc-200"
-                        }`}
+                        className={cx("h-9 px-4 rounded-full text-small font-medium whitespace-nowrap shrink-0 transition-colors",
+                            activeTab === tab ? "bg-surface-sunken text-ink" : "text-ink-3 hover:text-ink")}
                     >
                         {tab}
                     </button>
@@ -57,24 +58,21 @@ function InvestmentsPage() {
 
             {/* SIP Tracker tab */}
             {activeTab === "SIP Tracker" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6">
                     <SIPTracker />
                 </div>
             )}
 
             {/* Mutual Funds tab */}
             {activeTab === "Mutual Funds" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6">
                     <MutualFundsTab />
                 </div>
             )}
 
             {/* US Stocks tab */}
             {activeTab === "US Stocks" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6">
                     <USStocksTab />
                 </div>
             )}
@@ -83,38 +81,27 @@ function InvestmentsPage() {
             {activeTab === "AI Advisor" && (
                 <div>
                     {!recommendation && (
-                        <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                            <p className="text-sm text-zinc-400 mb-5">
-                                Generate personalized investment recommendations based on your financial profile,
-                                savings, spending behaviour and goals.
+                        <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6">
+                            <p className="text-heading text-ink">A mix that fits you</p>
+                            <p className="text-body text-ink-2 mt-1 mb-4">
+                                FinTwin suggests how to split your savings across kinds of investment, from your income,
+                                spending and goals. It's general guidance, not advice on specific funds.
                             </p>
-                            <button
-                                onClick={fetchRecommendation}
-                                disabled={loadingAI}
-                                className="px-5 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 hover:opacity-90 transition-all text-sm font-semibold"
-                            >
-                                {loadingAI ? "Generating..." : "Generate Recommendation"}
-                            </button>
+                            <Button onClick={fetchRecommendation} disabled={loadingAI}>
+                                {loadingAI ? "Working it out…" : "Show my mix"}
+                            </Button>
                         </div>
                     )}
 
                     {loadingAI && (
-                        <div className="flex items-center justify-center py-20 text-zinc-400">
-                            <div className="px-6 py-4 rounded-xl border border-white/10 bg-white/[0.03]">
-                                Generating AI Portfolio...
-                            </div>
+                        <div className="max-w-2xl rounded-card bg-surface border border-line px-6 py-10 text-center text-small text-ink-3" role="status">
+                            Working out your mix…
                         </div>
                     )}
 
                     {recommendation && !loadingAI && (
                         <div>
-                            <button
-                                onClick={fetchRecommendation}
-                                className="mb-6 px-5 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-all text-sm font-semibold"
-                            >
-                                Regenerate
-                            </button>
+                            <Button variant="secondary" size="sm" className="mb-6" onClick={fetchRecommendation}>Work it out again</Button>
                             <InvestmentRecommendationSection recommendation={recommendation} />
                         </div>
                     )}

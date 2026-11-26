@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect, memo, Fragment } from "react";
-import { Download, SlidersHorizontal, X, Search, Check, Pencil } from "lucide-react";
+import { useState, useMemo, memo } from "react";
+import { Download, SlidersHorizontal, X, Search, Check } from "lucide-react";
 import API from "../services/api";
 import { EDIT_CATEGORIES } from "../constants/categories";
 import CategoryDropdown from "./CategoryDropdown";
 import SpendGuardTxTag from "./SpendGuardTxTag";
+import { Button } from "./ui";
 
 const CATEGORIES = [
   "Food & Drinks","Shopping","Housing","Transportation","Vehicle",
@@ -43,8 +44,18 @@ function exportCSV(transactions) {
 function cleanMerchant(name) {
   if (!name) return "—";
   const parts = name.split("/");
-  if (parts.length >= 4) return parts[3];
-  return name;
+  return softenCaps(parts.length >= 4 ? parts[3] : name);
+}
+
+// Bank feeds shout: "ACME PVT LTD" reads better as "Acme Pvt Ltd". Only names
+// with no lower-case letters change; known acronyms (HDFC, UPI) and two-letter
+// words stay in capitals.
+const ACRONYMS = new Set(("HDFC ICICI SBI UPI LIC IRCTC ATM EMI NEFT IMPS RTGS NACH ECS POS ACH BSES KFC IGL BESCOM " +
+  "TNEB LPG CRED OTT IDFC HSBC BOB PNB RBL GST ITC BMTC DMRC BSNL MTNL JIO NSE BSE SIP ETF PPF NPS EPF ELSS " +
+  "IOB UCO CSB DCB YES KVB TMB AXIS").split(" ").filter(w => w !== "YES" && w !== "AXIS"));
+export function softenCaps(name) {
+  if (!name || /[a-z]/.test(name)) return name;
+  return name.replace(/[A-Z][A-Z']*/g, w => (w.length <= 2 || ACRONYMS.has(w) ? w : w[0] + w.slice(1).toLowerCase()));
 }
 
 function groupByDate(transactions) {
@@ -98,14 +109,6 @@ function formatDate(sortableKey, originalDisplay) {
   return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 18 };
-const inputStyle = {
-  background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
-  borderRadius: 10, padding: "8px 12px", color: "var(--text-primary, #fff)", fontSize: 13,
-  outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box",
-};
-const selectStyle = { ...inputStyle };
-
 // How far back to ask the server for. "Everything" can be years of rows, so
 // the list renders a chunk at a time — 10,000 rows in the DOM at once locks
 // the page up for seconds.
@@ -123,7 +126,6 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
   const [dateTo, setDateTo] = useState("");
   const [minAmt, setMinAmt] = useState("");
   const [maxAmt, setMaxAmt] = useState("");
-  const [showBalance, setShowBalance] = useState(true);
 
   // ── Inline category editing ──
   const CUSTOM = "__custom__";
@@ -202,40 +204,10 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
       .sort((a, b) => toSortableDate(b.date).localeCompare(toSortableDate(a.date)));
   }, [transactions, search, category, type, dateFrom, dateTo, minAmt, maxAmt]);
 
-  // running balance (chronological)
-  const withBalance = useMemo(() => {
-    const chrono = [...filtered].sort((a, b) => toSortableDate(a.date).localeCompare(toSortableDate(b.date)));
-    let bal = 0;
-    const balMap = {};
-    chrono.forEach(t => { bal += t.amount; balMap[t.id] = Math.round(bal * 100) / 100; });
-    return balMap;
-  }, [filtered]);
-
-  const renderCategoryChip = (t) => (
-    <button
-      onClick={() => startEdit(t)}
-      title="Edit category"
-      style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        gap: 5, fontSize: 11, fontWeight: 600,
-        padding: "3px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit",
-        background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)",
-        color: "#a78bfa", width: 130, whiteSpace: "nowrap", boxSizing: "border-box",
-      }}
-    >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t.category}</span>
-      <Pencil size={9} style={{ opacity: 0.55, flexShrink: 0 }} />
-    </button>
-  );
-
   const renderCategoryEditor = (t) => (
-    <div style={{
-      display: "flex", flexDirection: "column", gap: 7, minWidth: 170, maxWidth: 210,
-      padding: 10, borderRadius: 10,
-      background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.18)",
-    }}>
+    <div className="mt-2 ml-[52px] mr-1 p-3 rounded-control bg-surface-sunken space-y-2.5">
       <CategoryDropdown
-        value={editCategory === CUSTOM ? "＋ Custom…" : editCategory}
+        value={editCategory === CUSTOM ? "Custom category…" : editCategory}
         options={editOptions}
         onSelect={c => setEditCategory(c)}
         onCustomClick={() => setEditCategory(CUSTOM)}
@@ -245,56 +217,32 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
         <input
           autoFocus
           type="text"
-          placeholder="Type a category…"
+          placeholder="Type a category"
           maxLength={40}
           value={customCategory}
           onChange={e => setCustomCategory(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") saveCategory(t); }}
-          style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }}
+          className={INPUT}
         />
       )}
-      <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-dim)", cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={applySimilar}
-          onChange={e => setApplySimilar(e.target.checked)}
-          style={{ accentColor: "#a78bfa" }}
-        />
-        Also fix past transactions from this payee
+      <label className="flex items-center gap-2 text-small text-ink-2 cursor-pointer">
+        <input type="checkbox" checked={applySimilar} onChange={e => setApplySimilar(e.target.checked)} className="w-4 h-4 accent-[var(--accent)]" />
+        Also fix past payments to this payee
       </label>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          onClick={() => saveCategory(t)}
-          disabled={saving}
-          style={{
-            display: "flex", alignItems: "center", gap: 4, padding: "4px 10px",
-            borderRadius: 7, cursor: saving ? "wait" : "pointer", fontFamily: "inherit",
-            background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)",
-            color: "#4ade80", fontSize: 11, fontWeight: 600, opacity: saving ? 0.6 : 1,
-          }}
-        >
-          <Check size={11} /> {saving ? "Saving…" : "Save"}
-        </button>
-        <button
-          onClick={cancelEdit}
-          disabled={saving}
-          style={{
-            display: "flex", alignItems: "center", padding: "4px 10px",
-            borderRadius: 7, cursor: "pointer", fontFamily: "inherit",
-            background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
-            color: "var(--text-muted)", fontSize: 11,
-          }}
-        >
-          <X size={11} />
-        </button>
+      <div className="flex gap-2">
+        <Button size="sm" icon={Check} onClick={() => saveCategory(t)} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>Cancel</Button>
       </div>
-      {editError && <span style={{ fontSize: 10, color: "#f87171" }}>{editError}</span>}
+      {editError && <p className="text-small text-bad">{editError}</p>}
     </div>
   );
 
-  // Reset the rendered chunk whenever what's being shown changes
-  const [shown, setShown] = useState(chunkSize);
-  useEffect(() => { setShown(chunkSize); }, [chunkSize, transactions, search, category, type, dateFrom, dateTo, minAmt, maxAmt]);
+  // Reset the rendered chunk whenever what's being shown changes: the count
+  // belongs to one set of filters, and a new set starts from one chunk again
+  const viewKey = [chunkSize, transactions.length, transactions[0]?.id, search, category, type, dateFrom, dateTo, minAmt, maxAmt].join("|");
+  const [chunk, setChunk] = useState({ key: null, n: chunkSize });
+  const shown = chunk.key === viewKey ? chunk.n : chunkSize;
+  const setShown = (f) => setChunk({ key: viewKey, n: f(shown) });
 
   const visible = filtered.length > shown ? filtered.slice(0, shown) : filtered;
   const grouped = useMemo(() => groupByMonth(groupByDate(visible)), [visible]);
@@ -303,329 +251,142 @@ const EnhancedTransactionsTable = memo(function EnhancedTransactionsTable({
 
   const activeFilters = [search, category!=="All", type!=="All", dateFrom, dateTo, minAmt, maxAmt].filter(Boolean).length;
 
+  const money = (v, digits = 0) => `₹${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: digits })}`;
+
   return (
-    <div style={CARD}>
-      <style>{`
-        .tx-row-grid { display: grid; gap: 0; }
-        .tx-col-headers { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; padding: 8px 24px; border-bottom: 1px solid var(--border-subtle); }
-        .tx-row-desktop { display: grid; grid-template-columns: 3fr 2fr 2fr 1.5fr; align-items: center; padding: 12px 24px; border-bottom: 1px solid var(--border-subtle); transition: background 0.15s; }
-        .tx-row-desktop.balance { grid-template-columns: 3fr 2fr 2fr 1.5fr 1.5fr; }
-        .tx-mobile-card { display: none; padding: 10px 16px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
-        .tx-filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .tx-amount-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
-        @media (max-width: 640px) {
-          .tx-row-desktop { display: none !important; }
-          .tx-col-headers { display: none !important; }
-          .tx-mobile-card { display: flex; flex-direction: column; gap: 6px; }
-          .tx-filter-grid { grid-template-columns: 1fr 1fr; }
-          .tx-amount-grid { grid-template-columns: 1fr 1fr; gap: 12px 10px; }
-          .tx-header-wrap { flex-wrap: wrap; gap: 8px; }
-          .tx-export-btn { display: none; }
-        }
-      `}</style>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.2),transparent)", borderRadius: 18 }} />
-
-      {/* Header */}
-      <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.12em", marginBottom: 2 }}>RECORDS</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary, #fff)", margin: 0 }}>Transactions</h2>
-        </div>
-        <div className="tx-header-wrap" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {/* Summary chips */}
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#4ade80", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 8, padding: "4px 10px" }}>
-            +₹{totalIncome.toLocaleString("en-IN", {maximumFractionDigits: 0})}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "4px 10px" }}>
-            -₹{totalExpense.toLocaleString("en-IN", {maximumFractionDigits: 0})}
-          </span>
-
-          {onMonthsChange && (
-            <select
-              aria-label="How far back to show"
-              value={months}
-              onChange={e => onMonthsChange(Number(e.target.value))}
-              style={{ padding: "7px 10px", borderRadius: 10, background: "var(--bg-input)", border: "1px solid var(--border-card)", color: "var(--text-primary)", fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
-            >
-              {RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          )}
-
-          <button
-            onClick={() => setFiltersOpen(o => !o)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 12px", borderRadius: 10, cursor: "pointer",
-              background: filtersOpen ? "rgba(167,139,250,0.12)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${activeFilters > 0 ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}`,
-              color: activeFilters > 0 ? "#a78bfa" : "var(--text-muted)",
-              fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-            }}
-          >
-            <SlidersHorizontal size={13} />
-            Filters {activeFilters > 0 ? `(${activeFilters})` : ""}
-          </button>
-          {activeFilters > 0 && (
-            <button
-              onClick={reset}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "7px 12px", borderRadius: 10, cursor: "pointer",
-                background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)",
-                color: "#f87171", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-              }}
-            >
-              <X size={12} /> Reset
-            </button>
-          )}
-          <button
-            onClick={() => exportCSV(filtered)}
-            className="tx-export-btn"
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 12px", borderRadius: 10, cursor: "pointer",
-              background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.2)",
-              color: "#22d3ee", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-            }}
-          >
-            <Download size={13} /> Export CSV
-          </button>
-        </div>
+    <section aria-label="Transactions">
+      {/* Controls, then the totals for what's shown */}
+      <div className="flex items-center gap-2 mb-2 px-1">
+        {onMonthsChange && (
+          <select aria-label="How far back to show" value={months} onChange={e => onMonthsChange(Number(e.target.value))}
+                  className="h-9 rounded-full bg-surface border border-line px-3 text-small font-medium text-ink">
+            {RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        )}
+        <Button variant={activeFilters ? "soft" : "secondary"} size="sm" icon={SlidersHorizontal} onClick={() => setFiltersOpen(o => !o)} aria-expanded={filtersOpen}>
+          Filter{activeFilters ? ` (${activeFilters})` : ""}
+        </Button>
+        <button type="button" onClick={() => exportCSV(filtered)} aria-label="Download as CSV"
+                className="ml-auto w-9 h-9 rounded-full flex items-center justify-center text-ink-2 hover:bg-surface">
+          <Download size={16} aria-hidden />
+        </button>
       </div>
+      <p className="mb-4 px-1 text-small text-ink-3">
+        In <span className="text-good font-semibold num">{money(totalIncome)}</span>
+        <span className="mx-1.5">·</span>
+        Out <span className="text-ink font-semibold num">{money(totalExpense)}</span>
+      </p>
 
-      {/* Filter panel */}
       {filtersOpen && (
-        <div style={{ margin: "16px 24px 0", padding: 16, background: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: 14 }}>
-          <div className="tx-filter-grid">
-            <div>
-              <label style={lbl}>Search</label>
-              <div style={{ position: "relative" }}>
-                <Search size={12} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
-                <input style={{ ...inputStyle, paddingLeft: 28 }} placeholder="Merchant or category..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <label style={lbl}>Category</label>
-              <select style={selectStyle} value={category} onChange={e => setCategory(e.target.value)}>
+        <div className="mb-4 p-4 rounded-card bg-surface border border-line space-y-3">
+          <div className="relative">
+            <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+            <input className={`${INPUT} pl-9`} placeholder="Search payee or category" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category">
+              <select className={INPUT} value={category} onChange={e => setCategory(e.target.value)}>
                 <option value="All">All categories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {[...new Set([...CATEGORIES, ...editOptions])].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div>
-              <label style={lbl}>Type</label>
-              <select style={selectStyle} value={type} onChange={e => setType(e.target.value)}>
-                <option value="All">All types</option>
-                <option value="Income">Income</option>
-                <option value="Expense">Expense</option>
+            </Field>
+            <Field label="Type">
+              <select className={INPUT} value={type} onChange={e => setType(e.target.value)}>
+                <option value="All">Money in and out</option>
+                <option value="Income">Money in</option>
+                <option value="Expense">Money out</option>
               </select>
-            </div>
-            <div>
-              <label style={lbl}>Running Balance</label>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
-                <input type="checkbox" checked={showBalance} onChange={e => setShowBalance(e.target.checked)} style={{ accentColor: "#a78bfa" }} />
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Show balance column</span>
-              </label>
-            </div>
+            </Field>
+            <Field label="From"><input type="date" className={INPUT} value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></Field>
+            <Field label="To"><input type="date" className={INPUT} value={dateTo} onChange={e => setDateTo(e.target.value)} /></Field>
+            <Field label="Min ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="0" value={minAmt} onChange={e => setMinAmt(e.target.value)} /></Field>
+            <Field label="Max ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="Any" value={maxAmt} onChange={e => setMaxAmt(e.target.value)} /></Field>
           </div>
-          <div className="tx-amount-grid">
-            <div>
-              <label style={lbl}>Date from</label>
-              <input type="date" style={inputStyle} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <label style={lbl}>Date to</label>
-              <input type="date" style={inputStyle} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            </div>
-            <div>
-              <label style={lbl}>Min amount (₹)</label>
-              <input type="number" style={inputStyle} placeholder="0" value={minAmt} onChange={e => setMinAmt(e.target.value)} />
-            </div>
-            <div>
-              <label style={lbl}>Max amount (₹)</label>
-              <input type="number" style={inputStyle} placeholder="∞" value={maxAmt} onChange={e => setMaxAmt(e.target.value)} />
-            </div>
-          </div>
-          <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-            <button
-              onClick={reset}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "6px 14px", borderRadius: 8, cursor: "pointer",
-                background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)",
-                color: "#f87171", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-              }}
-            >
-              <X size={12} /> Reset all filters
-            </button>
-          </div>
+          {activeFilters > 0 && <Button variant="ghost" size="sm" icon={X} onClick={reset} className="-ml-2">Clear filters</Button>}
         </div>
       )}
 
-      {/* Column headers */}
-      <div className="tx-col-headers" style={{ gap: 0, padding: "14px 24px 8px", gridTemplateColumns: showBalance ? "3fr 2fr 2fr 1.5fr 1.5fr" : "3fr 2fr 2fr 1.5fr" }}>
-        {["Merchant","Category","Date","Amount", showBalance && "Balance"].filter(Boolean).map(h => (
-          <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.12em", textAlign: h === "Amount" || h === "Balance" ? "right" : h === "Category" ? "center" : "left" }}>{h}</span>
-        ))}
-      </div>
+      {grouped.length === 0 && (
+        <div className="rounded-card bg-surface border border-line px-6 py-10 text-center text-small text-ink-3">
+          {transactions.length ? "No transactions match your filters." : "No transactions yet."}
+        </div>
+      )}
 
-      {/* Grouped rows */}
-      <div style={{ maxHeight: 600, overflowY: "auto" }}>
-        {grouped.length === 0 && (
-          <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--text-dimmer)", fontSize: 13 }}>
-            No transactions match your filters.
-          </div>
-        )}
+      <div className="space-y-6">
         {grouped.map(([monthKey, monthLabel, monthNet, dayGroups]) => (
           <div key={monthKey}>
-            {/* Month band — the only tally shown */}
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 24px",
-              background: "rgba(167,139,250,0.06)",
-              borderTop: "1px solid rgba(167,139,250,0.12)",
-              borderBottom: "1px solid rgba(167,139,250,0.12)",
-              position: "sticky", top: 0, zIndex: 1,
-              backdropFilter: "blur(8px)",
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text-primary, #fff)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                {monthLabel}
-              </span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: monthNet >= 0 ? "#4ade80" : "#f87171", fontVariantNumeric: "tabular-nums" }}>
-                {monthNet >= 0 ? "+" : "-"}₹{Math.abs(monthNet).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            <div className="flex items-baseline justify-between px-1 mb-2">
+              <h3 className="text-heading text-ink">{monthLabel}</h3>
+              <span className={`text-small font-semibold num ${monthNet >= 0 ? "text-good" : "text-ink-2"}`}>
+                {monthNet >= 0 ? "+" : "−"}{money(monthNet)}
               </span>
             </div>
-
-            {dayGroups.map(([key, display, txns]) => (
-            <div key={key}>
-              {/* Date group header — label only, no per-day tally */}
-              <div style={{
-                padding: "7px 24px", background: "var(--bg-subtle)",
-                borderBottom: "1px solid var(--border-subtle)",
-              }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.06em" }}>
-                  {formatDate(key, display)}
-                </span>
-              </div>
-
-              {/* Transactions for this date */}
-              {txns.map(t => {
-                const pos = t.amount > 0;
-                const bal = withBalance[t.id];
-                return (
-                  <Fragment key={t.id}>
-                  <div
-                    className={`tx-row-desktop${showBalance ? " balance" : ""}`}
-                    style={{
-                      cursor: "default",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    {/* Merchant */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                        background: pos ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
-                        border: `1px solid ${pos ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, color: pos ? "#4ade80" : "#f87171",
-                      }}>
-                        {pos ? "↓" : "↑"}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)" }}>{t.merchant}</span>
-                        <SpendGuardTxTag t={t} onChanged={onReload} />
-                      </div>
-                    </div>
-
-                    {/* Category — click to edit; correction is remembered per payee */}
-                    <div style={{ justifySelf: "center" }}>
-                      {editingId === t.id ? renderCategoryEditor(t) : renderCategoryChip(t)}
-                    </div>
-
-                    {/* Date */}
-                    <span style={{ fontSize: 12, color: "var(--text-label)", fontVariantNumeric: "tabular-nums" }}>
-                      {t.date}
-                    </span>
-
-                    {/* Amount */}
-                    <span style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: pos ? "#4ade80" : "#f87171", fontVariantNumeric: "tabular-nums" }}>
-                      {pos ? "+" : "-"}₹{Math.abs(t.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                    </span>
-
-                    {/* Running balance */}
-                    {showBalance && (
-                      <span style={{ textAlign: "right", fontSize: 12, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>
-                        ₹{(bal ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Mobile card layout */}
-                  <div className="tx-mobile-card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: pos ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", border: `1px solid ${pos ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pos ? "#4ade80" : "#f87171" }}>
-                          {pos ? "↓" : "↑"}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <span style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-primary, #fff)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>{cleanMerchant(t.merchant)}</span>
-                          <SpendGuardTxTag t={t} onChanged={onReload} />
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: pos ? "#4ade80" : "#f87171", flexShrink: 0, marginLeft: 8 }}>
-                        {pos ? "+" : "-"}₹{Math.abs(t.amount).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 36 }}>
-                      {editingId === t.id ? renderCategoryEditor(t) : (
-                        <button
-                          onClick={() => startEdit(t)}
-                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 10, fontWeight: 600, color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 6, padding: "2px 6px", cursor: "pointer", fontFamily: "inherit", width: 110, whiteSpace: "nowrap", overflow: "hidden", boxSizing: "border-box" }}
-                        >
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t.category}</span> <Pencil size={8} style={{ opacity: 0.55, flexShrink: 0 }} />
-                        </button>
-                      )}
-                      <span style={{ fontSize: 11, color: "var(--text-label)" }}>{t.date}</span>
-                    </div>
-                  </div>
-                  </Fragment>
-                );
-              })}
+            <div className="rounded-card bg-surface border border-line overflow-hidden">
+              {dayGroups.map(([key, display, txns], gi) => (
+                <div key={key} className={gi ? "border-t border-line" : ""}>
+                  <p className="px-4 pt-3 pb-1 text-caption font-medium text-ink-3">{formatDate(key, display)}</p>
+                  <ul>
+                    {txns.map(t => {
+                      const pos = t.amount > 0;
+                      const name = cleanMerchant(t.merchant);
+                      return (
+                        <li key={t.id} className="px-4 py-2">
+                          <div className="flex items-center gap-3">
+                            <span aria-hidden className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-small font-semibold ${pos ? "bg-good-soft text-good" : "bg-surface-sunken text-ink-2"}`}>
+                              {(name.replace(/[^A-Za-z0-9]/g, "")[0] || "•").toUpperCase()}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-body text-ink truncate" title={t.merchant}>{name}</p>
+                              <button type="button" onClick={() => (editingId === t.id ? cancelEdit() : startEdit(t))}
+                                      className="inline-flex items-center gap-1 text-small text-ink-3 hover:text-accent max-w-full"
+                                      aria-label={`Category: ${t.category}. Change`}>
+                                <span className="truncate">{t.category || "Other"}</span>
+                              </button>
+                              <SpendGuardTxTag t={t} onChanged={onReload} />
+                            </div>
+                            <span className={`shrink-0 text-body font-semibold num ${pos ? "text-good" : "text-ink"}`}>
+                              {pos ? "+" : "−"}{money(t.amount, 2)}
+                            </span>
+                          </div>
+                          {editingId === t.id && renderCategoryEditor(t)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
-            ))}
           </div>
         ))}
-
-        {filtered.length > shown && (
-          <div style={{ padding: "14px 24px", textAlign: "center" }}>
-            <button
-              onClick={() => setShown(n => n + chunkSize)}
-              style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              Show more ({filtered.length - shown} older)
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Footer */}
-      <div style={{ padding: "12px 24px", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, color: "var(--text-dimmer)" }}>
-          Showing {Math.min(shown, filtered.length)} of {filtered.length}
-          {filtered.length !== transactions.length && ` (filtered from ${transactions.length})`}
-        </span>
-        <button
-          onClick={() => exportCSV(filtered)}
-          style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          <Download size={11} /> Download as CSV
-        </button>
-      </div>
-    </div>
+      {filtered.length > shown && (
+        <div className="mt-4 text-center">
+          <Button variant="secondary" onClick={() => setShown(n => n + chunkSize)}>
+            Show more ({filtered.length - shown} older)
+          </Button>
+        </div>
+      )}
+
+      <p className="mt-4 px-1 text-caption text-ink-3">
+        <span>Showing {Math.min(shown, filtered.length)} of {filtered.length}</span>
+        {filtered.length !== transactions.length && ` (filtered from ${transactions.length})`}.
+        {" "}Categories are FinTwin's best guess; change one and it remembers that payee.
+      </p>
+    </section>
   );
 });
 
+const INPUT = "w-full h-10 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent";
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <span className="block text-caption text-ink-3 mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
 export default EnhancedTransactionsTable;
 
-const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 5 };

@@ -6,6 +6,6 @@ import Profile from "./Profile";
 describe("Profile", () => {
   it("renders without crashing for an authenticated user", async () => {
     renderPage(<Profile />, { route: "/profile", authed: true });
-    expect(await screen.findByText("My Profile")).toBeInTheDocument();
+    expect(await screen.findByText("Profile")).toBeInTheDocument();
   });
 });

@@ -36,10 +36,10 @@ export default function CategoryDropdown({
 
   const itemStyle = (highlighted, selected) => ({
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-    padding: "7px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer",
-    fontWeight: selected ? 700 : 500,
-    color: selected ? "#a78bfa" : "var(--text-primary, #fff)",
-    background: highlighted ? "rgba(59,130,246,0.25)" : "transparent",
+    padding: "10px 12px", borderRadius: 10, fontSize: 15, cursor: "pointer",
+    fontWeight: selected ? 600 : 400,
+    color: selected ? "var(--accent)" : "var(--text-primary)",
+    background: highlighted ? "var(--bg-input)" : "transparent",
   });
 
   return (
@@ -50,19 +50,19 @@ export default function CategoryDropdown({
         onClick={() => setOpen(o => !o)}
         style={{
           width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 6, padding: "6px 10px", borderRadius: 8, fontSize: 12, fontFamily: "inherit",
+          gap: 6, height: 44, padding: "0 12px", borderRadius: "var(--radius-control)", fontSize: 15, fontFamily: "inherit",
           cursor: disabled ? "wait" : "pointer", opacity: disabled ? 0.5 : 1,
-          background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
-          color: "var(--text-primary, #fff)", boxSizing: "border-box",
+          background: "var(--bg-input)", border: "1px solid transparent",
+          color: "var(--text-primary)", boxSizing: "border-box",
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {value}
         </span>
         <ChevronDown
-          size={13}
+          size={16}
           style={{
-            flexShrink: 0, opacity: 0.6,
+            flexShrink: 0, color: "var(--text-dim)",
             transform: open ? "rotate(180deg)" : "none",
             transition: "transform 0.15s",
           }}
@@ -73,10 +73,10 @@ export default function CategoryDropdown({
         <div
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 40,
-            maxHeight: 190, overflowY: "auto", borderRadius: 10, padding: 4,
-            background: "var(--bg-floating, #0e1018)",
-            border: "1px solid var(--border-floating, rgba(255,255,255,0.1))",
-            boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
+            maxHeight: 260, overflowY: "auto", borderRadius: 14, padding: 6,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
+            boxShadow: "0 12px 32px rgba(17,17,26,0.12)",
           }}
         >
           {options.map((c, i) => (
@@ -88,7 +88,7 @@ export default function CategoryDropdown({
               style={itemStyle(hovered === i, c === value)}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c}</span>
-              {c === value && <Check size={12} style={{ flexShrink: 0 }} />}
+              {c === value && <Check size={16} style={{ flexShrink: 0 }} />}
             </div>
           ))}
 
@@ -99,13 +99,13 @@ export default function CategoryDropdown({
               onMouseLeave={() => setHovered(-1)}
               style={{
                 ...itemStyle(hovered === "custom", false),
-                color: "#a78bfa", fontWeight: 600,
-                borderTop: "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
-                borderRadius: hovered === "custom" ? 7 : 0,
+                color: "var(--accent)", fontWeight: 600,
+                borderTop: "1px solid var(--border-card)",
+                borderRadius: hovered === "custom" ? 10 : 0,
                 marginTop: 4, paddingTop: 8,
               }}
             >
-              ＋ Custom…
+              Custom category…
             </div>
           )}
         </div>

@@ -1,34 +1,33 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { cx } from "./ui";
 import { apiUrl } from "../services/apiOrigin";
 
 const INDICES = [
-  { label: "NIFTY 50",   symbol: "^NSEI",    color: "#a78bfa" },
-  { label: "SENSEX",     symbol: "^BSESN",   color: "#22d3ee" },
-  { label: "NIFTY BANK", symbol: "^NSEBANK", color: "#4ade80" },
-  { label: "GOLD (USD/oz)", symbol: "GC=F",  color: "#fbbf24" },
+  { label: "Nifty 50",   symbol: "^NSEI" },
+  { label: "Sensex",     symbol: "^BSESN" },
+  { label: "Nifty Bank", symbol: "^NSEBANK" },
+  { label: "Gold, $/oz", symbol: "GC=F" },
 ];
 
-function TickerItem({ item }) {
+/* One index: name, level, today's move. Dashes until the quote arrives. */
+function IndexCard({ item }) {
   const up = (item.change ?? 0) >= 0;
+  const has = item.value != null;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "0 28px", whiteSpace: "nowrap", flexShrink: 0 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: item.color, letterSpacing: "0.05em" }}>{item.label}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-        {item.value != null ? item.value.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}
-      </span>
-      {item.change != null && (
-        <span style={{ fontSize: 11, fontWeight: 600, color: up ? "#4ade80" : "#f87171" }}>
-          {up ? "▲" : "▼"} {Math.abs(item.change).toFixed(2)} ({up ? "+" : ""}{item.changePct?.toFixed(2)}%)
-        </span>
-      )}
-      <span style={{ color: "var(--border-subtle)", fontSize: 12 }}>|</span>
-    </span>
+    <div className="shrink-0 min-w-[132px] rounded-control bg-surface border border-line px-3 py-2">
+      <p className="text-caption text-ink-3">{item.label}</p>
+      <p className="text-body font-semibold text-ink num">
+        {has ? item.value.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}
+      </p>
+      <p className={cx("text-caption font-medium num", !has || item.changePct == null ? "text-ink-3" : up ? "text-good" : "text-bad")}>
+        {has && item.changePct != null ? `${up ? "+" : "−"}${Math.abs(item.changePct).toFixed(2)}%` : "\u00a0"}
+      </p>
+    </div>
   );
 }
 
 export default function MarketTicker() {
   const [data, setData] = useState(INDICES.map(i => ({ ...i, value: null, change: null, changePct: null })));
-  const trackRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,37 +71,9 @@ export default function MarketTicker() {
     return () => { cancelled = true; clearInterval(t); clearTimeout(retry); };
   }, []);
 
-  const items = [...data, ...data, ...data];
-
   return (
-    <div style={{
-      width: "100%", overflow: "hidden",
-      background: "var(--bg-subtle)",
-      borderBottom: "1px solid var(--border-subtle)",
-      borderTop: "1px solid var(--border-subtle)",
-      height: 36, display: "flex", alignItems: "center",
-      marginBottom: 20,
-      position: "relative",
-    }}>
-      <style>{`
-        @keyframes tickerScroll {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-33.333%); }
-        }
-        .ticker-track { display: inline-flex; animation: tickerScroll 40s linear infinite; will-change: transform; }
-        .ticker-track:hover { animation-play-state: paused; }
-      `}</style>
-
-      <div style={{ paddingLeft: 4, overflow: "hidden", width: "100%" }}>
-        <div className="ticker-track" ref={trackRef}>
-          {items.map((item, i) => (
-            <TickerItem key={i} item={item} />
-          ))}
-        </div>
-      </div>
-
-      {/* Right fade */}
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 60, background: "linear-gradient(270deg, var(--bg-base) 40%, transparent)", pointerEvents: "none" }} />
+    <div aria-label="Markets today" className="flex gap-2 mb-5 -mx-1 px-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      {data.map(item => <IndexCard key={item.symbol} item={item} />)}
     </div>
   );
 }

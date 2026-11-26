@@ -49,4 +49,17 @@ describe("Home numbers", () => {
         expect(items[0].text).toMatch(/^Food: .*over/);
         expect(items[2].text).toBe("Unusual spend");
     });
+
+    it("leaves out rent paid in full, budgets not started, and alerts that repeat a budget", () => {
+        const items = attentionItems({
+            budgets: [
+                { category: "Housing", limit: 17500, spent: 17500, fixedCost: true },
+                { category: "Food", limit: 9000, spent: 10700 },
+                { category: "Shopping", limit: 4500, spent: 9000, startsOn: "2026-12-01" },
+            ],
+            notifications: [{ type: "danger", message: "Food budget exceeded — ₹1,700 over" }],
+        });
+        expect(items).toHaveLength(1);
+        expect(items[0]).toMatchObject({ title: "Food", tone: "danger" });
+    });
 });

@@ -6,6 +6,6 @@ import InvestmentsPage from "./InvestmentsPage";
 describe("InvestmentsPage", () => {
   it("renders without crashing", async () => {
     renderPage(<InvestmentsPage />, { authed: true });
-    expect(await screen.findByRole("button", { name: "My Portfolio" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "My Portfolio" })).toBeInTheDocument();
   });
 });

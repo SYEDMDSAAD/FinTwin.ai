@@ -12,31 +12,29 @@ const gotoSection = (name) => {
 // while a background refresh runs silently.
 let _portfolioCache = null;
 let _nwCache = null;
-import {
-    PieChart, Pie, Cell, Tooltip, ResponsiveContainer
-} from "recharts";
 import { IPO_STATUSES } from "../constants/investments";
 import LinkHoldingModal from "./LinkHoldingModal";
 import InvestmentSuggestions from "./InvestmentSuggestions";
 import { useDebouncedSearch } from "./discover/useDebouncedSearch";
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Landmark, Wallet, ArrowRight, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, TrendingUp, RefreshCw, Landmark, Link2 } from "lucide-react";
+import { Button, SectionHeader, EmptyState, IconChip, cx } from "./ui";
 
 const INVESTMENT_TYPES = [
     "Stocks", "IPO", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
 ];
 
 const TYPE_COLORS = {
-    "Stocks":       "#a78bfa",
-    "IPO":          "#e879f9",
-    "Mutual Fund":  "#22d3ee",
-    "Fixed Deposit":"#4ade80",
-    "Gold":         "#fbbf24",
-    "PPF":          "#f87171",
-    "NPS":          "#f472b6",
-    "Bonds":        "#38bdf8",
-    "Crypto":       "#fb923c",
-    "Real Estate":  "#a3e635",
-    "Other":        "#94a3b8",
+    "Stocks":       "var(--accent)",
+    "IPO":          "#C026D3",
+    "Mutual Fund":  "#0EA5A4",
+    "Fixed Deposit":"#16A34A",
+    "Gold":         "#F59E0B",
+    "PPF":          "#EF4444",
+    "NPS":          "#EC4899",
+    "Bonds":        "#3B82F6",
+    "Crypto":       "#F97316",
+    "Real Estate":  "#84CC16",
+    "Other":        "#94A3B8",
 };
 
 const EMPTY_FORM = {
@@ -271,8 +269,8 @@ export default function PortfolioTab() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20 text-zinc-500">
-                Loading portfolio...
+            <div className="max-w-2xl rounded-card bg-surface border border-line px-6 py-10 text-center text-small text-ink-3" role="status">
+                Loading your portfolio…
             </div>
         );
     }
@@ -282,268 +280,157 @@ export default function PortfolioTab() {
     // onboarding. It can't be valued until the user says what it went into.
     const unlinked = holdings.filter(h => h.type === "Other" && !h.tickerCode);
     const alloc    = summary?.allocationByType || {};
-    const pieData  = Object.entries(alloc).map(([type, pct]) => ({ name: type, value: pct }));
+    const pieData  = Object.entries(alloc).map(([type, pct]) => ({ name: type, value: pct })).sort((x, y) => y.value - x.value);
 
     const pnlPositive = (summary?.totalPnl ?? 0) >= 0;
 
-    // Net worth contribution banner values
     const nwTotal = netWorth?.netWorth || 0;
     const nwPortfolio = netWorth?.portfolioCurrentValue || 0;
     const nwPct = nwTotal > 0 ? Math.round((nwPortfolio / nwTotal) * 100) : 0;
-    const nwPnl = netWorth?.portfolioPnl || 0;
-    const nwPnlPositive = nwPnl >= 0;
+    const typeColor = (t) => TYPE_COLORS[t] || "var(--text-dim)";
 
     return (
-        <div>
-            {/* Net Worth contribution banner */}
-            {netWorth && nwTotal > 0 && (
-                <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.18)", borderRadius: 14, padding: "14px 18px", marginBottom: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Wallet size={16} color="#f59e0b" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 3 }}>NET WORTH CONTRIBUTION</div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: "#f59e0b", fontVariantNumeric: "tabular-nums" }}>
-                                ₹{Math.round(nwPortfolio).toLocaleString("en-IN")}
-                            </span>
-                            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-                                of ₹{Math.round(nwTotal).toLocaleString("en-IN")} total net worth
-                            </span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.12)", borderRadius: 6, padding: "2px 8px" }}>
-                                {nwPct}%
-                            </span>
-                            {nwPnl !== 0 && (
-                                <span style={{ fontSize: 12, fontWeight: 700, color: nwPnlPositive ? "#4ade80" : "#f87171" }}>
-                                    {nwPnlPositive ? "▲ +" : "▼ −"}₹{Math.abs(Math.round(nwPnl)).toLocaleString("en-IN")} P&L
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => gotoSection("Net Worth")}
-                        style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 9, padding: "7px 12px", color: "#f59e0b", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}
-                    >
-                        Net Worth <ArrowRight size={12} />
+        <div className="max-w-2xl">
+            {/* The number */}
+            <section aria-label="Portfolio value" className="px-1 mb-6">
+                <p className="text-small text-ink-3">Portfolio value</p>
+                <p className="text-hero text-ink num mt-1">₹{fmt(Math.round(summary?.currentValue || 0))}</p>
+                <p className="mt-2 text-body text-ink-2">
+                    <span className={cx("font-medium num", pnlPositive ? "text-good" : "text-bad")}>
+                        {pnlPositive ? "+" : "−"}₹{fmt(Math.abs(Math.round(summary?.totalPnl || 0)))} ({pnlPositive ? "+" : ""}{summary?.totalPnlPercent ?? 0}%)
+                    </span>
+                    {" "}on ₹{fmt(Math.round(summary?.totalInvested || 0))} put in
+                </p>
+                {netWorth && nwTotal > 0 && (
+                    <button type="button" onClick={() => gotoSection("Net Worth")} className="mt-1 text-small text-ink-3 hover:text-ink">
+                        {nwPct}% of your net worth ›
                     </button>
-                </div>
-            )}
+                )}
+            </section>
 
-            {/* Action buttons */}
-            <div className="flex justify-end gap-2 mb-4">
-                <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-medium hover:bg-green-500/20 transition-all"
-                >
-                    {refreshing
-                        ? <><RefreshCw size={14} className="animate-spin" /> Refreshing...</>
-                        : <><RefreshCw size={14} /> Refresh Prices</>
-                    }
-                </button>
-                <button
-                    onClick={handleAutoDetect}
-                    disabled={detecting}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm font-medium hover:bg-cyan-500/20 transition-all"
-                >
-                    {detecting
-                        ? <><RefreshCw size={14} className="animate-spin" /> Scanning...</>
-                        : <><Landmark size={14} /> Find in my transactions</>
-                    }
-                </button>
+            <div className="flex flex-wrap gap-2 mb-4">
+                <Button size="sm" icon={Plus} onClick={openAdd}>Add</Button>
+                <Button size="sm" variant="secondary" icon={RefreshCw} onClick={handleRefresh} disabled={refreshing}>
+                    {refreshing ? "Updating…" : "Update prices"}
+                </Button>
+                <Button size="sm" variant="secondary" icon={Landmark} onClick={handleAutoDetect} disabled={detecting}>
+                    {detecting ? "Looking…" : "Find in transactions"}
+                </Button>
             </div>
 
             {refreshNote && (
-                <div
-                    className={`mb-4 px-4 py-2.5 rounded-xl text-xs border ${
-                        refreshNote.ok
-                            ? "bg-green-500/5 border-green-500/20 text-green-300"
-                            : "bg-amber-500/5 border-amber-500/20 text-amber-300"
-                    }`}
-                >
+                <p className={cx("mb-4 px-4 py-2.5 rounded-control text-small", refreshNote.ok ? "bg-good-soft text-good" : "bg-warn-soft text-warn")}>
                     {refreshNote.text}
-                </div>
+                </p>
             )}
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <SummaryCard label="Total Invested" value={`₹${fmt(summary?.totalInvested)}`} color="text-white" />
-                <SummaryCard label="Current Value"  value={`₹${fmt(summary?.currentValue)}`}  color="text-blue-400" />
-                <SummaryCard
-                    label="Total P&L"
-                    value={`${pnlPositive ? "+" : ""}₹${fmt(summary?.totalPnl)}`}
-                    color={pnlPositive ? "text-green-400" : "text-red-400"}
-                    icon={pnlPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                />
-                <SummaryCard
-                    label="P&L %"
-                    value={`${pnlPositive ? "+" : ""}${summary?.totalPnlPercent ?? 0}%`}
-                    color={pnlPositive ? "text-green-400" : "text-red-400"}
-                />
-            </div>
 
             <InvestmentSuggestions onAdded={load} />
 
             {unlinked.map(h => (
-                <div key={`unlinked-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "14px 18px", marginBottom: 18, borderRadius: 14, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.25)" }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(167,139,250,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Link2 size={16} color="#a78bfa" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
-                            ₹{fmt(h.investedAmount)} in “{h.name}” isn't linked to anything yet
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                            Tell us where you invested it and when, and we'll show what it's worth today.
+                <div key={`unlinked-${h.id}`} className="mb-4 p-4 rounded-card bg-surface border border-line">
+                    <div className="flex items-start gap-3">
+                        <IconChip icon={Link2} tone="accent" />
+                        <div className="min-w-0">
+                            <p className="text-body text-ink">₹{fmt(h.investedAmount)} in “{h.name}” isn't linked yet</p>
+                            <p className="text-small text-ink-3 mt-0.5">Say what you bought and when, and FinTwin shows what it's worth today.</p>
                         </div>
                     </div>
-                    <button type="button" onClick={() => setLinking(h)}
-                            style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        Link it
-                    </button>
-                    {/* Several payments to one payee can be several investments —
-                        a lump sum can only ever be linked to one of them */}
-                    <button type="button" disabled={splitting === h.id} onClick={() => splitHolding(h)}
-                            style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border-card)", background: "var(--bg-subtle)", color: "var(--text-secondary)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                        {splitting === h.id ? "Splitting…" : "Split into payments"}
-                    </button>
+                    <div className="mt-3 ml-[52px] flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => setLinking(h)}>Link it</Button>
+                        {/* Several payments to one payee can be several investments —
+                            a lump sum can only ever be linked to one of them */}
+                        <Button size="sm" variant="secondary" disabled={splitting === h.id} onClick={() => splitHolding(h)}>
+                            {splitting === h.id ? "Splitting…" : "Split into payments"}
+                        </Button>
+                    </div>
                 </div>
             ))}
 
             {holdings.length === 0 ? (
-                /* Empty state */
-                <div className="relative overflow-hidden p-10 border border-white/10 bg-white/[0.03] rounded-2xl text-center mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                    <p className="text-zinc-400 mb-4 text-sm">No holdings yet. Add your first investment to start tracking.</p>
-                    <button onClick={openAdd} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-sm font-semibold hover:opacity-90 transition-all">
-                        <Plus size={15} /> Add Investment
-                    </button>
-                </div>
+                <EmptyState icon={TrendingUp} title="No investments yet"
+                            body="Add a stock, fund, FD or gold and FinTwin keeps its value up to date."
+                            action={<Button icon={Plus} onClick={openAdd}>Add investment</Button>} />
             ) : (
-                <div className="grid xl:grid-cols-[1fr_1.4fr] gap-4 mb-6">
-                    {/* Pie chart */}
-                    <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] rounded-2xl">
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                        <div className="text-[10px] font-bold tracking-[0.1em] text-zinc-500 mb-4">ALLOCATION</div>
-                        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height={220}>
-                            <PieChart>
-                                <Pie
-                                    data={pieData}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    innerRadius={50}
-                                    outerRadius={90}
-                                    labelLine={false}
-                                    label={({ value }) => `${value}%`}
-                                >
-                                    {pieData.map((entry) => (
-                                        <Cell key={entry.name} fill={TYPE_COLORS[entry.name] || "#94a3b8"} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(v) => `${v}%`} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        {/* Legend */}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {pieData.map((entry) => (
-                                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-zinc-400">
-                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: TYPE_COLORS[entry.name] || "#94a3b8" }} />
-                                    {entry.name}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                <>
+                    {/* Allocation: one split bar, the holdings list carries the detail */}
+                    {pieData.length > 1 && (
+                        <section aria-label="Allocation" className="mb-6 rounded-card bg-surface border border-line p-4">
+                            <p className="text-small text-ink-3 mb-3">Allocation</p>
+                            <div className="flex h-2 gap-0.5 rounded-full overflow-hidden" aria-hidden>
+                                {pieData.map(e => <div key={e.name} style={{ width: `${e.value}%`, background: typeColor(e.name), minWidth: 3 }} />)}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                                {pieData.map(e => (
+                                    <span key={e.name} className="inline-flex items-center gap-1.5 text-small text-ink-2">
+                                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: typeColor(e.name) }} />
+                                        {e.name} <span className="text-ink-3 num">{e.value}%</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </section>
+                    )}
 
-                    {/* Holdings table */}
-                    <div className="relative overflow-hidden border border-white/10 bg-white/[0.03] rounded-2xl">
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                        <div className="flex items-center justify-between p-4 border-b border-white/5">
-                            <span className="text-[10px] font-bold tracking-[0.1em] text-zinc-500">HOLDINGS</span>
-                            <button onClick={openAdd} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium hover:bg-purple-500/20 transition-all">
-                                <Plus size={12} /> Add
-                            </button>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-[10px] font-bold tracking-wider text-zinc-500 border-b border-white/5">
-                                        <th className="text-left px-4 py-2">Name</th>
-                                        <th className="text-right px-4 py-2">Invested</th>
-                                        <th className="text-right px-4 py-2">Current</th>
-                                        <th className="text-right px-4 py-2">P&L</th>
-                                        <th className="px-4 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {holdings.map((h) => {
-                                        const pos = (h.pnl ?? 0) >= 0;
-                                        return (
-                                            <tr key={h.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <div className="font-medium text-white text-xs leading-tight">{h.name}</div>
-                                                    <div className="text-[10px] text-zinc-500 mt-0.5" style={{ color: TYPE_COLORS[h.type] || "#94a3b8" }}>
-                                                        {h.type}
-                                                        {h.type === "IPO" && h.ipoStatus && (
-                                                            <> · {IPO_STATUSES.find(s => s.value === h.ipoStatus)?.label.split(" — ")[0] || h.ipoStatus}</>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-zinc-300 text-xs">₹{fmt(h.investedAmount)}</td>
-                                                <td className="px-4 py-3 text-right text-xs text-blue-400">
-                                                    ₹{fmt(h.currentValue)}
-                                                    {ESTIMATED_TYPES.has(h.type) && (
-                                                        <span
-                                                            className="text-[9px] text-zinc-500 ml-1"
-                                                            title="Projected from interest rate — not a live market price"
-                                                        >
-                                                            est.
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className={`px-4 py-3 text-right text-xs font-medium ${pos ? "text-green-400" : "text-red-400"}`}>
-                                                    {pos ? "+" : ""}₹{fmt(h.pnl)}
-                                                    <div className="text-[10px] font-normal">{pos ? "+" : ""}{h.pnlPercent}%</div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-1">
-                                                        <button onClick={() => openEdit(h)} className="p-1 rounded text-zinc-500 hover:text-purple-400 transition-colors">
-                                                            <Pencil size={12} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(h.id)}
-                                                            disabled={deleting === h.id}
-                                                            className="p-1 rounded text-zinc-500 hover:text-red-400 transition-colors"
-                                                        >
-                                                            <Trash2 size={12} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                    <SectionHeader title="Holdings" subtitle={`${holdings.length} ${holdings.length === 1 ? "holding" : "holdings"}`} />
+                    <ul className="mb-6 rounded-card bg-surface border border-line divide-y divide-line">
+                        {holdings.map((h) => {
+                            const pos = (h.pnl ?? 0) >= 0;
+                            return (
+                                <li key={h.id} className="flex items-center gap-3 px-4 py-3">
+                                    <span aria-hidden className="shrink-0 w-2 h-8 rounded-full" style={{ background: typeColor(h.type) }} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-body text-ink truncate">{h.name}</span>
+                                        <span className="block text-small text-ink-3 num">
+                                            {h.type}
+                                            {h.type === "IPO" && h.ipoStatus && (
+                                                <> · {IPO_STATUSES.find(st => st.value === h.ipoStatus)?.label.split(" — ")[0] || h.ipoStatus}</>
+                                            )}
+                                            {" · "}₹{fmt(h.investedAmount)} in
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 text-right">
+                                        <span className="block text-body font-semibold text-ink num">
+                                            ₹{fmt(h.currentValue)}
+                                            {ESTIMATED_TYPES.has(h.type) && (
+                                                <span className="ml-1 text-caption font-normal text-ink-3" title="Projected from the interest rate, not a market price">est.</span>
+                                            )}
+                                        </span>
+                                        <span className={cx("block text-small num", pos ? "text-good" : "text-bad")}>
+                                            {pos ? "+" : "−"}₹{fmt(Math.abs(h.pnl ?? 0))} · {pos ? "+" : ""}{h.pnlPercent}%
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 flex -mr-2">
+                                        <button type="button" onClick={() => openEdit(h)} aria-label={`Edit ${h.name}`}
+                                                className="w-8 h-8 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken">
+                                            <Pencil size={15} aria-hidden />
+                                        </button>
+                                        <button type="button" onClick={() => handleDelete(h.id)} disabled={deleting === h.id} aria-label={`Delete ${h.name}`}
+                                                className="w-8 h-8 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken">
+                                            <Trash2 size={15} aria-hidden />
+                                        </button>
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </>
             )}
 
             {/* Auto-detect confirm modal */}
             {detected !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="relative w-full max-w-lg bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[80vh] flex flex-col">
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent rounded-t-2xl" />
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4">
+                    <div className="relative w-full max-w-lg bg-surface rounded-t-[24px] sm:rounded-card p-5 max-h-[85vh] flex flex-col">
+                        
 
                         <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-base font-bold">Investments Found in Bank Transactions</h3>
-                            <span className="text-xs text-zinc-500">{detected.length} detected</span>
+                            <h3 className="text-title text-ink">Found in your transactions</h3>
+                            <span className="text-small text-ink-3">{detected.length} found</span>
                         </div>
-                        <p className="text-xs text-zinc-500 mb-4">
-                            Invested amount = total debits to each instrument. Current value defaults to the same — update it after import.
+                        <p className="text-small text-ink-3 mb-4">
+                            Put in = everything paid to each one. Value starts the same; update it after adding.
                         </p>
 
                         {detected.length === 0 ? (
-                            <div className="text-center py-10 text-zinc-500 text-sm">
+                            <div className="text-center py-10 text-ink-3 text-small">
                                 No investment transactions detected in your bank history.
                             </div>
                         ) : (
@@ -553,20 +440,20 @@ export default function PortfolioTab() {
                                         key={i}
                                         className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                                             selected[i]
-                                                ? "border-cyan-500/30 bg-cyan-500/5"
-                                                : "border-white/5 bg-white/[0.02]"
+                                                ? "border-accent bg-accent-soft"
+                                                : "border-line bg-surface"
                                         }`}
                                     >
                                         <input
                                             type="checkbox"
-                                            className="mt-0.5 accent-cyan-400"
+                                            className="mt-0.5 w-4 h-4 accent-[var(--accent)]"
                                             checked={!!selected[i]}
                                             onChange={(e) => setSelected({ ...selected, [i]: e.target.checked })}
                                         />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-2">
-                                                <span className="text-sm font-medium text-white truncate">{item.name}</span>
-                                                <span className="text-xs font-semibold text-green-400 whitespace-nowrap">
+                                                <span className="text-body text-ink truncate">{item.name}</span>
+                                                <span className="text-body font-semibold text-ink num whitespace-nowrap">
                                                     ₹{item.investedAmount?.toLocaleString("en-IN")}
                                                 </span>
                                             </div>
@@ -576,7 +463,7 @@ export default function PortfolioTab() {
                                                     color: TYPE_COLORS[item.type] || "#94a3b8"
                                                 }}>{item.type}</span>
                                                 {item.purchaseDate && (
-                                                    <span className="text-[10px] text-zinc-500">since {item.purchaseDate}</span>
+                                                    <span className="text-small text-ink-3">since {item.purchaseDate}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -585,10 +472,10 @@ export default function PortfolioTab() {
                             </div>
                         )}
 
-                        <div className="flex gap-3 mt-5 pt-4 border-t border-white/5">
+                        <div className="flex gap-2 mt-4 pt-4 border-t border-line">
                             <button
                                 onClick={() => { setDetected(null); setSelected({}); }}
-                                className="flex-1 py-2.5 rounded-xl border border-white/10 text-zinc-400 text-sm hover:bg-white/5 transition-all"
+                                className="flex-1 h-11 rounded-full bg-surface-sunken text-ink text-body font-semibold"
                             >
                                 Cancel
                             </button>
@@ -596,9 +483,9 @@ export default function PortfolioTab() {
                                 <button
                                     onClick={handleImport}
                                     disabled={importing || !Object.values(selected).some(Boolean)}
-                                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-600 text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-40"
+                                    className="flex-1 h-11 rounded-full bg-accent-strong text-white text-body font-semibold disabled:opacity-40"
                                 >
-                                    {importing ? "Importing..." : `Import ${Object.values(selected).filter(Boolean).length} Selected`}
+                                    {importing ? "Importing..." : `Add ${Object.values(selected).filter(Boolean).length}`}
                                 </button>
                             )}
                         </div>
@@ -608,16 +495,16 @@ export default function PortfolioTab() {
 
             {/* Add/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="relative w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-500/40 to-transparent rounded-t-2xl" />
-                        <h3 className="text-base font-bold mb-5">{editId ? "Edit Investment" : "Add Investment"}</h3>
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sm:p-4">
+                    <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-t-[24px] sm:rounded-card p-5">
+                        
+                        <h3 className="text-title text-ink mb-4">{editId ? "Edit investment" : "Add investment"}</h3>
 
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-zinc-400 mb-1 block">Name *</label>
+                                <label className="text-small text-ink-2 mb-1 block">Name *</label>
                                 <input
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                    className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                     placeholder="e.g. Nifty 50 Index Fund"
                                     value={form.name}
                                     onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -625,9 +512,9 @@ export default function PortfolioTab() {
                             </div>
 
                             <div>
-                                <label className="text-xs text-zinc-400 mb-1 block">Type</label>
+                                <label className="text-small text-ink-2 mb-1 block">Type</label>
                                 <select
-                                    className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                    className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                     value={form.type}
                                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                                 >
@@ -639,16 +526,16 @@ export default function PortfolioTab() {
 
                             {form.type === "IPO" && (
                                 <div>
-                                    <label htmlFor="ipo-status" className="text-xs text-zinc-400 mb-1 block">Application status</label>
+                                    <label htmlFor="ipo-status" className="text-small text-ink-2 mb-1 block">Application status</label>
                                     <select
                                         id="ipo-status"
-                                        className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         value={form.ipoStatus}
                                         onChange={(e) => setForm({ ...form, ipoStatus: e.target.value })}
                                     >
                                         {IPO_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                     </select>
-                                    <p className="text-[10px] text-zinc-600 mt-1">
+                                    <p className="text-caption text-ink-3 mt-1">
                                         Amount = what was blocked or paid. Once listed, add the NSE symbol and shares to track the live price.
                                     </p>
                                 </div>
@@ -656,20 +543,20 @@ export default function PortfolioTab() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs text-zinc-400 mb-1 block">Invested Amount (₹) *</label>
+                                    <label className="text-small text-ink-2 mb-1 block">Invested Amount (₹) *</label>
                                     <input
                                         type="number"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         placeholder="50000"
                                         value={form.investedAmount}
                                         onChange={(e) => setForm({ ...form, investedAmount: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-zinc-400 mb-1 block">Current Value (₹)</label>
+                                    <label className="text-small text-ink-2 mb-1 block">Current Value (₹)</label>
                                     <input
                                         type="number"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         placeholder="Same as invested"
                                         value={form.currentValue}
                                         onChange={(e) => setForm({ ...form, currentValue: e.target.value })}
@@ -678,10 +565,10 @@ export default function PortfolioTab() {
                             </div>
 
                             <div>
-                                <label className="text-xs text-zinc-400 mb-1 block">Purchase Date</label>
+                                <label className="text-small text-ink-2 mb-1 block">Purchase Date</label>
                                 <input
                                     type="date"
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50"
+                                    className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                     value={form.purchaseDate}
                                     onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
                                 />
@@ -690,15 +577,15 @@ export default function PortfolioTab() {
                             {/* Context-sensitive live-price fields */}
                             {TYPE_FIELDS[form.type]?.ticker && (
                                 <div>
-                                    <label className="text-xs text-zinc-400 mb-1 block">{TYPE_FIELDS[form.type].ticker}</label>
+                                    <label className="text-small text-ink-2 mb-1 block">{TYPE_FIELDS[form.type].ticker}</label>
                                     <input
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         placeholder={form.type === "Mutual Fund" ? "e.g. 120716" : form.type === "IPO" ? "e.g. NEWCO — leave empty until it lists" : "e.g. TCS"}
                                         value={form.tickerCode}
                                         onChange={(e) => { setForm({ ...form, tickerCode: e.target.value }); symbolSearch.setQuery(e.target.value); }}
                                     />
                                     {symbolSearch.state === "done" && symbolSearch.results.length > 0 && (
-                                        <ul className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-zinc-900/95" style={{ listStyle: "none", margin: 0, padding: 4 }}>
+                                        <ul className="mt-1 max-h-48 overflow-y-auto rounded-[14px] border border-line bg-surface p-1 shadow-[0_12px_32px_rgba(17,17,26,0.12)]" style={{ listStyle: "none", margin: 0, padding: 4 }}>
                                             {symbolSearch.results.slice(0, 6).map(r => {
                                                 const symbol = form.type === "Mutual Fund" ? r.code : r.symbol.replace(/\.NS$/, "");
                                                 return (
@@ -706,17 +593,17 @@ export default function PortfolioTab() {
                                                         <button
                                                             type="button"
                                                             onClick={() => { setForm(f => ({ ...f, tickerCode: symbol })); symbolSearch.setQuery(""); }}
-                                                            className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/10"
+                                                            className="w-full text-left px-3 py-2 rounded-[10px] hover:bg-surface-sunken"
                                                         >
-                                                            <span className="block text-xs text-white">{r.name}</span>
-                                                            <span className="block text-[10px] text-zinc-500">{symbol}{r.exchange ? ` · ${r.exchange}` : ""}</span>
+                                                            <span className="block text-small text-ink">{r.name}</span>
+                                                            <span className="block text-caption text-ink-3">{symbol}{r.exchange ? ` · ${r.exchange}` : ""}</span>
                                                         </button>
                                                     </li>
                                                 );
                                             })}
                                         </ul>
                                     )}
-                                    <p className="text-[10px] text-zinc-600 mt-1">
+                                    <p className="text-caption text-ink-3 mt-1">
                                         {symbolSearch.state === "done" && symbolSearch.results.length === 0
                                             ? `Nothing on the exchange matches "${symbolSearch.query}" — check the spelling.`
                                             : form.type === "Mutual Fund" ? "Start typing the fund's name and pick it from the list"
@@ -727,10 +614,10 @@ export default function PortfolioTab() {
 
                             {TYPE_FIELDS[form.type]?.units && (
                                 <div>
-                                    <label className="text-xs text-zinc-400 mb-1 block">{TYPE_FIELDS[form.type].units}</label>
+                                    <label className="text-small text-ink-2 mb-1 block">{TYPE_FIELDS[form.type].units}</label>
                                     <input
                                         type="number"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         placeholder="0"
                                         value={form.units}
                                         onChange={(e) => setForm({ ...form, units: e.target.value })}
@@ -740,11 +627,11 @@ export default function PortfolioTab() {
 
                             {TYPE_FIELDS[form.type]?.rate && (
                                 <div>
-                                    <label className="text-xs text-zinc-400 mb-1 block">{TYPE_FIELDS[form.type].rate}</label>
+                                    <label className="text-small text-ink-2 mb-1 block">{TYPE_FIELDS[form.type].rate}</label>
                                     <input
                                         type="number"
                                         step="0.1"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                        className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                         placeholder={form.type === "Fixed Deposit" ? "7.1" : "7.5"}
                                         value={form.interestRate}
                                         onChange={(e) => setForm({ ...form, interestRate: e.target.value })}
@@ -753,15 +640,15 @@ export default function PortfolioTab() {
                             )}
 
                             {["PPF", "NPS"].includes(form.type) && (
-                                <div className="px-3 py-2 rounded-xl bg-blue-500/5 border border-blue-500/15 text-[11px] text-blue-400">
+                                <div className="px-3 py-2 rounded-control bg-info-soft text-small text-info">
                                     {form.type === "PPF" ? "PPF rate: 7.1% p.a. (auto-calculated)" : "NPS estimated return: 9% p.a. (auto-calculated)"}
                                 </div>
                             )}
 
                             <div>
-                                <label className="text-xs text-zinc-400 mb-1 block">Notes</label>
+                                <label className="text-small text-ink-2 mb-1 block">Notes</label>
                                 <input
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
+                                    className="w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
                                     placeholder="Optional"
                                     value={form.notes}
                                     onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -772,14 +659,14 @@ export default function PortfolioTab() {
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="flex-1 py-2.5 rounded-xl border border-white/10 text-zinc-400 text-sm hover:bg-white/5 transition-all"
+                                className="flex-1 h-11 rounded-full bg-surface-sunken text-ink text-body font-semibold"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={saving || !form.name.trim() || !form.investedAmount}
-                                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-40"
+                                className="flex-1 h-11 rounded-full bg-accent-strong text-white text-body font-semibold disabled:opacity-40"
                             >
                                 {saving ? "Saving..." : editId ? "Update" : "Add"}
                             </button>
@@ -796,19 +683,6 @@ export default function PortfolioTab() {
                     onOther={(h) => { setLinking(null); openEdit(h); }}
                 />
             )}
-        </div>
-    );
-}
-
-function SummaryCard({ label, value, color, icon }) {
-    return (
-        <div className="relative overflow-hidden p-5 border border-white/10 bg-white/[0.03] rounded-2xl">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            <p className="text-xs text-zinc-400 mb-2">{label}</p>
-            <div className={`flex items-center gap-1.5 text-xl font-bold ${color}`}>
-                {icon}
-                {value}
-            </div>
         </div>
     );
 }

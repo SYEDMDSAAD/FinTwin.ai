@@ -1,3 +1,4 @@
+import "@fontsource-variable/inter/opsz.css";
 import React from "react";
 
 import ReactDOM from "react-dom/client";

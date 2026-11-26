@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, ShieldCheck, X, AlertTriangle } from "lucide-react";
+import { Plus, ShieldCheck, X, HeartPulse, Car, Home, Plane, Umbrella } from "lucide-react";
+import { Button, Badge, SectionHeader, EmptyState, cx } from "../components/ui";
+import { rupees } from "../utils/money";
 import API from "../services/api";
 import toast from "react-hot-toast";
 
@@ -12,143 +14,97 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function RenewalBadge({ days }) {
+function renewal(days) {
   if (days == null) return null;
-  if (days < 0)  return <span style={badge("#f87171")}>Expired {Math.abs(days)}d ago</span>;
-  if (days < 30) return <span style={badge("#f87171")}>{days}d left ⚠</span>;
-  if (days < 90) return <span style={badge("#fbbf24")}>{days}d left</span>;
-  return <span style={badge("#4ade80")}>{days}d left</span>;
+  if (days < 0) return { tone: "bad", text: `Expired ${Math.abs(days)} days ago` };
+  if (days < 30) return { tone: "bad", text: `Renews in ${days} days` };
+  if (days < 90) return { tone: "warn", text: `Renews in ${days} days` };
+  return { tone: "neutral", text: `Renews in ${days} days` };
 }
 
-const badge = (c) => ({
-  fontSize: 10, fontWeight: 700, color: c,
-  background: c + "18", border: `1px solid ${c}30`,
-  borderRadius: 6, padding: "2px 8px",
-});
+const TYPE_ICON = { Life: Umbrella, Term: Umbrella, Health: HeartPulse, "Critical Illness": HeartPulse, Vehicle: Car, Home: Home, Travel: Plane };
 
-const TYPE_COLORS = { Life:"#22d3ee", Health:"#4ade80", Term:"#a78bfa", Vehicle:"#fbbf24", Home:"#f472b6", Travel:"#38bdf8", "Critical Illness":"#f87171" };
+const EMPTY = { type: "Life", provider: "", premium: "", frequency: "Annually", sumAssured: "", renewalDate: "", notes: "" };
+const PER = { Monthly: "a month", Quarterly: "a quarter", "Half-Yearly": "every 6 months", Annually: "a year" };
 
-const EMPTY = { type:"Life", provider:"", premium:"", frequency:"Annually", sumAssured:"", renewalDate:"", notes:"" };
-
-function PolicyCard({ policy, onDelete }) {
+function PolicyRow({ policy, onDelete }) {
   const days = daysUntil(policy.renewalDate);
-  const color = TYPE_COLORS[policy.type] || "#94a3b8";
-  const urgent = days != null && days < 30;
-
+  const r = renewal(days);
+  const Icon = TYPE_ICON[policy.type] || ShieldCheck;
   return (
-    <div style={{
-      position: "relative", overflow: "hidden",
-      background: urgent ? "rgba(248,113,113,0.04)" : "rgba(255,255,255,0.025)",
-      border: `1px solid ${urgent ? "rgba(248,113,113,0.2)" : "rgba(255,255,255,0.07)"}`,
-      borderRadius: 18, padding: "20px 22px",
-      borderLeft: `3px solid ${color}`,
-      transition: "all 0.2s",
-    }}>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: `linear-gradient(90deg,transparent,${color}30,transparent)` }} />
+    <li className="flex items-start gap-3 px-4 py-3.5">
+      <span aria-hidden className="shrink-0 w-10 h-10 rounded-full bg-surface-sunken text-ink-2 flex items-center justify-center"><Icon size={18} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-body text-ink">{policy.provider || "Unknown provider"}</span>
+          {r && r.tone !== "neutral" && <Badge tone={r.tone}>{r.tone === "bad" && days < 0 ? "Expired" : "Renew soon"}</Badge>}
+        </span>
+        <span className="block text-small text-ink-3">
+          {policy.type} · {rupees(policy.premium)} {PER[policy.frequency] || policy.frequency?.toLowerCase()}
+        </span>
+        <span className={cx("block text-small", r?.tone === "bad" ? "text-bad" : "text-ink-3")}>
+          {r ? r.text : "No renewal date"}{policy.notes ? ` · ${policy.notes}` : ""}
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-body font-semibold text-ink num">{rupees(policy.sumAssured)}</span>
+        <span className="block text-caption text-ink-3">cover</span>
+      </span>
+      <button type="button" onClick={() => onDelete(policy.id)} aria-label={`Remove ${policy.provider || "policy"}`}
+              className="shrink-0 -mr-1.5 w-8 h-8 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken">
+        <X size={16} aria-hidden />
+      </button>
+    </li>
+  );
+}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: color+"2e", border: `1px solid ${color}55`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={18} color={color} />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{policy.provider || "Unknown Provider"}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2 }}>{policy.type} Insurance</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <RenewalBadge days={days} />
-          <button onClick={() => onDelete(policy.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dimmer)", padding: 4, display: "flex" }}>
-            <X size={14} />
-          </button>
-        </div>
-      </div>
+const INPUT = "w-full h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent";
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>PREMIUM</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
-            ₹{parseFloat(policy.premium || 0).toLocaleString("en-IN")}
-            <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 400, marginLeft: 4 }}>/{policy.frequency?.toLowerCase()}</span>
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>SUM ASSURED</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80" }}>
-            ₹{parseFloat(policy.sumAssured || 0).toLocaleString("en-IN")}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>RENEWAL DATE</div>
-          <div style={{ fontSize: 13, color: days != null && days < 30 ? "#f87171" : "var(--text-secondary)", display: "flex", alignItems: "center", gap: 5 }}>
-            {urgent && <AlertTriangle size={11} />}
-            {policy.renewalDate || "Not set"}
-          </div>
-        </div>
-        {policy.notes && (
-          <div>
-            <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>NOTES</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{policy.notes}</div>
-          </div>
-        )}
-      </div>
-    </div>
+function Field({ label, children, wide }) {
+  return (
+    <label className={cx("block", wide && "col-span-2")}>
+      <span className="block text-small text-ink-2 mb-1">{label}</span>
+      {children}
+    </label>
   );
 }
 
 function AddModal({ onClose, onSave, saving }) {
   const [form, setForm] = useState(EMPTY);
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ width: "100%", maxWidth: 460, background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 20, padding: 24, position: "relative" }}>
-        <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(34,211,238,0.4),transparent)", borderRadius: 20 }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Add Insurance Policy</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", padding: 4 }}><X size={16} /></button>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="Add a policy">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[24px] sm:rounded-card bg-surface p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-title text-ink">Add a policy</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken"><X size={18} /></button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={lbl}>Insurance Type</label>
-            <select style={inp} value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Type" wide>
+            <select className={INPUT} value={form.type} onChange={set("type")}>
               {POLICY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-          </div>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={lbl}>Provider / Company *</label>
-            <input style={inp} placeholder="e.g. LIC, HDFC Ergo" value={form.provider} onChange={e => setForm({...form, provider: e.target.value})} />
-          </div>
-          <div>
-            <label style={lbl}>Premium Amount (₹)</label>
-            <input type="number" style={inp} placeholder="5000" value={form.premium} onChange={e => setForm({...form, premium: e.target.value})} />
-          </div>
-          <div>
-            <label style={lbl}>Frequency</label>
-            <select style={inp} value={form.frequency} onChange={e => setForm({...form, frequency: e.target.value})}>
+          </Field>
+          <Field label="Insurer" wide>
+            <input className={INPUT} placeholder="LIC, HDFC Ergo…" value={form.provider} onChange={set("provider")} />
+          </Field>
+          <Field label="Premium ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="5000" value={form.premium} onChange={set("premium")} /></Field>
+          <Field label="Paid">
+            <select className={INPUT} value={form.frequency} onChange={set("frequency")}>
               {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-          </div>
-          <div>
-            <label style={lbl}>Sum Assured (₹)</label>
-            <input type="number" style={inp} placeholder="1000000" value={form.sumAssured} onChange={e => setForm({...form, sumAssured: e.target.value})} />
-          </div>
-          <div>
-            <label style={lbl}>Renewal Date</label>
-            <input type="date" style={inp} value={form.renewalDate} onChange={e => setForm({...form, renewalDate: e.target.value})} />
-          </div>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={lbl}>Notes (optional)</label>
-            <input style={inp} placeholder="Policy number, agent, etc." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-          </div>
+          </Field>
+          <Field label="Cover ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="1000000" value={form.sumAssured} onChange={set("sumAssured")} /></Field>
+          <Field label="Renews on"><input type="date" className={INPUT} value={form.renewalDate} onChange={set("renewalDate")} /></Field>
+          <Field label="Notes (optional)" wide>
+            <input className={INPUT} placeholder="Policy number, agent…" value={form.notes} onChange={set("notes")} />
+          </Field>
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "1px solid var(--border-floating)", background: "none", color: "var(--text-muted)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-          <button
-            disabled={!form.provider.trim() || saving}
-            onClick={() => { if (form.provider.trim()) onSave(form); }}
-            style={{ flex: 1, padding: "11px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: (form.provider.trim() && !saving) ? 1 : 0.4 }}
-          >
-            {saving ? "Saving…" : "Add Policy"}
-          </button>
+        <div className="flex gap-2 mt-5">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button className="flex-1" disabled={!form.provider.trim() || saving} onClick={() => { if (form.provider.trim()) onSave(form); }}>
+            {saving ? "Saving…" : "Add policy"}
+          </Button>
         </div>
       </div>
     </div>
@@ -203,61 +159,35 @@ export default function InsurancePage() {
   };
 
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 16 }}>
-        <button
-          onClick={() => setShowAdd(true)}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-        >
-          <Plus size={15} /> Add Policy
-        </button>
-      </div>
+    <div className="max-w-2xl mb-8">
+      {policies.length > 0 && (
+        <section aria-label="Your cover" className="px-1 mb-8">
+          <p className="text-small text-ink-3">Total cover</p>
+          <p className="text-hero text-ink num mt-1">{rupees(totalCoverage)}</p>
+          <p className="mt-2 text-body text-ink-2">
+            {policies.length} {policies.length === 1 ? "policy" : "policies"}
+            {urgentCount > 0 && <> · <span className="text-bad font-medium">{urgentCount} to renew within 30 days</span></>}
+          </p>
+        </section>
+      )}
 
-      {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <SummaryCard label="Total Coverage" value={`₹${totalCoverage.toLocaleString("en-IN")}`} color="#4ade80" icon="🛡️" />
-        <SummaryCard label="Active Policies" value={policies.length} color="#22d3ee" icon="📋" />
-        <SummaryCard label="Renewing Soon (30d)" value={urgentCount} color={urgentCount > 0 ? "#f87171" : "#4ade80"} icon={urgentCount > 0 ? "⚠️" : "✅"} />
-        {POLICY_TYPES.map(t => {
-          const count = policies.filter(p=>p.type===t).length;
-          if (!count) return null;
-          return <SummaryCard key={t} label={t} value={`${count} polic${count===1?"y":"ies"}`} color={TYPE_COLORS[t]||"#94a3b8"} icon="🔐" />;
-        })}
-      </div>
+      <SectionHeader
+        title="Policies"
+        action={<Button size="sm" icon={Plus} onClick={() => setShowAdd(true)}>Add Policy</Button>}
+      />
 
-      {/* Policies */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)", fontSize: 13 }}>Loading…</div>
+        <div className="rounded-card bg-surface border border-line px-6 py-10 text-center text-small text-ink-3">Loading…</div>
       ) : policies.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dimmer)" }}>
-          <ShieldCheck size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No insurance policies tracked</div>
-          <div style={{ fontSize: 13, marginBottom: 20 }}>Add your Life, Health, Vehicle or Term policies to track renewals and coverage.</div>
-          <button onClick={() => setShowAdd(true)} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#22d3ee,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            + Add Policy
-          </button>
-        </div>
+        <EmptyState icon={ShieldCheck} title="No policies yet"
+                    body="Add your life, health, vehicle or term policies to see your cover in one place and get a nudge before each renewal." />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))", gap: 16 }}>
-          {policies.map(p => <PolicyCard key={p.id} policy={p} onDelete={handleDelete} />)}
-        </div>
+        <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+          {policies.map(p => <PolicyRow key={p.id} policy={p} onDelete={handleDelete} />)}
+        </ul>
       )}
 
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={handleSave} saving={saving} />}
     </div>
   );
 }
-
-function SummaryCard({ label, value, color, icon }) {
-  return (
-    <div style={{ position: "relative", overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 14, padding: "16px 18px" }}>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: `linear-gradient(90deg,transparent,${color}30,transparent)` }} />
-      <div style={{ fontSize: 18, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 4 }}>{label.toUpperCase()}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color }}>{value}</div>
-    </div>
-  );
-}
-
-const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 6 };
-const inp = { width: "100%", padding: "9px 12px", borderRadius: 10, background: "var(--bg-input)", border: "1px solid var(--border-floating)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

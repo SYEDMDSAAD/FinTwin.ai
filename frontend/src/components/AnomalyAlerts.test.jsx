@@ -31,18 +31,18 @@ describe("AnomalyAlerts", () => {
 
   it("shows anomalies that arrive after it has mounted", () => {
     const { rerender } = render(<AnomalyAlerts anomalies={[]} />);
-    expect(screen.getByText("No Anomalies Detected")).toBeInTheDocument();
+    expect(screen.getByText("No unusual spending")).toBeInTheDocument();
 
     rerender(<AnomalyAlerts anomalies={A} />);
-    expect(screen.getByText("Unusual Spending Detected")).toBeInTheDocument();
-    expect(screen.getByText("3 total")).toBeInTheDocument();
+    expect(screen.getByText("Unusual spending")).toBeInTheDocument();
+    expect(screen.getByText("3 found")).toBeInTheDocument();
   });
 
   it("keeps a dismissed pattern hidden when the list is reloaded", async () => {
     mock.onPost("/anomalies/dismiss").reply(204);
     const { rerender } = render(<AnomalyAlerts anomalies={A} />);
     fireEvent.click(screen.getAllByText("Not an anomaly")[0]);
-    await waitFor(() => expect(screen.getByText("2 total")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("2 found")).toBeInTheDocument());
 
     rerender(<AnomalyAlerts anomalies={[...A]} />);
     expect(screen.queryByText("4x your usual Swiggy order")).not.toBeInTheDocument();

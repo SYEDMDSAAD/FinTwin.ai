@@ -11,15 +11,17 @@ export default {
       boxShadow: { card: 'var(--shadow-card)', raised: 'var(--shadow-raised)' },
       fontSize: {
         // One type scale: [size, line-height]
-        'display': ['36px', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'title': ['22px', { lineHeight: '1.25', letterSpacing: '-0.01em', fontWeight: '700' }],
-        'heading': ['15px', { lineHeight: '1.4', fontWeight: '600' }],
-        'body': ['14px', { lineHeight: '1.55' }],
-        'small': ['13px', { lineHeight: '1.5' }],
-        'caption': ['12px', { lineHeight: '1.45' }],
+        // the one big number on a screen
+        'hero': ['44px', { lineHeight: '1.05', letterSpacing: '-0.035em', fontWeight: '650' }],
+        'display': ['32px', { lineHeight: '1.1', letterSpacing: '-0.03em', fontWeight: '650' }],
+        'title': ['22px', { lineHeight: '1.25', letterSpacing: '-0.02em', fontWeight: '650' }],
+        'heading': ['16px', { lineHeight: '1.35', letterSpacing: '-0.01em', fontWeight: '600' }],
+        'body': ['15px', { lineHeight: '1.5', letterSpacing: '-0.005em' }],
+        'small': ['13px', { lineHeight: '1.45' }],
+        'caption': ['12px', { lineHeight: '1.4' }],
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Inter Variable', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       // Design-system tokens (index.css); they follow the light/dark theme
       colors: {

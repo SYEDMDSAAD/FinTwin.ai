@@ -45,40 +45,42 @@
 
 /* ── Design tokens — light ─────────────────────────────── */
 :root[data-theme="light"] {
-    --bg-base:            linear-gradient(150deg, #f0f2ff 0%, #f8f5ff 50%, #f2f8ff 100%);
+    /* "Quiet light": a flat off-white canvas, white surfaces, neutral hairlines,
+       one violet accent used sparingly. No shadows; space and dividers do the work. */
+    --bg-base:            #F5F5F7;
     --bg-sidebar:         #ffffff;
     --bg-card:            #ffffff;
-    --bg-card-hover:      #fafafe;
-    --bg-input:           rgba(15,23,42,0.045);
-    --bg-subtle:          rgba(15,23,42,0.03);
+    --bg-card-hover:      #FAFAFB;
+    --bg-input:           #F1F1F4;
+    --bg-subtle:          #F5F5F7;
     --bg-floating:        #ffffff;
-    --border-card:        rgba(109,40,217,0.10);
-    --border-card-hover:  rgba(109,40,217,0.30);
-    --border-sidebar:     rgba(15,23,42,0.07);
-    --border-subtle:      rgba(15,23,42,0.09);
-    --border-floating:    rgba(15,23,42,0.12);
-    --text-primary:       #0f172a;
-    --text-secondary:     rgba(30,41,59,0.85);
-    --text-muted:         rgba(51,65,85,0.80);
-    --text-label:         rgba(51,65,85,0.70);
-    --text-dim:           rgba(30,41,59,0.78);
-    --text-dimmer:        rgba(30,41,59,0.70);
-    --scrollbar-thumb:    rgba(109,40,217,0.15);
-    --scrollbar-hover:    rgba(109,40,217,0.25);
-    --accent:             #7c3aed;
-    --accent-strong:      #6d28d9;
-    --accent-soft:        rgba(124,58,237,0.09);
+    --border-card:        rgba(17,17,26,0.07);
+    --border-card-hover:  rgba(17,17,26,0.16);
+    --border-sidebar:     rgba(17,17,26,0.07);
+    --border-subtle:      rgba(17,17,26,0.08);
+    --border-floating:    rgba(17,17,26,0.10);
+    --text-primary:       #111118;
+    --text-secondary:     #4A4A55;
+    --text-muted:         #6B6B76;
+    --text-label:         #6B6B76;
+    --text-dim:           #6E6E7A;
+    --text-dimmer:        #767682;
+    --accent:             #6D3AE8;
+    --accent-strong:      #5B2BD6;
+    --accent-soft:        #F1ECFE;
     --on-accent:          #ffffff;
-    --good:               #15803d;
-    --good-soft:          rgba(22,163,74,0.10);
-    --bad:                #dc2626;
-    --bad-soft:           rgba(220,38,38,0.08);
-    --warn:               #b45309;
-    --warn-soft:          rgba(217,119,6,0.10);
-    --info:               #0e7490;
-    --info-soft:          rgba(8,145,178,0.09);
-    --shadow-card:        0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(76,29,149,0.04);
-    --shadow-raised:      0 16px 40px rgba(15,23,42,0.14);
+    --good:               #0E7A43;
+    --good-soft:          #E8F5EE;
+    --bad:                #C8261B;
+    --bad-soft:           #FCEDEB;
+    --warn:               #A65A06;
+    --warn-soft:          #FDF3E4;
+    --info:               #0A64A8;
+    --info-soft:          #E8F1FA;
+    --radius-card:        20px;
+    --radius-control:     12px;
+    --shadow-card:        none;
+    --shadow-raised:      0 12px 32px rgba(17,17,26,0.12);
 }
 
 html,
@@ -280,10 +282,11 @@ body.sidebar-animating [class*="backdrop-blur"] {
    CSS !important overrides inline styles. Attribute selectors
    match the browser-normalised style attribute string.        */
 
-/* White → dark primary (exclude <button> and gradient divs) */
-[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: rgb(255, 255, 255)"],
-[data-theme="light"] :not(button):not([style*="gradient"])[style*="color:#fff"],
-[data-theme="light"] :not(button):not([style*="gradient"])[style*="color: #fff"] {
+/* White → dark primary (exclude <button>, gradient divs and solid accent or
+   status fills, where white text is meant) */
+[data-theme="light"] :not(button):not([style*="gradient"]):not([style*="--accent"]):not([style*="--good"]):not([style*="--bad"])[style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] :not(button):not([style*="gradient"]):not([style*="--accent"]):not([style*="--good"]):not([style*="--bad"])[style*="color:#fff"],
+[data-theme="light"] :not(button):not([style*="gradient"]):not([style*="--accent"]):not([style*="--good"]):not([style*="--bad"])[style*="color: #fff"] {
   color: var(--text-primary) !important;
 }
 
@@ -691,7 +694,11 @@ body.sidebar-animating [class*="backdrop-blur"] {
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+    /* Inter's optical sizes: big amounts get the tighter Display cut by themselves */
+    font-optical-sizing: auto;
+    /* cv05: lowercase l with a tail, cv08: serifed capital I, so l, I and 1 never look alike in amounts */
+    font-feature-settings: "cv05", "cv08";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -1151,3 +1158,7 @@ body {
 
 /* Chart axis labels: Recharts' default #666 is too dim on the dark cards */
 :root:not([data-theme="light"]) .recharts-cartesian-axis-tick-value { fill: #94a3b8; }
+
+
+/* Money: digits all the same width so amounts line up and don't jiggle as they change */
+.num, .tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum", "cv05", "cv08"; }

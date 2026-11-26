@@ -1,600 +1,105 @@
-import GlassCard from "./GlassCard";
+import { Sparkles } from "lucide-react";
+import { SectionHeader, Badge, cx } from "./ui";
+import { SERIES } from "./ui/chartTheme";
+import { rupees } from "../utils/money";
 
-import {
+/*
+ * The suggested split of monthly savings across kinds of investment: one
+ * number up top, the profile as rows, the split as one bar plus rows.
+ */
 
-    PieChart,
-    Pie,
-    Cell,
-    Tooltip,
-    ResponsiveContainer
+const riskTone = (risk = "") => {
+    const r = risk.toLowerCase();
+    if (r.includes("aggressive")) return "bad";
+    if (r.includes("moderate")) return "warn";
+    return "good";
+};
 
-} from "recharts";
+const scoreLabel = (score) =>
+    score >= 85 ? "Excellent" : score >= 70 ? "Good" : score >= 50 ? "Average" : "Needs work";
 
-function InvestmentRecommendationSection({
-
-    recommendation
-
-}) {
-
+function InvestmentRecommendationSection({ recommendation }) {
     if (!recommendation) return null;
 
-    const COLORS = [
-        "#a78bfa",
-        "#22d3ee",
-        "#4ade80",
-        "#fbbf24",
-        "#f87171",
-        "#f472b6"
+    const items = recommendation.recommendations || [];
+    const rows = [
+        { label: "Risk profile", value: <Badge tone={riskTone(recommendation.riskProfile)}>{recommendation.riskProfile}</Badge> },
+        { label: "Expected return", note: "A range, not a promise", value: recommendation.expectedReturn },
+        { label: "Horizon", value: recommendation.investmentHorizon },
+        { label: "Plan score", note: scoreLabel(recommendation.portfolioScore), value: `${recommendation.portfolioScore} / 100` },
     ];
 
     return (
-
-        <div className="mb-10">
-
-            <div className="flex items-center gap-3 mb-6">
-
-                <div
-                    className="
-                        w-10
-                        h-10
-                        rounded-xl
-                        flex
-                        items-center
-                        justify-center
-                        bg-purple-500/10
-                        border
-                        border-purple-500/20
-                    "
-                >
-                    📈
-                </div>
-
-                <div>
-
-                    <div
-                        className="
-                            text-[11px]
-                            font-bold
-                            tracking-[0.12em]
-                            text-zinc-500
-                        "
-                    >
-                        AI POWERED
-                    </div>
-
-                    <h2
-                        className="
-                            text-lg
-                            font-bold
-                        "
-                    >
-                        Investment Advisor
-                    </h2>
-
-                </div>
-
-            </div>
-
-            {/* Top Cards */}
-
-            <div className="
-                grid
-                grid-cols-1
-                md:grid-cols-2
-                xl:grid-cols-4
-                gap-4
-                mb-6
-            ">
-
-                <GlassCard
-                    className="
-                        relative
-                        overflow-hidden
-                        p-5
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                    "
-                >
-
-                    <div
-                        className="
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-gradient-to-r
-                            from-transparent
-                            via-white/20
-                            to-transparent
-                        "
-                    />
-
-                    <p className="
-                        text-zinc-400
-                        mb-2
-                    ">
-                        Risk Profile
-                    </p>
-
-                    <h3 className={`
-                        text-2xl
-                        font-bold
-
-                        ${
-                            recommendation.riskProfile
-                                .toLowerCase()
-                                .includes("aggressive")
-
-                            ? "text-red-400"
-
-                            : recommendation.riskProfile
-                                .toLowerCase()
-                                .includes("moderate")
-
-                            ? "text-yellow-400"
-
-                            : "text-green-400"
-                        }
-                    `}>
-                        {recommendation.riskProfile}
-                    </h3>
-
-                </GlassCard>
-
-                <GlassCard
-                    className="
-                        relative
-                        overflow-hidden
-                        p-5
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                    "
-                >
-
-                    <div
-                        className="
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-gradient-to-r
-                            from-transparent
-                            via-white/20
-                            to-transparent
-                        "
-                    />
-
-                    <p className="
-                        text-zinc-400
-                        mb-2
-                    ">
-                        Expected Return
-                    </p>
-
-                    <h3 className="
-                        text-2xl
-                        font-bold
-                        text-green-400
-                    ">
-                        {
-                            recommendation.expectedReturn
-                        }
-                    </h3>
-
-                </GlassCard>
-
-                <GlassCard
-                    className="
-                        relative
-                        overflow-hidden
-                        p-5
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                    "
-                >
-
-                    <div
-                        className="
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-gradient-to-r
-                            from-transparent
-                            via-white/20
-                            to-transparent
-                        "
-                    />
-
-                    <p className="
-                        text-zinc-400
-                        mb-2
-                    ">
-                        Horizon
-                    </p>
-
-                    <h3 className="
-                        text-xl
-                        font-bold
-                        text-blue-400
-                    ">
-                        {
-                            recommendation.investmentHorizon
-                        }
-                    </h3>
-
-                </GlassCard>
-
-                <GlassCard
-                    className="
-                        relative
-                        overflow-hidden
-                        p-5
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                    "
-                >
-
-                    <div
-                        className="
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-gradient-to-r
-                            from-transparent
-                            via-white/20
-                            to-transparent
-                        "
-                    />
-
-                    <p className="
-                        text-zinc-400
-                        mb-2
-                    ">
-                        Portfolio Score
-                    </p>
-
-                    <div>
-
-                        <h3 className="
-                            text-2xl
-                            font-bold
-                            text-yellow-400
-                        ">
-                            {recommendation.portfolioScore}/100
-                        </h3>
-
-                        <p className="
-                            text-zinc-500
-                            mt-2
-                        ">
-                            {
-                                recommendation.portfolioScore >= 85
-
-                                ? "Excellent"
-
-                                : recommendation.portfolioScore >= 70
-
-                                ? "Good"
-
-                                : recommendation.portfolioScore >= 50
-
-                                ? "Average"
-
-                                : "Needs Improvement"
-                            }
-                        </p>
-
-                    </div>
-
-                </GlassCard>
-
-            </div>
-
-            {/* Investable Amount */}
-
-            <GlassCard className="
-                relative
-                overflow-hidden
-                p-6
-                mb-6
-                border
-                border-white/10
-                bg-white/[0.03]
-                backdrop-blur-xl
-            ">
-
-                <p className="
-                    text-zinc-400
-                    mb-2
-                ">
-                    Monthly Investable Amount
-                </p>
-
-                <h1 className="
-                    text-4xl
-                    font-extrabold
-                    text-purple-400
-                ">
-                    ₹{
-                        recommendation
-                        .monthlyInvestableAmount
-                        ?.toLocaleString("en-IN")
-                    }
-                </h1>
-
-            </GlassCard>
-
-            <div
-                className="
-                    grid
-                    xl:grid-cols-[1fr_1.3fr]
-                    gap-4
-                    mb-6
-                "
-            >
-
-                {/* Pie Chart */}
-
-                <GlassCard
-                    className="
-                        relative
-                        overflow-hidden
-                        p-6
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        backdrop-blur-xl
-                    "
-                >
-
-                    <div
-                        className="
-                            text-[10px]
-                            font-bold
-                            tracking-[0.1em]
-                            text-zinc-500
-                            mb-4
-                        "
-                    >
-                        PORTFOLIO ALLOCATION
-                    </div>
-
-                    <ResponsiveContainer initialDimension={{ width: 320, height: 200 }}
-                        width="100%"
-                        height={260}
-                    >
-
-                        <PieChart>
-
-                            <Pie
-                                data={recommendation.recommendations}
-                                dataKey="allocation"
-                                nameKey="asset"
-                                innerRadius={50}
-                                outerRadius={100}
-                                labelLine={false}
-                                label={({ percent }) =>
-                                    `${(percent * 100).toFixed(0)}%`
-                                }
-                            >
-
-                                {recommendation.recommendations.map(
-                                    (_, index) => (
-                                        <Cell
-                                            key={index}
-                                            fill={
-                                                COLORS[
-                                                    index %
-                                                    COLORS.length
-                                                ]
-                                            }
-                                        />
-                                    )
-                                )}
-
-                            </Pie>
-
-                            <Tooltip />
-
-                        </PieChart>
-
-                    </ResponsiveContainer>
-
-                </GlassCard>
-
-                {/* Allocation Cards */}
-
-                <div
-                    className="
-                        flex
-                        flex-col
-                        gap-3
-                    "
-                >
-
-                    {recommendation.recommendations.map(
-                        (item, index) => (
-
-                            <div
-                                key={index}
-                                className="
-                                    rounded-xl
-                                    p-4
-                                "
-                                style={{
-                                    border:
-                                        `1px solid ${
-                                            COLORS[
-                                                index %
-                                                COLORS.length
-                                            ]
-                                        }25`,
-                                    borderLeft:
-                                        `3px solid ${
-                                            COLORS[
-                                                index %
-                                                COLORS.length
-                                            ]
-                                        }`,
-                                    background:
-                                        `${COLORS[
-                                            index %
-                                            COLORS.length
-                                        ]}10`
-                                }}
-                            >
-
-                                <div
-                                    className="
-                                        flex
-                                        justify-between
-                                        items-center
-                                        mb-2
-                                    "
-                                >
-
-                                    <span
-                                        className="
-                                            text-sm
-                                            font-bold
-                                        "
-                                    >
-                                        {item.asset}
-                                    </span>
-
-                                    <span
-                                        className="
-                                            text-xs
-                                            font-bold
-                                        "
-                                        style={{
-                                            color:
-                                                COLORS[
-                                                    index %
-                                                    COLORS.length
-                                                ]
-                                        }}
-                                    >
-                                        {item.allocation}%
-                                    </span>
-
-                                </div>
-
-                                <p
-                                    className="
-                                        text-lg
-                                        font-extrabold
-                                        mb-1
-                                    "
-                                >
-                                    ₹{item.amount?.toLocaleString("en-IN")}
-                                </p>
-
-                                <p
-                                    className="
-                                        text-xs
-                                        text-zinc-500
-                                    "
-                                >
-                                    {item.reason}
-                                </p>
-
+        <div className="max-w-2xl space-y-8">
+            <section aria-label="To invest each month" className="px-1">
+                <p className="text-small text-ink-3">You could invest each month</p>
+                <p className="text-hero text-ink num mt-1">{rupees(recommendation.monthlyInvestableAmount || 0)}</p>
+                <p className="mt-2 text-body text-ink-2">Worked out from your income, spending and goals</p>
+            </section>
+
+            <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+                {rows.map((r) => (
+                    <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                        <span className="min-w-0">
+                            <span className="block text-body text-ink">{r.label}</span>
+                            {r.note && <span className="block text-small text-ink-3">{r.note}</span>}
+                        </span>
+                        <span className="text-body font-semibold text-ink num text-right">{r.value}</span>
+                    </li>
+                ))}
+            </ul>
+
+            {items.length > 0 && (
+                <section aria-label="Suggested mix">
+                    <SectionHeader title="Suggested mix" />
+                    <div className="rounded-card bg-surface border border-line">
+                        <div className="p-4 pb-3">
+                            <div className="flex h-2 gap-0.5 rounded-full overflow-hidden" aria-hidden>
+                                {items.map((it, i) => (
+                                    <div key={it.asset} style={{ width: `${it.allocation}%`, background: SERIES[i % SERIES.length], minWidth: 3 }} />
+                                ))}
                             </div>
-                        )
-                    )}
+                        </div>
+                        <ul className="divide-y divide-line border-t border-line">
+                            {items.map((it, i) => (
+                                <li key={it.asset} className="flex items-start gap-3 px-4 py-3.5">
+                                    <span aria-hidden className="shrink-0 mt-1.5 w-2.5 h-2.5 rounded-full" style={{ background: SERIES[i % SERIES.length] }} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-baseline justify-between gap-3">
+                                            <span className="text-body text-ink">{it.asset}</span>
+                                            <span className="text-body font-semibold text-ink num shrink-0">{rupees(it.amount || 0)}</span>
+                                        </span>
+                                        <span className="flex items-start justify-between gap-3">
+                                            <span className="text-small text-ink-3">{it.reason}</span>
+                                            <span className="text-small text-ink-3 num shrink-0">{it.allocation}%</span>
+                                        </span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </section>
+            )}
 
-                </div>
+            {recommendation.summary && (
+                <section aria-label="In short">
+                    <SectionHeader title="In short" />
+                    <div className="flex gap-3 px-1">
+                        <Sparkles size={16} aria-hidden className="shrink-0 mt-1 text-accent" />
+                        <p className="text-body text-ink-2 leading-relaxed">{recommendation.summary}</p>
+                    </div>
+                </section>
+            )}
 
-            </div>
-
-            {/* AI Summary */}
-
-            <GlassCard
-                className="
-                    relative
-                    overflow-hidden
-                    p-6
-                    border
-                    border-white/10
-                    bg-white/[0.03]
-                    backdrop-blur-xl
-                "
-            >
-
-                <div
-                    className="
-                        absolute
-                        inset-x-0
-                        top-0
-                        h-px
-                        bg-gradient-to-r
-                        from-transparent
-                        via-white/20
-                        to-transparent
-                    "
-                />
-
-                <div
-                    className="
-                        text-[10px]
-                        font-bold
-                        tracking-[0.1em]
-                        text-purple-400/60
-                        mb-3
-                    "
-                >
-                    AI ANALYSIS
-                </div>
-
-                <p
-                    className="
-                        text-sm
-                        text-zinc-300
-                        leading-7
-                    "
-                >
-                    {
-                        recommendation.summary
-                    }
-                </p>
-
-            </GlassCard>
-
-            <div
-                className="
-                    mt-4
-                    px-4
-                    py-3
-                    rounded-xl
-                    border
-                    border-white/10
-                    bg-white/[0.02]
-                    text-[11px]
-                    leading-5
-                    text-zinc-500
-                "
-            >
-                <span className="font-semibold text-zinc-400">
-                    Educational estimate — not investment advice.
-                </span>{" "}
+            <p className={cx("px-1 text-caption text-ink-3 leading-5")}>
+                <span className="font-semibold text-ink-2">Educational estimate — not investment advice.</span>{" "}
                 These allocations are generated automatically from your own
                 income, spending and goal data. FinTwin is not a SEBI-registered
                 investment adviser, and nothing here is a personal
                 recommendation to buy or sell any security. Returns shown are
                 illustrative ranges, not guarantees — market-linked investments
                 can lose value. Consult a SEBI-registered adviser before acting.
-            </div>
-
+            </p>
         </div>
     );
 }

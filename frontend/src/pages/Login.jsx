@@ -10,22 +10,22 @@ import { isNativeApp, nativeGoogleIdToken } from "../native";
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowLeft, AlertOctagon, MessageSquare, X, User } from "lucide-react";
 
 const CSS = `
+  .l-orb, .l-shape { display:none; }
   .auth-page * { box-sizing: border-box; }
-  .auth-page { font-family: 'DM Sans', system-ui, sans-serif; }
 
-  .auth-input-wrap { display:flex; align-items:center; gap:12px; border-radius:13px; padding:0 16px; transition:all 0.2s; }
-  .auth-input-wrap:focus-within { box-shadow:0 0 0 3px rgba(124,58,237,0.10) !important; }
-  .auth-input { width:100%; background:transparent; padding:14px 0; font-size:14px; outline:none; font-family:inherit; }
-  .auth-btn { width:100%; padding:14px; border-radius:13px; border:none; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.22s; font-family:inherit; letter-spacing:0.02em; }
-  .auth-btn:hover:not(:disabled) { opacity:0.92; transform:translateY(-1px); box-shadow:0 8px 28px rgba(124,58,237,0.30); }
+  .auth-input-wrap { display:flex; align-items:center; gap:10px; border-radius:var(--radius-control); padding:0 14px; transition:border-color 0.15s; }
+  .auth-input-wrap:focus-within { border-color:var(--accent) !important; }
+  .auth-input { width:100%; background:transparent; height:48px; padding:0; font-size:16px; outline:none; font-family:inherit; }
+  .auth-btn { width:100%; height:48px; padding:0 16px; border-radius:999px; border:none; font-size:16px; font-weight:600; cursor:pointer; transition:opacity 0.15s; font-family:inherit; }
+  .auth-btn:hover:not(:disabled) { opacity:0.92; }
   .auth-btn:disabled { opacity:0.5; cursor:not-allowed; }
   .auth-link { cursor:pointer; font-weight:600; transition:color 0.15s; }
-  .otp-box { width:48px; height:56px; border-radius:13px; font-size:22px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
-  .otp-box:focus { box-shadow:0 0 0 3px rgba(124,58,237,0.10); }
-  .ticket-select { border-radius:13px; padding:14px 16px; font-size:14px; outline:none; font-family:inherit; width:100%; cursor:pointer; border:1px solid rgba(255,255,255,0.09); background:rgba(255,255,255,0.04); color:#e2e8f0; }
-  .ticket-select option { background:#0e1018; color:#e2e8f0; }
-  .ticket-textarea { width:100%; border-radius:13px; padding:14px 16px; font-size:14px; outline:none; font-family:inherit; resize:vertical; min-height:110px; border:1px solid rgba(255,255,255,0.09); background:rgba(255,255,255,0.04); color:#e2e8f0; }
-  .ticket-textarea::placeholder { color:rgba(100,116,139,0.5); }
+  .otp-box { width:46px; height:54px; border-radius:var(--radius-control); font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
+  .otp-box:focus { border-color:var(--accent) !important; }
+  .ticket-select { border-radius:var(--radius-control); padding:14px 16px; font-size:14px; outline:none; font-family:inherit; width:100%; cursor:pointer; border:1px solid transparent; background:var(--bg-input); color:var(--text-primary); }
+  .ticket-select option { background:var(--bg-card); color:var(--text-primary); }
+  .ticket-textarea { width:100%; border-radius:var(--radius-control); padding:14px 16px; font-size:14px; outline:none; font-family:inherit; resize:vertical; min-height:110px; border:1px solid transparent; background:var(--bg-input); color:var(--text-primary); }
+  .ticket-textarea::placeholder { color:var(--text-dim); }
 
   @keyframes authFade { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
   .auth-fade { animation: authFade 0.45s cubic-bezier(0.22,1,0.36,1) both; }
@@ -80,63 +80,63 @@ function TicketModal({ defaultEmail = "", onClose }) {
 
   return (
     <div
-      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(8px)" }}
+      style={{ position:"fixed", inset:0, background:"rgba(17,17,26,0.4)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(8px)" }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="auth-fade" style={{ width:"100%", maxWidth:460, background:"#0e1018", border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"32px 28px", position:"relative", overflowY:"auto", maxHeight:"90vh" }}>
-        <button onClick={onClose} style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"rgba(148,163,184,0.5)", cursor:"pointer", padding:4, display:"flex" }}>
+      <div className="auth-fade" style={{ width:"100%", maxWidth:460, background:"var(--bg-card)", border:"1px solid var(--border-card)", borderRadius:24, padding:"32px 28px", position:"relative", overflowY:"auto", maxHeight:"90vh" }}>
+        <button onClick={onClose} style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"var(--text-dim)", cursor:"pointer", padding:4, display:"flex" }}>
           <X size={18}/>
         </button>
         {success ? (
           <div style={{ textAlign:"center", padding:"24px 0" }}>
-            <div style={{ width:56, height:56, borderRadius:"50%", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px" }}>
-              <MessageSquare size={24} color="#34d399"/>
+            <div style={{ width:56, height:56, borderRadius:"50%", background:"var(--good-soft)", border:"1px solid transparent", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 18px" }}>
+              <MessageSquare size={24} color="var(--good)"/>
             </div>
-            <h2 style={{ fontSize:19, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Ticket Submitted!</h2>
-            <p style={{ fontSize:13, color:"rgba(148,163,184,0.6)", margin:"0 0 28px", lineHeight:1.6 }}>
-              Our support team will respond to <strong style={{ color:"#e2e8f0" }}>{tEmail}</strong> shortly.
+            <h2 style={{ fontSize:19, fontWeight:800, color:"var(--text-primary)", margin:"0 0 8px" }}>Ticket Submitted!</h2>
+            <p style={{ fontSize:13, color:"var(--text-dim)", margin:"0 0 28px", lineHeight:1.6 }}>
+              Our support team will respond to <strong style={{ color:"var(--text-primary)" }}>{tEmail}</strong> shortly.
             </p>
-            <button className="auth-btn" onClick={onClose} style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>Close</button>
+            <button className="auth-btn" onClick={onClose} style={{ background:"var(--accent-strong)", color:"#fff" }}>Close</button>
           </div>
         ) : (
           <>
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:26 }}>
-              <div style={{ width:40, height:40, borderRadius:12, background:"rgba(167,139,250,0.1)", border:"1px solid rgba(167,139,250,0.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <MessageSquare size={19} color="#a78bfa"/>
+              <div style={{ width:40, height:40, borderRadius:12, background:"var(--accent-soft)", border:"1px solid transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <MessageSquare size={19} color="var(--accent)"/>
               </div>
               <div>
-                <div style={{ fontSize:16, fontWeight:800, color:"#fff" }}>Raise a Support Ticket</div>
-                <div style={{ fontSize:11, color:"rgba(148,163,184,0.5)" }}>We'll reply directly to your email</div>
+                <div style={{ fontSize:16, fontWeight:800, color:"var(--text-primary)" }}>Raise a Support Ticket</div>
+                <div style={{ fontSize:11, color:"var(--text-dim)" }}>We'll reply directly to your email</div>
               </div>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
               <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>YOUR EMAIL *</label>
-                <div className="auth-input-wrap" style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)" }}>
-                  <Mail size={15} color="rgba(148,163,184,0.4)"/>
-                  <input className="auth-input" style={{ color:"#e2e8f0" }} type="email" placeholder="you@example.com" value={tEmail} onChange={e=>setTEmail(e.target.value)}/>
+                <label style={{ fontSize:14, fontWeight:500, color:"var(--text-secondary)", display:"block", marginBottom:8 }}>Your email</label>
+                <div className="auth-input-wrap" style={{ background:"var(--bg-input)", border:"1px solid var(--bg-input)" }}>
+                  <Mail size={15} color="var(--text-dim)"/>
+                  <input className="auth-input" style={{ color:"var(--text-primary)" }} type="email" placeholder="you@example.com" value={tEmail} onChange={e=>setTEmail(e.target.value)}/>
                 </div>
               </div>
               <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>YOUR NAME</label>
-                <div className="auth-input-wrap" style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)" }}>
-                  <User size={15} color="rgba(148,163,184,0.4)"/>
-                  <input className="auth-input" style={{ color:"#e2e8f0" }} type="text" placeholder="Optional" value={tName} onChange={e=>setTName(e.target.value)}/>
+                <label style={{ fontSize:14, fontWeight:500, color:"var(--text-secondary)", display:"block", marginBottom:8 }}>Your name</label>
+                <div className="auth-input-wrap" style={{ background:"var(--bg-input)", border:"1px solid var(--bg-input)" }}>
+                  <User size={15} color="var(--text-dim)"/>
+                  <input className="auth-input" style={{ color:"var(--text-primary)" }} type="text" placeholder="Optional" value={tName} onChange={e=>setTName(e.target.value)}/>
                 </div>
               </div>
               <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>CATEGORY</label>
+                <label style={{ fontSize:14, fontWeight:500, color:"var(--text-secondary)", display:"block", marginBottom:8 }}>Category</label>
                 <select className="ticket-select" value={tCategory} onChange={e=>setTCategory(e.target.value)}>
                   {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>DESCRIBE YOUR ISSUE *</label>
+                <label style={{ fontSize:14, fontWeight:500, color:"var(--text-secondary)", display:"block", marginBottom:8 }}>Describe your issue</label>
                 <textarea className="ticket-textarea" placeholder="Please describe your problem in detail…" value={tMessage} onChange={e=>setTMessage(e.target.value)}/>
               </div>
               <button className="auth-btn" onClick={submit}
                 disabled={loading || !tEmail.trim() || !tMessage.trim()}
-                style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>
+                style={{ background:"var(--accent-strong)", color:"#fff" }}>
                 {loading ? "Submitting…" : "Submit Ticket →"}
               </button>
             </div>
@@ -271,21 +271,20 @@ function Login() {
   };
 
   /* ── theme-derived tokens ─────────────────────────── */
-  const pageBg    = isDark ? "#080a0f" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
-  const cardBg    = isDark ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.88)";
-  const cardBdr   = isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)";
-  const cardShd   = isDark ? "0 40px 100px rgba(0,0,0,0.5)" : "0 24px 64px rgba(15,23,42,0.13), 0 4px 20px rgba(15,23,42,0.06)";
-  const accentH   = isDark ? 1 : 3;
-  const txt       = isDark ? "#fff"                      : "#0f172a";
-  const txtSub    = isDark ? "rgba(148,163,184,0.5)"     : "rgba(71,85,105,0.75)";
-  const txtLabel  = isDark ? "rgba(148,163,184,0.6)"     : "rgba(71,85,105,0.70)";
-  const inputBg   = isDark ? "rgba(255,255,255,0.04)"    : "rgba(15,23,42,0.04)";
-  const inputBdr  = isDark ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(15,23,42,0.10)";
-  const inputClr  = isDark ? "#e2e8f0"                   : "#0f172a";
-  const divider   = isDark ? "rgba(255,255,255,0.07)"    : "rgba(15,23,42,0.08)";
-  const linkClr   = isDark ? "#a78bfa"                   : "#7c3aed";
-  const otpBg     = isDark ? "rgba(255,255,255,0.04)"    : "rgba(15,23,42,0.04)";
-  const otpBdr    = isDark ? "rgba(255,255,255,0.09)"    : "rgba(15,23,42,0.10)";
+  const pageBg    = "var(--bg-base)";
+  const cardBg    = "var(--bg-card)";
+  const cardBdr   = "1px solid var(--border-card)";
+  const cardShd   = "0 1px 2px rgba(17,17,26,0.04)";
+  const txt       = "var(--text-primary)";
+  const txtSub    = "var(--text-dim)";
+  const txtLabel  = "var(--text-secondary)";
+  const inputBg   = "var(--bg-input)";
+  const inputBdr  = "1px solid transparent";
+  const inputClr  = "var(--text-primary)";
+  const divider   = "var(--border-card)";
+  const linkClr   = "var(--accent)";
+  const otpBg     = "var(--bg-input)";
+  const otpBdr    = "transparent";
 
   return (
     <>
@@ -294,42 +293,42 @@ function Login() {
 
       {/* Forgot password modal */}
       {showForgot && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(8px)" }}
+        <div style={{ position:"fixed", inset:0, background:"rgba(17,17,26,0.4)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(8px)" }}
           onClick={e => e.target === e.currentTarget && setShowForgot(false)}>
-          <div className="auth-fade" style={{ width:"100%", maxWidth:420, background:"#0e1018", border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"32px 28px", position:"relative" }}>
+          <div className="auth-fade" style={{ width:"100%", maxWidth:420, background:"var(--bg-card)", border:"1px solid var(--border-card)", borderRadius:24, padding:"32px 28px", position:"relative" }}>
             <button onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}
-              style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"rgba(148,163,184,0.5)", cursor:"pointer", padding:4, display:"flex" }}>
+              style={{ position:"absolute", top:16, right:16, background:"none", border:"none", color:"var(--text-dim)", cursor:"pointer", padding:4, display:"flex" }}>
               <X size={18}/>
             </button>
             {forgotSent ? (
               <div style={{ textAlign:"center", padding:"16px 0" }}>
-                <div style={{ width:52, height:52, borderRadius:"50%", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
-                  <Mail size={22} color="#34d399"/>
+                <div style={{ width:52, height:52, borderRadius:"50%", background:"var(--good-soft)", border:"1px solid transparent", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+                  <Mail size={22} color="var(--good)"/>
                 </div>
-                <h2 style={{ fontSize:18, fontWeight:800, color:"#fff", margin:"0 0 8px" }}>Check your inbox</h2>
-                <p style={{ fontSize:13, color:"rgba(148,163,184,0.6)", margin:"0 0 24px", lineHeight:1.6 }}>
-                  If <strong style={{ color:"#e2e8f0" }}>{forgotEmail}</strong> is registered, a password reset link has been sent. Check spam if you don't see it.
+                <h2 style={{ fontSize:18, fontWeight:800, color:"var(--text-primary)", margin:"0 0 8px" }}>Check your inbox</h2>
+                <p style={{ fontSize:13, color:"var(--text-dim)", margin:"0 0 24px", lineHeight:1.6 }}>
+                  If <strong style={{ color:"var(--text-primary)" }}>{forgotEmail}</strong> is registered, a password reset link has been sent. Check spam if you don't see it.
                 </p>
                 <button className="auth-btn" onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}
-                  style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>Back to Sign In</button>
+                  style={{ background:"var(--accent-strong)", color:"#fff" }}>Back to Sign In</button>
               </div>
             ) : (
               <>
                 <div style={{ marginBottom:24 }}>
-                  <h2 style={{ fontSize:20, fontWeight:800, color:"#fff", margin:"0 0 6px" }}>Reset your password</h2>
-                  <p style={{ fontSize:13, color:"rgba(148,163,184,0.5)", margin:0 }}>Enter your email and we'll send a reset link.</p>
+                  <h2 style={{ fontSize:20, fontWeight:800, color:"var(--text-primary)", margin:"0 0 6px" }}>Reset your password</h2>
+                  <p style={{ fontSize:13, color:"var(--text-dim)", margin:0 }}>Enter your email and we'll send a reset link.</p>
                 </div>
                 <div style={{ marginBottom:20 }}>
-                  <label style={{ fontSize:11, fontWeight:700, color:"rgba(148,163,184,0.6)", letterSpacing:"0.08em", display:"block", marginBottom:8 }}>EMAIL ADDRESS</label>
-                  <div className="auth-input-wrap" style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.09)" }}>
-                    <Mail size={15} color="rgba(148,163,184,0.4)"/>
-                    <input className="auth-input" style={{ color:"#e2e8f0" }} type="email" placeholder="you@example.com"
+                  <label style={{ fontSize:14, fontWeight:500, color:"var(--text-secondary)", display:"block", marginBottom:8 }}>Email address</label>
+                  <div className="auth-input-wrap" style={{ background:"var(--bg-input)", border:"1px solid var(--bg-input)" }}>
+                    <Mail size={15} color="var(--text-dim)"/>
+                    <input className="auth-input" style={{ color:"var(--text-primary)" }} type="email" placeholder="you@example.com"
                       value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && handleForgotPassword()} autoFocus/>
                   </div>
                 </div>
                 <button className="auth-btn" onClick={handleForgotPassword} disabled={forgotLoading || !forgotEmail.trim()}
-                  style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>
+                  style={{ background:"var(--accent-strong)", color:"#fff" }}>
                   {forgotLoading ? "Sending…" : "Send Reset Link →"}
                 </button>
               </>
@@ -339,11 +338,6 @@ function Login() {
       )}
 
       <div className="auth-page" style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:pageBg, position:"relative", overflow:"hidden", padding:20 }}>
-
-        {/* Light mode: dot grid */}
-        {!isDark && (
-          <div style={{ position:"fixed", inset:0, pointerEvents:"none", backgroundImage:"radial-gradient(rgba(99,102,241,0.07) 1px, transparent 1px)", backgroundSize:"28px 28px" }}/>
-        )}
 
         {/* Light mode: animated orbs + shapes */}
         {!isDark && (
@@ -357,23 +351,17 @@ function Login() {
         {/* Dark mode: existing orbs */}
         {isDark && (
           <>
-            <div style={{ position:"fixed", top:"-15%", left:"-10%", width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(167,139,250,0.1) 0%,transparent 70%)", pointerEvents:"none" }}/>
-            <div style={{ position:"fixed", bottom:"-10%", right:"5%", width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,rgba(34,211,238,0.07) 0%,transparent 70%)", pointerEvents:"none" }}/>
           </>
         )}
 
         {/* ── Card ── */}
-        <div className="auth-fade" style={{ width:"100%", maxWidth:440, background:cardBg, border:cardBdr, borderRadius:24, padding:"40px 36px", backdropFilter:"blur(24px)", boxShadow:cardShd, position:"relative", overflow:"hidden" }}>
-
-          {/* Top accent bar */}
-          <div style={{ position:"absolute", top:0, left:0, right:0, height:accentH, background:"linear-gradient(90deg, #a78bfa, #7c3aed 40%, #22d3ee)" }}/>
+        <div className="auth-fade" style={{ width:"100%", maxWidth:440, background:cardBg, border:cardBdr, borderRadius:24, padding:"32px 24px", boxShadow:cardShd, position:"relative", overflow:"hidden" }}>
 
           {/* Logo */}
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:32 }}>
-            <div style={{ width:38, height:38, borderRadius:11, background:"linear-gradient(135deg,#a78bfa,#22d3ee)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, fontWeight:800, color:"#fff", flexShrink:0 }}>F</div>
+            <div style={{ width:38, height:38, borderRadius:11, background:"var(--accent-strong)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, fontWeight:800, color:"#fff", flexShrink:0 }}>F</div>
             <div>
               <div style={{ fontSize:14, fontWeight:800, color:txt, letterSpacing:"-0.02em" }}>FinTwin AI</div>
-              <div style={{ fontSize:10, color:txtSub, letterSpacing:"0.06em" }}>FINANCIAL OS</div>
             </div>
           </div>
 
@@ -385,8 +373,8 @@ function Login() {
                 <ArrowLeft size={14}/> Back
               </button>
               <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-                <div style={{ width:44, height:44, borderRadius:12, background:"rgba(167,139,250,0.1)", border:"1px solid rgba(167,139,250,0.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <Shield size={22} color="#a78bfa"/>
+                <div style={{ width:44, height:44, borderRadius:12, background:"var(--accent-soft)", border:"1px solid transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Shield size={22} color="var(--accent)"/>
                 </div>
                 <div>
                   <h2 style={{ fontSize:20, fontWeight:800, color:txt, margin:0, letterSpacing:"-0.02em" }}>Two-factor auth</h2>
@@ -407,7 +395,7 @@ function Login() {
               </div>
               <button className="auth-btn" onClick={handle2FASubmit}
                 disabled={otpLoading || otpCode.join("").length < 6}
-                style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff" }}>
+                style={{ background:"var(--accent-strong)", color:"#fff" }}>
                 {otpLoading ? "Verifying…" : "Verify & Sign In →"}
               </button>
             </div>
@@ -422,12 +410,12 @@ function Login() {
 
               {accountBlocked && (
                 <div style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)", borderRadius:13, padding:"14px 16px", marginBottom:20, display:"flex", gap:12, alignItems:"flex-start" }}>
-                  <AlertOctagon size={18} color="#f87171" style={{ flexShrink:0, marginTop:1 }}/>
+                  <AlertOctagon size={18} color="var(--bad)" style={{ flexShrink:0, marginTop:1 }}/>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#f87171", marginBottom:4 }}>Account Blocked</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"var(--bad)", marginBottom:4 }}>Account Blocked</div>
                     <div style={{ fontSize:12, color:"rgba(239,68,68,0.7)", lineHeight:1.6 }}>Your account has been disabled. Please raise a support ticket and our team will assist you.</div>
                     <button onClick={() => openTicket(ticketDefaultEmail)}
-                      style={{ marginTop:10, background:"rgba(239,68,68,0.15)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:8, padding:"7px 14px", color:"#f87171", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"inline-flex", alignItems:"center", gap:6 }}>
+                      style={{ marginTop:10, background:"var(--bad-soft)", border:"1px solid transparent", borderRadius:8, padding:"7px 14px", color:"var(--bad)", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"inline-flex", alignItems:"center", gap:6 }}>
                       <MessageSquare size={13}/> Raise a Ticket
                     </button>
                   </div>
@@ -435,9 +423,9 @@ function Login() {
               )}
 
               <div style={{ marginBottom:14 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:txtLabel, letterSpacing:"0.08em", display:"block", marginBottom:8 }}>EMAIL ADDRESS</label>
+                <label style={{ fontSize:14, fontWeight:500, color:txtLabel, display:"block", marginBottom:8 }}>Email address</label>
                 <div className="auth-input-wrap" style={{ background:inputBg, border:inputBdr }}>
-                  <Mail size={15} color="rgba(148,163,184,0.5)"/>
+                  <Mail size={15} color="var(--text-dim)"/>
                   <input className="auth-input" style={{ color:inputClr }} type="email" placeholder="you@example.com" value={email}
                     onChange={e => { setEmail(e.target.value); setAccountBlocked(false); }}
                     onKeyDown={e => e.key === "Enter" && handleLogin()}/>
@@ -445,13 +433,13 @@ function Login() {
               </div>
 
               <div style={{ marginBottom:8 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:txtLabel, letterSpacing:"0.08em", display:"block", marginBottom:8 }}>PASSWORD</label>
+                <label style={{ fontSize:14, fontWeight:500, color:txtLabel, display:"block", marginBottom:8 }}>Password</label>
                 <div className="auth-input-wrap" style={{ background:inputBg, border:inputBdr }}>
-                  <Lock size={15} color="rgba(148,163,184,0.5)"/>
+                  <Lock size={15} color="var(--text-dim)"/>
                   <input className="auth-input" style={{ color:inputClr }} type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
                     onChange={e => setPassword(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-                  <button onClick={() => setShowPw(!showPw)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(148,163,184,0.5)", padding:0, display:"flex", alignItems:"center" }}>
+                  <button onClick={() => setShowPw(!showPw)} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-dim)", padding:0, display:"flex", alignItems:"center" }}>
                     {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
                   </button>
                 </div>
@@ -465,13 +453,13 @@ function Login() {
               </div>
 
               <button className="auth-btn" onClick={handleLogin} disabled={loading}
-                style={{ background:"linear-gradient(135deg,#a78bfa,#7c3aed)", color:"#fff", marginBottom:20 }}>
-                {loading ? "Signing in…" : "Sign In →"}
+                style={{ background:"var(--accent-strong)", color:"#fff", marginBottom:20 }}>
+                {loading ? "Signing in…" : "Sign in"}
               </button>
 
               <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
                 <div style={{ flex:1, height:1, background:divider }}/>
-                <span style={{ fontSize:11, color:txtSub, letterSpacing:"0.08em" }}>OR</span>
+                <span style={{ fontSize:11, color:txtSub, }}>or</span>
                 <div style={{ flex:1, height:1, background:divider }}/>
               </div>
 

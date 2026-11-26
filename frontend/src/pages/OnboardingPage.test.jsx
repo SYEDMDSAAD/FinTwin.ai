@@ -34,9 +34,9 @@ describe("OnboardingPage — step 2, adding transactions", () => {
     openStepTwo();
 
     expect(screen.getByText("Upload your bank statements")).toBeInTheDocument();
-    expect(screen.getByText("RECOMMENDED")).toBeInTheDocument();
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
     expect(screen.getByText("Try the Setu bank-link sandbox")).toBeInTheDocument();
-    expect(screen.getByText("DEMO ONLY")).toBeInTheDocument();
+    expect(screen.getByText("Demo only")).toBeInTheDocument();
     expect(screen.getByText(/a demo for now and isn't switched on during the beta/)).toBeInTheDocument();
     expect(screen.getByText(/upload a statement with option 1/)).toBeInTheDocument();
   });
@@ -54,7 +54,7 @@ describe("OnboardingPage — step 2, adding transactions", () => {
     fireEvent.click(screen.getByText("Upload statements"));
 
     expect(screen.getByText("Upload your bank statements")).toBeInTheDocument();
-    expect(screen.getByText("STEP 1 — UPLOAD STATEMENT")).toBeInTheDocument();
+    expect(screen.getByText("Choose a statement")).toBeInTheDocument();
     expect(screen.getByText(/Upload a statement to continue/).closest("button")).toBeDisabled();
   });
 
@@ -65,8 +65,8 @@ describe("OnboardingPage — step 2, adding transactions", () => {
     fireEvent.change(container.querySelector("#csv-upload"), {
       target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
     });
-    fireEvent.click(await screen.findByText(/Preview →/));
-    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+    fireEvent.click(await screen.findByText(/^Preview \d+ rows/));
+    fireEvent.click(await screen.findByText("Import 2 transactions"));
 
     expect(await screen.findByText(/2 months in — good to go/)).toBeInTheDocument();
     expect(screen.getByText("Continue to Profile").closest("button")).toBeEnabled();
@@ -134,7 +134,7 @@ describe("OnboardingPage — step 2 right-hand panel", () => {
 
   it("shows the statement snapshot, not a bank sync that will never come", () => {
     openStepTwo();
-    expect(screen.getByText("FROM YOUR STATEMENTS")).toBeInTheDocument();
+    expect(screen.getByText("From your statements")).toBeInTheDocument();
     expect(screen.queryByText("LIVE SNAPSHOT")).not.toBeInTheDocument();
   });
 });

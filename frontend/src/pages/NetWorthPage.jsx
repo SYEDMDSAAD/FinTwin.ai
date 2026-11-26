@@ -18,7 +18,7 @@ const isInvestmentType = (type) =>
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
   .nwp * { box-sizing: border-box; }
-  .nwp { font-family: 'DM Sans', system-ui, sans-serif; }
+  .nwp { font-family:inherit; }
   .nwp-card { background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; transition: all 0.25s; margin-bottom: 14px; }
   .nwp-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
   .nwp-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); }
@@ -62,7 +62,7 @@ function NetWorthPage() {
 
   if (!netWorth) {
     return (
-      <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
         <p style={{ fontSize: 13, color: "var(--text-dim)" }}>Loading Net Worth...</p>
       </div>
     );

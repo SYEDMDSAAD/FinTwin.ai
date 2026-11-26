@@ -57,27 +57,27 @@ export default function PrivacyPolicyPage() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
 
-  const pageBg = isDark ? "#080a0f" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
-  const txt    = isDark ? "#e2e8f0" : "#0f172a";
-  const txtSub = isDark ? "rgba(148,163,184,0.6)" : "rgba(71,85,105,0.7)";
-  const cardBg = isDark ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.9)";
-  const cardBdr= isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)";
+  const pageBg = isDark ? "var(--bg-base)" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
+  const txt    = isDark ? "var(--text-primary)" : "#0f172a";
+  const txtSub = isDark ? "var(--text-dim)" : "var(--text-dim)";
+  const cardBg = isDark ? "var(--bg-input)" : "rgba(255,255,255,0.9)";
+  const cardBdr= isDark ? "1px solid var(--border-card)" : "1px solid rgba(15,23,42,0.08)";
 
   return (
-    <div style={{ minHeight:"100vh", background:pageBg, fontFamily:"'DM Sans', system-ui, sans-serif", padding:"40px 20px" }}>
+    <div style={{ minHeight:"100vh", background:pageBg, padding:"40px 20px" }}>
       <div style={{ maxWidth:720, margin:"0 auto" }}>
 
         {/* Back button */}
         <button onClick={() => navigate(-1)}
-          style={{ display:"inline-flex", alignItems:"center", gap:7, background:"none", border:"none", color:isDark?"#a78bfa":"#7c3aed", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", marginBottom:28, padding:0 }}>
+          style={{ display:"inline-flex", alignItems:"center", gap:7, background:"none", border:"none", color:isDark?"var(--accent)":"var(--accent-strong)", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", marginBottom:28, padding:0 }}>
           <ArrowLeft size={15}/> Back
         </button>
 
         {/* Header */}
         <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:32 }}>
-          <div style={{ width:44, height:44, borderRadius:13, background:"linear-gradient(135deg,#a78bfa,#22d3ee)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", flexShrink:0 }}>F</div>
+          <div style={{ width:44, height:44, borderRadius:13, background:"var(--accent-strong)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight: 650, color:"#fff", flexShrink:0 }}>F</div>
           <div>
-            <div style={{ fontSize:22, fontWeight:800, color:txt, letterSpacing:"-0.02em" }}>Privacy Policy</div>
+            <div style={{ fontSize:22, fontWeight: 650, color:txt, letterSpacing:"-0.02em" }}>Privacy Policy</div>
             <div style={{ fontSize:12, color:txtSub }}>FinTwin AI · Last updated November 2026</div>
           </div>
         </div>

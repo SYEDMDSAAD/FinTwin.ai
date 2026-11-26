@@ -145,7 +145,7 @@ function DashboardHero({ score = 0, allTime = null, activeGoals = 0, alerts = 0 
             {/* ── Center: Welcome text ── */}
             <div style={{ flex: 1, minWidth: 160 }}>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-                Welcome Back 👋
+                Welcome back
               </h2>
               <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0, lineHeight: 1.6 }}>
                 Here's your financial snapshot for today.<br />

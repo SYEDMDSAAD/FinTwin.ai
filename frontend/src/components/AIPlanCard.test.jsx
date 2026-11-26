@@ -75,6 +75,6 @@ describe("AIPlanCard", () => {
 
   it("prompts a regenerate when the goal has no plan at all", () => {
     render(<AIPlanCard plan={null} />);
-    expect(screen.getByText(/No plan generated yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No plan yet/)).toBeInTheDocument();
   });
 });

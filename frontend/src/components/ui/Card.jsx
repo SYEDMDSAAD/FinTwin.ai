@@ -21,7 +21,7 @@ export default function Card({ as, onClick, tone, pad = "md", className, childre
             type={Tag === "button" ? "button" : undefined}
             onClick={onClick}
             className={cx(
-                "block w-full text-left rounded-card border shadow-card",
+                "block w-full text-left rounded-card border",
                 TONE[tone] || "bg-surface border-line",
                 onClick && "transition-colors hover:border-line-strong hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 PAD[pad],

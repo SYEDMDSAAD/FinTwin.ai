@@ -1,6 +1,4 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
-import { Sparkles, Upload } from "lucide-react";
-import { Button } from "../components/ui";
 import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
@@ -1614,7 +1612,7 @@ function Dashboard() {
             );
 
             toast.success(
-                "🎉 Congratulations on achieving your goal!",
+                "Goal reached. Well done!",
                 { duration: 5000 }
             );
 
@@ -1714,26 +1712,15 @@ function Dashboard() {
                         )}
 
                         {/* Add one by hand, or bring a whole statement in */}
-                        <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
-                            <div className="flex-1 min-w-0">
-                            <QuickEntryDropdown
-                                incomeText={incomeText}
-                                setIncomeText={setIncomeText}
-                                addIncome={addIncome}
-                                expenseText={expenseText}
-                                setExpenseText={setExpenseText}
-                                addExpense={addExpense}
-                            />
-                            </div>
-                            <Button variant="secondary" size="lg" icon={Upload} onClick={() => navigateTo("Imports")} className="shrink-0">
-                                Import a statement
-                            </Button>
-                        </div>
-
-                        <p role="note" className="flex items-start gap-2 mb-4 text-caption text-ink-3">
-                            <Sparkles size={13} aria-hidden className="text-accent shrink-0 mt-0.5" />
-                            Categories are FinTwin's best guess. If one is wrong, change it: FinTwin remembers your choice for that merchant.
-                        </p>
+                        <QuickEntryDropdown
+                            incomeText={incomeText}
+                            setIncomeText={setIncomeText}
+                            addIncome={addIncome}
+                            expenseText={expenseText}
+                            setExpenseText={setExpenseText}
+                            addExpense={addExpense}
+                            onImport={() => navigateTo("Imports")}
+                        />
 
                         {/* Outside the loading swap so it never unmounts and refetches */}
                         <SortOther

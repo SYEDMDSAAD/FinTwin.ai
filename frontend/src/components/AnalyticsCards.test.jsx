@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 
 import AnalyticsCards from "./AnalyticsCards";
-import { GOOD, BAD, NEUTRAL, MINUS } from "../utils/money";
+import { MINUS } from "../utils/money";
 
 const COMPARED = { from: "2026-10-01", to: "2026-10-20", income: 24585, expenses: 36780, savings: -12195 };
 
@@ -11,9 +11,6 @@ function show(props) {
     render(<AnalyticsCards prediction={15000} compared={COMPARED} {...props} />);
     act(() => { vi.advanceTimersByTime(3000); });
 }
-
-// jsdom reports colours as rgb()
-const rgb = (hex) => `rgb(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
 
 afterEach(() => { vi.useRealTimers(); });
 
@@ -41,11 +38,11 @@ describe("AnalyticsCards", () => {
         const saved = screen.getByTestId("trend-Net Savings");
 
         expect(income).toHaveTextContent(`${MINUS}48.6%`);
-        expect(income.style.color).toBe(rgb(BAD));        // less came in
+        expect(income).toHaveAttribute("data-tone", "bad");        // less came in
         expect(spent).toHaveTextContent(`${MINUS}59.5%`);
-        expect(spent.style.color).toBe(rgb(GOOD));        // less went out
+        expect(spent).toHaveAttribute("data-tone", "good");        // less went out
         expect(saved).toHaveTextContent("+81.6%");
-        expect(saved.style.color).toBe(rgb(GOOD));
+        expect(saved).toHaveAttribute("data-tone", "good");
         expect(income).toHaveAttribute("title", "₹24,585 on 1–20 Oct");
     });
 
@@ -55,7 +52,7 @@ describe("AnalyticsCards", () => {
 
         const income = screen.getByTestId("trend-Total Income");
         expect(income).toHaveTextContent("—");
-        expect(income.style.color).toBe(rgb(NEUTRAL));
+        expect(income).toHaveAttribute("data-tone", "neutral");
     });
 
     it("falls back to 'vs last month' when the backend sends no dates", () => {

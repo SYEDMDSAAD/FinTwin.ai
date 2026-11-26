@@ -65,7 +65,7 @@ describe("RecurringExpenses", () => {
     freezeToday();
     render(<RecurringExpenses recurringExpenses={[NETFLIX]} />);
 
-    expect(screen.getByText("MONTHLY")).toBeInTheDocument();
+    expect(screen.getByText(/Monthly ·/)).toBeInTheDocument();
     expect(screen.getByText("in 7 days")).toBeInTheDocument();
     expect(screen.getByText("₹7,896 a year")).toBeInTheDocument();
   });

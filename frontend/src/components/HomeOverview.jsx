@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle2, ChevronRight, Info, Target, TrendingUp, Gauge } from "lucide-react";
+import { AlertTriangle, AlertOctagon, CheckCircle2, Info, Target, TrendingUp, Gauge, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { rupees } from "../utils/money";
 import { headline, attentionItems } from "../utils/home";
-import { Card, SectionHeader, Stat, Button, cx } from "./ui";
+import { SectionHeader, Progress, List, ListRow, Button } from "./ui";
 import SpendGuardCard from "./SpendGuardCard";
 
 /*
@@ -14,23 +14,11 @@ import SpendGuardCard from "./SpendGuardCard";
  */
 
 const TONE = {
-    danger: { cls: "text-bad", Icon: AlertTriangle },
-    warning: { cls: "text-warn", Icon: AlertTriangle },
-    success: { cls: "text-good", Icon: CheckCircle2 },
-    info: { cls: "text-info", Icon: Info },
+    danger: { tone: "bad", icon: AlertOctagon },
+    warning: { tone: "warn", icon: AlertTriangle },
+    success: { tone: "good", icon: CheckCircle2 },
+    info: { tone: "info", icon: Info },
 };
-
-function Tile({ icon: Icon, label, value, note, onClick }) {
-    return (
-        <Card onClick={onClick} className="min-w-0">
-            <Stat
-                label={<span className="inline-flex items-center gap-1.5"><Icon size={14} aria-hidden className="text-accent" /> {label}</span>}
-                value={value}
-                note={note}
-            />
-        </Card>
-    );
-}
 
 export default function HomeOverview({
     income = 0,
@@ -47,89 +35,90 @@ export default function HomeOverview({
     const items = attentionItems({ budgets, notifications });
     const negative = head.kind !== "spent" && head.value < 0;
     const active = goals.filter((g) => !g.completed);
-    const topGoal = [...active]
-        .sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0))[0];
-    const barTone = head.share >= 1 ? "bg-bad" : head.share >= 0.8 ? "bg-warn" : "bg-accent";
+    const topGoal = [...active].sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0))[0];
+    const barTone = head.share >= 1 ? "bad" : head.share >= 0.8 ? "warn" : "accent";
 
     return (
-        <div className="max-w-5xl grid gap-4 lg:grid-cols-2">
-            {/* The number */}
-            <Card pad="lg" aria-label={head.label}>
+        <div className="max-w-2xl space-y-8">
+            {/* The number: no box around it, it's the screen */}
+            <section aria-label={head.label} className="px-1">
+                <p className="text-small text-ink-3">{head.label}</p>
                 {loading ? (
-                    <>
-                        <p className="text-caption font-medium text-ink-2">{head.label}</p>
-                        <div className="h-10 w-48 mt-2 rounded-control animate-pulse bg-accent-soft" />
-                    </>
+                    <div className="h-12 w-56 mt-2 rounded-control animate-pulse bg-surface-sunken" />
                 ) : (
-                    <Stat size="lg" label={head.label} value={rupees(head.value)} tone={negative ? "bad" : undefined} />
+                    <p className={`text-hero num mt-1 ${negative ? "text-bad" : "text-ink"}`}>{rupees(head.value)}</p>
                 )}
-                <p className="mt-1 text-small text-ink-3">{head.note}</p>
+                <p className="mt-2 text-body text-ink-2">{head.note}</p>
+                {head.share != null && <Progress className="mt-5" value={head.share * 100} tone={barTone} label="Share of this month's money spent" />}
 
-                {head.share != null && (
-                    <div className="mt-4 h-2 rounded-full overflow-hidden bg-accent-soft" aria-hidden>
-                        <div className={cx("h-full rounded-full transition-all", barTone)}
-                             style={{ width: `${Math.round(head.share * 100)}%` }} />
-                    </div>
-                )}
-
-                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-small text-ink-2">
-                    <span>In <b className="text-ink">{rupees(income)}</b></span>
-                    <span>Out <b className="text-ink">{rupees(spent)}</b></span>
-                    <Button variant="ghost" size="sm" className="ml-auto -mr-2" onClick={() => navigateTo("Analytics")}>
-                        Details <ChevronRight size={14} aria-hidden />
-                    </Button>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => navigateTo("Analytics")}
+                            className="flex items-center gap-3 rounded-card bg-surface border border-line px-4 py-3 text-left hover:bg-surface-hover">
+                        <span className="w-8 h-8 rounded-full bg-good-soft text-good flex items-center justify-center"><ArrowDownLeft size={16} aria-hidden /></span>
+                        <span className="min-w-0">
+                            <span className="block text-small text-ink-3">Money in</span>
+                            <span className="block text-body font-semibold text-ink num truncate">{rupees(income)}</span>
+                        </span>
+                    </button>
+                    <button type="button" onClick={() => navigateTo("Analytics")}
+                            className="flex items-center gap-3 rounded-card bg-surface border border-line px-4 py-3 text-left hover:bg-surface-hover">
+                        <span className="w-8 h-8 rounded-full bg-surface-sunken text-ink-2 flex items-center justify-center"><ArrowUpRight size={16} aria-hidden /></span>
+                        <span className="min-w-0">
+                            <span className="block text-small text-ink-3">Money out</span>
+                            <span className="block text-body font-semibold text-ink num truncate">{rupees(spent)}</span>
+                        </span>
+                    </button>
                 </div>
-            </Card>
+            </section>
 
             {/* What needs you */}
-            <Card pad="sm" aria-label="Needs your attention">
+            <section aria-label="Needs your attention">
                 <SectionHeader
-                    className="px-2 pt-1 mb-1 items-center"
                     title="Needs your attention"
                     action={notifications.length > 0 && (
-                        <Button variant="ghost" size="sm" onClick={() => navigateTo("AI Intelligence")}>See all</Button>
+                        <Button variant="ghost" size="sm" className="-mr-2" onClick={() => navigateTo("AI Intelligence")}>See all</Button>
                     )}
                 />
-                {items.length === 0 ? (
-                    <p className="flex items-center gap-2 px-2 py-3 text-small text-ink-2">
-                        <CheckCircle2 size={16} aria-hidden className="text-good" /> Nothing needs you right now
-                    </p>
-                ) : (
-                    <ul>
-                        {items.map((it, i) => {
-                            const { cls, Icon } = TONE[it.tone] || TONE.info;
-                            return (
-                                <li key={i}>
-                                    <button type="button" onClick={() => navigateTo(it.to)}
-                                            className="w-full flex items-start gap-3 px-2 py-2.5 rounded-control text-left hover:bg-accent-soft">
-                                        <Icon size={16} aria-hidden className={cx("shrink-0 mt-0.5", cls)} />
-                                        <span className="flex-1 text-small text-ink">{it.text}</span>
-                                        <ChevronRight size={15} aria-hidden className="shrink-0 mt-0.5 text-ink-3" />
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                )}
-            </Card>
+                <List>
+                    {items.length === 0 ? (
+                        <ListRow icon={CheckCircle2} tone="good" title="You're on track" subtitle="Nothing needs you right now" />
+                    ) : items.map((it, i) => {
+                        const t = TONE[it.tone] || TONE.info;
+                        return (
+                            <ListRow
+                                key={i}
+                                icon={t.icon}
+                                tone={t.tone}
+                                title={it.title}
+                                subtitle={it.detail}
+                                onClick={() => navigateTo(it.to)}
+                                wrap={!it.detail}
+                            />
+                        );
+                    })}
+                </List>
+            </section>
 
-            <div className="lg:col-span-2 empty:hidden [&>*]:mb-0">
-                <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />
-            </div>
+            <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />
 
             {/* The rest, one tap away */}
-            <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Tile icon={Gauge} label="Health score"
-                      value={scoreData?.score != null ? `${scoreData.score}/100` : "—"}
-                      note="What's behind it" onClick={() => navigateTo("AI Intelligence")} />
-                <Tile icon={Target} label="Goals"
-                      value={active.length ? `${active.length} active` : "None yet"}
-                      note={topGoal ? `${topGoal.title}: ${Math.round(topGoal.progressPercent || 0)}%` : "Set one"}
-                      onClick={() => navigateTo("Goals Planner")} />
-                <Tile icon={TrendingUp} label="Net worth"
-                      value={netWorth?.netWorth != null ? rupees(netWorth.netWorth) : "—"}
-                      note="Assets minus loans" onClick={() => navigateTo("Net Worth")} />
-            </div>
+            <section aria-label="Your money">
+                <SectionHeader title="Your money" />
+                <List>
+                    <ListRow icon={Gauge} title="Health score"
+                             subtitle="What's behind it"
+                             trailing={scoreData?.score != null ? `${scoreData.score}/100` : "—"}
+                             onClick={() => navigateTo("AI Intelligence")} />
+                    <ListRow icon={Target} title="Goals"
+                             subtitle={topGoal ? `${topGoal.title} · ${Math.round(topGoal.progressPercent || 0)}% there` : "Set your first goal"}
+                             trailing={active.length ? `${active.length} active` : null}
+                             onClick={() => navigateTo("Goals Planner")} />
+                    <ListRow icon={TrendingUp} title="Net worth"
+                             subtitle="Owned minus owed"
+                             trailing={netWorth?.netWorth != null ? rupees(netWorth.netWorth) : "—"}
+                             onClick={() => navigateTo("Net Worth")} />
+                </List>
+            </section>
         </div>
     );
 }

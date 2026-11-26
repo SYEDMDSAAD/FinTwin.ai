@@ -1,12 +1,7 @@
 import { useState } from "react";
-import GlassCard from "./GlassCard";
-import {
-    CheckCircle2,
-    AlertTriangle,
-    XCircle,
-    Loader2,
-    IndianRupee,
-} from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, ShoppingBag } from "lucide-react";
+import { Button, Progress, cx } from "./ui";
+import { rupees } from "../utils/money";
 
 function AffordabilitySection({
 
@@ -39,17 +34,17 @@ function AffordabilitySection({
     const verdict = affordability && (() => {
         if (!affordability.canAffordOutright) {
             return {
-                tone: "red",
+                tone: "bad",
                 Icon: XCircle,
                 title: "Not affordable outright",
                 detail: affordability.monthsToSave > 0
                     ? `Save for about ${affordability.monthsToSave} month${affordability.monthsToSave > 1 ? "s" : ""}, or use the suggested EMI below.`
-                    : "Your current savings rate doesn't cover this — consider the EMI option.",
+                    : "Your current savings rate doesn't cover this. Consider the EMI option.",
             };
         }
         if (affordability.risk === "High") {
             return {
-                tone: "yellow",
+                tone: "warn",
                 Icon: AlertTriangle,
                 title: "Affordable, but risky",
                 detail: "This would leave a thin emergency buffer. Consider the EMI option instead of paying outright.",
@@ -57,37 +52,19 @@ function AffordabilitySection({
         }
         if (affordability.risk === "Medium") {
             return {
-                tone: "yellow",
+                tone: "warn",
                 Icon: AlertTriangle,
                 title: "Affordable, with some strain",
                 detail: "You can cover this, but it'll narrow your safety buffer for a few months.",
             };
         }
         return {
-            tone: "green",
+            tone: "good",
             Icon: CheckCircle2,
             title: "Comfortably affordable",
             detail: "You can cover this outright without denting your emergency buffer.",
         };
     })();
-
-    const toneClasses = {
-        green: {
-            border: "border-green-500/20",
-            bg: "bg-green-500/10",
-            text: "text-green-400",
-        },
-        yellow: {
-            border: "border-yellow-500/20",
-            bg: "bg-yellow-500/10",
-            text: "text-yellow-400",
-        },
-        red: {
-            border: "border-red-500/20",
-            bg: "bg-red-500/10",
-            text: "text-red-400",
-        },
-    };
 
     // Visual split of "price" vs "what's left" out of total available funds,
     // reconstructed from remainingSavings (= availableFunds - price) since
@@ -100,382 +77,92 @@ function AffordabilitySection({
         ? Math.max(0, Math.min(100, (Number(price) / availableFunds) * 100))
         : 0;
 
+    const TEXT = { good: "text-good", warn: "text-warn", bad: "text-bad" };
+    const SOFT = { good: "bg-good-soft text-good", warn: "bg-warn-soft text-warn", bad: "bg-bad-soft text-bad" };
+
+    const rows = affordability ? [
+        { label: "Risk", value: affordability.risk, cls: TEXT[affordability.risk === "High" ? "bad" : affordability.risk === "Medium" ? "warn" : "good"] },
+        { label: "Savings left after", value: rupees(affordability.remainingSavings) },
+        {
+            label: "Suggested EMI",
+            note: affordability.emiMonths
+                ? `${affordability.emiMonths} months${affordability.emiAnnualInterestRate ? ` at an assumed ${affordability.emiAnnualInterestRate}% a year` : ""}`
+                : null,
+            value: `${rupees(affordability.suggestedEMI)} a month`,
+        },
+        { label: "Average saved a month", value: rupees(affordability.monthlySavingsAvg), cls: affordability.monthlySavingsAvg < 0 ? "text-bad" : "" },
+    ] : [];
+
     return (
-
-        <GlassCard
-            className="
-                relative
-                overflow-hidden
-                p-6
-                mb-10
-                border
-                border-white/10
-                bg-white/[0.03]
-                backdrop-blur-xl
-            "
-        >
-
-            <div
-                className="
-                    absolute
-                    inset-x-0
-                    top-0
-                    h-px
-                    bg-gradient-to-r
-                    from-transparent
-                    via-white/20
-                    to-transparent
-                "
-            />
-
-            <div
-                className="
-                    flex
-                    items-center
-                    gap-3
-                    mb-5
-                "
-            >
-
-                <div
-                    className="
-                        w-10
-                        h-10
-                        rounded-xl
-                        flex
-                        items-center
-                        justify-center
-                        bg-yellow-500/10
-                        border
-                        border-yellow-500/20
-                    "
-                >
-                    💳
-                </div>
-
-                <div>
-
-                    <div
-                        className="
-                            text-[11px]
-                            font-bold
-                            tracking-[0.12em]
-                            text-zinc-500
-                        "
-                    >
-                        AI ADVISOR
-                    </div>
-
-                    <h2
-                        className="
-                            text-lg
-                            font-bold
-                            text-white
-                        "
-                    >
-                        Can I Afford This?
-                    </h2>
-
-                </div>
-
-            </div>
-
-            <div className="flex flex-col md:flex-row gap-4 mb-5">
-
-                <div className="relative w-full">
-
-                    <IndianRupee
-                        size={16}
-                        className="
-                            absolute
-                            left-4
-                            top-1/2
-                            -translate-y-1/2
-                            text-zinc-500
-                            pointer-events-none
-                        "
-                    />
-
-                    <input
-                        type="number"
-                        placeholder="Enter product price"
-                        value={price}
-                        onChange={(e) =>
-                            setPrice(e.target.value)
-                        }
-                        onKeyDown={handleKeyDown}
-                        className="
-                            no-spinner
-                            w-full
-                            bg-white/[0.03]
-                            backdrop-blur-xl
-                            border
-                            border-white/10
-                            rounded-xl
-                            pl-10
-                            pr-4
-                            py-3
-                            text-sm
-                            outline-none
-                            focus:border-purple-500/40
-                        "
-                    />
-
-                </div>
-
-                <button
-                    onClick={handleAnalyze}
-                    disabled={analyzing || !price}
-                    className="
-                        flex
-                        items-center
-                        justify-center
-                        gap-2
-                        px-5
-                        py-3
-                        rounded-xl
-                        bg-gradient-to-r
-                        from-purple-500
-                        to-violet-600
-                        hover:opacity-90
-                        disabled:opacity-50
-                        disabled:cursor-not-allowed
-                        transition-all
-                        text-sm
-                        font-semibold
-                        whitespace-nowrap
-                    "
-                >
-                    {analyzing ? (
-                        <>
-                            <Loader2 size={15} className="animate-spin" />
-                            Analyzing...
-                        </>
-                    ) : (
-                        "Analyze →"
-                    )}
-                </button>
-
-            </div>
-
-            {affordability && verdict && (
-
-                <div
-                    className={`
-                        flex
-                        items-start
-                        gap-3
-                        rounded-xl
-                        border
-                        p-4
-                        mb-4
-                        ${toneClasses[verdict.tone].border}
-                        ${toneClasses[verdict.tone].bg}
-                    `}
-                >
-
-                    <verdict.Icon
-                        size={20}
-                        className={`shrink-0 mt-0.5 ${toneClasses[verdict.tone].text}`}
-                    />
-
+        <section aria-label="Can I afford this?" className="max-w-2xl mb-10">
+            <div className="rounded-card bg-surface border border-line p-5">
+                <div className="flex items-center gap-3">
+                    <span className="shrink-0 w-10 h-10 rounded-full bg-surface-sunken text-ink-2 flex items-center justify-center">
+                        <ShoppingBag size={18} aria-hidden />
+                    </span>
                     <div>
-                        <p className={`text-sm font-bold ${toneClasses[verdict.tone].text}`}>
-                            {verdict.title}
-                        </p>
-                        <p className="text-xs text-zinc-400 mt-1">
-                            {verdict.detail}
-                        </p>
+                        <h2 className="text-heading text-ink">Can I afford this?</h2>
+                        <p className="text-small text-ink-3">Checked against your savings and spending</p>
                     </div>
-
                 </div>
-            )}
 
-            {affordability && availableFunds > 0 && (
-
-                <div className="mb-5">
-
-                    <div className="flex justify-between text-[11px] text-zinc-500 mb-1.5">
-                        <span>₹{Number(price).toLocaleString("en-IN")} price</span>
-                        <span>₹{availableFunds.toLocaleString("en-IN")} available</span>
-                    </div>
-
-                    <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
-                        <div
-                            className={`
-                                h-full
-                                rounded-full
-                                transition-all
-                                duration-500
-                                ${
-                                    usedPct >= 80
-                                        ? "bg-red-400"
-                                        : usedPct >= 50
-                                        ? "bg-yellow-400"
-                                        : "bg-green-400"
-                                }
-                            `}
-                            style={{ width: `${usedPct}%` }}
+                <div className="mt-4 flex gap-2">
+                    <div className="relative flex-1 min-w-0">
+                        <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3">₹</span>
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            placeholder="Price"
+                            aria-label="Price"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="no-spinner w-full h-11 rounded-control bg-surface-sunken border border-transparent pl-7 pr-3 text-body text-ink num placeholder:text-ink-3 focus:outline-none focus:border-accent"
                         />
                     </div>
-
-                    <p className="text-[11px] text-zinc-500 mt-1.5">
-                        This purchase uses {usedPct.toFixed(0)}% of your available savings.
-                    </p>
-
+                    <Button onClick={handleAnalyze} disabled={analyzing || !price} className="shrink-0">
+                        {analyzing ? "Checking…" : "Check"}
+                    </Button>
                 </div>
-            )}
+
+                {affordability && verdict && (
+                    <div className="mt-5 flex items-start gap-3">
+                        <span className={cx("shrink-0 w-10 h-10 rounded-full flex items-center justify-center", SOFT[verdict.tone])}>
+                            <verdict.Icon size={18} aria-hidden />
+                        </span>
+                        <div className="min-w-0">
+                            <p className={cx("text-body font-semibold", TEXT[verdict.tone])}>{verdict.title}</p>
+                            <p className="text-small text-ink-2 mt-0.5">{verdict.detail}</p>
+                        </div>
+                    </div>
+                )}
+
+                {affordability && availableFunds > 0 && (
+                    <div className="mt-5">
+                        <div className="flex justify-between text-small text-ink-3 mb-2 num">
+                            <span>{rupees(price)} price</span>
+                            <span>{rupees(availableFunds)} available</span>
+                        </div>
+                        <Progress value={usedPct} tone={usedPct >= 80 ? "bad" : usedPct >= 50 ? "warn" : "good"} label="Share of savings used" />
+                        <p className="text-small text-ink-3 mt-2">Uses {usedPct.toFixed(0)}% of your available savings.</p>
+                    </div>
+                )}
+            </div>
 
             {affordability && (
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
-                    {/* Risk */}
-
-                    <div className="
-                        bg-white/[0.02]
-                        border
-                        border-white/10
-                        rounded-xl
-                        p-4
-                    ">
-
-                        <p className="
-                            text-[10px]
-                            uppercase
-                            tracking-[0.08em]
-                            text-zinc-500
-                            mb-2
-                        ">
-                            Risk Level
-                        </p>
-
-                        <p className={`
-                            text-xl
-                            font-bold
-                            mt-3
-                            ${
-                                affordability.risk === "High"
-                                    ? "text-red-400"
-                                    : affordability.risk === "Medium"
-                                    ? "text-yellow-400"
-                                    : "text-green-400"
-                            }
-                        `}>
-
-                            {affordability.risk}
-
-                        </p>
-
-                    </div>
-
-                    {/* Savings */}
-
-                    <div className="
-                        bg-white/[0.02]
-                        border
-                        border-white/10
-                        rounded-xl
-                        p-4
-                    ">
-
-                        <h3 className="text-zinc-400 text-[10px] uppercase tracking-[0.08em]">
-                            Remaining Savings
-                        </h3>
-
-                        <p className="
-                            text-xl
-                            font-bold
-                            mt-3
-                            text-cyan-400
-                        ">
-
-                            ₹{
-                                affordability.remainingSavings
-                                    .toLocaleString("en-IN")
-                            }
-
-                        </p>
-
-                    </div>
-
-                    {/* EMI */}
-
-                    <div className="
-                        bg-white/[0.02]
-                        border
-                        border-white/10
-                        rounded-xl
-                        p-4
-                    ">
-
-                        <h3 className="text-zinc-400 text-[10px] uppercase tracking-[0.08em]">
-                            Suggested EMI
-                        </h3>
-
-                        <p className="
-                            text-xl
-                            font-bold
-                            mt-3
-                            text-purple-400
-                        ">
-
-                            ₹{
-                                affordability.suggestedEMI
-                                    .toLocaleString("en-IN")
-                            } / mo
-
-                        </p>
-
-                        {affordability.emiMonths && (
-                            <p className="text-[11px] text-zinc-500 mt-1">
-                                {affordability.emiMonths} months
-                                {affordability.emiAnnualInterestRate
-                                    ? ` at an assumed ${affordability.emiAnnualInterestRate}% p.a.`
-                                    : ""}
-                            </p>
-                        )}
-
-                    </div>
-
-                    {/* Monthly savings avg */}
-
-                    <div className="
-                        bg-white/[0.02]
-                        border
-                        border-white/10
-                        rounded-xl
-                        p-4
-                    ">
-
-                        <h3 className="text-zinc-400 text-[10px] uppercase tracking-[0.08em]">
-                            Avg Monthly Savings
-                        </h3>
-
-                        <p className={`
-                            text-xl
-                            font-bold
-                            mt-3
-                            ${
-                                affordability.monthlySavingsAvg >= 0
-                                    ? "text-emerald-400"
-                                    : "text-red-400"
-                            }
-                        `}>
-
-                            ₹{
-                                affordability.monthlySavingsAvg
-                                    .toLocaleString("en-IN")
-                            }
-
-                        </p>
-
-                    </div>
-
-                </div>
+                <ul className="mt-4 rounded-card bg-surface border border-line divide-y divide-line">
+                    {rows.map((r) => (
+                        <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                            <span className="min-w-0">
+                                <span className="block text-body text-ink">{r.label}</span>
+                                {r.note && <span className="block text-small text-ink-3">{r.note}</span>}
+                            </span>
+                            <span className={cx("shrink-0 text-body font-semibold num text-ink", r.cls)}>{r.value}</span>
+                        </li>
+                    ))}
+                </ul>
             )}
-
-        </GlassCard>
+        </section>
     );
 }
 

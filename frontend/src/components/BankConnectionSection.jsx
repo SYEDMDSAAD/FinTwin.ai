@@ -66,7 +66,7 @@ function BankConnectionSection({ onSynced }) {
 
     const openModal = () => {
         if (!BANK_LINK_ENABLED) {
-            toast(BANK_LINK_OFF_MESSAGE, { icon: "🧪", duration: 6000 });
+            toast(BANK_LINK_OFF_MESSAGE, { duration: 6000 });
             return;
         }
         setMobile("");

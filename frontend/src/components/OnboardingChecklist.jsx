@@ -42,14 +42,12 @@ export default function OnboardingChecklist({ transactions = [], budgets = [], g
   return (
     <div style={{
       position: "relative", overflow: "hidden",
-      background: "rgba(167,139,250,0.05)",
-      border: "1px solid rgba(167,139,250,0.2)",
+      background: "var(--accent-soft)",
+      border: "none",
       borderRadius: 18, padding: "20px 24px",
       marginBottom: 24,
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-    }}>
+      }}>
       {/* Top shimmer */}
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.5), transparent)" }} />
 
       {/* Dismiss */}
       <button
@@ -61,20 +59,20 @@ export default function OnboardingChecklist({ transactions = [], budgets = [], g
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-        <div style={{ fontSize: 22 }}>🚀</div>
+        
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.12em", marginBottom: 2 }}>GETTING STARTED</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Set up your FinTwin AI</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 2 }}>Getting started</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Set up your FinTwin AI</div>
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>{pct}%</div>
-          <div style={{ fontSize: 10, color: "rgba(148,163,184,0.5)" }}>Complete</div>
+          <div style={{ fontSize: 22, fontWeight: 650, color: "var(--accent)" }}>{pct}%</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Complete</div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 4, marginBottom: 16, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #a78bfa, #22d3ee)", borderRadius: 4, transition: "width 0.6s ease" }} />
+      <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 4, marginBottom: 16, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, var(--accent), var(--info))", borderRadius: 4, transition: "width 0.6s ease" }} />
       </div>
 
       {/* Steps */}
@@ -84,12 +82,12 @@ export default function OnboardingChecklist({ transactions = [], budgets = [], g
           return (
             <div key={step.key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {done
-                ? <CheckCircle size={16} color="#4ade80" />
-                : <Circle size={16} color="rgba(148,163,184,0.3)" />
+                ? <CheckCircle size={16} color="var(--good)" />
+                : <Circle size={16} color="var(--text-dim)" />
               }
               <span style={{
                 fontSize: 13, fontWeight: 500,
-                color: done ? "#4ade80" : "rgba(148,163,184,0.7)",
+                color: done ? "var(--good)" : "var(--text-dim)",
                 textDecoration: done ? "line-through" : "none",
               }}>
                 {step.label}
@@ -100,7 +98,7 @@ export default function OnboardingChecklist({ transactions = [], budgets = [], g
       </div>
 
       {pct === 100 && (
-        <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 10, fontSize: 12, color: "#4ade80", fontWeight: 600 }}>
+        <div style={{ marginTop: 14, padding: "10px 14px", background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 10, fontSize: 12, color: "var(--good)", fontWeight: 600 }}>
           All done! Your FinTwin AI is fully set up.
         </div>
       )}
