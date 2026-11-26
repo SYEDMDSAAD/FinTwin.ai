@@ -46,6 +46,20 @@ public class ReportController {
             .generateWeeklyReport();
     }
 
+    /** This week's report as the weekly agent wrote it; 204 when there isn't one yet. */
+    @GetMapping("/weekly/latest")
+    public ResponseEntity<WeeklyReportDTO> latestWeeklyReport() {
+        return reportService.latestStored()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** The weekly agent's trigger: write this week's report if it isn't there yet. */
+    @PostMapping("/weekly/ensure")
+    public java.util.Map<String, Object> ensureWeeklyReport() {
+        return java.util.Map.of("written", reportService.ensureThisWeek());
+    }
+
     @GetMapping(
         value="/weekly/pdf",
         produces=MediaType.APPLICATION_PDF_VALUE

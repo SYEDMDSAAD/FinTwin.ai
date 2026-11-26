@@ -85,7 +85,7 @@ GOAL_PLAN_LLM_LATENCY = Histogram(
 # Labelled by feature, never by user: one series per user would grow
 # Prometheus without bound.
 LLM_FEATURES = ("copilot", "advisor", "coach", "goal_plan", "report",
-                "category_suggest", "investments", "other")
+                "category_suggest", "document_extract", "investments", "other")
 
 LLM_CALLS = Counter(
     "fintwin_ai_llm_calls_total",

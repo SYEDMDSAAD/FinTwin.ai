@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FillFromPdf from "../components/FillFromPdf";
 import { TrendingUp, Plus, Pencil, Trash2, Check, Info, Home, Car, Gem, Landmark, Briefcase, GraduationCap, CreditCard, ChevronRight, ChevronDown, PiggyBank } from "lucide-react";
 import { Button, SectionHeader, IconChip, cx } from "../components/ui";
 import { rupees } from "../utils/money";
@@ -336,6 +337,14 @@ function NetWorthManagement({
 
         {addingLiability && (
           <div className="mb-3 p-4 rounded-card bg-surface border border-line space-y-3">
+            <FillFromPdf kind="loan" onFields={(f) => {
+              if (f.name) setLiabilityName(f.name);
+              if (f.amount != null) setLiabilityAmount(String(Math.round(f.amount)));
+              if (f.type && LIABILITY_TYPES.includes(f.type)) setLiabilityType(f.type);
+              if (f.emi != null) setLiabilityEmi(String(Math.round(f.emi)));
+              if (f.interestRate != null) setLiabilityRate(String(f.interestRate));
+              if (f.termMonths != null) setLiabilityTerm(String(f.termMonths));
+            }} />
             <input className={INPUT} placeholder="Name, like Home loan" aria-label="Loan name" value={liabilityName} onChange={(e) => setLiabilityName(e.target.value)} />
             <div className="grid grid-cols-2 gap-2">
               <input className={INPUT} type="number" inputMode="numeric" placeholder="Owed ₹" aria-label="Amount owed" value={liabilityAmount} onChange={(e) => setLiabilityAmount(e.target.value)} />

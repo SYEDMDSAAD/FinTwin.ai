@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import API from "../services/api";
 import {
     FileText, ShieldAlert, TrendingUp, TrendingDown, Download,
@@ -111,6 +111,21 @@ function WeeklyReport() {
     const [error, setError]       = useState(null);
     const [exporting, setExporting] = useState(false);
     const [savedAt, setSavedAt]   = useState(saved?.savedAt || null);
+
+    // The weekly agent writes this week's report on the first visit of the
+    // week and keeps it in the account: show that one when it's there.
+    useEffect(() => {
+        let alive = true;
+        API.get("/reports/weekly/latest")
+            .then(({ status, data }) => {
+                if (!alive || status !== 200 || !data) return;
+                setReport(data);
+                saveReport(data);
+                setSavedAt(data.generatedAt || new Date().toISOString());
+            })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, []);
 
     const fetchReport = async () => {
         setLoading(true);

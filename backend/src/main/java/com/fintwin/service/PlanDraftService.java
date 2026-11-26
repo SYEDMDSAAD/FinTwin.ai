@@ -52,7 +52,7 @@ public class PlanDraftService {
         return draftFor(currentUser(), LocalDate.now(INDIA));
     }
 
-    PlanDraftMath.Draft draftFor(User user, LocalDate today) {
+    public PlanDraftMath.Draft draftFor(User user, LocalDate today) {
         var recent = transactions.findSince(user.getId(), today.minusMonths(5).withDayOfMonth(1));
         Map<String, Double> limits = new HashMap<>();
         for (Budget b : budgets.findByUser(user)) {

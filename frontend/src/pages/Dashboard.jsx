@@ -3,6 +3,7 @@ import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
+import { storedUserIsDemo } from "../utils/demoGuard";
 import DemoBanner from "../components/DemoBanner";
 
 import { useTheme } from "../context/ThemeContext";
@@ -155,6 +156,17 @@ function Dashboard() {
         localStorage.setItem("activeSection", section);
         rememberSection(section);
         startTransition(() => setActiveSection(section));
+    }, []);
+
+    // The weekly agent: once per visit, write this week's report if it isn't
+    // there yet. Fire and forget; the bell says when it's ready.
+    useEffect(() => {
+        if (storedUserIsDemo()) return;
+        try {
+            if (sessionStorage.getItem("fintwin-weekly-ensured")) return;
+            sessionStorage.setItem("fintwin-weekly-ensured", "1");
+        } catch { /* private mode: just ask */ }
+        API.post("/reports/weekly/ensure").catch(() => {});
     }, []);
 
     // Allow child components (NetWorthPage, PortfolioTab) to trigger section navigation

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import FillFromPdf from "../components/FillFromPdf";
 import { Plus, ShieldCheck, X, HeartPulse, Car, Home, Plane, Umbrella } from "lucide-react";
 import { Button, Badge, SectionHeader, EmptyState, cx } from "../components/ui";
 import { rupees } from "../utils/money";
@@ -79,6 +80,15 @@ function AddModal({ onClose, onSave, saving }) {
           <h3 className="text-title text-ink">Add a policy</h3>
           <button type="button" onClick={onClose} aria-label="Close" className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken"><X size={18} /></button>
         </div>
+        <FillFromPdf kind="policy" className="mb-4" onFields={(f) => setForm(prev => ({
+          ...prev,
+          ...(f.type ? { type: f.type } : {}),
+          ...(f.provider ? { provider: f.provider } : {}),
+          ...(f.premium != null ? { premium: String(Math.round(f.premium)) } : {}),
+          ...(f.frequency ? { frequency: f.frequency } : {}),
+          ...(f.sumAssured != null ? { sumAssured: String(Math.round(f.sumAssured)) } : {}),
+          ...(f.renewalDate ? { renewalDate: f.renewalDate } : {}),
+        }))} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type" wide>
             <select className={INPUT} value={form.type} onChange={set("type")}>

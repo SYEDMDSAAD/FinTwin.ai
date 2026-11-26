@@ -234,6 +234,9 @@ public class NotificationService {
         // ── 9. What the agents did or noticed (last 7 days) ──────────────
         // Watch alerts sort with warnings; the sorting summary with info.
         notifications.addAll(agentNotifications(user));
+        if (nudgeAgents != null) {
+            notifications.addAll(nudgeAgents.all(user, transactions, today, !budgets.isEmpty()));
+        }
 
         notifications.sort((a, b) -> Integer.compare(
                 PRIORITY.getOrDefault(a.getType(), 5),
@@ -248,6 +251,10 @@ public class NotificationService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.fintwin.repository.AgentAlertRepository agentAlerts;
+
+    /** Weekly, budget, subscription and goal agents (worked out on each bell load). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.agent.NudgeAgents nudgeAgents;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.fintwin.repository.DismissedAnomalyRepository dismissedAnomalies;
