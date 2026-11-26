@@ -408,7 +408,7 @@ export default function ScanPanel({ wallet, onWallet, onNeedTopup, initial, onFi
                 </div>
             )}
             {after?.choice === "paid" && after.toRebalance > 0 && (
-                <CutsCard eventId={result.eventId} amount={after.toRebalance} onWallet={onWallet}
+                <CutsCard eventId={result.eventId} amount={after.toRebalance} onWallet={onWallet} autoSuggest
                           reason={`This took your ${result.category} budget over.`} />
             )}
             {after?.choice === "skipped" && (

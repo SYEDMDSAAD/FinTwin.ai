@@ -1964,6 +1964,7 @@ function Dashboard() {
                         updateBudget={
                             updateBudget
                         }
+                        onPlanApplied={fetchBudgets}
                     />
 
                     <AffordabilitySection

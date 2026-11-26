@@ -216,6 +216,7 @@ public class InternalAIController {
             row.put("spent",     b.getSpent());
             row.put("remaining", b.getRemaining());
             row.put("exceeded",  b.getExceeded());
+            row.put("adjustment", b.getAdjustment());
             budgets.add(row);
         });
         return ResponseEntity.ok(Map.of("budgets", budgets));

@@ -98,9 +98,11 @@ it can give).
 Choose one to three sources and how much each gives, so that:
 - the amounts are whole rupees and add up to exactly FACTS.amount
 - no source gives more than its room
-- no source marked locked is used (essentials and bills)
+- no source marked locked is used (essentials, bills, and savings goals
+  unless the user unlocked them)
 - spending categories with plenty of room go first, then next week's
-  allowance, and savings goals only as a last resort
+  allowance, then next month's budgets, and unlocked savings goals only as
+  a last resort
 Use each source's kind and name exactly as FACTS writes them.
 
 The message: one sentence under 240 characters saying where the money comes

@@ -1,12 +1,13 @@
 import BudgetCard from "./BudgetCard";
 import BudgetModal from "./BudgetModal";
 import GlassCard from "./GlassCard";
+import PlanDraftCard from "./PlanDraftCard";
 import { Wallet } from "lucide-react";
 import { budgetStatus, sortByUrgency, BUDGET_SAFE, BUDGET_WATCH, BUDGET_OVER } from "../constants/budgetStatus";
 
 const rupees = (v) => `₹${Math.round(v || 0).toLocaleString("en-IN")}`;
 
-function BudgetSection({ budgets, createBudget, deleteBudget, updateBudget }) {
+function BudgetSection({ budgets, createBudget, deleteBudget, updateBudget, onPlanApplied }) {
   const totalLimit = budgets.reduce((s, b) => s + (b.limit || 0), 0);
   const totalSpent = budgets.reduce((s, b) => s + (b.spent || 0), 0);
   const remaining = totalLimit - totalSpent;
@@ -23,6 +24,8 @@ function BudgetSection({ budgets, createBudget, deleteBudget, updateBudget }) {
 
   return (
     <div className="mb-10">
+      <PlanDraftCard hasBudgets={budgets.length > 0} onApplied={onPlanApplied} />
+
       {/* Roll-up — leads the section so the overall picture reads before the detail */}
       {budgets.length > 0 && (
         <GlassCard className="relative overflow-hidden p-5 mb-6">

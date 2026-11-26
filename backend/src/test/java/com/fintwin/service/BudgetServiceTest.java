@@ -36,6 +36,7 @@ class BudgetServiceTest {
     @Mock private TransactionRepository transactionRepository;
     @Mock private UserRepository userRepository;
     @Mock private ProfileService profileService;
+    @Mock private SpendGuardLinks spendGuard;
 
     @InjectMocks private BudgetService service;
 
@@ -198,6 +199,29 @@ class BudgetServiceTest {
         assertThat(result.get(0).getSpent()).isEqualTo(2300.0);
         assertThat(result.get(0).getRemaining()).isEqualTo(2700.0);
         assertThat(result.get(0).getExceeded()).isFalse();
+    }
+
+    @Test
+    void getBudgetStatus_includesMovesApprovedInSpendGuard() {
+        Budget food = budget("Food", 3000.0);
+        food.setId(1L);
+        food.setUser(user);
+        Budget shopping = budget("Shopping", 4000.0);
+        shopping.setId(2L);
+        shopping.setUser(user);
+        when(budgetRepository.findByUser(user)).thenReturn(List.of(food, shopping));
+        when(transactionRepository.findLatestThreeMonthsTransactions(eq(1L), any(LocalDate.class)))
+                .thenReturn(List.of(txn("Food", -5000.0)));
+        when(spendGuard.budgetAdjustments(eq(1L), any())).thenReturn(java.util.Map.of("food", 2000.0, "Shopping", -1200.0));
+
+        List<BudgetStatusDTO> result = service.getBudgetStatus(null);
+
+        // The overspend was balanced: Food grew by what Shopping gave up
+        assertThat(result.get(0).getLimit()).isEqualTo(5000.0);
+        assertThat(result.get(0).getAdjustment()).isEqualTo(2000.0);
+        assertThat(result.get(0).getExceeded()).isFalse();
+        assertThat(result.get(1).getLimit()).isEqualTo(2800.0);
+        assertThat(result.get(1).getAdjustment()).isEqualTo(-1200.0);
     }
 
     @Test

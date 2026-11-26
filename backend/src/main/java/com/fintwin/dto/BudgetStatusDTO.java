@@ -13,6 +13,8 @@ public class BudgetStatusDTO {
     private Boolean exceeded;
 
     private Long id;
+    // What Spend Guard's approved rebalances added (or took away, negative) this month; limit includes it
+    private Double adjustment = 0.0;
 
     // =========================
     // Constructor
@@ -71,5 +73,13 @@ public class BudgetStatusDTO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Double getAdjustment() {
+        return adjustment;
+    }
+
+    public void setAdjustment(Double adjustment) {
+        this.adjustment = adjustment;
     }
 }

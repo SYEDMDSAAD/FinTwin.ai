@@ -136,6 +136,11 @@ class EventBody(Body):
     eventId: str = Field(max_length=64)
 
 
+class RebalanceBody(EventBody):
+    # Goal savings are protected unless the user chooses to let them give
+    allowGoals: bool = False
+
+
 class ConfirmBody(EventBody):
     paid: bool
 
@@ -224,7 +229,8 @@ def _to_rebalance(e: dict) -> int:
 
 
 def _sources(w: dict, finances, now_dt, e: dict) -> list[dict]:
-    sources = rules.rebalance_sources(wallet=w, finances=finances, now_dt=now_dt)
+    sources = rules.rebalance_sources(wallet=w, finances=finances, now_dt=now_dt,
+                                      allow_goals=bool(e.get("allow_goals")))
     if e["type"] == "scan":      # the overspent category can't pay for itself
         cat = (e.get("category") or "").lower()
         sources = [s for s in sources if not (s["kind"] == "category" and s["name"].lower() == cat)]
@@ -305,8 +311,14 @@ def summary(uid: int) -> dict:
     for e in pauses:
         by_category[e.get("category") or "Other"] = by_category.get(e.get("category") or "Other", 0) + 1
     plan = w.get("plan")
+    following = rules.next_month(now_dt)
+    adjustments = {m: {k: v for k, v in w.get("adjustments", {}).get(m, {}).items()
+                       if not k.startswith("goal:") and v}
+                   for m in (month, following)}
     return {
         "month": month,
+        # Approved rebalances, so FinTwin's budgets show the same limits
+        "budgetAdjustments": {m: a for m, a in adjustments.items() if a},
         "savedByPausingThisMonth": w.get("saved_by_month", {}).get(month, 0),
         "savedByPausingTotal": w.get("saved_by_pausing", 0),
         "paymentsChecked": len(scans),
@@ -712,7 +724,7 @@ async def topup(body: TopupBody):
 
 @app.post("/guard/rebalance")
 @persisted
-async def rebalance(body: EventBody):
+async def rebalance(body: RebalanceBody):
     """Where an overspend or a top-up comes from this month. Proposes; approve-cuts applies."""
     started, uid, now_dt = time.monotonic(), body.userId, rules.now()
     e = _event(uid, body.eventId)
@@ -725,6 +737,8 @@ async def rebalance(body: EventBody):
         raise rules.GuardError("This stayed inside your plan, so nothing needs to move.")
     w = _wallet(uid, now_dt)
     finances = await data.load(uid, body.toolToken)
+    e["allow_goals"] = body.allowGoals
+    store.update_event(uid, e["id"], {"allow_goals": body.allowGoals})
     sources = _sources(w, finances, now_dt, e)
     facts = {"mode": "rebalance", "amount": amount,
              "why": "over_budget" if e["type"] == "scan" else "top_up",
@@ -769,7 +783,8 @@ async def approve_cuts(body: EventBody):
         if s is None or s["locked"] or c["amount"] > s["room"]:
             raise rules.GuardError("Your plan changed since this was suggested. Ask for a new suggestion.")
     rules.apply_cuts(w, cuts, now_dt.strftime("%Y-%m"),
-                     over_category=e.get("category") if e["type"] == "scan" else None)
+                     over_category=e.get("category") if e["type"] == "scan" else None,
+                     finances=finances, following=rules.next_month(now_dt))
     store.save_wallet(uid, w)
     store.update_event(uid, e["id"], {"rebalanced": True, "rebalanced_at": now_dt.isoformat()})
     return {"wallet": _view(uid, w, now_dt)}

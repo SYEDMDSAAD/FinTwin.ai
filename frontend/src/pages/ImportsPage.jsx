@@ -6,6 +6,7 @@ import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize, gu
 import DataCoverage from "../components/DataCoverage";
 import EmailAlertsSetup from "../components/EmailAlertsSetup";
 import SmsSyncCard from "../components/SmsSyncCard";
+import IphoneSmsCard from "../components/IphoneSmsCard";
 
 const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 
@@ -217,6 +218,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 720 }}>
       {!compact && <>
       <SmsSyncCard onImported={() => setCoverageKey(k => k + 1)} />
+      <IphoneSmsCard />
       <DataCoverage refreshKey={coverageKey} />
       </>}
 

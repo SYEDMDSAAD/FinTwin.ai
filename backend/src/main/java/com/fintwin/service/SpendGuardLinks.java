@@ -36,7 +36,9 @@ import java.util.regex.Pattern;
  *   <li>a payment the user paid through Spend Guard becomes a transaction
  *       (source SPEND_GUARD, external id "GUARD:&lt;event&gt;"). It is provisional,
  *       like an alert-email transaction: the statement row for the same money
- *       takes it over on import, so it never counts twice.</li>
+ *       takes it over on import, so it never counts twice. If the bank's SMS
+ *       or alert email for the same money is already in, that transaction is
+ *       claimed for the payment instead of adding a second one.</li>
  *   <li>an approved salary plan earmarks goal money for the month
  *       ({@link GoalEarmark}).</li>
  *   <li>Spend Guard's own records are stored here, encrypted, instead of in the
@@ -129,17 +131,48 @@ public class SpendGuardLinks {
 
         String merchant = text(record.get("merchant"), 120);
         if (merchant == null) merchant = "UPI payment";
+        Categorized category = category(user, merchant,
+                text(record.get("category"), 40), text(record.get("categorySource"), 20));
+
+        // The bank's SMS or alert email often lands before the user comes back
+        // and confirms: that is this payment, not a second one
+        Optional<Transaction> alert = unclaimedAlert(user, amount.negate());
+        if (alert.isPresent()) {
+            Transaction t = alert.get();
+            t.setExternalId(externalId);        // claimed: no other event takes it, and a statement still takes it over
+            if (t.getCategoryReview() == null) {
+                // The scanned QR names the payee better than the bank's text, unless the user already fixed it
+                t.setMerchant(merchant);
+                t.applyPrediction(category);
+            }
+            return transactions.save(t).getId();
+        }
 
         Transaction t = new Transaction();
         t.setDate(LocalDate.now(INDIA));
         t.setMerchant(merchant);
         t.setAmountExact(amount.negate());           // money out
-        t.applyPrediction(category(user, merchant,
-                text(record.get("category"), 40), text(record.get("categorySource"), 20)));
+        t.applyPrediction(category);
         t.setSource(SOURCE);
         t.setExternalId(externalId);
         t.setUser(user);
         return transactions.save(t).getId();
+    }
+
+    /**
+     * A bank SMS or alert-email debit of exactly this amount from today or
+     * yesterday that no Spend Guard payment has claimed yet.
+     */
+    private Optional<Transaction> unclaimedAlert(User user, BigDecimal debit) {
+        LocalDate today = LocalDate.now(INDIA);
+        double amount = debit.doubleValue();
+        return transactions.findSince(user.getId(), today.minusDays(1)).stream()
+                .filter(t -> t.getExternalId() != null
+                        && (t.getExternalId().startsWith(SmsImportService.EXTERNAL_ID_PREFIX)
+                            || t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX)))
+                .filter(t -> t.getAmount() != null && Math.abs(t.getAmount() - amount) < 0.005)
+                .filter(t -> t.getDate() != null && !t.getDate().isBefore(today.minusDays(1)))
+                .max(Comparator.comparing(Transaction::getDate));
     }
 
     /**
@@ -253,6 +286,32 @@ public class SpendGuardLinks {
             return s;
         } catch (Exception e) {
             return Map.of("active", false, "message", "Spend Guard's figures couldn't be read.");
+        }
+    }
+
+    /**
+     * Budget moves the user approved in Spend Guard for a month (category →
+     * rupees added, negative when taken away), so FinTwin's budgets show the
+     * same limits. Read from the stored summary; anything malformed is ignored.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Double> budgetAdjustments(Long userId, YearMonth month) {
+        Optional<SpendGuardState> row = states.findById(userId);
+        if (row.isEmpty() || row.get().getSummary() == null) return Map.of();
+        try {
+            JsonNode moves = mapper.readTree(row.get().getSummary()).path("budgetAdjustments").path(month.toString());
+            if (!moves.isObject()) return Map.of();
+            Map<String, Double> out = new HashMap<>();
+            moves.fields().forEachRemaining(e -> {
+                JsonNode v = e.getValue();
+                if (e.getKey().length() <= 40 && !e.getKey().startsWith("goal:") && v.isNumber()
+                        && Math.abs(v.asDouble()) <= MAX_PAYMENT.doubleValue() * 4) {
+                    out.put(e.getKey(), v.asDouble());
+                }
+            });
+            return out;
+        } catch (Exception e) {
+            return Map.of();
         }
     }
 

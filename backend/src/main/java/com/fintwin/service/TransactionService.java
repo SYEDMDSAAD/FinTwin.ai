@@ -474,12 +474,13 @@ public class TransactionService {
         int skipped = 0;
         LocalDate firstDay = null, lastDay = null;       // the dates this file covers
 
-        // Transactions that arrived from alert emails or Spend Guard payments and
+        // Transactions that arrived from alert emails, bank SMS or Spend Guard payments and
         // no statement has claimed yet. A statement row for the same money
         // replaces them, keeping any name or category the user fixed.
         List<Transaction> fromAlerts = new ArrayList<>(onRecord.stream()
                 .filter(t -> t.getExternalId() != null
                         && (t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX)
+                            || t.getExternalId().startsWith(SmsImportService.EXTERNAL_ID_PREFIX)
                             || t.getExternalId().startsWith(SpendGuardLinks.EXTERNAL_ID_PREFIX)))
                 .filter(t -> t.getAmount() != null && t.getDate() != null)
                 .toList());

@@ -107,6 +107,43 @@ class SpendGuardLinksIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void theBankSmsArrivedFirst_soConfirmingClaimsItInsteadOfAddingASecond() {
+        String email = "guard-links-sms-first@example.com";
+        User user = user(email);
+        Transaction sms = new Transaction();
+        sms.setUser(user);
+        sms.setDate(TODAY);
+        sms.setMerchant("paytmqr2810050501@paytm");
+        sms.setAmount(-450.0);
+        sms.setCategory("Other");
+        sms.setSource("SMS");
+        sms.setExternalId("SMS:abc123");
+        sms.setAccountRef("SBI ··5678");
+        sms = transactions.save(sms);
+
+        Long id = links.recordPayment(user.getId(), Map.of("eventId", "f1f2", "merchant", "Chai Point",
+                "amount", "450", "category", "Food", "categorySource", "MERCHANT_CODE"));
+
+        assertThat(id).isEqualTo(sms.getId());
+        List<Transaction> all = transactions.findByUser(user);
+        assertThat(all).hasSize(1);
+        Transaction t = all.get(0);
+        assertThat(t.getExternalId()).isEqualTo("GUARD:f1f2");
+        assertThat(t.getSource()).isEqualTo("SMS");               // the bank says it happened
+        assertThat(t.getAccountRef()).isEqualTo("SBI ··5678");
+        assertThat(t.getMerchant()).isEqualTo("Chai Point");      // the QR's payee name
+        assertThat(t.getCategory()).isEqualTo("Food");
+        // The bank confirmed it, so "I didn't pay" can't remove it
+        assertThat(links.unrecordPayment(user.getId(), "f1f2")).isFalse();
+
+        // A second payment of the same amount doesn't take the claimed SMS
+        Long other = links.recordPayment(user.getId(), Map.of("eventId", "f1f3", "merchant", "Chai Point",
+                "amount", "450", "category", "Food"));
+        assertThat(other).isNotEqualTo(sms.getId());
+        assertThat(transactions.findByUser(user)).hasSize(2);
+    }
+
+    @Test
     void aPaymentTheStatementDidntShow_isFlagged_thenKeptOrRemovedByTheUser() {
         String email = "guard-links-unmatched@example.com";
         User user = user(email);

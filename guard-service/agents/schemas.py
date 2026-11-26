@@ -32,7 +32,7 @@ class LocalTopupDecision(TopupDecision):
 
 
 class Cut(BaseModel):
-    kind: Literal["category", "next_allowance", "goal"]
+    kind: Literal["category", "next_allowance", "next_month", "goal"]
     name: str = Field(description="The source's name exactly as written in FACTS.sources.")
     amount: int = Field(description="Whole rupees this source gives.")
 

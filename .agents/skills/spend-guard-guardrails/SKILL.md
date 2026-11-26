@@ -115,7 +115,11 @@ a model can ignore a prompt, but not a check.
     or the same amount turning up in FinTwin's transactions within `PENDING_DAYS` (3) of it
     (`pending_match`, settled when the wallet is read) marks it paid; "I didn't pay", or 3 days with no
     sign of it, marks it `not_paid`. A payment found in the transactions is never recorded a second time,
-    and a failed read decides nothing. Scan history lives on the Scan tab (`ScanHistory.jsx`).
+    and a failed read decides nothing. When "I paid" comes after the bank's SMS or alert email for the
+    same money (same amount, today or yesterday, not claimed by another event), `recordPayment` claims
+    that transaction (its external id becomes `GUARD:<event id>`, the QR's payee name and category
+    replace the bank's text unless the user fixed them) instead of adding a second one; the bank's
+    record can't be removed with "I didn't pay". Scan history lives on the Scan tab (`ScanHistory.jsx`).
 19c. **The bank statement settles it, and the user has the last word.** A statement import flags a
     `SPEND_GUARD` transaction dated inside the file's date range that no row matched as
     `SPEND_GUARD_UNMATCHED` ("not in your statement"); it is never deleted on import, because the
@@ -142,6 +146,18 @@ a model can ignore a prompt, but not a check.
     take a bet out of the check.
 24. **The Copilot's Spend Guard figures are counts and rupees only** (`summary` in `main.py`), never a
     payee's name, UPI ID or note, and they say the wallet balances are pretend.
+
+25. **Goal savings are protected in a rebalance.** `rebalance_sources` marks every goal `locked` unless the
+    user ticked "Let goal savings give too" (`allowGoals`, stored on the event so approving uses the same
+    sources). The order is this month's unlocked budgets, next week's allowance, then next month's
+    everyday budgets (`next_month`: at most half of them, `NEXT_MONTH_SHARE`, spread over them in
+    proportion to their size when approved), and unlocked goals last. Essentials are never cut.
+26. **Approved budget moves show in FinTwin.** `summary()` carries `budgetAdjustments` (this month and
+    next, categories only, never goal keys); `SpendGuardLinks.budgetAdjustments` reads them and
+    `BudgetService` adds them to that month's limits, with the amount in `adjustment`. guard-service
+    subtracts `adjustment` when it reads FinTwin's budgets, because the wallet adds its own moves.
+27. **After "Pay anyway" goes over budget, the suggestion is ready** (`CutsCard autoSuggest` in
+    `ScanPanel`): one rebalance call, and still nothing changes until the user approves.
 
 ## The limits are product decisions
 

@@ -96,6 +96,27 @@ class SmsImportServiceTest {
     }
 
     @Test
+    void sbiUpiDebitToAMultiWordMerchant() {
+        var r = run("JD-SBIUPI-S", "Dear UPI user A/C X1234 debited by 17102.00 on date 24Nov26 trf to Trip com "
+                + "Refno 600011112222 If not u? call-1800111109 for other services-18001234-SBI");
+        assertThat(r.imported()).isEqualTo(1);
+        Transaction t = saved.get(0);
+        assertThat(t.getAmount()).isEqualTo(-17102.0);
+        assertThat(t.getMerchant()).isEqualTo("Trip com");
+        assertThat(t.getAccountRef()).isEqualTo("SBI ··1234");
+        assertThat(t.getDate()).isEqualTo(LocalDate.of(2026, 11, 24));
+    }
+
+    @Test
+    void refusesUpiCollectRequestsNotYetApproved() {
+        // From a bank header too, in case a bank ever relays one
+        var r = run("VM-SBIUPI", "Trip com has requested money from you on PhonePe.Rs.17102 will be debited "
+                + "from your account on approving the request - https://phone.pe/PHONPE/abcdefgh");
+        assertThat(r.imported()).isZero();
+        assertThat(saved).isEmpty();
+    }
+
+    @Test
     void refusesOtpsBalancesAndFailedPayments() {
         var r = service.importFor(user, List.of(
                 new SmsImportService.Sms("VM-HDFCBK", "123456 is the OTP for txn of Rs 999.00 at AMAZON on HDFC Bank Card x1234. Do not share.", NOV_24),

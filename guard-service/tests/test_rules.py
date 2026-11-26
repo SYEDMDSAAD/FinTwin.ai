@@ -280,6 +280,14 @@ def test_essentials_and_bills_are_locked():
     assert (s["Shopping"]["room"], s["Entertainment"]["room"], s["Food"]["room"]) == (900, 500, 250)
     assert s["Next week's allowance"]["room"] == 5000 - rules.essentials_weekly(PERSONA) == 1998
     assert s["Goa trip"]["room"] == 6000
+    # Half of next month's everyday budgets (Food, Shopping, Entertainment)
+    assert s["Next month's budgets"]["room"] == 6000 and not s["Next month's budgets"]["locked"]
+
+
+def test_goal_savings_are_protected_unless_the_user_unlocks_them():
+    assert all(x["locked"] for x in sources() if x["kind"] == "goal")
+    unlocked = rules.rebalance_sources(wallet=wallet(), finances=PERSONA, now_dt=NOON, allow_goals=True)
+    assert not any(x["locked"] for x in unlocked if x["kind"] == "goal")
 
 
 def test_good_cuts_are_accepted():
@@ -306,13 +314,28 @@ def test_bad_cuts_are_rejected(cuts, why):
         rules.check_cuts(answer, 1200, sources(), set())
 
 
-def test_fallback_cuts_take_from_categories_first_and_goals_last():
+def test_fallback_cuts_take_from_categories_then_next_month_and_never_goals():
     cuts = rules.proportional_cuts(1200, sources())
     assert sum(c["amount"] for c in cuts) == 1200 and {c["kind"] for c in cuts} == {"category"}
     cuts = rules.proportional_cuts(5000, sources())
-    assert sum(c["amount"] for c in cuts) == 5000 and cuts[-1]["kind"] == "goal"
+    assert sum(c["amount"] for c in cuts) == 5000 and cuts[-1]["kind"] == "next_month"
+    assert "goal" not in {c["kind"] for c in cuts}
     with pytest.raises(rules.GuardError):
         rules.proportional_cuts(1_000_000, sources())
+    # Only when the user unlocked them do goals give, and only last
+    unlocked = rules.rebalance_sources(wallet=wallet(), finances=PERSONA, now_dt=NOON, allow_goals=True)
+    cuts = rules.proportional_cuts(12000, unlocked)
+    assert sum(c["amount"] for c in cuts) == 12000 and cuts[-1]["kind"] == "goal"
+
+
+def test_a_cut_from_next_month_is_spread_over_its_everyday_budgets():
+    w = wallet()
+    rules.apply_cuts(w, [{"kind": "next_month", "name": "Next month's budgets", "amount": 1200}],
+                     "2026-11", over_category="Food", finances=PERSONA, following="2026-12")
+    assert w["adjustments"]["2026-11"] == {"Food": 1200}
+    # 6000 : 4000 : 2000
+    assert w["adjustments"]["2026-12"] == {"Food": -600, "Shopping": -400, "Entertainment": -200}
+    assert rules.next_month(rules.now().replace(year=2026, month=12)) == "2027-01"
 
 
 def test_approved_cuts_move_this_months_plan():

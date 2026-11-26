@@ -1,15 +1,15 @@
 package com.fintwin.service;
 
+import com.fintwin.exception.BadRequestException;
+import com.fintwin.exception.UnauthorizedException;
 import com.fintwin.model.User;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.util.BankAlertParser;
 import com.fintwin.util.SmsSenders;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -68,20 +68,32 @@ public class SmsImportService {
     public Result importMessages(List<Sms> messages) {
         if (messages == null || messages.isEmpty()) return new Result(0, 0, 0, 0, 0, Set.of());
         if (messages.size() > MAX_MESSAGES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At most " + MAX_MESSAGES + " messages at a time");
+            throw new BadRequestException("At most " + MAX_MESSAGES + " messages at a time");
         }
         User user = users.findByEmail(SecurityUtils.getCurrentUserEmail())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() -> new UnauthorizedException("Not signed in"));
         return importFor(user, messages);
     }
 
     Result importFor(User user, List<Sms> messages) {
+        return importFor(user, messages, false);
+    }
+
+    /**
+     * @param userChoseThem the user picked these messages themselves (an iPhone
+     *        Shortcut they set up), so a message whose sender the phone didn't pass
+     *        on may still be placed by the bank's name in its text
+     */
+    Result importFor(User user, List<Sms> messages, boolean userChoseThem) {
         int imported = 0, duplicates = 0, onRecord = 0, notBank = 0, notTransaction = 0;
         Set<String> unknown = new LinkedHashSet<>();
 
         for (Sms sms : messages) {
             if (sms == null || sms.body() == null || sms.receivedAt() == null) { notTransaction++; continue; }
             Optional<String> bank = SmsSenders.bankFor(sms.sender());
+            if (bank.isEmpty() && userChoseThem && SmsSenders.code(sms.sender()) == null) {
+                bank = SmsSenders.bankFromText(sms.body());
+            }
             if (bank.isEmpty()) {
                 notBank++;
                 String code = SmsSenders.code(sms.sender());

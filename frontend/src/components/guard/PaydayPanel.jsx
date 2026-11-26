@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarCheck, CheckCircle2 } from "lucide-react";
 import { guard, guardError } from "../../services/guardApi";
+import API from "../../services/api";
 import { SOURCE_LABEL, inr } from "./format";
 
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
@@ -104,6 +105,17 @@ function PlanEditor({ plan, busy, onSave, onCancel }) {
     );
 }
 
+/** A salary that landed in the last 10 days with no plan approved since. */
+export function salaryNeedsPlan(salary, plan, now = new Date()) {
+    const paid = new Date(salary.lastPaid + "T00:00:00");
+    if (now - paid > 10 * 86_400_000) return false;
+    return !plan?.approved_at || new Date(plan.approved_at) < paid;
+}
+
+function shortDate(iso) {
+    return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
 export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
     const [salary, setSalary] = useState(wallet.plan?.salary ? String(wallet.plan.salary) : "");
     const [proposal, setProposal] = useState(null);
@@ -112,6 +124,21 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
     const [approved, setApproved] = useState(false);
     const [earmarked, setEarmarked] = useState(0);
     const [editing, setEditing] = useState(false);
+    const [arrived, setArrived] = useState(null);
+
+    // The salary FinTwin saw land (from bank SMS, alerts or statements) fills
+    // the amount in, unless a plan was already approved since it arrived
+    useEffect(() => {
+        let live = true;
+        API.get("/plan/draft").then(({ data }) => {
+            const s = data?.salary;
+            if (!live || !s?.lastPaid || !(s.lastAmount > 0)) return;
+            if (!salaryNeedsPlan(s, wallet.plan)) return;
+            setArrived(s);
+            setSalary((typed) => typed || String(Math.round(s.lastAmount)));
+        }).catch(() => {});
+        return () => { live = false; };
+    }, [wallet.plan]);
 
     async function saveOwn(split) {
         setBusy(true);
@@ -168,6 +195,11 @@ export default function PaydayPanel({ wallet, onWallet, onFinTwinChanged }) {
                     The Payday Planner reads your budgets and goals, then splits the salary before you can spend it.
                 </p>
                 {error && <div className="sg-error" role="alert">{error}</div>}
+                {arrived && (
+                    <p className="sg-chip sg-chip-good" role="status" style={{ marginBottom: 12 }}>
+                        Your salary of {inr(Math.round(arrived.lastAmount))} arrived on {shortDate(arrived.lastPaid)}
+                    </p>
+                )}
                 <label className="sg-field">
                     <span className="sg-label">This month's salary</span>
                     <span className="sg-money">

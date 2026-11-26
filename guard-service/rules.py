@@ -627,7 +627,20 @@ def emergency_message(facts: dict) -> str:
 
 # ── Rebalance: where an override's money comes from ──────────────────────────
 
-def rebalance_sources(*, wallet: dict, finances, now_dt: datetime) -> list[dict]:
+def next_month(now_dt: datetime) -> str:
+    y, m = now_dt.year, now_dt.month
+    return f"{y + (m == 12)}-{m % 12 + 1:02d}"
+
+
+# Next month's everyday budgets can give up to this share, so one overspend
+# never empties them
+NEXT_MONTH_SHARE = 0.5
+
+
+def rebalance_sources(*, wallet: dict, finances, now_dt: datetime, allow_goals: bool = False) -> list[dict]:
+    """Where an overspend can come from: this month's unspent budgets, next
+    week's allowance, then next month's everyday budgets. Goal savings are
+    locked (protected) unless the user chose to let them give."""
     month = now_dt.strftime("%Y-%m")
     adj = wallet.get("adjustments", {}).get(month, {})
     sources = []
@@ -637,10 +650,15 @@ def rebalance_sources(*, wallet: dict, finances, now_dt: datetime) -> list[dict]
                         "locked": b.category in ESSENTIAL})
     next_room = max(0, wallet["weekly"] - wallet.get("next_allowance_cut", 0) - essentials_weekly(finances))
     sources.append({"kind": "next_allowance", "name": "Next week's allowance", "room": next_room, "locked": False})
+    following = wallet.get("adjustments", {}).get(next_month(now_dt), {})
+    everyday = sum(max(0, b.limit + following.get(b.category, 0)) for b in finances.budgets if b.category not in ESSENTIAL)
+    already = -sum(v for k, v in following.items() if not k.startswith("goal:") and v < 0)
+    sources.append({"kind": "next_month", "name": "Next month's budgets",
+                    "room": max(0, int(everyday * NEXT_MONTH_SHARE) - already), "locked": False})
     for g in finances.goals:
         if g.monthly > 0:
             sources.append({"kind": "goal", "name": g.title,
-                            "room": max(0, g.monthly + adj.get("goal:" + g.title, 0)), "locked": False})
+                            "room": max(0, g.monthly + adj.get("goal:" + g.title, 0)), "locked": not allow_goals})
     return sources
 
 
@@ -676,11 +694,12 @@ def check_cuts(answer, amount: int, sources: list[dict], allowed: set[int]) -> t
 
 
 def proportional_cuts(amount: int, sources: list[dict]) -> list[dict]:
-    """Fallback: spread the amount over categories with room, then next week's allowance, then goals."""
-    tiers = {"category": 0, "next_allowance": 1, "goal": 2}
+    """Fallback: spread the amount over categories with room, then next week's
+    allowance, then next month's budgets, and goals only if they're unlocked."""
+    tiers = {"category": 0, "next_allowance": 1, "next_month": 2, "goal": 3}
     usable = [s for s in sources if not s["locked"] and s["room"] > 0]
     remaining, cuts = amount, []
-    for tier in (0, 1, 2):
+    for tier in (0, 1, 2, 3):
         group = [s for s in usable if tiers[s["kind"]] == tier]
         room = sum(s["room"] for s in group)
         if remaining <= 0 or room <= 0:
@@ -695,7 +714,7 @@ def proportional_cuts(amount: int, sources: list[dict]) -> list[dict]:
         cuts += [{"kind": s["kind"], "name": s["name"], "amount": a} for s, a in zip(group, shares) if a > 0]
         remaining -= take
     if remaining > 0:
-        raise GuardError("There's no room left in this month's plan to cover it.")
+        raise GuardError("There's no room left in this month's or next month's plan to cover it.")
     return cuts
 
 
@@ -707,11 +726,18 @@ def cuts_message(cuts: list[dict]) -> str:
 
 
 def _sentence_name(cut: dict) -> str:
-    return "next week's allowance" if cut["kind"] == "next_allowance" else cut["name"]
+    if cut["kind"] == "next_allowance":
+        return "next week's allowance"
+    if cut["kind"] == "next_month":
+        return "next month's budgets"
+    return cut["name"]
 
 
-def apply_cuts(wallet: dict, cuts: list[dict], month: str, over_category: str | None = None) -> None:
-    """Move this month's plan: the cuts shrink their sources, and an overspent category grows to match."""
+def apply_cuts(wallet: dict, cuts: list[dict], month: str, over_category: str | None = None,
+               finances=None, following: str | None = None) -> None:
+    """Move the plan: the cuts shrink their sources, and an overspent category
+    grows to match. A cut from next month's budgets is spread over its everyday
+    budgets in proportion to their size."""
     adj = wallet.setdefault("adjustments", {}).setdefault(month, {})
     if over_category:
         adj[over_category] = adj.get(over_category, 0) + sum(c["amount"] for c in cuts)
@@ -725,6 +751,23 @@ def apply_cuts(wallet: dict, cuts: list[dict], month: str, over_category: str | 
             # That money stays in the main account next week, so it refills the buffer now
             wallet["next_allowance_cut"] = wallet.get("next_allowance_cut", 0) + c["amount"]
             wallet["buffer"] += c["amount"]
+        elif c["kind"] == "next_month" and finances is not None and following:
+            nxt = wallet["adjustments"].setdefault(following, {})
+            limits = {b.category: max(0, b.limit + nxt.get(b.category, 0))
+                      for b in finances.budgets if b.category not in ESSENTIAL}
+            total = sum(limits.values())
+            if total <= 0:
+                raise GuardError("Next month has no everyday budgets to take it from.")
+            shares = {k: c["amount"] * v // total for k, v in limits.items()}
+            spare = c["amount"] - sum(shares.values())
+            for k in sorted(limits, key=limits.get, reverse=True):
+                if spare <= 0:
+                    break
+                shares[k] += 1
+                spare -= 1
+            for k, a in shares.items():
+                if a:
+                    nxt[k] = nxt.get(k, 0) - a
 
 
 # ── Payday: splitting the salary ─────────────────────────────────────────────

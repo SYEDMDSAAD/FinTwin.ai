@@ -129,7 +129,10 @@ async def load(user_id: int, tool_token: str | None) -> Finances:
         raw_goals = goals_json.get("goals", [])
     except (RuntimeError, AttributeError):
         return Finances(data_ok=False)
-    budgets = [Budget(str(b.get("category", "Other")), _int(b.get("limit")), _int(b.get("spent")))
+    # FinTwin's limit already includes Spend Guard's approved moves; the
+    # wallet adds its own, so start from the user's own limit
+    budgets = [Budget(str(b.get("category", "Other")),
+                      _int(b.get("limit")) - _int(b.get("adjustment") or 0), _int(b.get("spent")))
                for b in raw_budgets if b.get("category")]
     goals = [Goal(str(g.get("title", "Goal"))[:60], _int(g.get("targetAmount")),
                   _int(g.get("savedSoFar")), _int(g.get("monthlyTarget")))

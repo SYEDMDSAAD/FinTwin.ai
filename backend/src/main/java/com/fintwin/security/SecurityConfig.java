@@ -213,6 +213,11 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.POST, "/api/v1/inbound/email")
                                 .permitAll()
 
+                                // iPhone Shortcut: signed with the user's import key
+                                // (X-FinTwin-Key), not a JWT; see SmsShortcutService
+                                .requestMatchers(HttpMethod.POST, "/api/v1/sms/shortcut")
+                                .permitAll()
+
                                 // Admin endpoints authenticate via X-Admin-Key header, not JWT
                                 .requestMatchers("/admin/**")
                                 .permitAll()

@@ -10,6 +10,7 @@ import com.fintwin.model.User;
 import com.fintwin.repository.*;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.util.CoverageMath;
+import com.fintwin.util.PlanDraftMath;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +39,9 @@ public class NotificationService {
 
     private static final Map<String, Integer> PRIORITY =
             Map.of("danger", 1, "warning", 2, "success", 3, "info", 4);
+
+    /** How many days after the salary lands the "split it" nudge stays up. */
+    static final int SALARY_NUDGE_DAYS = 3;
 
     @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
     public List<NotificationDTO> generateNotifications() {
@@ -203,6 +207,17 @@ public class NotificationService {
             notifications.add(new NotificationDTO("info",
                     "Upload your " + CoverageMath.monthName(month, today) + " statement for " + c.account()
                     + " to close the month — until then its spending isn't counted."
+            ));
+        }
+
+        // ── 8. Salary day ────────────────────────────────────────────────
+        // The salary just landed: the moment to split it, before it's spent
+        PlanDraftMath.Salary salary = PlanDraftMath.detectSalary(transactions, today);
+        if (salary != null && !salary.lastPaid().isAfter(today)
+                && salary.lastPaid().isAfter(today.minusDays(SALARY_NUDGE_DAYS + 1))) {
+            notifications.add(new NotificationDTO("success",
+                    "Salary of ₹" + fmt(Math.round(salary.lastAmount())) + " arrived. Split it into bills, goals and"
+                    + " weekly spending before it goes: open Spend Guard → Salary day."
             ));
         }
 

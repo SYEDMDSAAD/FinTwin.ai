@@ -1,5 +1,6 @@
 package com.fintwin.util;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -53,6 +54,34 @@ public final class SmsSenders {
             Map.entry("AIRBNK", "Airtel Payments Bank"), Map.entry("IPBMSG", "India Post Payments Bank"),
             Map.entry("EQUTAS", "Equitas"), Map.entry("UJJIVN", "Ujjivan"),
             Map.entry("ONECRD", "OneCard"), Map.entry("SLICEI", "Slice"));
+
+    // How banks sign their messages: "...-SBI", "HDFC Bank", "ICICI Bank."
+    private static final List<Map.Entry<Pattern, String>> SIGNATURES = List.of(
+            Map.entry(Pattern.compile("(?i)-\\s*SBI\\b|\\bSBI\\s*$|State Bank of India"), "SBI"),
+            Map.entry(Pattern.compile("(?i)\\bHDFC\\s*Bank\\b"), "HDFC"),
+            Map.entry(Pattern.compile("(?i)\\bICICI\\s*Bank\\b"), "ICICI"),
+            Map.entry(Pattern.compile("(?i)\\bAxis\\s*Bank\\b"), "Axis"),
+            Map.entry(Pattern.compile("(?i)\\bKotak\\b"), "Kotak"),
+            Map.entry(Pattern.compile("(?i)\\bYes\\s*Bank\\b"), "Yes Bank"),
+            Map.entry(Pattern.compile("(?i)\\bIDFC\\s*FIRST\\b"), "IDFC FIRST"),
+            Map.entry(Pattern.compile("(?i)\\bIndusInd\\b"), "IndusInd"),
+            Map.entry(Pattern.compile("(?i)\\bFederal\\s*Bank\\b"), "Federal"),
+            Map.entry(Pattern.compile("(?i)\\bBank\\s*of\\s*Baroda\\b|\\bBOB\\b"), "Bank of Baroda"),
+            Map.entry(Pattern.compile("(?i)\\bPNB\\b|Punjab National Bank"), "PNB"),
+            Map.entry(Pattern.compile("(?i)\\bCanara\\s*Bank\\b"), "Canara"),
+            Map.entry(Pattern.compile("(?i)\\bUnion\\s*Bank\\b"), "Union Bank"));
+
+    /**
+     * The bank that signed a message, for when the phone didn't pass on who
+     * sent it. Only for messages the user chose to forward themselves.
+     */
+    public static Optional<String> bankFromText(String body) {
+        if (body == null) return Optional.empty();
+        for (var e : SIGNATURES) {
+            if (e.getKey().matcher(body).find()) return Optional.of(e.getValue());
+        }
+        return Optional.empty();
+    }
 
     /** The bank behind an SMS sender, if it is one. */
     public static Optional<String> bankFor(String sender) {

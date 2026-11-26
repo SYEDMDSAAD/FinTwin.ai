@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { parseGoalText } from "../utils/goalText";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Target, Zap, Edit2, Trash2, RefreshCw, Link, Trophy, ChevronDown, Sparkles, CalendarClock, Wallet, TrendingUp, Plus } from "lucide-react";
@@ -75,6 +76,8 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
 
   const [durationMonths, setDurationMonths] = useState("");
 
+  const [sentence, setSentence] = useState("");
+
   const [loadingGoalId, setLoadingGoalId] = useState(null);
 
   const [completingGoalId, setCompletingGoalId] = useState(null);
@@ -136,6 +139,20 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
   const previewMonthly = Number(targetAmount) > 0 && Number(durationMonths) > 0
     ? Number(targetAmount) / Number(durationMonths)
     : null;
+
+  // "Goa trip in March, 40k" fills the three fields below; the user checks them and creates
+  const fillFromSentence = (e) => {
+    e.preventDefault();
+    const g = parseGoalText(sentence);
+    if (!g.title && !g.targetAmount && !g.durationMonths) {
+      toast.error("Try something like \"Goa trip in March, 40k\".");
+      return;
+    }
+    if (g.title) setTitle(g.title);
+    if (g.targetAmount) setTargetAmount(String(g.targetAmount));
+    if (g.durationMonths) setDurationMonths(String(g.durationMonths));
+    setSentence("");
+  };
 
   const applyPreset = (p) => {
     setTitle(p.label);
@@ -206,6 +223,20 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
 
           {newGoalOpen && (
             <>
+              {/* Say it in a sentence */}
+              <form onSubmit={fillFromSentence} className="mb-4 flex gap-2">
+                <input
+                  className="goal-input flex-1"
+                  placeholder={'Describe it: "Goa trip in March, 40k"'}
+                  aria-label="Describe your goal"
+                  value={sentence}
+                  onChange={(e) => setSentence(e.target.value)}
+                />
+                <button type="submit" className="g-btn" disabled={!sentence.trim()} style={{ whiteSpace: "nowrap" }}>
+                  Fill in
+                </button>
+              </form>
+
               {/* Presets — fastest path from "I should save" to a real goal */}
               <div className="flex flex-wrap gap-2 mb-4">
                 {GOAL_PRESETS.map(p => (

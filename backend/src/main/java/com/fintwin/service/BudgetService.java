@@ -24,6 +24,8 @@ import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 public class BudgetService {
@@ -32,17 +34,20 @@ public class BudgetService {
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
     private final ProfileService profileService;
+    private final SpendGuardLinks spendGuard;
 
     public BudgetService(
             BudgetRepository budgetRepository,
             TransactionRepository transactionRepository,
             UserRepository userRepository,
-            ProfileService profileService
+            ProfileService profileService,
+            SpendGuardLinks spendGuard
     ) {
         this.budgetRepository = budgetRepository;
         this.transactionRepository = transactionRepository;
         this.userRepository = userRepository;
         this.profileService = profileService;
+        this.spendGuard = spendGuard;
     }
 
     // =========================
@@ -262,13 +267,22 @@ public class BudgetService {
 
         List<BudgetStatusDTO> result = new ArrayList<>();
 
+        // Moves approved in Spend Guard's rebalancer for this month
+        Map<String, Double> moved = new HashMap<>();
+        if (spendGuard != null && user.getId() != null) {
+            spendGuard.budgetAdjustments(user.getId(), month)
+                    .forEach((k, v) -> moved.merge(k.toLowerCase(java.util.Locale.ROOT), v, Double::sum));
+        }
+
         for (Budget budget : budgets) {
 
             // Case-insensitive category matching. Exact BigDecimal sum so
             // "spent" and "remaining" are correct to the cent. Self-transfers
             // are excluded like everywhere else money is measured — moving
             // money between own accounts is not spending.
-            BigDecimal limit = nz(budget.getLimitAmountExact());
+            double adjustment = budget.getCategory() == null ? 0
+                    : moved.getOrDefault(budget.getCategory().toLowerCase(java.util.Locale.ROOT), 0.0);
+            BigDecimal limit = nz(budget.getLimitAmountExact()).add(BigDecimal.valueOf(adjustment)).max(BigDecimal.ZERO);
             BigDecimal spent = transactions.stream()
                     .filter(t ->
                             t.getAmountExact() != null
@@ -285,14 +299,16 @@ public class BudgetService {
             BigDecimal remaining = limit.subtract(spent);
             boolean exceeded = spent.compareTo(limit) > 0;
 
-            result.add(new BudgetStatusDTO(
+            BudgetStatusDTO status = new BudgetStatusDTO(
                     budget.getId(),
                     budget.getCategory(),
                     money(limit),
                     money(spent),
                     money(remaining),
                     exceeded
-            ));
+            );
+            status.setAdjustment(adjustment);
+            result.add(status);
         }
 
         return result;

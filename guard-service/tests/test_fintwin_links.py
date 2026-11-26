@@ -202,6 +202,27 @@ def test_the_summary_carries_this_months_approved_plan(api, brain, real):
     assert [g["goal"] for g in s["salaryPlan"]["goals"]] == ["Goa trip", "Emergency fund"]
 
 
+def test_the_summary_carries_approved_budget_moves_but_not_goal_ones(api, brain):
+    w = main.store.wallet(42, rules.now().date())
+    w["adjustments"] = {"2026-11": {"Food": 2000, "Shopping": -1200, "goal:Goa trip": -800},
+                        "2026-12": {"Food": -300}}
+    main.store.save_wallet(42, w)
+    s = main.summary(42)
+    assert s["budgetAdjustments"] == {"2026-11": {"Food": 2000, "Shopping": -1200}, "2026-12": {"Food": -300}}
+
+
+def test_fintwins_limit_is_read_without_spend_guards_own_moves(monkeypatch):
+    def get(uid, path, token, params=None):
+        if path == "/budgets":
+            return {"budgets": [{"category": "Food", "limit": 5000, "spent": 4800, "adjustment": 2000}]}
+        return {"goals": []}
+    monkeypatch.setattr(data.backend_api, "get", get)
+    monkeypatch.setattr(data, "persona_mode", lambda: False)
+    data._cache.clear()
+    f = asyncio.run(data.load(7, "token"))
+    assert f.budgets[0].limit == 3000      # the wallet adds its own 2000 back
+
+
 # ── A minute-old copy of budgets and goals ───────────────────────────────────
 
 def test_budgets_and_goals_are_read_once_a_minute_and_after_a_change(monkeypatch, clock):
