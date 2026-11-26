@@ -231,12 +231,52 @@ public class NotificationService {
             ));
         }
 
+        // ── 9. What the agents did or noticed (last 7 days) ──────────────
+        // Watch alerts sort with warnings; the sorting summary with info.
+        notifications.addAll(agentNotifications(user));
+
         notifications.sort((a, b) -> Integer.compare(
                 PRIORITY.getOrDefault(a.getType(), 5),
                 PRIORITY.getOrDefault(b.getType(), 5)
         ));
 
         return notifications.stream().limit(7).toList();
+    }
+
+    /** How long an agent's alert stays in the bell. */
+    static final int AGENT_ALERT_DAYS = 7;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.AgentAlertRepository agentAlerts;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.DismissedAnomalyRepository dismissedAnomalies;
+
+    /**
+     * The agents' recent alerts, newest first. A watch alert disappears once
+     * the user dismisses its anomaly on the Insights page ("that's fine").
+     */
+    List<NotificationDTO> agentNotifications(User user) {
+        if (agentAlerts == null) return List.of();
+        Set<String> dismissed = new HashSet<>();
+        if (dismissedAnomalies != null) {
+            dismissedAnomalies.findByUser(user).forEach(p ->
+                    dismissed.add(p.getAnomalyType() + "|" + (p.getMerchant() == null ? "" : p.getMerchant())));
+        }
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays(AGENT_ALERT_DAYS);
+        List<NotificationDTO> out = new ArrayList<>();
+        boolean sortShown = false;
+        for (com.fintwin.model.AgentAlert a : agentAlerts.findByUserAndCreatedAtAfterOrderByCreatedAtDesc(user, since)) {
+            if (com.fintwin.model.AgentAlert.WATCH.equals(a.getAgent())) {
+                String key = a.getAnomalyType() + "|" + (a.getMerchant() == null ? "" : a.getMerchant());
+                if (!dismissed.contains(key)) out.add(new NotificationDTO("warning", a.getMessage()));
+            } else if (!sortShown) {
+                // Only the latest sorting summary: older ones are covered by it.
+                out.add(new NotificationDTO("info", a.getMessage()));
+                sortShown = true;
+            }
+        }
+        return out.stream().limit(4).toList();
     }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")

@@ -92,6 +92,10 @@ public class InboundEmailService {
     private final String secret;
     private final String domain;
 
+    /** Tells the import agents (sorting, watch) that new rows were saved. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher agentEvents;
+
     @Autowired
     public InboundEmailService(UserRepository users, TransactionRepository transactions,
                                EmailIngestEventRepository events, CategoryService categories,
@@ -277,6 +281,7 @@ public class InboundEmailService {
             case IMPORTED -> {
                 record(user, fromDomain, bank, Status.IMPORTED, null, result.accountRef(), result.transactionId());
                 importer.evictUserCaches(user);
+                if (agentEvents != null) agentEvents.publishEvent(new com.fintwin.agent.TransactionsImported(user.getId(), SOURCE_EMAIL));
             }
         }
     }

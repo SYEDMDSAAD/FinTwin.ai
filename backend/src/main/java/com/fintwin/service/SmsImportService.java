@@ -58,6 +58,10 @@ public class SmsImportService {
     private final UserRepository users;
     private final AlertImporter importer;
 
+    /** Tells the import agents (sorting, watch) that new rows were saved. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher events;
+
     public SmsImportService(UserRepository users, AlertImporter importer) {
         this.users = users;
         this.importer = importer;
@@ -114,7 +118,10 @@ public class SmsImportService {
                 case ON_RECORD -> onRecord++;
             }
         }
-        if (imported > 0) importer.evictUserCaches(user);
+        if (imported > 0) {
+            importer.evictUserCaches(user);
+            if (events != null) events.publishEvent(new com.fintwin.agent.TransactionsImported(user.getId(), SOURCE_SMS));
+        }
         return new Result(imported, duplicates, onRecord, notBank, notTransaction, unknown);
     }
 

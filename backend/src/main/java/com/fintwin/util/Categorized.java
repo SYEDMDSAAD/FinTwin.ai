@@ -37,6 +37,8 @@ public record Categorized(String category, String source) {
     public static final String BANK_KEYWORD = "BANK_KEYWORD";
     /** The local model's suggestion for a payee the rules left in Other, accepted or changed by the user. */
     public static final String LLM = "LLM";
+    /** The sorting agent applied the model's answer on its own (the model was sure); not yet reviewed. */
+    public static final String LLM_AUTO = "LLM_AUTO";
 
     // ── Not predictions ───────────────────────────────────────────────────────
     /** The user picked the category when adding the transaction. */

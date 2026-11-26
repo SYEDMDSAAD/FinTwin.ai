@@ -45,6 +45,10 @@ public class BankConnectionService {
     private final LiabilityRepository      liabilityRepo;
     private final CategoryService          categoryService;
 
+    /** Tells the import agents (sorting, watch) that new rows were saved. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher events;
+
     public BankConnectionService(
             SetuAAService setuAAService,
             BankConnectionRepository bankRepo,
@@ -267,6 +271,7 @@ public class BankConnectionService {
                 // Real bank data arrived — replace synthetic seeded placeholder transactions
                 txnRepo.deleteAll(txnRepo.findSeededByUser(user));
                 txnRepo.saveAll(newTxns);
+                if (events != null) events.publishEvent(new com.fintwin.agent.TransactionsImported(user.getId(), "BANK"));
             }
             log.info("Bank sync: {} new transactions saved for user #{} ({} from cards)",
                      newTxns.size(), user.getId(), cardTxnCount);

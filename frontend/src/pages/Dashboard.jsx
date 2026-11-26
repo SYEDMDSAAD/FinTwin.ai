@@ -81,6 +81,7 @@ import SpendGuardPage from "./SpendGuardPage";
 import BottomNav from "../components/BottomNav";
 import CreditScoreCard from "../components/CreditScoreCard";
 import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
+import AutoSorted from "../components/AutoSorted";
 import SortOther from "../components/SortOther";
 import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
@@ -1723,6 +1724,7 @@ function Dashboard() {
                         />
 
                         {/* Outside the loading swap so it never unmounts and refetches */}
+                        <AutoSorted onChanged={refreshTransactionsQuietly} />
                         <SortOther
                             onSorted={handleCategoryChanged}
                             onBulkChanged={refreshTransactionsQuietly}

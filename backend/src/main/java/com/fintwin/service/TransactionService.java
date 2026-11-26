@@ -47,6 +47,10 @@ public class TransactionService {
     private static final Logger log =
             LoggerFactory.getLogger(TransactionService.class);
 
+    /** Tells the import agents (sorting, watch) that new rows were saved. */
+    @Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher events;
+
     @Autowired
     private TransactionRepository repository;
 
@@ -594,6 +598,7 @@ public class TransactionService {
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
             applyPaymentPatterns(user);
+            if (events != null) events.publishEvent(new com.fintwin.agent.TransactionsImported(user.getId(), "STATEMENT"));
 
             // The first card statement makes bank-side bill payments already on
             // record duplicates of these purchases — restamp them, as the AA
@@ -786,7 +791,7 @@ public class TransactionService {
 
     private static final Set<String> UNSORTED = Set.of("other", "others", "uncategorized", "uncategorised");
 
-    private static boolean unsorted(Transaction t) {
+    public static boolean unsorted(Transaction t) {
         return t.getCategory() == null || UNSORTED.contains(t.getCategory().trim().toLowerCase());
     }
 
@@ -867,6 +872,106 @@ public class TransactionService {
                     return m;
                 })
                 .toList();
+    }
+
+    /**
+     * Payees the sorting agent placed on its own and the user hasn't looked
+     * at yet, biggest spend first. Changing one goes through the usual
+     * category edit (applyToSimilar), which also teaches a rule.
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    public List<Map<String, Object>> autoSortedPayees(int limit) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        Map<String, Object[]> groups = new LinkedHashMap<>();   // key → {name, count, total, sampleId, merchant, category}
+        for (Transaction t : repository.findByUser(user)) {
+            if (!com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource()) || t.getCategoryReview() != null) continue;
+            if (t.getAmount() == null || t.getAmount() >= 0) continue;
+            String key = com.fintwin.agent.SortingAgent.payeeKey(categoryService, t.getMerchant()) + "|" + t.getCategory();
+            Object[] g = groups.computeIfAbsent(key, k -> new Object[] {
+                    com.fintwin.util.MerchantCategorizer.payeeOf(t.getMerchant() == null ? "Unknown" : t.getMerchant()),
+                    0, 0.0, t.getId(), t.getMerchant(), t.getCategory()});
+            g[1] = (int) g[1] + 1;
+            g[2] = (double) g[2] - t.getAmount();
+        }
+        return groups.values().stream()
+                .sorted((a, b) -> Double.compare((double) b[2], (double) a[2]))
+                .limit(Math.max(1, Math.min(limit, 100)))
+                .map(g -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("payee", g[0]);
+                    m.put("count", g[1]);
+                    m.put("total", Math.round((double) g[2] * 100) / 100.0);
+                    m.put("sampleId", g[3]);
+                    m.put("merchant", g[4]);
+                    m.put("category", g[5]);
+                    return m;
+                })
+                .toList();
+    }
+
+    /**
+     * "These are right": marks the agent's choice for these payees as
+     * confirmed and remembers each as a rule, so they no longer need review.
+     * Returns how many transactions were confirmed.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public int confirmAutoSorted(List<String> merchants) {
+        return reviewAutoSorted(merchants, null);
+    }
+
+    /**
+     * The agent got this payee wrong: move every payment it auto-sorted for
+     * them to {@code category}, record the correction (a training label) and
+     * remember the right category for next time.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public int correctAutoSorted(String merchant, String category) {
+        String c = category == null ? "" : category.trim();
+        if (c.isEmpty() || c.length() > 50) throw new IllegalArgumentException("Choose a category");
+        if (merchant == null || merchant.isBlank()) throw new IllegalArgumentException("Which payee?");
+        return reviewAutoSorted(List.of(merchant), c);
+    }
+
+    /** Confirms (chosen = null) or corrects the agent's rows for these payees; returns rows changed. */
+    private int reviewAutoSorted(List<String> merchants, String chosen) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        if (merchants == null || merchants.isEmpty()) return 0;
+        Set<String> keys = new HashSet<>();
+        for (String m : merchants.stream().limit(100).toList())
+            if (m != null && !m.isBlank()) keys.add(com.fintwin.agent.SortingAgent.payeeKey(categoryService, m));
+
+        List<Transaction> changed = new ArrayList<>();
+        Map<String, String> rules = new LinkedHashMap<>();
+        for (Transaction t : repository.findByUser(user)) {
+            if (!com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource()) || t.getCategoryReview() != null) continue;
+            if (!keys.contains(com.fintwin.agent.SortingAgent.payeeKey(categoryService, t.getMerchant()))) continue;
+            String category = chosen == null ? t.getCategory() : chosen;
+            t.recordReview(category, false);   // same as predicted → CONFIRMED, else CORRECTED
+            changed.add(t);
+            // The payee's name, not this row's text with its bank reference, so
+            // the rule (a substring match) also catches the next payment.
+            String payee = com.fintwin.util.MerchantCategorizer.payeeOf(t.getMerchant());
+            rules.putIfAbsent(payee != null && payee.trim().length() >= 5 ? payee : t.getMerchant(), category);
+        }
+        if (!changed.isEmpty()) repository.saveAll(changed);
+        rules.forEach((merchant, category) -> categoryService.rememberRule(user, merchant, category));
+        return changed.size();
     }
 
     /**

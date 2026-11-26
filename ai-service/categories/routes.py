@@ -13,9 +13,9 @@ class SuggestRequest(BaseModel):
 
 @router.post("/categories/suggest")
 async def suggest_categories(req: SuggestRequest):
-    """A likely category (or null) for each payee name, for the user to confirm."""
+    """A likely category (or null) for each payee name, and whether the model is sure."""
     if not req.payees:
-        return {"suggestions": {}, "complete": True}
+        return {"suggestions": {}, "sure": {}, "complete": True}
     try:
         return await run_in_threadpool(suggest, req.payees)
     except Exception:
