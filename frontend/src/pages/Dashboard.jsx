@@ -90,6 +90,7 @@ import AnalyticsPage from "./AnalyticsPage";
 import TabHeader from "../components/TabHeader";
 import HomeOverview from "../components/HomeOverview";
 import { normaliseSection, rememberSection } from "../constants/navigation";
+import { startSmsAutoSync } from "../services/smsSync";
 
 function Dashboard() {
 
@@ -1057,6 +1058,17 @@ function Dashboard() {
 
             fetchLiabilities();
         };
+
+    // Android app: bank SMS that arrived since the last look become
+    // transactions, on opening and on coming back to the app
+    const refreshRef = useRef(refreshDashboard);
+    refreshRef.current = refreshDashboard;
+    useEffect(() => {
+        const stop = startSmsAutoSync();
+        const onChange = () => refreshRef.current();
+        window.addEventListener("fintwin:transactions-changed", onChange);
+        return () => { stop(); window.removeEventListener("fintwin:transactions-changed", onChange); };
+    }, []);
 
     // =========================
     // Add Expense

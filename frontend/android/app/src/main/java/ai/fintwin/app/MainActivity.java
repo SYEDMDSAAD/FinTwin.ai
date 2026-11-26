@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(SmsReaderPlugin.class);
         super.onCreate(savedInstanceState);
         bridge.setWebViewClient(new BridgeWebViewClient(bridge) {
             @Override

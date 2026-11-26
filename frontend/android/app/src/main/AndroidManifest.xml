@@ -41,4 +41,6 @@
     <!-- Spend Guard scans payment QR codes; asked only when the scanner opens -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Bank SMS become transactions; asked only when the person turns it on -->
+    <uses-permission android:name="android.permission.READ_SMS" />
 </manifest>

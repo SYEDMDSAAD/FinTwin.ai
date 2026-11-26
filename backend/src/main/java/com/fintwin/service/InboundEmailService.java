@@ -4,14 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fintwin.model.EmailIngestEvent;
 import com.fintwin.model.EmailIngestEvent.Status;
-import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.repository.EmailIngestEventRepository;
 import com.fintwin.repository.TransactionRepository;
 import com.fintwin.repository.UserRepository;
 import com.fintwin.util.BankAlertParser;
 import com.fintwin.util.BankSenders;
-import com.fintwin.util.TransactionMath;
 import jakarta.mail.Address;
 import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
@@ -23,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +37,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -89,7 +85,7 @@ public class InboundEmailService {
     private final EmailIngestEventRepository events;
     private final CategoryService categories;
     private final DkimCheck dkim;
-    private final CacheManager caches;
+    private final AlertImporter importer;
     private final Clock clock;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -113,7 +109,7 @@ public class InboundEmailService {
         this.events = events;
         this.categories = categories;
         this.dkim = dkim;
-        this.caches = caches;
+        this.importer = new AlertImporter(transactions, categories, caches);
         this.secret = secret == null ? "" : secret;
         this.domain = domain == null ? "" : domain.toLowerCase(Locale.ROOT).trim();
         this.clock = clock;
@@ -271,69 +267,17 @@ public class InboundEmailService {
 
     private void importAlert(User user, MimeMessage message, byte[] raw, String fromDomain,
                              String bank, BankAlertParser.Alert alert) {
-        String accountRef = alert.last4() == null ? bank : bank + " ··" + alert.last4();
         String externalId = EXTERNAL_ID_PREFIX + digest(messageId(message, raw));
-
-        if (transactions.findByUserAndExternalId(user, externalId).isPresent()) {
-            record(user, fromDomain, bank, Status.DUPLICATE, "This alert was already imported", accountRef, null);
-            return;
-        }
-
-        // The same money may already be on record from a statement, a bank
-        // link, or a manual entry — the alert must not count it twice
-        List<Transaction> nearby = transactions.findSince(user.getId(), alert.date().minusDays(2));
-        Optional<Transaction> already = nearby.stream()
-                .filter(t -> t.getAmount() != null && t.getDate() != null)
-                .filter(t -> Math.abs(t.getAmount() - alert.amount()) < 0.005)
-                .filter(t -> Math.abs(t.getDate().toEpochDay() - alert.date().toEpochDay()) <= 1)
-                .filter(t -> t.getAccountRef() == null || t.getAccountRef().equals(accountRef))
-                .findFirst();
-        if (already.isPresent()) {
-            record(user, fromDomain, bank, Status.DUPLICATE, "Already on record from another source",
-                    accountRef, already.get().getId());
-            return;
-        }
-
-        String merchant = alert.counterparty() != null ? alert.counterparty()
-                : alert.card() ? bank + " card " + (alert.amount() < 0 ? "spend" : "credit")
-                : describeChannel(alert);
-        boolean cardDataPresent = alert.card() || transactions.countByUserAndSource(user, "CARD") > 0;
-        String forced = TransactionMath.forcedImportCategory(merchant, alert.amount(), alert.card(), cardDataPresent);
-        com.fintwin.util.Categorized category = forced != null
-                ? new com.fintwin.util.Categorized(forced, com.fintwin.util.Categorized.FORCED)
-                : categories.classify(merchant, categories.learnedRulesFor(user), alert.amount());
-
-        Transaction t = new Transaction();
-        t.setUser(user);
-        t.setDate(alert.date());
-        t.setMerchant(merchant);
-        t.setAmount(alert.amount());
-        t.applyPrediction(category);
-        t.setSource(alert.card() ? "CARD" : SOURCE_EMAIL);
-        t.setExternalId(externalId);
-        t.setAccountRef(accountRef);
-        Transaction saved = transactions.save(t);
-
-        if (alert.card()) {
-            // First card purchases on record: bank-side bill payments already
-            // imported now duplicate them, exactly as with a card statement
-            List<Transaction> restamped = TransactionMath.restampCardBillPayments(transactions.findByUser(user));
-            if (!restamped.isEmpty()) transactions.saveAll(restamped);
-        }
-
-        record(user, fromDomain, bank, Status.IMPORTED, null, accountRef, saved.getId());
-        evictUserCaches(user);
-    }
-
-    private static String describeChannel(BankAlertParser.Alert alert) {
-        String dir = alert.amount() < 0 ? "payment" : "credit";
-        return alert.channel() == null ? "Bank " + dir : alert.channel() + " " + dir;
-    }
-
-    private void evictUserCaches(User user) {
-        for (String name : List.of("user-insights", "user-score")) {
-            Cache cache = caches.getCache(name);
-            if (cache != null && user.getEmail() != null) cache.evict(user.getEmail());
+        AlertImporter.Result result = importer.importAlert(user, bank, alert, externalId, SOURCE_EMAIL);
+        switch (result.status()) {
+            case DUPLICATE -> record(user, fromDomain, bank, Status.DUPLICATE,
+                    "This alert was already imported", result.accountRef(), null);
+            case ON_RECORD -> record(user, fromDomain, bank, Status.DUPLICATE,
+                    "Already on record from another source", result.accountRef(), result.transactionId());
+            case IMPORTED -> {
+                record(user, fromDomain, bank, Status.IMPORTED, null, result.accountRef(), result.transactionId());
+                importer.evictUserCaches(user);
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { parseStatement, parseGrid, guessMapping, buildImportRows, summarize, guessAccountLabel } from "../services/statementParser";
 import DataCoverage from "../components/DataCoverage";
 import EmailAlertsSetup from "../components/EmailAlertsSetup";
+import SmsSyncCard from "../components/SmsSyncCard";
 
 const STEP_LABELS = ["Upload File", "Map Columns", "Preview & Import"];
 
@@ -215,6 +216,7 @@ export default function ImportsPage({ onImported, onViewTransactions, compact = 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 720 }}>
       {!compact && <>
+      <SmsSyncCard onImported={() => setCoverageKey(k => k + 1)} />
       <DataCoverage refreshKey={coverageKey} />
       </>}
 
