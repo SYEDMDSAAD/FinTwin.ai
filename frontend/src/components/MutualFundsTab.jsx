@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Star, RefreshCw, Bookmark } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { watchlistApi } from "../services/trackedHoldings";
 
 const CAT_COLORS = {
   "Large Cap": "var(--info)", "Mid Cap": "var(--accent)", "Small Cap": "var(--warn)",
@@ -7,9 +9,6 @@ const CAT_COLORS = {
   "Index": "var(--info)", "Flexi Cap": "#fb923c",
 };
 
-const WATCHLIST_KEY = "fintwin-mf-watchlist";
-function getWatchlist() { try { return JSON.parse(localStorage.getItem(WATCHLIST_KEY)) || []; } catch { return []; } }
-function saveWatchlist(w) { localStorage.setItem(WATCHLIST_KEY, JSON.stringify(w)); }
 
 function categoryFromName(name = "") {
   const n = name.toLowerCase();
@@ -29,7 +28,7 @@ export default function MutualFundsTab() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [watchlist, setWatchlist] = useState(getWatchlist);
+  const [watchlist, setWatchlist] = useState([]);
   const [navCache, setNavCache] = useState({});
   const debRef = useRef(null);
   // Ref, not navCache — the closure over navCache is stale by the time a
@@ -92,14 +91,36 @@ export default function MutualFundsTab() {
     debRef.current = setTimeout(() => search(query), 400);
   }, [query]);
 
-  const toggleWatch = (fund) => {
-    const w = getWatchlist();
-    const exists = w.find(f => f.schemeCode === fund.schemeCode);
-    const next = exists ? w.filter(f => f.schemeCode !== fund.schemeCode) : [...w, fund];
-    setWatchlist(next); saveWatchlist(next);
+  // Scheme codes come back from the account as strings and from mfapi as
+  // numbers, so compare them as strings.
+  const sameCode = (a, b) => String(a) === String(b);
+
+  useEffect(() => {
+    let cancelled = false;
+    watchlistApi.list().then((list) => {
+      if (cancelled) return;
+      setWatchlist(list);
+      fetchNAVs(list.map(f => f.schemeCode));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // fetchNAVs only reads refs and setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleWatch = async (fund) => {
+    const before = watchlist;
+    const exists = watchlist.some(f => sameCode(f.schemeCode, fund.schemeCode));
+    setWatchlist(exists ? watchlist.filter(f => !sameCode(f.schemeCode, fund.schemeCode)) : [...watchlist, fund]);
+    try {
+      if (exists) await watchlistApi.remove(fund.schemeCode);
+      else await watchlistApi.add(fund);
+    } catch {
+      setWatchlist(before);
+      toast.error("Couldn't update your watchlist.");
+    }
   };
 
-  const isWatched = (code) => watchlist.some(f => f.schemeCode === code);
+  const isWatched = (code) => watchlist.some(f => sameCode(f.schemeCode, code));
 
   const display = query.trim() ? results : (watchlist.length > 0 ? watchlist : []);
   const showingWatchlist = !query.trim() && watchlist.length > 0;
@@ -124,7 +145,7 @@ export default function MutualFundsTab() {
 
       {showingWatchlist && (
         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 12 }}>
-          WATCHLIST ({watchlist.length})
+          Watchlist ({watchlist.length})
         </div>
       )}
 

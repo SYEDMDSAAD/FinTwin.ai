@@ -1,13 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { sipApi } from "../services/trackedHoldings";
 import { parseGoalText } from "../utils/goalText";
 import { toast } from "react-hot-toast";
 import { Target, Pencil, Trash2, RefreshCw, Link, Trophy, ChevronDown, Plus, Check } from "lucide-react";
 import AIPlanCard from "./AIPlanCard";
 import { Button, Badge, Progress, SectionHeader, EmptyState, cx } from "./ui";
 
-const SIP_LINKS_KEY = "fintwin-goal-sip-links";
-function getSIPLinks() { try { return JSON.parse(localStorage.getItem(SIP_LINKS_KEY)) || {}; } catch { return {}; } }
-function saveSIPLinks(m) { localStorage.setItem(SIP_LINKS_KEY, JSON.stringify(m)); }
 
 // Starting points for the create form — one tap fills title/amount/duration,
 // which is the slowest part of creating a goal from scratch.
@@ -81,7 +79,8 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingGoalId, setDeletingGoalId] = useState(null);
 
-  const [sipLinks, setSIPLinks] = useState(getSIPLinks);
+  // goalId -> the SIP (stored in the account) that funds that goal
+  const [sipLinks, setSIPLinks] = useState({});
   const [sipLinkOpen, setSIPLinkOpen] = useState(null);
   const [sipLinkForm, setSIPLinkForm] = useState({ fundName: "", monthlyAmount: "" });
 
@@ -97,15 +96,42 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
     });
   };
 
-  const saveSIPLink = (goalId) => {
-    if (!sipLinkForm.monthlyAmount) return;
-    const next = { ...sipLinks, [goalId]: { ...sipLinkForm } };
-    setSIPLinks(next); saveSIPLinks(next); setSIPLinkOpen(null);
+  useEffect(() => {
+    let cancelled = false;
+    sipApi.list().then((list) => {
+      if (cancelled) return;
+      const byGoal = {};
+      list.forEach((s) => { if (s.goalId != null) byGoal[s.goalId] = { ...s, monthlyAmount: s.amount }; });
+      setSIPLinks(byGoal);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const saveSIPLink = async (goalId) => {
+    const amount = parseFloat(sipLinkForm.monthlyAmount);
+    if (!(amount > 0)) return;
+    try {
+      const sip = await sipApi.create({ fundName: sipLinkForm.fundName, amount, frequency: "Monthly", goalId });
+      setSIPLinks((prev) => ({ ...prev, [goalId]: { ...sip, monthlyAmount: sip.amount } }));
+      setSIPLinkOpen(null);
+    } catch {
+      toast.error("Couldn't link this SIP. Try again.");
+    }
   };
-  const removeSIPLink = (goalId) => {
+  // Unlinking keeps the SIP in the SIP tracker; it just stops funding this goal.
+  const removeSIPLink = async (goalId) => {
+    const sip = sipLinks[goalId];
+    if (!sip) return;
+    const before = sipLinks;
     const next = { ...sipLinks };
     delete next[goalId];
-    setSIPLinks(next); saveSIPLinks(next);
+    setSIPLinks(next);
+    try {
+      await sipApi.update(sip.id, { ...sip, goalId: null });
+    } catch {
+      setSIPLinks(before);
+      toast.error("Couldn't remove the link.");
+    }
   };
 
   const activeGoals = useMemo(() => (goals || []).filter(g => !g.completed), [goals]);
@@ -341,7 +367,7 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                             <p className="text-small text-ink-3">Linked SIP</p>
                             <p className="text-body text-ink truncate">{linked.fundName || "SIP"}</p>
                           </div>
-                          <Button size="sm" variant="ghost" onClick={() => removeSIPLink(goal.id)} className="-mr-2">Remove</Button>
+                          <Button size="sm" variant="ghost" onClick={() => removeSIPLink(goal.id)} className="-mr-2">Unlink</Button>
                         </div>
                         <p className="mt-1 text-small text-ink-2 num">
                           {inr(sipAmt)} a month · {inr(sipTotal)} by the end · covers {sipPct}%

@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { Plus, X, TrendingUp } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { apiUrl } from "../services/apiOrigin";
+import { usHoldingApi } from "../services/trackedHoldings";
 
 const INDICES = [
   { label: "S&P 500",   symbol: "^GSPC", color: "var(--good)" },
   { label: "NASDAQ",    symbol: "^IXIC",  color: "var(--info)" },
   { label: "Dow Jones", symbol: "^DJI",   color: "var(--accent)" },
 ];
-
-const STORAGE_KEY = "fintwin-us-holdings";
-function getHoldings() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
-function saveHoldings(h) { localStorage.setItem(STORAGE_KEY, JSON.stringify(h)); }
 
 const EMPTY = { name: "", ticker: "", units: "", buyPrice: "", buyDate: "" };
 
@@ -62,13 +60,15 @@ function IndexCard({ idx }) {
 }
 
 export default function USStocksTab() {
-  const [holdings, setHoldings] = useState(getHoldings);
+  const [holdings, setHoldings] = useState([]);
+  // Live prices by ticker; not stored, fetched each visit.
+  const [prices, setPrices] = useState({});
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Live-price the holdings that have a ticker; without this, currentPrice
-  // stays frozen at buyPrice and P&L reads 0 forever.
+  // Without live prices P&L reads 0 forever, so price every ticker we hold.
   const refreshHoldingPrices = async (list) => {
     const tickers = [...new Set(list.map(h => h.ticker).filter(Boolean))];
     if (!tickers.length) return;
@@ -79,41 +79,53 @@ export default function USStocksTab() {
         { signal: AbortSignal.timeout(10000) }
       );
       const quotes = await res.json();
-      const bySymbol = Object.fromEntries(
-        (Array.isArray(quotes) ? quotes : []).map(q => [q.symbol, q])
-      );
-      const next = list.map(h => {
-        const q = h.ticker ? bySymbol[h.ticker] : null;
-        return q?.price != null ? { ...h, currentPrice: q.price } : h;
-      });
-      setHoldings(next); saveHoldings(next);
+      const next = {};
+      (Array.isArray(quotes) ? quotes : []).forEach(q => { if (q?.price != null) next[q.symbol] = q.price; });
+      setPrices(p => ({ ...p, ...next }));
     } catch {} finally {
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { refreshHoldingPrices(getHoldings()); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    usHoldingApi.list().then((list) => {
+      if (cancelled) return;
+      setHoldings(list);
+      refreshHoldingPrices(list);
+    }).catch(() => { if (!cancelled) toast.error("Couldn't load your US holdings."); });
+    return () => { cancelled = true; };
+  }, []);
 
-  const handleSave = () => {
-    if (!form.name.trim() || !form.buyPrice) return;
-    const h = {
-      id: Date.now().toString(),
-      ...form,
-      units: parseFloat(form.units) || 0,
-      buyPrice: parseFloat(form.buyPrice) || 0,
-      currentPrice: parseFloat(form.buyPrice) || 0,
-    };
-    const next = [...holdings, h];
-    setHoldings(next); saveHoldings(next); setShowAdd(false); setForm(EMPTY);
-    refreshHoldingPrices(next);
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.buyPrice || saving) return;
+    setSaving(true);
+    try {
+      const made = await usHoldingApi.create({
+        name: form.name, ticker: form.ticker || null,
+        units: parseFloat(form.units) || 0, buyPrice: parseFloat(form.buyPrice) || 0,
+        buyDate: form.buyDate || null,
+      });
+      const next = [...holdings, made];
+      setHoldings(next); setShowAdd(false); setForm(EMPTY);
+      refreshHoldingPrices([made]);
+    } catch {
+      toast.error("Couldn't save this holding. Check the ticker and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
-  const handleDelete = (id) => {
-    const next = holdings.filter(h => h.id !== id);
-    setHoldings(next); saveHoldings(next);
+  const handleDelete = async (id) => {
+    const before = holdings;
+    setHoldings(holdings.filter(h => h.id !== id));
+    try { await usHoldingApi.remove(id); } catch {
+      setHoldings(before); toast.error("Couldn't remove this holding.");
+    }
   };
 
+  const priceOf = (h) => (h.ticker && prices[h.ticker] != null ? prices[h.ticker] : h.buyPrice);
   const totalInvested = holdings.reduce((s,h) => s + (h.units * h.buyPrice), 0);
-  const totalCurrent  = holdings.reduce((s,h) => s + (h.units * (h.currentPrice || h.buyPrice)), 0);
+  const totalCurrent  = holdings.reduce((s,h) => s + (h.units * priceOf(h)), 0);
   const totalPnl = totalCurrent - totalInvested;
 
   return (
@@ -129,7 +141,7 @@ export default function USStocksTab() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)" }}>US stocks</div>
-          <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>Saved on this device only</div>
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>Prices in US dollars</div>
           {holdings.length > 0 && (
             <div style={{ display: "flex", gap: 16 }}>
               <div>
@@ -193,7 +205,7 @@ export default function USStocksTab() {
             <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-card)", background: "none", color: "var(--text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button
               onClick={handleSave}
-              disabled={!form.name.trim() || !form.buyPrice}
+              disabled={!form.name.trim() || !form.buyPrice || saving}
               style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "var(--good-soft)", color: "var(--good)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.name.trim() && form.buyPrice ? 1 : 0.4 }}
             >
               Add holding
@@ -222,7 +234,7 @@ export default function USStocksTab() {
             <tbody>
               {holdings.map(h => {
                 const invested = h.units * h.buyPrice;
-                const current  = h.units * (h.currentPrice || h.buyPrice);
+                const current  = h.units * priceOf(h);
                 const pnl = current - invested;
                 const pct = invested ? (pnl / invested * 100).toFixed(1) : 0;
                 const pos = pnl >= 0;
@@ -234,7 +246,7 @@ export default function USStocksTab() {
                     </td>
                     <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--text-secondary)" }}>{h.units}</td>
                     <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--text-secondary)" }}>${h.buyPrice}</td>
-                    <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--info)" }}>${(h.currentPrice || h.buyPrice)?.toFixed(2)}</td>
+                    <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--info)" }}>${Number(priceOf(h)).toFixed(2)}</td>
                     <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textAlign: "right" }}>${current.toFixed(2)}</td>
                     <td style={{ padding: "11px 12px", textAlign: "right" }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: pos ? "var(--good)" : "var(--bad)" }}>{pos?"+":""}${Math.abs(pnl).toFixed(2)}</div>
