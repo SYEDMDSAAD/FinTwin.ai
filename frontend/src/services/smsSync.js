@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import API from "./api";
 import { storedUserIsDemo } from "../utils/demoGuard";
+import { SMS_TEST_BUILD, sampleMessages } from "./smsSamples";
 
 /* Bank SMS → transactions, Android app only.
 
@@ -51,9 +52,19 @@ export async function requestSmsPermission() {
 let running = null;
 
 /** Reads new bank SMS and imports them; resolves to the summed counts. One sync at a time. */
-export function syncSms({ now = Date.now() } = {}) {
-    if (!running) running = doSync(now).finally(() => { running = null; });
+export function syncSms({ now = Date.now(), samples = false } = {}) {
+    if (!running) running = (samples && SMS_TEST_BUILD ? importSamples(now) : doSync(now)).finally(() => { running = null; });
     return running;
+}
+
+/** Test builds only: send made-up messages through the same import, without touching the inbox. */
+async function importSamples(now) {
+    if (!localStorage.getItem("token") || storedUserIsDemo()) return null;
+    const messages = sampleMessages(now);
+    const { data } = await API.post("/sms/import", { messages });
+    const total = { ...data, read: messages.length };
+    if (total.imported > 0) window.dispatchEvent(new CustomEvent("fintwin:transactions-changed"));
+    return total;
 }
 
 async function doSync(now) {
@@ -64,11 +75,12 @@ async function doSync(now) {
     const since = Number(localStorage.getItem(key)) || now - FIRST_SYNC_DAYS * DAY;
     const { messages = [] } = await SmsReader.inbox({ since, limit: 5000 });
 
-    const total = { imported: 0, duplicates: 0, onRecord: 0, notBank: 0, notTransaction: 0, read: messages.length };
+    const total = { imported: 0, duplicates: 0, onRecord: 0, notBank: 0, notTransaction: 0, read: messages.length, unknownSenders: [] };
     for (let i = 0; i < messages.length; i += BATCH) {
         const batch = messages.slice(i, i + BATCH);
         const { data } = await API.post("/sms/import", { messages: batch });
         for (const k of ["imported", "duplicates", "onRecord", "notBank", "notTransaction"]) total[k] += data?.[k] || 0;
+        for (const code of data?.unknownSenders || []) if (!total.unknownSenders.includes(code)) total.unknownSenders.push(code);
         // Saved after every batch, so a failure part-way resumes where it stopped
         localStorage.setItem(key, String(batch[batch.length - 1].receivedAt));
     }

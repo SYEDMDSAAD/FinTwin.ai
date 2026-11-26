@@ -6,6 +6,7 @@ import { storedUserIsDemo } from "../utils/demoGuard";
 import {
     FIRST_SYNC_DAYS, lastSync, requestSmsPermission, smsAvailable, smsPermission, syncSms,
 } from "../services/smsSync";
+import { SMS_TEST_BUILD } from "../services/smsSamples";
 
 /* Android app only: turn bank SMS into transactions. */
 
@@ -15,7 +16,11 @@ function summary(r) {
     const parts = [`${r.imported} added`];
     const had = r.duplicates + r.onRecord;
     if (had) parts.push(`${had} already on record`);
-    return parts.join(", ") + ".";
+    const skipped = (r.notTransaction || 0) + (r.notBank || 0);
+    if (skipped) parts.push(`${skipped} skipped`);
+    let text = parts.join(", ") + ".";
+    if (r.unknownSenders?.length) text += ` Unrecognised senders: ${r.unknownSenders.join(", ")}.`;
+    return text;
 }
 
 function when(ms) {
@@ -36,10 +41,10 @@ export default function SmsSyncCard({ onImported }) {
 
     if (!smsAvailable()) return null;
 
-    const run = async () => {
+    const run = async (opts) => {
         setBusy(true);
         try {
-            const r = await syncSms();
+            const r = await syncSms(opts);
             if (r) {
                 setResult(r);
                 setCheckedAt(lastSync());
@@ -81,7 +86,7 @@ export default function SmsSyncCard({ onImported }) {
                         <p className="mt-3 text-small text-ink-3">Not available in the demo. Sign up to use your own messages.</p>
                     ) : on ? (
                         <div className="mt-3 flex flex-wrap items-center gap-3">
-                            <Button variant="secondary" size="sm" icon={RefreshCw} onClick={run} disabled={busy}>
+                            <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => run()} disabled={busy}>
                                 {busy ? "Checking…" : "Check now"}
                             </Button>
                             <span className="text-caption text-ink-3" role="status">
@@ -96,6 +101,15 @@ export default function SmsSyncCard({ onImported }) {
                         <Button className="mt-3" size="sm" onClick={turnOn} disabled={permission === null}>
                             Allow and import
                         </Button>
+                    )}
+
+                    {SMS_TEST_BUILD && !demo && (
+                        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+                            <Button variant="secondary" size="sm" onClick={() => run({ samples: true })} disabled={busy}>
+                                Send test messages
+                            </Button>
+                            {!on && <span className="text-caption text-ink-3" role="status">{busy ? "Sending…" : summary(result)}</span>}
+                        </div>
                     )}
                 </div>
             </div>
