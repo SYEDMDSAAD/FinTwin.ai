@@ -30,8 +30,8 @@ public class PlanDraftService {
 
     public record ApprovedLine(String category, Double limit) {}
 
-    /** What applying changed. */
-    public record Applied(int created, int updated, int unchanged) {}
+    /** What applying changed, and when the new budgets start counting. */
+    public record Applied(int created, int updated, int unchanged, LocalDate startsOn) {}
 
     private final UserRepository users;
     private final TransactionRepository transactions;
@@ -65,9 +65,13 @@ public class PlanDraftService {
     @PreAuthorize("hasAuthority('WRITE_OWN_BUDGETS')")
     @Transactional
     public Applied apply(List<ApprovedLine> lines) {
+        return applyFor(currentUser(), lines, LocalDate.now(INDIA));
+    }
+
+    Applied applyFor(User user, List<ApprovedLine> lines, LocalDate today) {
         if (lines == null || lines.isEmpty()) throw new IllegalArgumentException("Nothing to save");
         if (lines.size() > MAX_LINES) throw new IllegalArgumentException("Too many budgets at once");
-        User user = currentUser();
+        LocalDate starts = PlanDraftMath.planStarts(today);
 
         Map<String, Budget> existing = new HashMap<>();
         for (Budget b : budgets.findByUser(user)) {
@@ -91,6 +95,7 @@ public class PlanDraftService {
                 b = new Budget();
                 b.setCategory(Character.toUpperCase(category.charAt(0)) + category.substring(1));
                 b.setUser(user);
+                if (starts.isAfter(today)) b.setStartsOn(starts);
                 created++;
             } else if (b.getLimitAmount() != null && Math.abs(b.getLimitAmount() - limit) < 0.005) {
                 unchanged++;
@@ -105,7 +110,7 @@ public class PlanDraftService {
             budgets.saveAll(toSave);
             profiles.saveScoreSnapshot(user);
         }
-        return new Applied(created, updated, unchanged);
+        return new Applied(created, updated, unchanged, starts.isAfter(today) && created > 0 ? starts : null);
     }
 
     private User currentUser() {

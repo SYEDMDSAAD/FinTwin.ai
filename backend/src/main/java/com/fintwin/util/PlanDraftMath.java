@@ -36,6 +36,27 @@ public final class PlanDraftMath {
         return ESSENTIAL.stream().anyMatch(e -> e.equalsIgnoreCase(category));
     }
 
+    /** Paid once a month at a set amount: spending all of it is "paid", not a warning. */
+    static final Set<String> FIXED_COST = Set.of(
+            "Rent", "Housing", "Bills", "Utilities", "EMI", "Loan", "Insurance", "Education");
+
+    public static boolean isFixedCost(String category) {
+        return category != null && FIXED_COST.stream().anyMatch(e -> e.equalsIgnoreCase(category));
+    }
+
+    /** With fewer days than this left in the month, new budgets start on the 1st. */
+    static final int LATE_IN_MONTH_DAYS = 10;
+
+    /**
+     * When budgets approved today start counting: today, or the 1st of next
+     * month when the month is nearly over, so spending from before the plan
+     * existed doesn't open it "over budget".
+     */
+    public static LocalDate planStarts(LocalDate today) {
+        int left = today.lengthOfMonth() - today.getDayOfMonth();
+        return left < LATE_IN_MONTH_DAYS ? today.plusMonths(1).withDayOfMonth(1) : today;
+    }
+
     /** Not spending: money moved, saved or repaid elsewhere. */
     static final Set<String> NOT_SPENDING = Set.of(
             "Transfer", "Investments", "Savings", TransactionMath.CARD_PAYMENT_CATEGORY, "Income", "Salary");
@@ -61,9 +82,10 @@ public final class PlanDraftMath {
     /**
      * @param monthsUsed  complete months the figures come from (0 = not enough data yet)
      * @param plannedShareOfIncome suggested budgets as a % of the salary, or null without one
+     * @param newBudgetsStart when budgets approved today start counting ({@link #planStarts})
      */
     public record Draft(Salary salary, List<BudgetLine> budgets, int monthsUsed,
-                        double typicalMonthlySpend, Integer plannedShareOfIncome) {}
+                        double typicalMonthlySpend, Integer plannedShareOfIncome, LocalDate newBudgetsStart) {}
 
     public static Draft draft(List<Transaction> transactions, Map<String, Double> currentLimits, LocalDate today) {
         List<Transaction> usable = transactions.stream()
@@ -109,7 +131,7 @@ public final class PlanDraftMath {
             double planned = lines.stream().mapToDouble(BudgetLine::suggested).sum();
             share = (int) Math.round(planned / salary.typicalAmount() * 100);
         }
-        return new Draft(salary, lines, months.size(), round2(typicalTotal), share);
+        return new Draft(salary, lines, months.size(), round2(typicalTotal), share, planStarts(today));
     }
 
     private static String reason(double typical, boolean essential, int months) {

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.time.YearMonth;
 import java.util.*;
 
 @Service
@@ -65,13 +66,18 @@ public class NotificationService {
         double monthlyIncome = income / 3.0;
 
         // ── 1. Budget alerts (specific numbers) ──────────────────────────
+        YearMonth thisMonth = YearMonth.now(java.time.ZoneId.of("Asia/Kolkata"));
         for (Budget budget : budgets) {
             if (budget.getLimitAmount() == null || budget.getLimitAmount() <= 0) continue;
+            if (!budget.countsIn(thisMonth)) continue;
 
+            // A budget is monthly: this month's spending only (it used to add up three months)
             double spent = transactions.stream()
+                    .filter(t -> t.getDate() != null && YearMonth.from(t.getDate()).equals(thisMonth))
                     .filter(t -> t.getCategory() != null
                             && t.getCategory().equalsIgnoreCase(budget.getCategory())
-                            && t.getAmount() != null && t.getAmount() < 0)
+                            && t.getAmount() != null && t.getAmount() < 0
+                            && !com.fintwin.util.TransactionMath.isSelfTransfer(t))
                     .mapToDouble(t -> Math.abs(t.getAmount())).sum();
 
             double pct = (spent / budget.getLimitAmount()) * 100;

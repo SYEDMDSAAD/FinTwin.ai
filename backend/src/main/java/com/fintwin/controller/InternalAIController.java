@@ -209,7 +209,7 @@ public class InternalAIController {
         if (user == null) return ResponseEntity.notFound().build();
 
         List<Map<String, Object>> budgets = new ArrayList<>();
-        budgetService.getBudgetStatusFor(user).forEach(b -> {
+        budgetService.getBudgetStatusFor(user).stream().filter(b -> b.getStartsOn() == null).forEach(b -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("category",  b.getCategory());
             row.put("limit",     b.getLimit());

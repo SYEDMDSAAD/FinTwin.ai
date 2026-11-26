@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import { Card, Button, Badge } from "./ui";
 import { storedUserIsDemo } from "../utils/demoGuard";
+import { startsLabel } from "../constants/budgetStatus";
 
 /* A plan drafted from the user's own transactions: their salary, and a
    budget per category from what it usually costs. Nothing is saved until
@@ -61,7 +62,8 @@ export default function PlanDraftCard({ hasBudgets, onApplied }) {
                 budgets: kept.map((r) => ({ category: r.category, limit: Number(r.amount) })),
             });
             const n = (data?.created || 0) + (data?.updated || 0);
-            toast.success(n === 1 ? "1 budget saved" : `${n} budgets saved`);
+            const saved = n === 1 ? "1 budget saved" : `${n} budgets saved`;
+            toast.success(data?.startsOn ? `${saved}. New ones count from ${startsLabel(data.startsOn)}.` : saved);
             setDismissed(true);
             onApplied?.();
         } catch (e) {
@@ -72,6 +74,8 @@ export default function PlanDraftCard({ hasBudgets, onApplied }) {
     };
 
     const months = draft.monthsUsed === 1 ? "last month" : `the last ${draft.monthsUsed} months`;
+    const today = new Date().toLocaleDateString("en-CA");
+    const startsLater = draft.newBudgetsStart && draft.newBudgetsStart > today && kept.some((r) => r.currentLimit == null);
 
     return (
         <Card tone="accent" className="mb-6">
@@ -140,6 +144,13 @@ export default function PlanDraftCard({ hasBudgets, onApplied }) {
                                     </li>
                                 ))}
                             </ul>
+
+                            {startsLater && (
+                                <p className="mt-3 text-small text-ink-2">
+                                    This month is nearly over, so new budgets count from {startsLabel(draft.newBudgetsStart)}.
+                                    What you've already spent won't show as over budget.
+                                </p>
+                            )}
 
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                 <span className="text-small text-ink-2" role="status">

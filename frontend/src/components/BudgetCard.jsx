@@ -34,8 +34,10 @@ function BudgetCard({ budget, onDelete, onUpdate }) {
     }
   };
 
-  const { label, color, pct } = budgetStatus(budget);
-  const barWidth = Math.min(pct, 100);
+  const { key, label, color, pct } = budgetStatus(budget);
+  const upcoming = key === "upcoming";
+  const warn = key === "over" || key === "watch";
+  const barWidth = upcoming ? 0 : Math.min(pct, 100);
   const remaining = budget.remaining ?? (budget.limit || 0) - (budget.spent || 0);
 
   return (
@@ -56,7 +58,7 @@ function BudgetCard({ budget, onDelete, onUpdate }) {
           </h3>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
-            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>· {pct.toFixed(0)}% used</span>
+            {!upcoming && <span style={{ fontSize: 11, color: "var(--text-dim)" }}>· {pct.toFixed(0)}% used</span>}
           </div>
         </div>
 
@@ -158,18 +160,24 @@ function BudgetCard({ budget, onDelete, onUpdate }) {
               <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 2 }}>spent this month</div>
             </div>
 
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
+            {!upcoming && <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: remaining >= 0 ? "#4ade80" : "#f87171" }}>
                 {rupees(Math.abs(remaining))}
               </div>
               <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 2 }}>
                 {remaining >= 0 ? "left" : "over"}
               </div>
-            </div>
+            </div>}
           </div>
 
+          {upcoming && (
+            <p style={{ fontSize: 11.5, lineHeight: 1.4, marginTop: 12, color: "var(--text-dim)" }}>
+              Set up this month, so it counts from {label.replace("Starts ", "")}. Spending before then isn't counted against it.
+            </p>
+          )}
+
           {/* One line, not a paragraph — the numbers above already say how much */}
-          {pct >= 70 && (
+          {warn && (
             <div
               style={{
                 display: "flex", alignItems: "center", gap: 7, marginTop: 12,

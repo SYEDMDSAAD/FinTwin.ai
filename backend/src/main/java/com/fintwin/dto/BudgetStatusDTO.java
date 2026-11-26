@@ -15,6 +15,15 @@ public class BudgetStatusDTO {
     private Long id;
     // What Spend Guard's approved rebalances added (or took away, negative) this month; limit includes it
     private Double adjustment = 0.0;
+    // Set only while the budget hasn't started yet (ISO date); this month's spending doesn't count against it
+    private String startsOn;
+    // Rent, bills and the like: one payment of the full amount is "paid", not a warning
+    private boolean fixedCost;
+
+    public String getStartsOn() { return startsOn; }
+    public void setStartsOn(String startsOn) { this.startsOn = startsOn; }
+    public boolean isFixedCost() { return fixedCost; }
+    public void setFixedCost(boolean fixedCost) { this.fixedCost = fixedCost; }
 
     // =========================
     // Constructor

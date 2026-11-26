@@ -225,6 +225,30 @@ class BudgetServiceTest {
     }
 
     @Test
+    void getBudgetStatus_aBudgetStartingNextMonthIsntOverThisMonth() {
+        Budget food = budget("Food", 1000.0);
+        food.setId(1L);
+        food.setUser(user);
+        food.setStartsOn(java.time.YearMonth.now().plusMonths(1).atDay(1));
+        Budget rent = budget("Rent", 15000.0);
+        rent.setId(2L);
+        rent.setUser(user);
+        when(budgetRepository.findByUser(user)).thenReturn(List.of(food, rent));
+        when(transactionRepository.findLatestThreeMonthsTransactions(eq(1L), any(LocalDate.class)))
+                .thenReturn(List.of(txn("Food", -1200.0), txn("Rent", -15000.0)));
+
+        List<BudgetStatusDTO> result = service.getBudgetStatus(null);
+
+        assertThat(result.get(0).getExceeded()).isFalse();
+        assertThat(result.get(0).getSpent()).isEqualTo(1200.0);
+        assertThat(result.get(0).getStartsOn()).isEqualTo(food.getStartsOn().toString());
+        // Rent paid in full is a fixed cost, not a warning; it started long ago
+        assertThat(result.get(1).getStartsOn()).isNull();
+        assertThat(result.get(1).isFixedCost()).isTrue();
+        assertThat(result.get(0).isFixedCost()).isFalse();
+    }
+
+    @Test
     void getBudgetStatus_exceededFlagTrueWhenOverLimit() {
         Budget food = budget("Food", 1000.0);
         food.setId(1L);

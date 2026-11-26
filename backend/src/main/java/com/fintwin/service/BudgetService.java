@@ -297,7 +297,8 @@ public class BudgetService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             BigDecimal remaining = limit.subtract(spent);
-            boolean exceeded = spent.compareTo(limit) > 0;
+            boolean started = budget.countsIn(month);
+            boolean exceeded = started && spent.compareTo(limit) > 0;
 
             BudgetStatusDTO status = new BudgetStatusDTO(
                     budget.getId(),
@@ -308,6 +309,8 @@ public class BudgetService {
                     exceeded
             );
             status.setAdjustment(adjustment);
+            if (!started) status.setStartsOn(budget.getStartsOn().toString());
+            status.setFixedCost(com.fintwin.util.PlanDraftMath.isFixedCost(budget.getCategory()));
             result.add(status);
         }
 

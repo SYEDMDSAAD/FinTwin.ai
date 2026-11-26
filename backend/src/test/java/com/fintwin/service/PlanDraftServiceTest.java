@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,16 +55,31 @@ class PlanDraftServiceTest {
         Budget rent = budget("Rent", 15_000);
         when(budgets.findByUser(user)).thenReturn(List.of(food, rent));
 
-        var r = service.apply(List.of(
+        var r = service.applyFor(user, List.of(
                 new PlanDraftService.ApprovedLine("food", 2_700.0),
                 new PlanDraftService.ApprovedLine("Rent", 15_000.0),
-                new PlanDraftService.ApprovedLine("shopping", 1_800.0)));
+                new PlanDraftService.ApprovedLine("shopping", 1_800.0)), LocalDate.of(2026, 11, 10));
 
-        assertThat(r).isEqualTo(new PlanDraftService.Applied(1, 1, 1));
+        assertThat(r).isEqualTo(new PlanDraftService.Applied(1, 1, 1, null));
         assertThat(food.getLimitAmount()).isEqualTo(2_700.0);
         verify(budgets).saveAll(argThat((List<Budget> saved) -> saved.size() == 2
                 && saved.stream().anyMatch(b -> b.getCategory().equals("Shopping") && b.getUser() == user)));
         verify(profiles).saveScoreSnapshot(user);
+    }
+
+    @Test
+    void lateInTheMonth_newBudgetsStartOnTheFirst_soEarlierSpendingIsntOverBudget() {
+        Budget food = budget("Food", 2_000);
+        when(budgets.findByUser(user)).thenReturn(List.of(food));
+
+        var r = service.applyFor(user, List.of(
+                new PlanDraftService.ApprovedLine("Food", 2_700.0),
+                new PlanDraftService.ApprovedLine("Shopping", 1_800.0)), LocalDate.of(2026, 11, 26));
+
+        assertThat(r.startsOn()).isEqualTo(LocalDate.of(2026, 12, 1));
+        assertThat(food.getStartsOn()).isNull();      // an existing budget keeps counting
+        verify(budgets).saveAll(argThat((List<Budget> saved) -> saved.stream()
+                .anyMatch(b -> b.getCategory().equals("Shopping") && LocalDate.of(2026, 12, 1).equals(b.getStartsOn()))));
     }
 
     @Test
