@@ -99,6 +99,7 @@ export default function VoiceAssistant() {
         const start = async () => {
             if (wake.current || cancelled || document.visibilityState !== "visible") return;
             try {
+                setWakeProblem("Getting “Hey FinTwin” ready… (the first time downloads about 15 MB)");
                 const w = await startWakeWord(() => askAloud(), () => setWakeProblem("“Hey FinTwin” stopped. Switch it off and on again."));
                 if (cancelled) { w.release(); return; }
                 wake.current = w;
@@ -107,7 +108,7 @@ export default function VoiceAssistant() {
             } catch (e) {
                 setWakeProblem(e?.name === "NotAllowedError"
                     ? "FinTwin needs the microphone to hear “Hey FinTwin”."
-                    : "“Hey FinTwin” isn't set up on this build yet. Tap the mic instead.");
+                    : "Couldn't start “Hey FinTwin” on this device. Tap the mic instead.");
                 setWakeLive(false);
             }
         };
@@ -177,7 +178,7 @@ export default function VoiceAssistant() {
                         <label className="flex items-start justify-between gap-3 pt-2 border-t border-line cursor-pointer">
                             <span className="min-w-0">
                                 <span className="block text-small text-ink">Listen for “Hey FinTwin”</span>
-                                <span className="block text-caption text-ink-3">Only while FinTwin is open. Nothing leaves your phone until you say it.</span>
+                                <span className="block text-caption text-ink-3">Only while FinTwin is open. Listening happens on your device; nothing is sent until you say it.</span>
                             </span>
                             <input type="checkbox" className="mt-1 h-4 w-4 accent-[var(--accent)]" checked={wakeOn}
                                    onChange={(e) => toggleWake(e.target.checked)} />

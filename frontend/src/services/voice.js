@@ -1,10 +1,9 @@
 /*
  * "Hey FinTwin" in the browser and the Android app (WebView).
  *
- * - Wake word (services/wakeWord.js): Porcupine, on the device. Off until the user switches it on,
- *   and only while FinTwin is open and on screen; no audio leaves the device
- *   until "Hey FinTwin" is heard. Needs VITE_PICOVOICE_ACCESS_KEY at build
- *   time and the keyword + model files in public/voice/ (see README there).
+ * - Wake word (services/wakeWord.js): sherpa-onnx keyword spotting, on the
+ *   device. Off until the user switches it on, and only while FinTwin is open
+ *   and on screen; no audio leaves the device until "Hey FinTwin" is heard.
  * - The question: recorded after the wake word (or a tap on the mic) until
  *   the user stops talking, then sent once for transcription.
  * - The answer: read aloud piece by piece, each piece voiced while the one
@@ -13,13 +12,13 @@
 import API from "./api";
 import { pieces } from "../utils/voiceText";
 
-const ACCESS_KEY = import.meta.env.VITE_PICOVOICE_ACCESS_KEY || "";
+import { wakeWordSupported } from "./wakeWord";
 
 export const canRecord = () =>
     typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof window.MediaRecorder !== "undefined";
 
-/** The wake word can only be offered when the build has a Porcupine key. */
-export const wakeWordConfigured = () => !!ACCESS_KEY && canRecord();
+/** The wake word runs where workers, WebAssembly and the microphone are all available. */
+export const wakeWordConfigured = () => canRecord() && wakeWordSupported();
 
 // ── Recording the question ──────────────────────────────────────────────────
 

@@ -449,7 +449,7 @@ Respond in this format:
 
 
 def _portfolio_direct(message: str, user_id, trace: dict | None = None,
-                      tool_token: str | None = None) -> str | None:
+                      tool_token: str | None = None, voice: bool = False) -> str | None:
     """
     Plain portfolio data questions answered from the backend's figures, no
     model: a 3B model's prose has contradicted the very numbers it quoted.
@@ -470,6 +470,10 @@ def _portfolio_direct(message: str, user_id, trace: dict | None = None,
     logger.info("Copilot portfolio question answered from figures: %s (%s)", intent, holding_type or "all")
     if trace is not None:
         trace.update({"path": "portfolio_direct", "intent": intent, "holding_type": holding_type})
+    if voice:
+        # Read aloud: a few sentences with rounded figures; the page it opens shows the rest
+        answer = portfolio_answers.spoken(intent, data)
+        return answer + " The details are on your screen. This isn't financial advice." if data.get("holdingCount") else answer
     answer = portfolio_answers.compose(intent, data)
     return answer + _PORTFOLIO_CAVEAT if data.get("holdingCount") else answer
 
@@ -518,7 +522,7 @@ def _advise(message: str, financial_data: dict, mode: str, trace: dict) -> str:
 
         if financial_data.get("userId") is not None:
             direct = _portfolio_direct(message, financial_data["userId"], trace,
-                                       financial_data.get("toolToken"))
+                                       financial_data.get("toolToken"), voice=mode == VOICE_MODE)
             if direct is not None:
                 return direct
             try:

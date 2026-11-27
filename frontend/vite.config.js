@@ -13,11 +13,6 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.js',
     css: false,
-    // The wake word packages are browser-only (no Node entry point)
-    alias: {
-      '@picovoice/porcupine-web': new URL('./src/test/stubs/picovoice.js', import.meta.url).pathname,
-      '@picovoice/web-voice-processor': new URL('./src/test/stubs/picovoice.js', import.meta.url).pathname,
-    },
   },
   build: {
     // CSS minification stays OFF intentionally. This is rolldown-vite, whose only

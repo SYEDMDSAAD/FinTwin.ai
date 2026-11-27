@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/voice", () => ({
     canRecord: () => true,
-    wakeWordConfigured: () => false,
+    wakeWordConfigured: vi.fn(() => false),
     chime: vi.fn(),
     recordQuestion: vi.fn(),
     transcribe: vi.fn(),
@@ -18,6 +18,7 @@ import VoiceAssistant from "./VoiceAssistant";
 
 beforeEach(() => {
     vi.clearAllMocks();
+    voice.wakeWordConfigured.mockReturnValue(false);
     try { localStorage.clear(); } catch { /* ignore */ }
 });
 
@@ -55,9 +56,22 @@ describe("VoiceAssistant", () => {
         expect(voice.ask).not.toHaveBeenCalled();
     });
 
-    it("doesn't offer the wake word on a build without a Porcupine key, and never starts it", () => {
+    it("doesn't offer the wake word where the device can't run it, and never starts it", () => {
         render(<VoiceAssistant />);
         expect(screen.queryByText(/Listen for “Hey FinTwin”/)).not.toBeInTheDocument();
         expect(startWakeWord).not.toHaveBeenCalled();
+    });
+
+    it("listens for the wake word only after the user switches it on", async () => {
+        voice.wakeWordConfigured.mockReturnValue(true);
+        startWakeWord.mockResolvedValue({ pause: vi.fn(), resume: vi.fn(), release: vi.fn().mockResolvedValue() });
+        voice.recordQuestion.mockReturnValue({ done: Promise.resolve(null), stop: vi.fn() });
+        const user = userEvent.setup();
+        render(<VoiceAssistant />);
+        expect(startWakeWord).not.toHaveBeenCalled();
+        await user.click(screen.getByRole("button", { name: "Ask FinTwin out loud" }));
+        await user.click(await screen.findByRole("checkbox", { name: /Listen for “Hey FinTwin”/ }));
+        expect(startWakeWord).toHaveBeenCalledTimes(1);
+        expect(localStorage.getItem("fintwin.voice.wake")).toBe("on");
     });
 });

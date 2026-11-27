@@ -80,6 +80,15 @@ server {
     }
 
     # React router — every other path is the app itself
+    # "Hey FinTwin" keyword spotter (WebAssembly + model, ~18 MB): served
+    # pre-compressed (~7.5 MB, see Dockerfile.cloudrun) and cached for a week.
+    # Fetched only when a user switches the wake word on.
+    location /voice/kws/ {
+        gzip_static on;
+        expires 7d;
+        try_files $uri =404;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
