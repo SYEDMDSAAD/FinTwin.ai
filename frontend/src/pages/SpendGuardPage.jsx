@@ -5,6 +5,15 @@ import { GUARD_CSS } from "../components/guard/guardCss";
 import { aiStatus, inr } from "../components/guard/format";
 import ScanPanel from "../components/guard/ScanPanel";
 import WalletPanel from "../components/guard/WalletPanel";
+
+/** Investments → Future Twin, where money kept by pausing is shown invested. */
+const openTwin = () => {
+    try {
+        localStorage.setItem("investmentsTab", "Future Twin");
+        localStorage.setItem("activeSection", "Investments");
+    } catch { /* storage blocked: navigation still works */ }
+    window.dispatchEvent(new Event("dashboardNav"));
+};
 import PaydayPanel from "../components/guard/PaydayPanel";
 
 const TABS = [
@@ -187,6 +196,12 @@ function WeekAside({ wallet }) {
                         <div className="sg-tile-value">{inr(wallet.savedByPausing)}</div>
                     </div>
                 </div>
+                {wallet.savedByPausing > 0 && (
+                    <button type="button" className="sg-sub" style={{ marginTop: 10, background: "none", border: 0, padding: 0, cursor: "pointer", textDecoration: "underline" }}
+                            onClick={() => openTwin()}>
+                        See what it grows into: your Future Twin invests it
+                    </button>
+                )}
             </div>
             <div className="sg-card">
                 <h2 className="sg-h2">How Spend Guard decides</h2>

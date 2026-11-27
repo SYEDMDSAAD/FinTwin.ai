@@ -31,6 +31,10 @@ import java.util.*;
  *                  well below what the user really spends
  *  - subscription: a renewal in the next three days, or a price rise
  *  - goal:         on salary day, how much to set aside for a goal that's behind
+ *  - SIP:          a monthly SIP instalment that didn't leave the bank
+ *  - tax:          in February and March, long-term gains that could still be booked tax-free
+ *  - wishlist:     an item whose 48-hour wait in Spend Guard is over: still want it?
+ *  - step-up:      a salary above the usual, and the SIP rise that keeps the same share invested
  *
  * Each one only points at something the user then does themselves (accept a
  * draft, set money aside); none changes data. Failures drop that nudge only.
@@ -50,6 +54,9 @@ public class NudgeAgents {
     @Autowired @Lazy private GoalPlannerService goals;
     @Autowired private TransactionRepository transactions;
     @Autowired private WeeklyReportRecordRepository weeklyReports;
+    @Autowired(required = false) private com.fintwin.repository.SipPlanRepository sips;
+    @Autowired(required = false) @Lazy private com.fintwin.service.PortfolioHealthService portfolioHealth;
+    @Autowired(required = false) @Lazy private com.fintwin.service.TwinService twins;
 
     public List<NotificationDTO> all(User user, List<Transaction> lastThreeMonths, LocalDate today, boolean hasBudgets) {
         List<NotificationDTO> out = new ArrayList<>();
@@ -72,7 +79,121 @@ public class NudgeAgents {
             NotificationDTO g = goalNudge(goals.getGoalsForUser(user), salary, today);
             if (g != null) out.add(g);
         } catch (RuntimeException e) { log.debug("goal nudge skipped: {}", e.getClass().getSimpleName()); }
+        try {
+            if (sips != null) out.addAll(sipNudges(sips.findByUserOrderByCreatedAtAsc(user), lastThreeMonths, today));
+        } catch (RuntimeException e) { log.debug("SIP nudge skipped: {}", e.getClass().getSimpleName()); }
+        try {
+            if (portfolioHealth != null && taxSeason(today)) {
+                NotificationDTO t = taxNudge(portfolioHealth.healthOf(user, today).tax());
+                if (t != null) out.add(t);
+            }
+        } catch (RuntimeException e) { log.debug("tax nudge skipped: {}", e.getClass().getSimpleName()); }
+        try {
+            if (twins != null) {
+                NotificationDTO w = wishlistNudge(twins.readyWishes(user, java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"))));
+                if (w != null) out.add(w);
+            }
+        } catch (RuntimeException e) { log.debug("wishlist nudge skipped: {}", e.getClass().getSimpleName()); }
+        try {
+            if (sips != null) {
+                double sipMonthly = sips.findByUserOrderByCreatedAtAsc(user).stream().filter(p -> p.getAmount() != null)
+                        .mapToDouble(p -> p.getAmount().doubleValue() / ("Quarterly".equals(p.getFrequency()) ? 3 : 1)).sum();
+                NotificationDTO up = stepUpNudge(PlanDraftMath.detectSalary(lastThreeMonths, today), sipMonthly, today);
+                if (up != null) out.add(up);
+            }
+        } catch (RuntimeException e) { log.debug("step-up nudge skipped: {}", e.getClass().getSimpleName()); }
         return out;
+    }
+
+    // ── Wishlist check-in ───────────────────────────────────────────────────
+
+    static NotificationDTO wishlistNudge(List<com.fintwin.util.TwinMath.Wish> ready) {
+        if (ready == null || ready.isEmpty()) return null;
+        var w = ready.get(0);
+        String more = ready.size() > 1 ? " (and " + (ready.size() - 1) + " more)" : "";
+        return new NotificationDTO("info", "'" + w.name() + "' (" + rupees(w.amount()) + ")" + more
+                + " has waited two days on your wishlist. Still want it? If not, drop it in Spend Guard"
+                + " and your Future Twin invests the " + rupees(w.amount()) + ".");
+    }
+
+    // ── Step-up agent ───────────────────────────────────────────────────────
+
+    /** A salary this far above the usual counts as a rise worth mentioning. */
+    static final double STEP_UP_MIN_RISE = 0.05;
+
+    static NotificationDTO stepUpNudge(PlanDraftMath.Salary salary, double sipMonthly, LocalDate today) {
+        if (salary == null || sipMonthly <= 0 || salary.lastPaid() == null || salary.typicalAmount() <= 0) return null;
+        if (ChronoUnit.DAYS.between(salary.lastPaid(), today) > SALARY_DAYS) return null;
+        double rise = salary.lastAmount() / salary.typicalAmount() - 1;
+        if (rise < STEP_UP_MIN_RISE) return null;
+        double step = Math.round(sipMonthly * rise / 100.0) * 100.0;
+        if (step < 100) return null;
+        return new NotificationDTO("info", "This salary is about " + rupees(salary.lastAmount() - salary.typicalAmount())
+                + " more than usual. If it's a raise, adding " + rupees(step) + " a month to your SIPs keeps the same"
+                + " share of it invested.");
+    }
+
+    // ── Tax agent ───────────────────────────────────────────────────────────
+
+    /** Below this, booking and buying back isn't worth the bother. */
+    static final double TAX_NUDGE_MIN = 5_000;
+
+    static boolean taxSeason(LocalDate today) {
+        return today.getMonthValue() == 2 || today.getMonthValue() == 3;
+    }
+
+    static NotificationDTO taxNudge(com.fintwin.util.TaxHarvest.Result tax) {
+        if (tax == null || tax.harvestable() < TAX_NUDGE_MIN) return null;
+        return new NotificationDTO("info", "Before 31 March: about " + rupees(tax.harvestable())
+                + " of long-term gains on your equity funds could be booked tax-free. See the health check in Investments.");
+    }
+
+    // ── SIP agent ───────────────────────────────────────────────────────────
+
+    /** Days after the SIP date before an instalment counts as missed (banks debit a day or two late). */
+    static final int SIP_GRACE_DAYS = 4;
+    /** An instalment matches a debit within this share of its amount (stamp duty, rounding). */
+    static final double SIP_TOLERANCE = 0.02;
+
+    /**
+     * A monthly SIP whose latest instalment isn't among the bank's debits. Only
+     * said when the statement runs past the SIP date, so a statement that just
+     * hasn't been imported yet doesn't look like a missed payment.
+     */
+    static List<NotificationDTO> sipNudges(List<com.fintwin.model.SipPlan> plans, List<Transaction> recent, LocalDate today) {
+        List<NotificationDTO> out = new ArrayList<>();
+        LocalDate lastSeen = recent.stream().map(Transaction::getDate).filter(Objects::nonNull)
+                .max(LocalDate::compareTo).orElse(null);
+        if (lastSeen == null) return out;
+        for (com.fintwin.model.SipPlan p : plans) {
+            if (!"Monthly".equals(p.getFrequency()) || p.getAmount() == null || p.getNextDebitDate() == null) continue;
+            double amount = p.getAmount().doubleValue();
+            if (amount <= 0) continue;
+            LocalDate due = lastDue(p.getNextDebitDate().getDayOfMonth(), today.minusDays(SIP_GRACE_DAYS));
+            if (due.isBefore(p.getNextDebitDate())) continue;                                         // first instalment still to come
+            if (p.getCreatedAt() != null && due.isBefore(p.getCreatedAt().toLocalDate())) continue;
+            if (!lastSeen.isAfter(due.plusDays(SIP_GRACE_DAYS))) continue;                            // statement not that far yet
+            boolean paid = recent.stream().anyMatch(t -> t.getAmount() != null && t.getAmount() < 0 && t.getDate() != null
+                    && !t.getDate().isBefore(due.minusDays(3)) && !t.getDate().isAfter(due.plusDays(SIP_GRACE_DAYS + 1))
+                    && Math.abs(-t.getAmount() - amount) <= amount * SIP_TOLERANCE);
+            if (paid) continue;
+            String fund = p.getFundName() == null || p.getFundName().isBlank() ? "" : " in " + p.getFundName();
+            out.add(new NotificationDTO("warning", "Your " + rupees(amount) + " SIP" + fund + " didn't go out around "
+                    + due.getDayOfMonth() + " " + due.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
+                    + ". Check the bank balance or the mandate: a missed instalment isn't made up later."));
+        }
+        return out;
+    }
+
+    /** The latest date on or before {@code onOrBefore} that falls on the SIP day (the month's last day when shorter). */
+    static LocalDate lastDue(int day, LocalDate onOrBefore) {
+        java.time.YearMonth m = java.time.YearMonth.from(onOrBefore);
+        LocalDate d = m.atDay(Math.min(day, m.lengthOfMonth()));
+        if (d.isAfter(onOrBefore)) {
+            m = m.minusMonths(1);
+            d = m.atDay(Math.min(day, m.lengthOfMonth()));
+        }
+        return d;
     }
 
     // ── Budget agent ────────────────────────────────────────────────────────

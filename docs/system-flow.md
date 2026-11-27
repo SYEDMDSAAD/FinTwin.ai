@@ -393,10 +393,10 @@ returns a step plan. All goal amounts are stored encrypted.
   `ScheduledPriceRefreshService.java:101` call ai-service `/market/prices`
   (`investments/price_service.py` wraps yfinance-style lookups);
   `MarketDataService` caches quotes (Caffeine) and fetches in parallel.
-- **Recommendations:** `InvestmentRecommendationSection.jsx` →
-  `/api/v1/investment-recommendations` → `InvestmentRecommendationService.java:92`
-  → ai-service `/investment-recommendation`
-  (`investments/recommendation_engine.py`) → risk-profiled suggestions.
+- **Plan:** `InvestmentPlanSection.jsx` → `/api/v1/investments/plan` →
+  `InvestmentPlanService` → `util/InvestmentPlan` (facts and goal maths:
+  surplus, emergency-fund months, monthly need per goal, SIPs, current mix).
+  No AI and no suggested allocation: FinTwin isn't SEBI-registered.
 
 ### 4.12 Bank & crypto connections (Setu Account Aggregator)
 

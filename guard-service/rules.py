@@ -775,13 +775,16 @@ def apply_cuts(wallet: dict, cuts: list[dict], month: str, over_category: str | 
 # ── Payday: splitting the salary ─────────────────────────────────────────────
 
 def payday_facts(*, salary: int, wallet: dict, finances) -> tuple[dict, set[int]]:
-    bills = sum(b.limit for b in finances.budgets if b.category in {"Rent", "Bills"})
+    sips = max(0, int(getattr(finances, "sip_monthly", 0) or 0))
+    bills = sum(b.limit for b in finances.budgets if b.category in {"Rent", "Bills"}) + sips
     if salary < bills:
-        raise GuardError(f"That's less than the {inr(bills)} of rent and bills in your budgets.")
+        what = "rent, bills and SIPs" if sips else "rent and bills"
+        raise GuardError(f"That's less than the {inr(bills)} of {what} in your budgets.")
     facts = {
         "mode": "payday",
         "salary": salary,
-        "bills": bills,
+        "bills": bills,            # rent and bills budgets, plus SIPs: all leave before spending
+        "sips": sips,
         "after_bills": salary - bills,
         "essentials_weekly_floor": essentials_weekly(finances),
         "current_weekly_allowance": wallet["weekly"],
@@ -839,5 +842,5 @@ def fallback_plan(facts: dict, goals: list) -> dict:
     weekly = [week, week, week, left - 3 * week]
     return {"goals": [{"goal": g.title, "amount": a} for g, a in zip(goals, shares)],
             "buffer": buffer, "weekly": weekly,
-            "message": f"Bills of {inr(facts['bills'])} come out first. {inr(goal_pot)} goes to your goals, "
+            "message": f"{'Rent, bills and SIPs' if facts.get('sips') else 'Bills'} of {inr(facts['bills'])} come out first. {inr(goal_pot)} goes to your goals, "
                        f"{inr(buffer)} stays as a buffer, and about {inr(week)} a week is yours to spend."}

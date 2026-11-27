@@ -130,4 +130,79 @@ class NudgeAgentsTest {
         assertThat(ReportService.weekStart(LocalDate.of(2026, 11, 23))).isEqualTo(LocalDate.of(2026, 11, 23));
         assertThat(ReportService.weekStart(LocalDate.of(2026, 11, 29))).isEqualTo(LocalDate.of(2026, 11, 23));
     }
+
+    // ── SIP agent ───────────────────────────────────────────────────────────
+
+    private static com.fintwin.model.SipPlan sip(String fund, int amount, LocalDate next) {
+        com.fintwin.model.SipPlan p = new com.fintwin.model.SipPlan();
+        p.setFundName(fund);
+        p.setAmount(new java.math.BigDecimal(amount));
+        p.setFrequency("Monthly");
+        p.setNextDebitDate(next);
+        return p;
+    }
+
+    @Test
+    void aMonthlySipThatDidNotLeaveTheBankIsFlagged() {
+        var plans = List.of(sip("Parag Parikh Flexi Cap", 5000, LocalDate.of(2026, 9, 5)));
+        List<Transaction> paid = List.of(charge("BSE STAR MF", 5000.25, LocalDate.of(2026, 11, 6)),
+                charge("SWIGGY", 400, LocalDate.of(2026, 11, 25)));
+        assertThat(NudgeAgents.sipNudges(plans, paid, TODAY)).isEmpty();
+
+        List<Transaction> missed = List.of(charge("SWIGGY", 400, LocalDate.of(2026, 11, 25)));
+        assertThat(NudgeAgents.sipNudges(plans, missed, TODAY)).singleElement().satisfies(n -> {
+            assertThat(n.getType()).isEqualTo("warning");
+            assertThat(n.getMessage()).isEqualTo("Your ₹5,000 SIP in Parag Parikh Flexi Cap didn't go out around 5 Nov."
+                    + " Check the bank balance or the mandate: a missed instalment isn't made up later.");
+        });
+    }
+
+    @Test
+    void noSipAlarmBeforeTheStatementReachesTheDateOrTheFirstInstalment() {
+        // Statement only runs to 7 Nov: too early to say the 5 Nov instalment is missing
+        assertThat(NudgeAgents.sipNudges(List.of(sip("Fund", 5000, LocalDate.of(2026, 9, 5))),
+                List.of(charge("SWIGGY", 400, LocalDate.of(2026, 11, 7))), TODAY)).isEmpty();
+        // First instalment is next month
+        assertThat(NudgeAgents.sipNudges(List.of(sip("Fund", 5000, LocalDate.of(2026, 12, 5))),
+                List.of(charge("SWIGGY", 400, LocalDate.of(2026, 11, 25))), TODAY)).isEmpty();
+    }
+
+    @Test
+    void aSipOnThe31stFallsDueOnTheMonthsLastDay() {
+        assertThat(NudgeAgents.lastDue(31, LocalDate.of(2026, 11, 23))).isEqualTo(LocalDate.of(2026, 10, 31));
+        assertThat(NudgeAgents.lastDue(31, LocalDate.of(2026, 12, 2))).isEqualTo(LocalDate.of(2026, 11, 30));
+        assertThat(NudgeAgents.lastDue(5, LocalDate.of(2026, 11, 23))).isEqualTo(LocalDate.of(2026, 11, 5));
+    }
+
+    @Test
+    void theTaxNudgeOnlyComesInFebruaryAndMarchAndWhenItsWorthIt() {
+        assertThat(NudgeAgents.taxSeason(LocalDate.of(2027, 2, 1))).isTrue();
+        assertThat(NudgeAgents.taxSeason(LocalDate.of(2027, 3, 31))).isTrue();
+        assertThat(NudgeAgents.taxSeason(LocalDate.of(2027, 4, 1))).isFalse();
+        var small = new com.fintwin.util.TaxHarvest.Result(null, null, 0, 3_000, 3_000, List.of(), 0);
+        var big = new com.fintwin.util.TaxHarvest.Result(null, null, 0, 90_000, 90_000, List.of(), 0);
+        assertThat(NudgeAgents.taxNudge(small)).isNull();
+        assertThat(NudgeAgents.taxNudge(big).getMessage()).startsWith("Before 31 March: about ₹90,000 of long-term gains");
+    }
+
+    @Test
+    void aWishlistItemPastItsWaitAsksIfItsStillWanted() {
+        assertThat(NudgeAgents.wishlistNudge(List.of())).isNull();
+        var n = NudgeAgents.wishlistNudge(List.of(new com.fintwin.util.TwinMath.Wish("Headphones", 3499, "2026-11-25"),
+                new com.fintwin.util.TwinMath.Wish("Shoes", 2000, "2026-11-26")));
+        assertThat(n.getMessage()).isEqualTo("'Headphones' (₹3,499) (and 1 more) has waited two days on your wishlist."
+                + " Still want it? If not, drop it in Spend Guard and your Future Twin invests the ₹3,499.");
+    }
+
+    @Test
+    void aRaiseSuggestsTheSipStepUpThatKeepsTheSameShare() {
+        var raised = new PlanDraftMath.Salary("ACME", 80_000, 1, 3, TODAY.minusDays(1), 88_000, TODAY.plusMonths(1));
+        assertThat(NudgeAgents.stepUpNudge(raised, 10_000, TODAY).getMessage())
+                .isEqualTo("This salary is about ₹8,000 more than usual. If it's a raise, adding ₹1,000 a month"
+                        + " to your SIPs keeps the same share of it invested.");
+        var same = new PlanDraftMath.Salary("ACME", 80_000, 1, 3, TODAY.minusDays(1), 81_000, TODAY.plusMonths(1));
+        assertThat(NudgeAgents.stepUpNudge(same, 10_000, TODAY)).isNull();
+        assertThat(NudgeAgents.stepUpNudge(raised, 0, TODAY)).isNull();                    // no SIPs to step up
+        assertThat(NudgeAgents.stepUpNudge(raised, 10_000, TODAY.plusDays(10))).isNull();  // salary day has passed
+    }
 }

@@ -47,6 +47,10 @@ import java.util.Map;
 @RequestMapping("/internal/ai")
 public class InternalAIController {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.SipPlanRepository sipPlans;
+
+
     private static final Logger log = LoggerFactory.getLogger(InternalAIController.class);
 
     @Value("${ai.service.internal-key}")
@@ -219,7 +223,13 @@ public class InternalAIController {
             row.put("adjustment", b.getAdjustment());
             budgets.add(row);
         });
-        return ResponseEntity.ok(Map.of("budgets", budgets));
+        // SIPs leave every month before any spending: Spend Guard's salary split
+        // sets them aside with rent and bills
+        double sipMonthly = sipPlans == null ? 0 : sipPlans.findByUserOrderByCreatedAtAsc(user).stream()
+                .filter(s -> s.getAmount() != null)
+                .mapToDouble(s -> s.getAmount().doubleValue() / ("Quarterly".equals(s.getFrequency()) ? 3 : 1))
+                .sum();
+        return ResponseEntity.ok(Map.of("budgets", budgets, "sipMonthly", Math.round(sipMonthly)));
     }
 
     // ── Goals ─────────────────────────────────────────────────────────────────

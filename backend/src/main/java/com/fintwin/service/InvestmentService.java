@@ -48,6 +48,9 @@ public class InvestmentService {
     @Value("${ai.service.url}")
     private String aiServiceUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.HoldingTransactionRepository holdingTxns;
+
     public InvestmentService(InvestmentRepository repo, UserRepository userRepo, TransactionRepository txnRepo) {
         this.repo     = repo;
         this.userRepo = userRepo;
@@ -63,6 +66,18 @@ public class InvestmentService {
         List<InvestmentDTO> holdings = all.stream()
                 .map(InvestmentDTO::from)
                 .collect(Collectors.toList());
+
+        // XIRR from the CAS transactions where there are any, else estimated from amount + date
+        Map<Long, List<com.fintwin.model.HoldingTransaction>> lines = all.isEmpty() || holdingTxns == null ? Map.of()
+                : holdingTxns.findByInvestmentInOrderByDateAsc(all).stream()
+                        .collect(Collectors.groupingBy(t -> t.getInvestment().getId()));
+        var returns = com.fintwin.util.HoldingReturns.of(all, lines, java.time.LocalDate.now());
+        for (InvestmentDTO d : holdings) {
+            var r = returns.holdings().get(d.getId());
+            if (r == null) continue;
+            d.setXirr(pct(r.xirr()));
+            d.setXirrEstimated(r.estimated());
+        }
 
         // Exact BigDecimal sums for the authoritative portfolio totals.
         BigDecimal totalInvested = all.stream()
@@ -101,7 +116,12 @@ public class InvestmentService {
         summary.setTotalPnl(money(totalPnl));
         summary.setTotalPnlPercent(totalPnlPct);
         summary.setAllocationByType(allocation);
+        summary.setXirr(pct(returns.portfolio()));
         return summary;
+    }
+
+    private static Double pct(Double rate) {
+        return rate == null ? null : Math.round(rate * 1000.0) / 10.0;
     }
 
     private static BigDecimal nz(BigDecimal v) {

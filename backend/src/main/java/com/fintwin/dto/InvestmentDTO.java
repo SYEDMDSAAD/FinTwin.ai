@@ -25,6 +25,13 @@ public class InvestmentDTO {
     // After a save: "live" when a price came back, "not_found" when the market
     // doesn't know the symbol, "unavailable" when the lookup itself failed
     private String priceStatus;
+    /** CAMS | KFINTECH | NSDL | CDSL when imported from a statement. */
+    private String source;
+    private LocalDate unitsAsOf;
+    /** Annual return in % (XIRR); null under a year or without a date. */
+    private Double xirr;
+    /** True when worked out from the amount and date alone, without the real transactions. */
+    private Boolean xirrEstimated;
 
     public static InvestmentDTO from(com.fintwin.model.Investment inv) {
         InvestmentDTO dto = new InvestmentDTO();
@@ -40,6 +47,8 @@ public class InvestmentDTO {
         dto.interestRate  = inv.getInterestRate();
         dto.ipoStatus     = inv.getIpoStatus();
         dto.ipoListingId  = inv.getIpoListingId();
+        dto.source        = inv.getSource();
+        dto.unitsAsOf     = inv.getUnitsAsOf();
 
         double invested = inv.getInvestedAmount() != null ? inv.getInvestedAmount() : 0;
         double current  = inv.getCurrentValue()   != null ? inv.getCurrentValue()   : invested;
@@ -52,6 +61,12 @@ public class InvestmentDTO {
     }
 
     // getters
+    public String getSource()       { return source; }
+    public LocalDate getUnitsAsOf() { return unitsAsOf; }
+    public Double getXirr()         { return xirr; }
+    public void setXirr(Double xirr) { this.xirr = xirr; }
+    public Boolean getXirrEstimated() { return xirrEstimated; }
+    public void setXirrEstimated(Boolean e) { this.xirrEstimated = e; }
     public String getIpoStatus()    { return ipoStatus; }
     public Long getIpoListingId()   { return ipoListingId; }
     public Long getId()             { return id; }

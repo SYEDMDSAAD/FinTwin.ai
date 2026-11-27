@@ -1,3 +1,4 @@
+import pytest
 """Discover-page market data: AMFI fund list, returns from NAV history, stocks."""
 from unittest.mock import MagicMock, patch
 
@@ -159,6 +160,13 @@ def test_no_price_history_means_no_answer():
         assert data.stock_price_on("NOPE", "2026-01-01") is None
 
 
+@pytest.fixture(autouse=True)
+def _fresh_nav_history():
+    data._HISTORY_CACHE.clear()
+    yield
+    data._HISTORY_CACHE.clear()
+
+
 def _mfapi(points):
     resp = MagicMock()
     resp.json.return_value = {"data": [{"date": d, "nav": n} for d, n in points]}
@@ -199,3 +207,20 @@ def test_latest_nav_route_skips_return_history(monkeypatch):
                         "nav": 88.4567, "date": "21-Sep-2026"}
     assert called == []
 
+
+
+def test_monthly_navs_keep_each_months_last_nav_and_cache_the_history():
+    resp = _mfapi([("31-10-2026", "90.0"), ("30-10-2026", "89.0"), ("29-09-2026", "85.0"),
+                   ("28-08-2026", "80.0"), ("02-09-2026", "81.0")])
+    with patch.object(data.requests, "get", return_value=resp) as get:
+        assert data.fund_monthly_navs("122640", "2026-09") == [
+            {"month": "2026-09", "nav": 85.0}, {"month": "2026-10", "nav": 90.0}]
+        data.fund_nav_on("122640", "2026-10-30")
+        assert get.call_count == 1
+
+
+def test_monthly_route_checks_the_code_and_month(monkeypatch):
+    monkeypatch.setattr(data, "fund_monthly_navs", lambda c, s: [{"month": s, "nav": 1.0}])
+    assert client.get("/discover/funds/abc/monthly", params={"since": "2026-01"}, headers=KEY).status_code == 400
+    assert client.get("/discover/funds/1/monthly", params={"since": "2026-1"}, headers=KEY).status_code == 422
+    assert client.get("/discover/funds/1/monthly", params={"since": "2026-01"}, headers=KEY).json() == [{"month": "2026-01", "nav": 1.0}]

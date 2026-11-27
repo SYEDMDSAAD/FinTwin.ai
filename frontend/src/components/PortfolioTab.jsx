@@ -15,6 +15,9 @@ let _nwCache = null;
 import { IPO_STATUSES } from "../constants/investments";
 import LinkHoldingModal from "./LinkHoldingModal";
 import InvestmentSuggestions from "./InvestmentSuggestions";
+import ImportCas from "./ImportCas";
+import PortfolioHealthCard from "./PortfolioHealthCard";
+import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import { useDebouncedSearch } from "./discover/useDebouncedSearch";
 import { Plus, Pencil, Trash2, TrendingUp, RefreshCw, Landmark, Link2 } from "lucide-react";
 import { Button, SectionHeader, EmptyState, IconChip, cx } from "./ui";
@@ -301,6 +304,11 @@ export default function PortfolioTab() {
                     </span>
                     {" "}on ₹{fmt(Math.round(summary?.totalInvested || 0))} put in
                 </p>
+                {summary?.xirr != null && (
+                    <p className="mt-1 text-small text-ink-3 num">
+                        {summary.xirr}% a year (XIRR), counting when each rupee went in
+                    </p>
+                )}
                 {netWorth && nwTotal > 0 && (
                     <button type="button" onClick={() => gotoSection("Net Worth")} className="mt-1 text-small text-ink-3 hover:text-ink">
                         {nwPct}% of your net worth ›
@@ -316,6 +324,7 @@ export default function PortfolioTab() {
                 <Button size="sm" variant="secondary" icon={Landmark} onClick={handleAutoDetect} disabled={detecting}>
                     {detecting ? "Looking…" : "Find in transactions"}
                 </Button>
+                <ImportCas onImported={load} />
             </div>
 
             {refreshNote && (
@@ -323,6 +332,10 @@ export default function PortfolioTab() {
                     {refreshNote.text}
                 </p>
             )}
+
+            <PortfolioHistoryChart refreshKey={summary?.currentValue} />
+
+            <PortfolioHealthCard refreshKey={summary?.currentValue} />
 
             <InvestmentSuggestions onAdded={load} />
 
@@ -385,6 +398,7 @@ export default function PortfolioTab() {
                                                 <> · {IPO_STATUSES.find(st => st.value === h.ipoStatus)?.label.split(" — ")[0] || h.ipoStatus}</>
                                             )}
                                             {" · "}₹{fmt(h.investedAmount)} in
+                                            {h.source && <> · from {h.source === "KFINTECH" ? "KFintech" : h.source}</>}
                                         </span>
                                     </span>
                                     <span className="shrink-0 text-right">
@@ -397,6 +411,12 @@ export default function PortfolioTab() {
                                         <span className={cx("block text-small num", pos ? "text-good" : "text-bad")}>
                                             {pos ? "+" : "−"}₹{fmt(Math.abs(h.pnl ?? 0))} · {pos ? "+" : ""}{h.pnlPercent}%
                                         </span>
+                                        {h.xirr != null && (
+                                            <span className="block text-caption text-ink-3 num"
+                                                  title={h.xirrEstimated ? "Worked out from the amount and date, as one lump sum" : "XIRR from the statement's transactions"}>
+                                                {h.xirr}% a year{h.xirrEstimated ? " (est.)" : ""}
+                                            </span>
+                                        )}
                                     </span>
                                     <span className="shrink-0 flex -mr-2">
                                         <button type="button" onClick={() => openEdit(h)} aria-label={`Edit ${h.name}`}

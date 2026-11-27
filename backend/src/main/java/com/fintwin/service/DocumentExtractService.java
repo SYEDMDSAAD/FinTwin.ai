@@ -49,32 +49,50 @@ public class DocumentExtractService {
     public Map<String, Object> extract(MultipartFile file, String kind, String password) {
         if (!"policy".equals(kind) && !"loan".equals(kind))
             throw new BadRequestException("Choose a policy or a loan document.");
+        byte[] bytes = pdfBytes(file);
+        Map<?, ?> res = post("/documents/extract", bytes, Map.of("kind", kind), password);
+        Object fields = res == null ? null : res.get("fields");
+        return Map.of("fields", fields instanceof Map<?, ?> m ? m : Map.of());
+    }
+
+    /**
+     * Holdings and their transactions from a CAS (CAMS/KFintech or NSDL/CDSL).
+     * The AI service parses it without a model and drops the investor's name,
+     * PAN and contact details; this returns what it found, saving nothing.
+     */
+    @PreAuthorize("hasAuthority('WRITE_OWN_INVESTMENTS')")
+    public Map<?, ?> readCas(MultipartFile file, String password) {
+        byte[] bytes = pdfBytes(file);
+        Map<?, ?> res = post("/documents/cas", bytes, Map.of(), password);
+        if (res == null) throw unavailable();
+        return res;
+    }
+
+    private static byte[] pdfBytes(MultipartFile file) {
         if (file == null || file.isEmpty()) throw new BadRequestException("Choose a PDF to upload.");
         if (file.getSize() > MAX_BYTES) throw new BadRequestException("That PDF is over 15 MB.");
-
-        byte[] bytes;
         try {
-            bytes = file.getBytes();
+            return file.getBytes();
         } catch (IOException e) {
             throw new BadRequestException("The file could not be read. Try uploading it again.");
         }
+    }
 
+    private Map<?, ?> post(String path, byte[] bytes, Map<String, String> fields, String password) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new ByteArrayResource(bytes) {
             @Override public String getFilename() { return "document.pdf"; }
         });
-        body.add("kind", kind);
+        fields.forEach(body::add);
         if (password != null && !password.isEmpty()) body.add("password", password);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         try {
-            Map<?, ?> res = ai.postForObject(aiUrl + "/documents/extract", new HttpEntity<>(body, headers), Map.class);
-            Object fields = res == null ? null : res.get("fields");
-            return Map.of("fields", fields instanceof Map<?, ?> m ? m : Map.of());
+            return ai.postForObject(aiUrl + path, new HttpEntity<>(body, headers), Map.class);
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() == 403) {
-                log.error("AI service refused the internal key on /documents/extract");
+                log.error("AI service refused the internal key on {}", path);
                 throw unavailable();
             }
             throw readerError(e.getResponseBodyAsString());

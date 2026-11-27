@@ -271,9 +271,16 @@ def stock_price_on(symbol: str, on: str) -> dict | None:
     return {"symbol": sym, "date": pick[0].isoformat(), "price": round(pick[1], 4)}
 
 
-def fund_nav_on(code: str, on: str) -> dict | None:
-    """NAV on `on` (YYYY-MM-DD), or the next business day's — the NAV units are allotted at."""
-    day = datetime.strptime(on, "%Y-%m-%d")
+_HISTORY_CACHE: dict[str, tuple[float, list]] = {}
+_HISTORY_TTL_S = 6 * 3600
+
+
+def _nav_history(code: str) -> list[tuple[datetime, float]]:
+    """A fund's NAV history from mfapi.in, oldest first; cached for a few hours."""
+    import time
+    hit = _HISTORY_CACHE.get(code)
+    if hit and time.monotonic() - hit[0] < _HISTORY_TTL_S:
+        return hit[1]
     history = None
     for attempt in range(2):                      # mfapi.in sometimes stalls once
         try:
@@ -284,13 +291,34 @@ def fund_nav_on(code: str, on: str) -> dict | None:
         except Exception as e:
             logger.info("NAV history attempt %d failed for %s: %s", attempt + 1, code, e)
     if not history:
-        return None
+        return []
     points = []
     for h in history:
         try:
             points.append((datetime.strptime(h["date"], "%d-%m-%Y"), float(h["nav"])))
         except (KeyError, ValueError):
             continue
+    points.sort()
+    if len(_HISTORY_CACHE) > 500:
+        _HISTORY_CACHE.clear()
+    _HISTORY_CACHE[code] = (time.monotonic(), points)
+    return points
+
+
+def fund_monthly_navs(code: str, since: str) -> list[dict]:
+    """The last NAV of each month from `since` (YYYY-MM) to now, for a value-over-time chart."""
+    start = datetime.strptime(since + "-01", "%Y-%m-%d")
+    last: dict[str, float] = {}
+    for d, nav in _nav_history(code):
+        if d >= start:
+            last[d.strftime("%Y-%m")] = nav        # sorted, so the month's last NAV wins
+    return [{"month": m, "nav": v} for m, v in sorted(last.items())]
+
+
+def fund_nav_on(code: str, on: str) -> dict | None:
+    """NAV on `on` (YYYY-MM-DD), or the next business day's — the NAV units are allotted at."""
+    day = datetime.strptime(on, "%Y-%m-%d")
+    points = list(_nav_history(code))
     if not points:
         return None
     points.sort()

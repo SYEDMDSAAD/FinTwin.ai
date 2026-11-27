@@ -397,6 +397,18 @@ def test_a_salary_below_the_bills_is_refused():
         rules.payday_facts(salary=12000, wallet=wallet(), finances=PERSONA)
 
 
+def test_sips_come_out_first_with_rent_and_bills():
+    import dataclasses
+    investor = dataclasses.replace(PERSONA, sip_monthly=5000)
+    facts, _ = rules.payday_facts(salary=45000, wallet=wallet(), finances=investor)
+    assert facts["bills"] == 19500 and facts["sips"] == 5000 and facts["after_bills"] == 25500
+    plan = rules.fallback_plan(facts, investor.goals)
+    assert facts["bills"] + sum(g["amount"] for g in plan["goals"]) + plan["buffer"] + sum(plan["weekly"]) == 45000
+    assert plan["message"].startswith("Rent, bills and SIPs of ₹19,500 come out first.")
+    with pytest.raises(rules.GuardError, match="rent, bills and SIPs"):
+        rules.payday_facts(salary=18000, wallet=wallet(), finances=investor)
+
+
 # ── Weeks ────────────────────────────────────────────────────────────────────
 
 def test_a_new_week_moves_the_allowance_once():

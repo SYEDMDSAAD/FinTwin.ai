@@ -9,3 +9,12 @@ describe("InvestmentsPage", () => {
     expect(await screen.findByRole("tab", { name: "My Portfolio" })).toBeInTheDocument();
   });
 });
+
+describe("InvestmentsPage tabs", () => {
+  it("opens the tab another screen asked for", async () => {
+    localStorage.setItem("investmentsTab", "Future Twin");
+    renderPage(<InvestmentsPage />, { authed: true });
+    expect(await screen.findByRole("tab", { name: "Future Twin", selected: true })).toBeInTheDocument();
+    expect(localStorage.getItem("investmentsTab")).toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 import app as app_module
 from investments.price_service import _compound, refresh_prices
-from investments.routes import InvestmentItem, InvestmentRecommendationRequest
+from investments.routes import InvestmentItem
 
 client = TestClient(app_module.app)
 GOOD_KEY = {"x-internal-key": "test-internal-key"}
@@ -38,22 +38,6 @@ def test_market_prices_accepts_backend_payload():
     r = client.post("/market/prices", json=payload, headers=GOOD_KEY)
     assert r.status_code == 200
     assert r.json()[0]["id"] == 42
-
-
-def test_recommendation_request_preserves_liquid_savings():
-    """Undeclared fields are dropped by model_dump(), which silently disabled
-    the emergency-fund check."""
-    req = InvestmentRecommendationRequest(income=1.0, netWorth=99.0, liquidSavings=5.0)
-    assert req.model_dump()["liquidSavings"] == 5.0
-
-
-def test_recommendation_request_preserves_portfolio_context():
-    req = InvestmentRecommendationRequest(
-        portfolioValue=1000.0, currentAllocation={"Stocks": 60.0}
-    )
-    dumped = req.model_dump()
-    assert dumped["portfolioValue"] == 1000.0
-    assert dumped["currentAllocation"] == {"Stocks": 60.0}
 
 
 # ── Compounding ──────────────────────────────────────────────────────────────

@@ -1,32 +1,27 @@
 import { useState } from "react";
-import API from "../services/api";
-import InvestmentRecommendationSection from "../components/InvestmentRecommendationSection";
+import InvestmentPlanSection from "../components/InvestmentPlanSection";
+import FutureTwin from "../components/FutureTwin";
 import PortfolioTab from "../components/PortfolioTab";
 import DiscoverPage from "../components/DiscoverPage";
 import SIPTracker from "../components/SIPTracker";
 import MutualFundsTab from "../components/MutualFundsTab";
 import USStocksTab from "../components/USStocksTab";
 import MarketTicker from "../components/MarketTicker";
-import { Button, cx } from "../components/ui";
+import { cx } from "../components/ui";
 
-const TABS = ["My Portfolio", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];  // labels are also the keys
+const TABS = ["My Portfolio", "Future Twin", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "Plan"];  // labels are also the keys
 
 function InvestmentsPage() {
-    const [activeTab, setActiveTab] = useState("My Portfolio");
-    const [recommendation, setRecommendation] = useState(null);
-    const [loadingAI, setLoadingAI] = useState(false);
-
-    const fetchRecommendation = async () => {
+    // Another screen can open a tab here (Spend Guard → Future Twin) by leaving its name behind
+    const [activeTab, setActiveTab] = useState(() => {
         try {
-            setLoadingAI(true);
-            const res = await API.get("/investments");
-            setRecommendation(res.data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingAI(false);
+            const asked = localStorage.getItem("investmentsTab");
+            localStorage.removeItem("investmentsTab");
+            return TABS.includes(asked) ? asked : "My Portfolio";
+        } catch {
+            return "My Portfolio";
         }
-    };
+    });
 
     return (
         <div className="mb-10">
@@ -77,36 +72,9 @@ function InvestmentsPage() {
                 </div>
             )}
 
-            {/* AI Advisor tab */}
-            {activeTab === "AI Advisor" && (
-                <div>
-                    {!recommendation && (
-                        <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6">
-                            <p className="text-heading text-ink">A mix that fits you</p>
-                            <p className="text-body text-ink-2 mt-1 mb-4">
-                                FinTwin suggests how to split your savings across kinds of investment, from your income,
-                                spending and goals. It's general guidance, not advice on specific funds.
-                            </p>
-                            <Button onClick={fetchRecommendation} disabled={loadingAI}>
-                                {loadingAI ? "Working it out…" : "Show my mix"}
-                            </Button>
-                        </div>
-                    )}
+            {activeTab === "Future Twin" && <FutureTwin onOpenSips={() => setActiveTab("SIP Tracker")} />}
 
-                    {loadingAI && (
-                        <div className="max-w-2xl rounded-card bg-surface border border-line px-6 py-10 text-center text-small text-ink-3" role="status">
-                            Working out your mix…
-                        </div>
-                    )}
-
-                    {recommendation && !loadingAI && (
-                        <div>
-                            <Button variant="secondary" size="sm" className="mb-6" onClick={fetchRecommendation}>Work it out again</Button>
-                            <InvestmentRecommendationSection recommendation={recommendation} />
-                        </div>
-                    )}
-                </div>
-            )}
+            {activeTab === "Plan" && <InvestmentPlanSection />}
         </div>
     );
 }

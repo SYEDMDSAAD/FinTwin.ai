@@ -807,7 +807,7 @@ async def payday(body: PaydayBody):
         lambda: rules.fallback_plan(facts, finances.goals),
         persona=finances.persona, data_ok=finances.data_ok, attempts=3,
         budget_s=_budget("payday", started), state=state)
-    plan = {"salary": body.salary, "bills": facts["bills"], **result, "source": source, "reason": reason,
+    plan = {"salary": body.salary, "bills": facts["bills"], "sips": facts.get("sips", 0), **result, "source": source, "reason": reason,
             "model": agents.MODEL if source == "ai" else None, "ms": _ms(started),
             "created_at": now_dt.isoformat()}
     plan_id = store.save_plan(uid, plan)

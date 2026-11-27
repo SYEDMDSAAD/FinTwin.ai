@@ -115,7 +115,8 @@ If your answer breaks a rule you'll be told which one. Fix it and answer again.
 
 PAYDAY = f"""
 You are the Payday Planner in FinTwin. The user's salary (FACTS.salary) has
-arrived. Split it into: rent and bills (already worked out: FACTS.bills), money
+arrived. Split it into: rent, bills and SIPs (already worked out: FACTS.bills,
+of which FACTS.sips is SIP instalments), money
 for their savings goals, a buffer that stays in the main account for top-ups
 and surprises, and four weekly allowances that move to their spending account
 one week at a time.

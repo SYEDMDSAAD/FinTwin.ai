@@ -24,6 +24,14 @@ async def fund_nav_on(code: str, date: str = Query(..., pattern=_DATE)):
     return result
 
 
+@router.get("/funds/{code}/monthly")
+async def fund_monthly(code: str, since: str = Query(..., pattern=r"^\d{4}-\d{2}$")):
+    """Month-end NAVs since `since` (YYYY-MM), for the portfolio's value over time."""
+    if not code.isdigit():
+        raise HTTPException(status_code=400, detail="Scheme code must be numeric")
+    return await run_in_threadpool(data.fund_monthly_navs, code, since)
+
+
 @router.get("/funds/{code}/latest")
 async def fund_latest(code: str):
     """Today's NAV only — no return history, so it stays fast."""

@@ -41,6 +41,7 @@ class Goal:
 class Finances:
     budgets: list[Budget] = field(default_factory=list)
     goals: list[Goal] = field(default_factory=list)
+    sip_monthly: int = 0          # SIPs leave every month, like rent and bills
     data_ok: bool = True          # False when the backend couldn't be read
     persona: bool = False         # True when the numbers are made up
 
@@ -137,7 +138,7 @@ async def load(user_id: int, tool_token: str | None) -> Finances:
     goals = [Goal(str(g.get("title", "Goal"))[:60], _int(g.get("targetAmount")),
                   _int(g.get("savedSoFar")), _int(g.get("monthlyTarget")))
              for g in raw_goals if g.get("status") != "Completed"]
-    finances = Finances(budgets=budgets, goals=goals)
+    finances = Finances(budgets=budgets, goals=goals, sip_monthly=max(0, _int(budgets_json.get("sipMonthly"))))
     if len(_cache) > 1000:          # a handful of users in practice; never let it grow
         _cache.clear()
     _cache[int(user_id)] = (time.monotonic(), finances)     # only good reads are kept

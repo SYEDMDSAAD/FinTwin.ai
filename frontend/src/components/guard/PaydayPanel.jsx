@@ -13,7 +13,7 @@ export function PlanView({ plan }) {
     const goals = sum(plan.goals.map((g) => g.amount));
     const spending = sum(plan.weekly);
     const parts = [
-        { key: "bills", name: "Rent and bills", amount: plan.bills, color: "var(--sg-seg-bills)" },
+        { key: "bills", name: plan.sips ? `Rent, bills and SIPs (${inr(plan.sips)})` : "Rent and bills", amount: plan.bills, color: "var(--sg-seg-bills)" },
         { key: "goals", name: "Savings goals", amount: goals, color: "var(--sg-seg-goals)" },
         { key: "spending", name: "Spending, four weeks", amount: spending, color: "var(--sg-seg-spending)" },
         { key: "buffer", name: "Buffer for top-ups", amount: plan.buffer, color: "var(--sg-seg-buffer)" },
@@ -85,7 +85,7 @@ function PlanEditor({ plan, busy, onSave, onCancel }) {
                      buffer: num(buffer), weekly: weekly.map(num) });
         }}>
             <p className="sg-sub" style={{ margin: "4px 0 12px" }}>
-                Rent and bills stay at {inr(plan.bills)}. Split the rest your way; every week needs enough for essentials.
+                {plan.sips ? "Rent, bills and SIPs" : "Rent and bills"} stay at {inr(plan.bills)}. Split the rest your way; every week needs enough for essentials.
             </p>
             <div className="sg-plan-grid">
                 {goals.map((g, i) => field(g.goal, g.amount,
