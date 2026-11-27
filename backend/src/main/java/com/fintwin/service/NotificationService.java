@@ -105,9 +105,11 @@ public class NotificationService {
         // ── 2. High merchant concentration ───────────────────────────────
         Map<String, Double> merchantTotals = new HashMap<>();
         for (Transaction t : transactions) {
-            // Not rent, EMIs or bills: a cap on the landlord isn't advice anyone can use
+            // Not rent, EMIs, bills or money to people: a cap on the landlord or
+            // on what you send Mom isn't advice anyone can use
             if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null
-                    && !com.fintwin.util.PlanDraftMath.isFixedCost(t.getCategory())) {
+                    && !com.fintwin.util.PlanDraftMath.isFixedCost(t.getCategory())
+                    && !"People".equalsIgnoreCase(t.getCategory())) {
                 merchantTotals.merge(t.getMerchant(), Math.abs(t.getAmount()), Double::sum);
             }
         }

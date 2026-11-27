@@ -139,6 +139,7 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
         assertThat(lines).anyMatch(l -> l.startsWith("Disney+ Hotstar went up from ₹299 to ₹399"));
         assertThat(lines).anyMatch(l -> l.startsWith("From this salary,"));                       // goal
         assertThat(lines).anyMatch(l -> l.contains("budget of") || l.contains("drafted"));        // budget
+        assertThat(lines).noneMatch(l -> l.contains("Paid to Mom"));                               // not a merchant to cap
 
         ResponseEntity<String> sorted = call(token, HttpMethod.GET, "/api/v1/transactions/auto-sorted", null);
         assertThat(sorted.getStatusCode()).isEqualTo(HttpStatus.OK);
