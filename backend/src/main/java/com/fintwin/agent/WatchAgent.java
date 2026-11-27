@@ -62,6 +62,8 @@ public class WatchAgent {
         for (AnomalyDTO a : found) {
             if (raised >= MAX_NEW) break;
             if (!"high".equals(a.getSeverity())) continue;
+            // Rent, EMIs and bills are big by design; a "check it's yours" for the rent is noise
+            if (com.fintwin.util.PlanDraftMath.isFixedCost(a.getCategory())) continue;
             String key = key(user, a);
             if (alerts.existsByUserAndPatternKey(user, key)) continue;
             AgentAlert alert = new AgentAlert();

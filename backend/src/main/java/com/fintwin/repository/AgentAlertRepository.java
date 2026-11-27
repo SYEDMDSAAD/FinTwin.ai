@@ -11,4 +11,8 @@ public interface AgentAlertRepository extends JpaRepository<AgentAlert, Long> {
     boolean existsByUserAndPatternKey(User user, String patternKey);
 
     List<AgentAlert> findByUserAndCreatedAtAfterOrderByCreatedAtDesc(User user, LocalDateTime after);
+
+    boolean existsByUserAndAgent(User user, String agent);
+
+    void deleteByUser(User user);
 }

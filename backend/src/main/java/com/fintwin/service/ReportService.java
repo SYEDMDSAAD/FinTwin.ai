@@ -266,7 +266,8 @@ public class ReportService {
         return weeklyReports.findByUserAndWeekStart(user, weekStart(LocalDate.now(INDIA))).flatMap(r -> {
             try {
                 WeeklyReportDTO dto = objectMapper.readValue(r.getReport(), WeeklyReportDTO.class);
-                if (r.getViewedAt() == null) {
+                // The shared demo keeps its "report is ready" line for the next visitor
+                if (r.getViewedAt() == null && !com.fintwin.demo.DemoSession.ROLE.equals(user.getRole())) {
                     r.setViewedAt(java.time.LocalDateTime.now());
                     weeklyReports.save(r);
                 }

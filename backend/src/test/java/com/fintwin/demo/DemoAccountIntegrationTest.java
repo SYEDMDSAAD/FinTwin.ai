@@ -123,6 +123,33 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void everyAgentHasSomethingToShowInTheDemo() throws Exception {
+        String token = startDemo();
+
+        ResponseEntity<String> bell = call(token, HttpMethod.GET, "/api/v1/notifications", null);
+        assertThat(bell.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> lines = ((List<Map<String, Object>>) JSON.readValue(bell.getBody(), List.class)).stream()
+                .map(n -> String.valueOf(n.get("message"))).toList();
+        System.out.println("DEMO BELL:\n  " + String.join("\n  ", lines));
+
+        assertThat(lines).anyMatch(l -> l.startsWith("FinTwin sorted 5 payments to 3 payees"));   // sorting
+        assertThat(lines).anyMatch(l -> l.contains("Swiggy"));                                    // watch
+        assertThat(lines).anyMatch(l -> l.startsWith("YouTube Premium renews"));                  // subscription
+        assertThat(lines).anyMatch(l -> l.startsWith("Disney+ Hotstar went up from ₹299 to ₹399"));
+        assertThat(lines).anyMatch(l -> l.startsWith("From this salary,"));                       // goal
+        assertThat(lines).anyMatch(l -> l.contains("budget of") || l.contains("drafted"));        // budget
+
+        ResponseEntity<String> sorted = call(token, HttpMethod.GET, "/api/v1/transactions/auto-sorted", null);
+        assertThat(sorted.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(JSON.readValue(sorted.getBody(), List.class)).hasSize(3);
+
+        // The weekly agent may run for the demo; it isn't blocked as a change
+        assertThat(call(token, HttpMethod.POST, "/api/v1/reports/weekly/ensure", Map.of()).getStatusCode())
+                .isNotEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void nothingInTheDemoCanBeChanged() throws Exception {
         String token = startDemo();
 

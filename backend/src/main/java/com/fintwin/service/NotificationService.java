@@ -105,7 +105,9 @@ public class NotificationService {
         // ── 2. High merchant concentration ───────────────────────────────
         Map<String, Double> merchantTotals = new HashMap<>();
         for (Transaction t : transactions) {
-            if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null) {
+            // Not rent, EMIs or bills: a cap on the landlord isn't advice anyone can use
+            if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null
+                    && !com.fintwin.util.PlanDraftMath.isFixedCost(t.getCategory())) {
                 merchantTotals.merge(t.getMerchant(), Math.abs(t.getAmount()), Double::sum);
             }
         }
@@ -233,17 +235,34 @@ public class NotificationService {
 
         // ── 9. What the agents did or noticed (last 7 days) ──────────────
         // Watch alerts sort with warnings; the sorting summary with info.
-        notifications.addAll(agentNotifications(user));
+        List<NotificationDTO> agents = new ArrayList<>(agentNotifications(user));
         if (nudgeAgents != null) {
-            notifications.addAll(nudgeAgents.all(user, transactions, today, !budgets.isEmpty()));
+            agents.addAll(nudgeAgents.all(user, transactions, today, !budgets.isEmpty()));
         }
+        return bell(notifications, agents);
+    }
 
-        notifications.sort((a, b) -> Integer.compare(
-                PRIORITY.getOrDefault(a.getType(), 5),
-                PRIORITY.getOrDefault(b.getType(), 5)
-        ));
+    /** Most lines the bell shows. */
+    static final int BELL_SIZE = 12;
+    /** Room kept for each side: the rule alerts above, and the agents. */
+    static final int BELL_SHARE = 7;
 
-        return notifications.stream().limit(7).toList();
+    /**
+     * The bell's list: rule alerts and agent lines each sorted by priority,
+     * each given up to BELL_SHARE places (more when the other side has
+     * fewer), then shown together by priority. Without this, a month with a
+     * few budgets over the limit filled every place and no agent was heard.
+     */
+    static List<NotificationDTO> bell(List<NotificationDTO> rules, List<NotificationDTO> agents) {
+        Comparator<NotificationDTO> byPriority = Comparator.comparingInt(n -> PRIORITY.getOrDefault(n.getType(), 5));
+        List<NotificationDTO> r = rules.stream().sorted(byPriority).toList();
+        List<NotificationDTO> a = agents.stream().sorted(byPriority).toList();
+        int fromAgents = Math.min(a.size(), Math.max(BELL_SHARE, BELL_SIZE - r.size()));
+        int fromRules = Math.min(r.size(), BELL_SIZE - fromAgents);
+        List<NotificationDTO> out = new ArrayList<>(r.subList(0, fromRules));
+        out.addAll(a.subList(0, fromAgents));
+        out.sort(byPriority);
+        return out;
     }
 
     /** How long an agent's alert stays in the bell. */
@@ -273,18 +292,23 @@ public class NotificationService {
         java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays(AGENT_ALERT_DAYS);
         List<NotificationDTO> out = new ArrayList<>();
         boolean sortShown = false;
+        int watchShown = 0;
         for (com.fintwin.model.AgentAlert a : agentAlerts.findByUserAndCreatedAtAfterOrderByCreatedAtDesc(user, since)) {
             if (com.fintwin.model.AgentAlert.WATCH.equals(a.getAgent())) {
+                // The newest two: the Anomalies page has the rest, and the other agents need room too
+                if (watchShown >= WATCH_IN_BELL) continue;
                 String key = a.getAnomalyType() + "|" + (a.getMerchant() == null ? "" : a.getMerchant());
-                if (!dismissed.contains(key)) out.add(new NotificationDTO("warning", a.getMessage()));
+                if (!dismissed.contains(key)) { out.add(new NotificationDTO("warning", a.getMessage())); watchShown++; }
             } else if (!sortShown) {
                 // Only the latest sorting summary: older ones are covered by it.
                 out.add(new NotificationDTO("info", a.getMessage()));
                 sortShown = true;
             }
         }
-        return out.stream().limit(4).toList();
+        return out;
     }
+
+    static final int WATCH_IN_BELL = 2;
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void deleteNotification(int index) {

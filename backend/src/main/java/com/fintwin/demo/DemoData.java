@@ -31,6 +31,18 @@ final class DemoData {
     static final double SALARY = 72_000;
     static final int DAYS = 92;
 
+    /** Days ago, payee, amount, category: what the sorting agent sorted on the last import. */
+    static final Object[][] AUTO_SORTED = {
+            {1, "Paid to SHREE SAI HARDWARE", -1_240.0, "Shopping"},
+            {3, "Paid to SHREE SAI HARDWARE", -380.0, "Shopping"},
+            {4, "Paid to PUNE CITY DIAGNOSTICS", -1_800.0, "Health"},
+            {2, "Paid to KAKA HALWAI SWEETS", -560.0, "Food"},
+            {6, "Paid to KAKA HALWAI SWEETS", -320.0, "Food"},
+    };
+    /** The payees above, biggest spend first, as the sorting agent's summary names them. */
+    static final List<String> AUTO_SORTED_PAYEES = List.of("SHREE SAI HARDWARE", "PUNE CITY DIAGNOSTICS",
+            "KAKA HALWAI SWEETS");
+
     private final User user;
     private final LocalDate today;
     private final LocalDate from;
@@ -44,9 +56,12 @@ final class DemoData {
 
     List<Transaction> transactions() {
         List<Transaction> out = new ArrayList<>();
-        // Monthly, on a fixed day: salary, rent, investing, EMI, bills, subscriptions
+        // Monthly, on a fixed day: salary, rent, investing, EMI, bills, subscriptions.
+        // The salary lands the day before today, so the salary-day help (the
+        // goal agent and Spend Guard's Salary day) is always there to see.
+        int salaryDay = today.minusDays(1).getDayOfMonth();
         for (LocalDate month = from.withDayOfMonth(1); !month.isAfter(today); month = month.plusMonths(1)) {
-            monthly(out, month, 1, "BRIGHTWAVE TECHNOLOGIES PVT LTD", SALARY, "Income", Categorized.BRAND);
+            monthly(out, month, salaryDay, "BRIGHTWAVE TECHNOLOGIES PVT LTD", SALARY, "Income", Categorized.BRAND);
             monthly(out, month, 3, "Paid to Netflix", -649, "Entertainment", Categorized.BRAND);
             monthly(out, month, 5, "Paid to Sunita Deshpande", -18_000, "Rent", Categorized.PERSON);
             monthly(out, month, 6, "Paid to Mom", -5_000, "People", Categorized.PERSON);
@@ -87,6 +102,27 @@ final class DemoData {
         add(out, today.minusDays(33), "Udemy", -449, "Education", Categorized.BRAND);
         add(out, today.minusDays(18), "MakeMyTrip", -5_420, "Travel", Categorized.BRAND);
 
+        // For the subscription agent: one plan renewing in two days, and one
+        // whose latest charge went up
+        for (int k = 1; k <= 3; k++) {
+            addInWindow(out, today.plusDays(2).minusMonths(k), "YouTube Premium", -149, "Entertainment");
+        }
+        for (int k = 0; k <= 2; k++) {
+            addInWindow(out, today.minusDays(5).minusMonths(k), "Disney+ Hotstar", k == 0 ? -399 : -299,
+                    "Entertainment");
+        }
+
+        // For the watch agent: today's Swiggy order is far above the usual one
+        out.removeIf(t -> today.equals(t.getDate()) && "Swiggy".equals(t.getMerchant()));
+        add(out, today, "Swiggy", -2_840, "Food", Categorized.BRAND);
+
+        // For the sorting agent: payees no rule knew, sorted by FinTwin and
+        // waiting in Transactions for a yes or a fix (see AUTO_SORTED)
+        for (Object[] row : AUTO_SORTED) {
+            add(out, today.minusDays((int) row[0]), (String) row[1], (double) row[2], (String) row[3],
+                    Categorized.LLM_AUTO);
+        }
+
         // Spend Guard payments, as the Transactions page shows them: one paid
         // yesterday that no statement has confirmed yet, and one the last
         // statement didn't show (the user is asked whether they paid)
@@ -106,8 +142,10 @@ final class DemoData {
     }
 
     List<Budget> budgets() {
-        return List.of(budget("Food", 5_000), budget("Groceries", 7_000), budget("Shopping", 3_500),
-                budget("Entertainment", 1_200), budget("Transport", 3_000));
+        // Close to what Riya spends, except Shopping: set too low, so the
+        // budget agent has a limit to question
+        return List.of(budget("Food", 11_000), budget("Groceries", 11_000), budget("Shopping", 3_500),
+                budget("Entertainment", 2_000), budget("Transport", 4_000));
     }
 
     List<FinancialGoal> goals(double monthlySavings) {
@@ -167,6 +205,10 @@ final class DemoData {
                          String category, String source) {
         LocalDate date = month.withDayOfMonth(Math.min(day, month.lengthOfMonth()));
         if (!date.isBefore(from) && !date.isAfter(today)) add(out, date, merchant, amount, category, source);
+    }
+
+    private void addInWindow(List<Transaction> out, LocalDate date, String merchant, double amount, String category) {
+        if (!date.isBefore(from) && !date.isAfter(today)) add(out, date, merchant, amount, category, Categorized.BRAND);
     }
 
     private void add(List<Transaction> out, LocalDate date, String merchant, double amount, String category,

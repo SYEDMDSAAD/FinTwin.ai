@@ -36,6 +36,8 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
             new Rule("POST", "/api/v1/transactions/chat"),
             new Rule("POST", "/api/v1/demo/event"),
             new Rule("POST", "/api/v1/visits"),
+            // The weekly agent writes this week's report once, for every visitor to read
+            new Rule("POST", "/api/v1/reports/weekly/ensure"),
             // Building and regenerating goals, kept per visitor (GoalPlannerService)
             new Rule("POST", "/api/v1/goals"),
             new Rule("POST", "/api/v1/goals/\\d+/(regenerate|complete)"),

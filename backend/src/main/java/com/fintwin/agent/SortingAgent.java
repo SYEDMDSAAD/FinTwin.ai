@@ -151,6 +151,11 @@ public class SortingAgent {
     }
 
     private void record(User user, int payees, int payments, List<String> names) {
+        alerts.save(summary(user, payees, payments, names));
+    }
+
+    /** The bell's "FinTwin sorted N payments" line (also used for the demo account). */
+    public static AgentAlert summary(User user, int payees, int payments, List<String> names) {
         AgentAlert a = new AgentAlert();
         a.setUser(user);
         a.setAgent(AgentAlert.SORT);
@@ -160,6 +165,6 @@ public class SortingAgent {
         a.setMessage("FinTwin sorted " + payments + (payments == 1 ? " payment" : " payments") + " to "
                 + payees + (payees == 1 ? " payee" : " payees") + " (" + who + "). Check them under Transactions.");
         a.setCreatedAt(LocalDateTime.now());
-        alerts.save(a);
+        return a;
     }
 }

@@ -141,7 +141,12 @@ public class NudgeAgents {
         Transaction last = charges.get(charges.size() - 1);
         if (last.getDate().isBefore(today.minusDays(14))) return null;
         double latest = -last.getAmount();
-        double before = median(charges.subList(0, charges.size() - 1).stream().mapToDouble(t -> -t.getAmount()).toArray());
+        double[] earlier = charges.subList(0, charges.size() - 1).stream().mapToDouble(t -> -t.getAmount()).toArray();
+        double before = median(earlier);
+        // A price rise needs a steady price before it: a bill that changes every
+        // month (electricity, water) going up once isn't one
+        double low = Arrays.stream(earlier).min().orElse(0), high = Arrays.stream(earlier).max().orElse(0);
+        if (high > low * 1.03) return null;
         if (latest < before * 1.08 || latest - before < 20) return null;
         double perYear = (latest - before) * 365.0 / Math.max(7, r.cadenceDays());
         return new NotificationDTO("warning", r.merchant() + " went up from " + rupees(before) + " to "

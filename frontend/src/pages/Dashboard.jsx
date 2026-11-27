@@ -3,7 +3,6 @@ import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
 import API from "../services/api";
-import { storedUserIsDemo } from "../utils/demoGuard";
 import DemoBanner from "../components/DemoBanner";
 
 import { useTheme } from "../context/ThemeContext";
@@ -160,8 +159,9 @@ function Dashboard() {
 
     // The weekly agent: once per visit, write this week's report if it isn't
     // there yet. Fire and forget; the bell says when it's ready.
+    // The shared demo account asks too: its first visitor of the week writes
+    // the report every later visitor reads.
     useEffect(() => {
-        if (storedUserIsDemo()) return;
         try {
             if (sessionStorage.getItem("fintwin-weekly-ensured")) return;
             sessionStorage.setItem("fintwin-weekly-ensured", "1");
