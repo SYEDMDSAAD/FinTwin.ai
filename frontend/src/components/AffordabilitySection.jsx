@@ -94,7 +94,7 @@ function AffordabilitySection({
     ] : [];
 
     return (
-        <section aria-label="Can I afford this?" className="max-w-2xl mb-10">
+        <section aria-label="Can I afford this?" className="max-w-2xl mb-10 lg:sticky lg:top-6">
             <div className="rounded-card bg-surface border border-line p-5">
                 <div className="flex items-center gap-3">
                     <span className="shrink-0 w-10 h-10 rounded-full bg-surface-sunken text-ink-2 flex items-center justify-center">

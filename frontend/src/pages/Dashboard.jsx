@@ -1073,6 +1073,12 @@ function Dashboard() {
 
     // Android app: bank SMS that arrived since the last look become
     // transactions, on opening and on coming back to the app
+    // A new section starts at its top, not where the last one was scrolled to
+    const mainRef = useRef(null);
+    useEffect(() => {
+        mainRef.current?.scrollTo?.({ top: 0 });
+    }, [activeSection]);
+
     const refreshRef = useRef(refreshDashboard);
     refreshRef.current = refreshDashboard;
     useEffect(() => {
@@ -1684,11 +1690,15 @@ function Dashboard() {
                     pb-28
                     md:pb-6
                     xl:pb-10
+                    lg:px-10
                     overflow-y-auto
                     overflow-x-hidden
                     min-w-0
+                    desk-canvas
                 "
+                ref={mainRef}
             >
+              <div className="desk-page lg:max-w-[1240px] lg:mx-auto">
 
                 <DemoBanner section={activeSection} onOpenGuard={() => navigateTo("Spend Guard")} />
 
@@ -1705,6 +1715,7 @@ function Dashboard() {
                         goals={goals}
                         scoreData={scoreData}
                         netWorth={netWorth}
+                        monthlyHistory={monthlyHistory}
                         loading={loading}
                         navigateTo={navigateTo}
                     />
@@ -1843,6 +1854,7 @@ function Dashboard() {
                 {activeSection ===
                     "Analytics" && (
                     <>
+                    <div className="desk-cols">
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
                             <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
@@ -1867,6 +1879,7 @@ function Dashboard() {
                     )}
                     <MonthlySummaryCard summary={monthlySummary} />
                     <CategoryForecastCard categoryForecast={categoryForecast} />
+                    </div>
                     <AnalyticsPage
                         transactions={transactions}
                         recurringExpenses={recurringExpenses}
@@ -1894,7 +1907,7 @@ function Dashboard() {
                 {activeSection ===
                 "AI Intelligence" && (
 
-                <>
+                <div className="desk-cols">
 
                     <FinancialScoreCard
                         scoreData={scoreData}
@@ -1918,7 +1931,7 @@ function Dashboard() {
 
                     <CreditScoreCard />
 
-                </>
+                </div>
 
                 )}
 
@@ -1953,7 +1966,7 @@ function Dashboard() {
                 {activeSection ===
                 "Budgeting" && (
 
-                <>
+                <div className="lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-7 lg:items-start">
 
                     <BudgetSection
                         budgets={budgets}
@@ -1980,7 +1993,7 @@ function Dashboard() {
                         }
                     />
 
-                </>
+                </div>
 
                 )}
 
@@ -2077,8 +2090,7 @@ function Dashboard() {
                     <SettingsPage navigateTo={navigateTo} />
                 )}
 
-
-
+              </div>
             </div>
 
             {/* Mobile bottom navigation — hidden on md+ */}

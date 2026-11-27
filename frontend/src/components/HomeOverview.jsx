@@ -3,6 +3,8 @@ import { rupees } from "../utils/money";
 import { headline, attentionItems } from "../utils/home";
 import { SectionHeader, Progress, List, ListRow, Button } from "./ui";
 import SpendGuardCard from "./SpendGuardCard";
+import HomeDesk from "./HomeDesk";
+import useWide from "../hooks/useWide";
 
 /*
  * Home: one number, what needs you, and a way into the rest.
@@ -28,15 +30,26 @@ export default function HomeOverview({
     goals = [],
     scoreData,
     netWorth,
+    monthlyHistory,
     loading,
     navigateTo,
 }) {
+    const wide = useWide();
     const head = headline({ income, spent, budgets });
     const items = attentionItems({ budgets, notifications });
     const negative = head.kind !== "spent" && head.value < 0;
     const active = goals.filter((g) => !g.completed);
     const topGoal = [...active].sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0))[0];
     const barTone = head.share >= 1 ? "bad" : head.share >= 0.8 ? "warn" : "accent";
+
+    if (wide) {
+        return (
+            <HomeDesk head={head} items={items} negative={negative} barTone={barTone}
+                      income={income} spent={spent} notifications={notifications}
+                      active={active} topGoal={topGoal} scoreData={scoreData} netWorth={netWorth}
+                      monthlyHistory={monthlyHistory} loading={loading} navigateTo={navigateTo} />
+        );
+    }
 
     return (
         <div className="max-w-2xl space-y-8">

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sun, Moon, CalendarDays, Coffee, Handshake, KeyRound, Landmark, Lock, MessageCircle, PauseCircle, PieChart, RefreshCw, Target, TrendingUp } from "lucide-react";
+import { Sun, Moon, CalendarDays, Coffee, Handshake, KeyRound, Landmark, Lock, MessageCircle, PauseCircle, PieChart, RefreshCw, Target, TrendingUp, FileSpreadsheet, Smartphone, QrCode, LineChart } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { toLight } from "./landingLightCss";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { recordVisit, startDemo } from "../utils/demo";
+import { isNativeApp } from "../native";
 
 /* One typeface everywhere: Inter, from the app bundle */
 
@@ -231,6 +232,93 @@ const CSS = `
 .gt-gold { color: #fbbf24; }
 .gt-green { color: #4ade80; }
 
+
+/* ══ Website-only layer (.land.web; the Android app never gets this class) ══ */
+.web .hero { min-height: auto; }
+.web .hero-inner { grid-template-columns: 44fr 56fr; gap: 56px; padding: 120px 32px 96px; }
+.web .hero-h1 { font-size: clamp(44px, 5.4vw, 72px); }
+.pv { position: relative; padding: 0 0 70px 0; margin-right: 40px; }
+.pv-frame { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); border-radius: 18px; overflow: hidden; box-shadow: 0 40px 100px -30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.02); }
+.pv-top { display: flex; align-items: center; gap: 6px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.pv-top i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.12); display: block; }
+.pv-url { margin-left: 12px; flex: 1; max-width: 260px; height: 20px; border-radius: 6px; background: rgba(255,255,255,0.05); font-size: 10.5px; color: rgba(148,163,184,0.8); display: flex; align-items: center; padding: 0 10px; }
+.pv-body { display: grid; grid-template-columns: 104px 1fr; min-height: 360px; }
+.pv-side { border-right: 1px solid rgba(255,255,255,0.07); padding: 14px 10px; display: flex; flex-direction: column; gap: 6px; }
+.pv-side span { font-size: 11px; color: rgba(148,163,184,0.8); padding: 6px 8px; border-radius: 8px; }
+.pv-side span.on { background: rgba(167,139,250,0.12); color: #a78bfa; font-weight: 600; }
+.pv-main { padding: 16px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; align-content: start; }
+.pv-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px; }
+.pv-k { font-size: 10px; color: rgba(148,163,184,0.85); }
+.pv-v { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #f1f5f9; margin-top: 2px; }
+.pv-v.sm { font-size: 15px; }
+.pv-n { font-size: 10px; color: #4ade80; margin-top: 2px; }
+.pv-track { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.07); margin-top: 10px; overflow: hidden; }
+.pv-track b { display: block; height: 100%; border-radius: 3px; background: #7c3aed; }
+.pv-wide { grid-column: 1 / -1; }
+.pv-bars { display: flex; align-items: flex-end; gap: 8px; height: 96px; margin-top: 10px; }
+.pv-bars b { flex: 1; border-radius: 5px 5px 2px 2px; background: rgba(167,139,250,0.28); display: block; }
+.pv-bars b.hi { background: #7c3aed; }
+.pv-months { display: flex; gap: 8px; margin-top: 6px; }
+.pv-months span { flex: 1; text-align: center; font-size: 9px; color: rgba(148,163,184,0.8); }
+.pv .gm-card { position: absolute; right: -48px; bottom: 0; width: 262px; max-width: none; margin: 0; padding: 16px; background: rgba(6,8,16,0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 30px 70px -20px rgba(0,0,0,0.6); }
+.pv .gm-name { font-size: 15px; }
+.pv .gm-amount { font-size: 20px; }
+.pv .gm-msg { font-size: 12px; margin: 8px 0; }
+.pv .gm-facts { display: none; }
+.pv .gm-btn { font-size: 11.5px; padding: 7px 10px; }
+
+.works { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.works-inner { max-width: 1200px; margin: 0 auto; padding: 22px 32px; display: flex; align-items: center; justify-content: center; gap: 14px 34px; flex-wrap: wrap; }
+.works-label { font-size: 12px; font-weight: 600; color: rgba(148,163,184,0.8); }
+.works-item { font-size: 14px; font-weight: 600; color: rgba(226,232,240,0.78); display: inline-flex; align-items: center; gap: 8px; }
+.works-item svg { color: #a78bfa; }
+
+.why-split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 72px; align-items: start; }
+.why-list { list-style: none; }
+.why-row { display: grid; grid-template-columns: 56px 1fr; gap: 6px 18px; padding: 26px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+.why-row:last-child { border-bottom: 1px solid rgba(255,255,255,0.08); }
+.why-num { font-size: 13px; font-weight: 700; color: #a78bfa; padding-top: 3px; }
+
+.web .steps { counter-reset: none; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 48px; border: 1px solid rgba(255,255,255,0.07); border-radius: 22px; overflow: hidden; background: rgba(255,255,255,0.025); }
+.web .step { border: none; border-radius: 0; background: transparent; padding: 30px 28px; border-right: 1px solid rgba(255,255,255,0.07); }
+.web .steps > div:last-child .step { border-right: none; }
+.feat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 48px; }
+.feat-row .feat-card-icon { margin-bottom: 14px; }
+
+.bento { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+.bento .feat-card { height: 100%; display: flex; flex-direction: column; }
+.bento-2 { grid-column: span 2; }
+.bento-viz { margin-top: auto; padding-top: 22px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips span { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: rgba(226,232,240,0.85); }
+.big-fig { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; color: #f1f5f9; }
+.big-fig small { font-size: 14px; font-weight: 600; color: #4ade80; margin-left: 8px; letter-spacing: 0; }
+
+.web .sec-wrap { background: rgba(255,255,255,0.02); }
+.footer-a { font-size: 13px; color: rgba(100,116,139,0.7); text-decoration: none; transition: color 0.15s; }
+.footer-a:hover { color: #a78bfa; }
+.web .footer-grid { grid-template-columns: 2fr 1fr 1fr; }
+
+@media (max-width: 1100px) {
+  .web .hero-inner { grid-template-columns: 1fr; }
+  .pv { max-width: 640px; margin: 0 auto; width: 100%; }
+  .pv { margin-right: 0; }
+  .pv .gm-card { right: -8px; }
+}
+@media (max-width: 900px) {
+  .web .hero-right { display: none; }
+  .why-split { grid-template-columns: 1fr; gap: 24px; }
+  .web .steps { grid-template-columns: 1fr; }
+  .web .step { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .feat-row { grid-template-columns: 1fr 1fr; }
+  .bento { grid-template-columns: 1fr; }
+  .bento-2 { grid-column: auto; }
+}
+@media (max-width: 600px) {
+  .feat-row { grid-template-columns: 1fr; gap: 24px; }
+  .web .footer-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Responsive ─────────────────── */
 @media (max-width: 900px) {
   .hero-inner { grid-template-columns: 1fr; gap: 48px; }
@@ -308,6 +396,9 @@ const LIGHT_CSS = toLight(CSS) + `
 .land.light .gm-facts span { background: #eef2f7; color: #334155; }
 .land.light .footer-copy, .land.light .fine-print { color: #475569; }
 .land.light .section-tag { color: #6d28d9; }
+.land.light.web .pv-frame { box-shadow: 0 40px 90px -36px rgba(40,24,90,0.28), 0 0 0 1px rgba(15,23,42,0.04); }
+.land.light.web .pv .gm-card { box-shadow: 0 30px 60px -24px rgba(40,24,90,0.35); }
+.land.light.web .hero { background: radial-gradient(900px 520px at 78% 30%, rgba(124,58,237,0.09), transparent 70%); }
 `;
 
 
@@ -356,6 +447,130 @@ function GuardMockup() {
   );
 }
 
+
+/* The website's hero picture: the dashboard, with a pause on top (made-up figures) */
+function ProductPreview() {
+  return (
+    <div className="pv" role="img" aria-label="The FinTwin dashboard with Spend Guard pausing a ₹2,400 payment">
+      <div className="pv-frame" aria-hidden="true">
+        <div className="pv-top"><i /><i /><i /><span className="pv-url">fintwin · Home</span></div>
+        <div className="pv-body">
+          <div className="pv-side">
+            <span className="on">Home</span><span>Spend</span><span>Grow</span><span>Me</span><span>Copilot</span>
+          </div>
+          <div className="pv-main">
+            <div className="pv-card">
+              <div className="pv-k">Left this month</div>
+              <div className="pv-v">₹18,240</div>
+              <div className="pv-track"><b style={{ width: "68%" }} /></div>
+            </div>
+            <div className="pv-card">
+              <div className="pv-k">Net worth</div>
+              <div className="pv-v sm">₹6,08,913</div>
+              <div className="pv-n">↑ 4.2% this quarter</div>
+            </div>
+            <div className="pv-card pv-wide">
+              <div className="pv-k">Spending by month</div>
+              <div className="pv-bars">
+                {[58, 72, 64, 80, 61, 52].map((h, i) => <b key={i} className={i === 5 ? "hi" : ""} style={{ height: `${h}%` }} />)}
+              </div>
+              <div className="pv-months">{["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"].map((m) => <span key={m}>{m}</span>)}</div>
+            </div>
+            <div className="pv-card pv-wide">
+              <div className="pv-k">Goa trip · 62% there</div>
+              <div className="pv-track"><b style={{ width: "62%", background: "#22c55e" }} /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <GuardMockup />
+    </div>
+  );
+}
+
+
+/* The website's feature grid: each card shows a little of the real thing (made-up figures) */
+function FeatureBento() {
+  const cats = [
+    { label: "Rent", pct: 100, val: "₹18k", color: "#7c3aed" },
+    { label: "Groceries", pct: 48, val: "₹8.6k", color: "#22d3ee" },
+    { label: "Food", pct: 46, val: "₹8.3k", color: "#fbbf24" },
+    { label: "Shopping", pct: 44, val: "₹8.0k", color: "#f472b6" },
+    { label: "Transport", pct: 20, val: "₹3.7k", color: "#4ade80" },
+  ];
+  return (
+    <div className="bento">
+      <Reveal className="bento-2">
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><PieChart size={20} /></div>
+          <div className="feat-card-title">See where it goes</div>
+          <div className="feat-card-desc">Every rupee sorted into clear categories, month by month. FinTwin learns your local shops and remembers your corrections.</div>
+          <div className="bento-viz mini-bar-wrap" aria-hidden="true">
+            {cats.map((c) => (
+              <div className="mini-bar-row" key={c.label}>
+                <span className="mini-bar-label">{c.label}</span>
+                <span className="mini-bar-track"><span className="mini-bar-fill" style={{ display: "block", width: `${c.pct}%`, background: c.color }} /></span>
+                <span className="mini-bar-val" style={{ color: "inherit" }}>{c.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Reveal>
+      <Reveal delay={1}>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><MessageCircle size={20} /></div>
+          <div className="feat-card-title">Ask about your money</div>
+          <div className="feat-card-desc">Plain answers from your own numbers, typed or spoken.</div>
+          <div className="bento-viz" aria-hidden="true">
+            <div className="mini-chat">
+              <div className="mini-chat-user">Where did most of it go last month?</div>
+              <div className="mini-chat-ai"><div className="mini-chat-ai-tag">FinTwin</div>Rent was ₹18,000. After that, groceries at ₹8,568, up ₹1,354 on October.</div>
+            </div>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><Target size={20} /></div>
+          <div className="feat-card-title">Goals that keep up</div>
+          <div className="feat-card-desc">See when you'll get there, based on what you really save.</div>
+          <div className="bento-viz mini-goal" aria-hidden="true">
+            {[{ n: "Goa trip", p: 62 }, { n: "Emergency fund", p: 35 }].map((g) => (
+              <div className="mini-goal-row" key={g.n}>
+                <div className="mini-goal-info">
+                  <div className="mini-goal-name">{g.n}</div>
+                  <div className="mini-goal-bar-track"><div className="mini-goal-bar-fill" style={{ width: `${g.p}%`, background: "#22c55e" }} /></div>
+                </div>
+                <span className="mini-goal-pct">{g.p}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Reveal>
+      <Reveal delay={1}>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><TrendingUp size={20} /></div>
+          <div className="feat-card-title">Investments, honestly measured</div>
+          <div className="feat-card-desc">Import your mutual-fund statement and see your real yearly return, with tax-saving tips.</div>
+          <div className="bento-viz" aria-hidden="true">
+            <div className="big-fig">₹1,70,734<small>12.4% a year</small></div>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal delay={2}>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><FileSpreadsheet size={20} /></div>
+          <div className="feat-card-title">Bring your data in once</div>
+          <div className="feat-card-desc">No bank passwords. Import what you already have.</div>
+          <div className="bento-viz chips" aria-hidden="true">
+            <span>CSV</span><span>PDF statement</span><span>Excel</span><span>CAS</span><span>Bank SMS</span><span>Receipts</span>
+          </div>
+        </div>
+      </Reveal>
+    </div>
+  );
+}
+
 function Reveal({ children, delay = 0, className = "" }) {
   const ref = useScrollReveal();
   return (
@@ -364,6 +579,15 @@ function Reveal({ children, delay = 0, className = "" }) {
     </div>
   );
 }
+
+const WHY = [
+  { icon: Coffee, title: "Small spends add up",
+    desc: "₹150 here and ₹400 there is how a month's savings quietly disappear." },
+  { icon: Moon, title: "Late nights cost more",
+    desc: "The buys people regret most happen late, on impulse, and in a hurry." },
+  { icon: Target, title: "Goals slip out of sight",
+    desc: "A trip, a phone, an emergency fund: easy to forget at the counter." },
+];
 
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -375,6 +599,8 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const auth = useAuth();
   const [demoStarting, setDemoStarting] = useState(false);
+  // The Android app opens on this page too; the newer website layout is for browsers only
+  const web = !isNativeApp();
 
   // "Try the demo": one click into a shared account with sample data
   const tryDemo = async () => {
@@ -425,7 +651,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className={`land${isDark ? "" : " light"}`}>
+    <div className={`land${isDark ? "" : " light"}${web ? " web" : ""}`}>
       <style>{isDark ? DARK_CSS : LIGHT_CSS}</style>
 
       {/* ── Mobile menu ──────────────────────────────────────── */}
@@ -547,14 +773,56 @@ export default function LandingPage() {
           </div>
 
           <div className="hero-right" aria-label="Example: Spend Guard pausing a payment">
-            <GuardMockup />
+            {web ? <ProductPreview /> : <GuardMockup />}
           </div>
         </div>
       </section>
 
+      {web && (
+        <div className="works" aria-label="What FinTwin works with">
+          <div className="works-inner">
+            <span className="works-label">Works with</span>
+            <span className="works-item"><QrCode size={16} aria-hidden /> Google Pay, PhonePe, Paytm</span>
+            <span className="works-item"><FileSpreadsheet size={16} aria-hidden /> Bank statements: CSV, PDF, Excel</span>
+            <span className="works-item"><LineChart size={16} aria-hidden /> Mutual-fund CAS</span>
+            <span className="works-item"><Smartphone size={16} aria-hidden /> Bank SMS on Android</span>
+          </div>
+        </div>
+      )}
+
       {/* ════════════════════════════════════════════════════════
           WHY
       ════════════════════════════════════════════════════════ */}
+      {web ? (
+      <section id="why" aria-labelledby="why-heading">
+        <div className="section why-split">
+          <Reveal>
+            <div className="section-tag">Why FinTwin</div>
+            <h2 className="section-h2" id="why-heading">
+              Paying got instant.<br />
+              <span className="gt-purple">Thinking about it didn't.</span>
+            </h2>
+            <p className="section-sub">
+              A scan and a PIN, and the money's gone. Budget apps tell you what went wrong at the end of the
+              month. FinTwin helps at the moment it matters: just before you pay.
+            </p>
+          </Reveal>
+          <Reveal delay={1}>
+            <ol className="why-list">
+              {WHY.map((c, i) => (
+                <li className="why-row" key={c.title}>
+                  <span className="why-num" aria-hidden="true">0{i + 1}</span>
+                  <div>
+                    <div className="feat-card-title">{c.title}</div>
+                    <div className="feat-card-desc">{c.desc}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
+        </div>
+      </section>
+      ) : (
       <section id="why" aria-labelledby="why-heading">
         <div className="section">
           <Reveal>
@@ -569,14 +837,7 @@ export default function LandingPage() {
             </p>
           </Reveal>
           <div className="feat-grid feat-grid-3">
-            {[
-              { icon: Coffee, title: "Small spends add up",
-                desc: "₹150 here and ₹400 there is how a month's savings quietly disappear." },
-              { icon: Moon, title: "Late nights cost more",
-                desc: "The buys people regret most happen late, on impulse, and in a hurry." },
-              { icon: Target, title: "Goals slip out of sight",
-                desc: "A trip, a phone, an emergency fund: easy to forget at the counter." },
-            ].map((c, i) => (
+            {WHY.map((c, i) => (
               <Reveal key={c.title} delay={(i % 2) + 1}>
                 <div className="feat-card">
                   <div className="feat-card-icon" aria-hidden="true"><c.icon size={20} /></div>
@@ -588,6 +849,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ════════════════════════════════════════════════════════
           SPEND GUARD: how it works
@@ -617,7 +879,7 @@ export default function LandingPage() {
               </Reveal>
             ))}
           </ol>
-          <div className="feat-grid" style={{ marginTop: 28 }}>
+          <div className={web ? "feat-row" : "feat-grid"} style={web ? undefined : { marginTop: 28 }}>
             {[
               { icon: PauseCircle, title: "A pause only when it matters",
                 desc: "Essentials and small payments never wait. A buy that breaks your budget gets a short, honest note." },
@@ -629,7 +891,7 @@ export default function LandingPage() {
                 desc: "You can always pay anyway. Your UPI app makes every payment, with your PIN." },
             ].map((c, i) => (
               <Reveal key={c.title} delay={(i % 2) + 1}>
-                <div className="feat-card">
+                <div className={web ? "" : "feat-card"}>
                   <div className="feat-card-icon" aria-hidden="true"><c.icon size={20} /></div>
                   <div className="feat-card-title">{c.title}</div>
                   <div className="feat-card-desc">{c.desc}</div>
@@ -653,6 +915,7 @@ export default function LandingPage() {
               once and get the full picture.
             </p>
           </Reveal>
+          {web ? <FeatureBento /> : (
           <div className="feat-grid">
             {[
               { icon: PieChart, title: "See where it goes",
@@ -673,6 +936,7 @@ export default function LandingPage() {
               </Reveal>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -837,6 +1101,15 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {web ? (
+            <div>
+              <div className="footer-col-title">Legal</div>
+              <div className="footer-links">
+                <a className="footer-a" href="/privacy-policy">Privacy policy</a>
+                <a className="footer-a" href="/terms">Terms of service</a>
+              </div>
+            </div>
+            ) : (<>
             {/* Company */}
             <div>
               <div className="footer-col-title">Company</div>
@@ -858,15 +1131,23 @@ export default function LandingPage() {
                 <span className="footer-link">Help center</span>
               </div>
             </div>
+            </>)}
           </div>
 
           <div className="footer-bottom">
             <span className="footer-copy">© 2026 FinTwin AI · Made in India · Beta</span>
+            {web ? (
+              <div className="footer-legal">
+                <a className="footer-a" style={{ fontSize: 12 }} href="/privacy-policy">Privacy</a>
+                <a className="footer-a" style={{ fontSize: 12 }} href="/terms">Terms</a>
+              </div>
+            ) : (
             <div className="footer-legal">
               <span className="footer-link" style={{ fontSize: 12 }}>Privacy</span>
               <span className="footer-link" style={{ fontSize: 12 }}>Terms</span>
               <span className="footer-link" style={{ fontSize: 12 }}>Security</span>
             </div>
+            )}
           </div>
         </div>
       </footer>

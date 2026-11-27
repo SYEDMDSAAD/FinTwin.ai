@@ -1162,3 +1162,67 @@ body {
 
 /* Money: digits all the same width so amounts line up and don't jiggle as they change */
 .num, .tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum", "cv05", "cv08"; }
+
+/* Copilot on a phone: a full screen between the top and the bottom tab bar,
+   like a messaging app, not a card inside the page */
+.copilot-shell {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+}
+@media (min-width: 768px) {
+    .copilot-shell { bottom: auto; padding-top: 0; }
+}
+
+/* ══ Wide screens (the website on a computer) ══════════════════════════════
+   Phones and the Android app never reach 1024px (the app is portrait-only),
+   so everything below changes the website alone. */
+@media (min-width: 1024px) {
+    :root[data-theme="light"] {
+        --bg-base: #F3F2F8;
+        --shadow-card: 0 1px 2px rgba(17,17,26,0.04), 0 10px 28px -14px rgba(40,24,90,0.14);
+    }
+    :root:not([data-theme="light"]) {
+        --shadow-card: 0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 30px -16px rgba(0,0,0,0.6);
+    }
+
+    /* A soft wash of colour behind the page instead of flat grey */
+    .desk-canvas {
+        background:
+            radial-gradient(900px 420px at 85% -120px, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+            radial-gradient(700px 360px at 10% -160px, color-mix(in srgb, var(--info) 7%, transparent), transparent 70%),
+            var(--bg-base);
+    }
+
+    /* Pages use the screen: the phone-width cap goes */
+    .desk-page .max-w-2xl,
+    .desk-page .max-w-xl { max-width: none; }
+
+    /* Every card and grouped list sits on the page with a little depth */
+    .desk-page .rounded-card.border,
+    .desk-page ul.rounded-card {
+        box-shadow: var(--shadow-card);
+    }
+
+    /* Several independent sections: flow them into two balanced columns */
+    .desk-cols {
+        column-count: 2;
+        column-gap: 1.75rem;
+    }
+    .desk-cols > * {
+        display: inline-block;
+        width: 100%;
+        vertical-align: top;
+        break-inside: avoid;
+        margin-top: 0 !important;
+        margin-bottom: 1.75rem !important;
+    }
+    .desk-cols > .desk-span {
+        column-span: all;
+        display: block;
+    }
+    .desk-cols > :empty { display: none; }
+}
+
+@media (min-width: 1440px) {
+    .desk-cols-3 { column-count: 3; }
+}

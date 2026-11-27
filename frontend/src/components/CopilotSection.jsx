@@ -167,12 +167,18 @@ function CopilotSection({
 
         <div
             className={`
-                relative
+                copilot-shell
+                fixed
+                inset-x-0
+                top-0
+                z-[55]
+                md:relative
+                md:inset-auto
+                md:z-auto
                 overflow-hidden
                 flex
                 flex-col
-                pt-3
-                h-[calc(100vh-6rem)]
+                md:pt-3
                 w-full
                 md:w-auto
                 md:h-screen
@@ -180,9 +186,7 @@ function CopilotSection({
                 md:-mx-6
                 xl:-my-10
                 xl:-mx-10
-                rounded-2xl
-                md:rounded-none
-                border
+                md:border
                 bg-surface border-line
             `}
         >
@@ -196,8 +200,10 @@ function CopilotSection({
                     flex
                     items-center
                     justify-between
-                    px-5
-                    py-3.5
+                    px-4
+                    md:px-5
+                    py-3
+                    md:py-3.5
                     border-b
                     border-line
                 `}
@@ -222,10 +228,11 @@ function CopilotSection({
                         <button
                             onClick={clearChat}
                             title="Delete the entire chat history"
-                            className="flex items-center gap-1.5 h-9 px-3.5 rounded-full text-small font-semibold text-bad hover:bg-bad-soft transition-colors"
+                            aria-label="Clear chat"
+                            className="flex items-center gap-1.5 h-9 px-2.5 md:px-3.5 rounded-full text-small font-semibold text-bad hover:bg-bad-soft transition-colors"
                         >
-                            <Trash2 size={14} aria-hidden />
-                            Clear chat
+                            <Trash2 size={16} aria-hidden />
+                            <span className="hidden sm:inline">Clear chat</span>
                         </button>
                     )}
 
@@ -239,7 +246,7 @@ function CopilotSection({
 
             <div className="flex-1 min-h-0 overflow-y-auto">
 
-                <div className="w-full px-6 py-6 flex flex-col gap-6">
+                <div className="w-full px-4 py-5 md:px-6 md:py-6 flex flex-col gap-5 md:gap-6">
 
                     {/* ── Empty state: centered greeting + prompt chips ── */}
 
@@ -495,7 +502,7 @@ function CopilotSection({
                 picker chip + send button in one card)
             ===================================== */}
 
-            <div className="px-5 pb-5 pt-2">
+            <div className="px-3 pb-3 pt-2 md:px-5 md:pb-5">
 
                 {!aiOnline && (
                     <div

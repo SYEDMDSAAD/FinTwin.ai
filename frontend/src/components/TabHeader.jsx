@@ -13,13 +13,21 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
     const tab = tabOf(activeSection);
     const sections = tab ? sectionsOf(tab, guardOn) : [];
     const title = tab ? tab.label : "Copilot";
+    const pageLabel = sections.length > 1 ? sections.find((s) => s.name === activeSection)?.label : null;
 
     return (
         <header className="mb-6 pt-1">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-[28px] leading-tight font-[650] tracking-[-0.03em] md:text-[30px] text-ink min-w-0 truncate">
-                    {title}
-                </h1>
+                <div className="min-w-0">
+                    {/* Wide screens: the tab small above, the page itself as the title */}
+                    {pageLabel && (
+                        <p className="hidden lg:block text-small font-semibold text-accent mb-0.5">{title}</p>
+                    )}
+                    <h1 className="text-[28px] leading-tight font-[650] tracking-[-0.03em] md:text-[30px] lg:text-[32px] text-ink min-w-0 truncate">
+                        <span className={pageLabel ? "lg:hidden" : ""}>{title}</span>
+                        {pageLabel && <span className="hidden lg:inline">{pageLabel}</span>}
+                    </h1>
+                </div>
                 <div className="flex items-center gap-1 shrink-0">
                     {activeSection !== COPILOT && (
                         <button
@@ -40,7 +48,7 @@ export default function TabHeader({ activeSection, navigateTo, notifications = [
                 <div
                     role="tablist"
                     aria-label={`${title} sections`}
-                    className="mt-4 -mx-4 px-4 md:mx-0 md:px-0 flex gap-1 overflow-x-auto"
+                    className="mt-4 -mx-4 px-4 md:mx-0 md:px-0 flex gap-1 overflow-x-auto lg:hidden"
                     style={{ scrollbarWidth: "none" }}
                 >
                     {sections.map((s) => {

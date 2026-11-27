@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { ScanLine, Sparkles } from "lucide-react";
 import { useSpendGuardEnabled } from "../hooks/useSpendGuard";
-import { TABS, COPILOT, SPEND_GUARD, tabOf, entryOf } from "../constants/navigation";
+import { TABS, COPILOT, SPEND_GUARD, tabOf, entryOf, sectionsOf } from "../constants/navigation";
 
 /*
  * Desktop navigation: the same four tabs as the phone's bottom bar, so the app
@@ -15,7 +15,7 @@ function Sidebar({ activeSection, setActiveSection }) {
     return (
         <nav
             aria-label="Main"
-            className="relative hidden md:flex flex-col shrink-0 w-[216px] min-h-screen border-r"
+            className="relative hidden md:flex flex-col shrink-0 w-[216px] lg:w-[240px] min-h-screen border-r"
             style={{ background: "var(--bg-sidebar)", borderColor: "var(--border-sidebar)" }}
         >
             <div className="flex items-center gap-3 px-5 pt-6 pb-5">
@@ -57,6 +57,28 @@ function Sidebar({ activeSection, setActiveSection }) {
                                 <Icon size={18} aria-hidden className={active ? "text-violet-500" : ""} />
                                 <span className={active ? "text-violet-500 font-semibold" : ""}>{tab.label}</span>
                             </button>
+                            {/* On a wide screen, the tab's pages are listed right here */}
+                            {active && sectionsOf(tab, guardOn).length > 1 && (
+                                <ul className="hidden lg:block mt-1 mb-2 ml-[22px] pl-3 border-l space-y-0.5" style={{ borderColor: "var(--border-card)" }}>
+                                    {sectionsOf(tab, guardOn).map((s) => {
+                                        const on = s.name === activeSection;
+                                        return (
+                                            <li key={s.name}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveSection(s.name)}
+                                                    aria-current={on ? "page" : undefined}
+                                                    className={`w-full text-left rounded-lg px-3 py-1.5 text-[13px] transition-colors ${
+                                                        on ? "font-semibold text-ink bg-surface-sunken" : "text-ink-3 hover:text-ink hover:bg-violet-500/[0.05]"
+                                                    }`}
+                                                >
+                                                    {s.label}
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
                         </li>
                     );
                 })}
