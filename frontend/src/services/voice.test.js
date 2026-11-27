@@ -20,9 +20,9 @@ beforeEach(() => {
 describe("speak", () => {
     it("voices the next piece while the one before plays, then plays them in order", async () => {
         const asked = [];
-        mock.onPost("/voice/speak").reply((cfg) => {
+        mock.onPost("/voice/speak?encoding=base64").reply((cfg) => {
             asked.push(JSON.parse(cfg.data).text);
-            return [200, new Blob(["a".repeat(asked.length)], { type: "audio/wav" })];
+            return [200, { audio: btoa("RIFF" + "a".repeat(asked.length)), contentType: "audio/wav" }];
         });
         const onStart = vi.fn();
         await speak("Your portfolio is worth about ₹1.7 lakh, up 11 percent. Your index fund did best this year. Details are on screen.", { onStart }).done;
@@ -35,7 +35,7 @@ describe("speak", () => {
     });
 
     it("finishes quietly when the voice is unavailable: the answer is already on screen", async () => {
-        mock.onPost("/voice/speak").reply(502, { message: "The voice is unavailable." });
+        mock.onPost("/voice/speak?encoding=base64").reply(502, { message: "The voice is unavailable." });
         await expect(speak("Hello there, this is your FinTwin answer.").done).resolves.toBeUndefined();
         expect(played).toHaveLength(0);
     });

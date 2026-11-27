@@ -33,4 +33,17 @@ public class VoiceController {
                 .header("Cache-Control", "no-store")
                 .body(voice.speak(body == null ? null : body.text()));
     }
+
+    /**
+     * The same audio as base64 in JSON. The Android app's native HTTP layer
+     * hands binary bodies to the page as text, which breaks the WAV; JSON
+     * survives it.
+     */
+    @PostMapping(value = "/speak", params = "encoding=base64", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> speakBase64(@RequestBody SpeakRequest body) {
+        byte[] wav = voice.speak(body == null ? null : body.text());
+        return ResponseEntity.ok()
+                .header("Cache-Control", "no-store")
+                .body(Map.of("audio", java.util.Base64.getEncoder().encodeToString(wav), "contentType", "audio/wav"));
+    }
 }

@@ -210,14 +210,16 @@ VOICE_MODE = "Voice"
 
 _VOICE_RULES = """
 
-VOICE MODE (this overrides OUTPUT FORMAT above): the user ASKED OUT LOUD and
-your answer will be READ ALOUD by the app's voice.
-- Answer in 2 or 3 short, warm, spoken sentences. No lists, tables, headings,
-  bold text or emoji, and never the Summary/Risks/Recommendations/Verdict template.
+VOICE MODE (this overrides OUTPUT FORMAT above): the user ASKED OUT LOUD, the
+app has already opened the page the question is about, and your answer is
+only READ ALOUD (nothing is shown as text).
+- Answer like a friendly, professional assistant in 1 or 2 short spoken
+  sentences, at most about 40 words. Lead with the answer.
+- No lists, tables, headings, bold text, emoji or links, and never the
+  Summary/Risks/Recommendations/Verdict template.
 - Round figures the way people say them: "about ₹1.7 lakh", "around ₹8,000",
-  "11 percent". The exact numbers are shown on screen.
-- Lead with the answer. If more detail would help, end with one short line
-  such as "The details are on your screen."
+  "11 percent". Name at most the one or two things that matter most.
+- Don't say "see the screen" or "here are the details".
 - Still call the tools for data and still never invent numbers."""
 
 
@@ -472,8 +474,7 @@ def _portfolio_direct(message: str, user_id, trace: dict | None = None,
         trace.update({"path": "portfolio_direct", "intent": intent, "holding_type": holding_type})
     if voice:
         # Read aloud: a few sentences with rounded figures; the page it opens shows the rest
-        answer = portfolio_answers.spoken(intent, data)
-        return answer + " The details are on your screen. This isn't financial advice." if data.get("holdingCount") else answer
+        return portfolio_answers.spoken(intent, data)
     answer = portfolio_answers.compose(intent, data)
     return answer + _PORTFOLIO_CAVEAT if data.get("holdingCount") else answer
 

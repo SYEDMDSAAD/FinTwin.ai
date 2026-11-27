@@ -95,43 +95,65 @@ export async function ask(question) {
     return data?.reply || "";
 }
 
-// ── Speaking the answer ─────────────────────────────────────────────────────
+// ── Speaking ────────────────────────────────────────────────────────────────
 
-const voiced = (text) => API.post("/voice/speak", { text }, { responseType: "blob" }).then((r) => r.data);
+// As base64 JSON: the Android app's native HTTP layer turns binary bodies into text
+const voiced = (text) => API.post("/voice/speak?encoding=base64", { text }).then((r) => toBlob(r.data));
+
+export function toBlob(data) {
+    if (!data?.audio) throw new Error("No audio in the answer");
+    const bin = atob(data.audio);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: data.contentType || "audio/wav" });
+}
+
+/** Plays one clip; done resolves when it ends (or can't play). */
+export function play(blob) {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    const done = new Promise((resolve) => {
+        audio.onended = resolve;
+        audio.onerror = resolve;
+        audio.play().catch(resolve);
+    }).finally(() => URL.revokeObjectURL(url));
+    return { done, stop: () => { audio.pause(); audio.onended?.(); } };
+}
+
+// Short phrases said often ("Yes, hi Saad…"), voiced once and kept for the visit
+const phrases = new Map();
+
+/** The phrase in FinTwin's voice, from memory after the first time; null if the voice is unavailable. */
+export function phrase(text) {
+    if (!phrases.has(text)) {
+        phrases.set(text, voiced(text).catch(() => { phrases.delete(text); return null; }));
+    }
+    return phrases.get(text);
+}
 
 /**
  * Reads the answer aloud. Returns { done, stop }; done resolves when the last
- * piece has played (or speech failed, which is fine: the text is on screen).
+ * piece has played (or speech failed).
  */
 export function speak(text, { onStart } = {}) {
     const parts = pieces(text);
     let stopped = false;
-    let audio = null;
-    const urls = [];
+    let current = null;
     const done = (async () => {
         if (!parts.length) return;
         let next = voiced(parts[0]);
         for (let i = 0; i < parts.length && !stopped; i++) {
             const blob = await next;
-            if (i + 1 < parts.length) next = voiced(parts[i + 1]);
-            if (stopped) break;
-            const url = URL.createObjectURL(blob);
-            urls.push(url);
-            audio = new Audio(url);
+            if (i + 1 < parts.length) next = voiced(parts[i + 1]).catch(() => null);
+            if (stopped || !blob) break;
+            current = play(blob);
             if (i === 0) onStart?.();
-            await new Promise((resolve) => {
-                audio.onended = resolve;
-                audio.onerror = resolve;
-                audio.play().catch(resolve);
-            });
+            await current.done;
         }
-    })().catch(() => {}).finally(() => urls.forEach((u) => URL.revokeObjectURL(u)));
+    })().catch(() => {});
     return {
         done,
-        stop: () => {
-            stopped = true;
-            if (audio) { audio.pause(); audio.onended?.(); }
-        },
+        stop: () => { stopped = true; current?.stop(); },
     };
 }
 

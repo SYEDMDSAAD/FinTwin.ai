@@ -65,6 +65,8 @@ export async function startWakeWord(onWake, onError) {
         });
         const Ctx = window.AudioContext || window.webkitAudioContext;
         const ctx = new Ctx();
+        // With no tap to start it, a WebView can create the context paused
+        if (ctx.state === "suspended") await ctx.resume().catch(() => {});
         const source = ctx.createMediaStreamSource(stream);
         const node = ctx.createScriptProcessor(4096, 1, 1);
         node.onaudioprocess = (ev) => {

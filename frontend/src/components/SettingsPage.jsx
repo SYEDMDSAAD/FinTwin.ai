@@ -3,7 +3,8 @@ import {
   Settings, Cpu, Shield, CreditCard, Info, Wifi,
   Copy, Download, Trash2, RotateCcw, Database,
   Bell, CheckCircle, ChevronRight, Building2,
-  Unlink, Lock, X, ShieldCheck, ShieldOff, Moon, Check
+  Unlink, Lock, X, ShieldCheck, ShieldOff, Moon, Check,
+  Mic,
 } from "lucide-react";
 import { Button, IconChip } from "./ui";
 import API, { identityApi } from "../services/api";
@@ -13,6 +14,8 @@ import { useCurrency, CURRENCIES } from "../context/CurrencyContext";
 import ChangePasswordModal from "./ChangePasswordModal";
 import DeleteAccountModal from "./DeleteAccountModal";
 import { AI_MODES } from "../constants/aiModes";
+import { wakePref, setWakePref } from "../utils/voicePref";
+import { wakeWordConfigured } from "../services/voice";
 
 const TABS = [
   { id: "general",      label: "General",        Icon: Settings   },
@@ -264,6 +267,7 @@ export default function SettingsPage({ navigateTo }) {
   const { currency, setCurrency }   = useCurrency();
 
   const [activeTab, setActiveTab]           = useState("general");
+  const [heyFinTwin, setHeyFinTwin]         = useState(() => wakePref());
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal]     = useState(false);
   const [showTwoFAModal, setShowTwoFAModal]       = useState(false);
@@ -408,6 +412,27 @@ export default function SettingsPage({ navigateTo }) {
                     <Toggle on={isDark} onChange={toggleTheme} label="Dark mode" />
                   </div>
                 </div>
+
+                {/* "Hey FinTwin" */}
+                {wakeWordConfigured() && (
+                  <>
+                    <SectionLabel>Voice</SectionLabel>
+                    <div className="sp-card">
+                      <div className="sp-row">
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <IconChip icon={Mic} />
+                          <div>
+                            <div className="text-body text-ink">“Hey FinTwin”</div>
+                            <div className="text-small text-ink-3">
+                              Ask about your money out loud while FinTwin is open. Listening happens on this device; nothing is sent until you say “Hey FinTwin”.
+                            </div>
+                          </div>
+                        </div>
+                        <Toggle on={heyFinTwin} onChange={(on) => { setWakePref(on); setHeyFinTwin(on); }} label="Hey FinTwin" />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Currency */}
                 <SectionLabel>Currency</SectionLabel>
