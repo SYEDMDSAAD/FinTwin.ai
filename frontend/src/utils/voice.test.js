@@ -4,9 +4,9 @@ import { speakable, pieces, MAX_SPOKEN } from "./voiceText";
 
 describe("voice routing", () => {
     it("opens the page the question is about", () => {
-        expect(routeFor("how are my portfolios")).toEqual({ section: "Investments", tab: "My Portfolio", label: "your portfolio" });
-        expect(routeFor("how much do my SIPs add up to")?.tab).toBe("SIP Tracker");
-        expect(routeFor("what will my future twin have")?.tab).toBe("Future Twin");
+        expect(routeFor("how are my portfolios")).toEqual({ section: "Investments", label: "your portfolio" });
+        expect(routeFor("how much do my SIPs add up to")?.section).toBe("SIPs");
+        expect(routeFor("what will my future twin have")?.section).toBe("Future Twin");
         expect(routeFor("Kitna kharcha hua Swiggy pe last month?")?.section).toBe("Transactions");
         expect(routeFor("am I on track for the Goa trip")?.section).toBe("Goals Planner");
         expect(routeFor("what's my net worth")?.section).toBe("Net Worth");

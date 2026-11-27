@@ -6,6 +6,7 @@ import QrScanner from "./QrScanner";
 import CutsCard from "./CutsCard";
 import UpiAppChoice from "./UpiAppChoice";
 import ScanHistory from "./ScanHistory";
+import PauseInvest from "../invest/PauseInvest";
 import { FAST_LANE_REASON, SAMPLES, SOURCE_LABEL, inr, inrExact, isPhone, isSample, openUpi, previewQr, upiLinkFor } from "./format";
 
 // A pause asks for five seconds before "Pay anyway" works: long enough to
@@ -415,6 +416,7 @@ export default function ScanPanel({ wallet, onWallet, onNeedTopup, initial, onFi
                 <div className="sg-card" role="status">
                     <div className="sg-h2">Skipped</div>
                     <p className="sg-sub" style={{ marginTop: 4 }}>{inrExact(result.amount)} stays in your spending account.</p>
+                    <PauseInvest amount={result.amount} className="sg-pi" textClass="sg-sub" linkClass="sg-linkbtn" />
                 </div>
             )}
             {after?.choice === "wishlist" && (

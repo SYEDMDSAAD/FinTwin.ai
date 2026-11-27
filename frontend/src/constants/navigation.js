@@ -1,4 +1,4 @@
-import { Home, ArrowLeftRight, Sprout, UserRound } from "lucide-react";
+import { Home, ArrowLeftRight, TrendingUp, UserRound } from "lucide-react";
 
 /*
  * The app's whole map: four tabs, each a handful of sections.
@@ -16,6 +16,19 @@ export const TABS = [
         ],
     },
     {
+        // FinTwin is an investing app first: this tab sits right after Home
+        id: "invest", label: "Invest", icon: TrendingUp,
+        sections: [
+            { name: "Investments", label: "Portfolio" },
+            { name: "SIPs", label: "SIPs" },
+            { name: "Explore", label: "Explore" },
+            { name: "Investment Insights", label: "Insights" },
+            { name: "Future Twin", label: "Future Twin" },
+            { name: "Goals Planner", label: "Goals" },
+            { name: "Net Worth", label: "Net worth" },
+        ],
+    },
+    {
         id: "spend", label: "Spend", icon: ArrowLeftRight,
         sections: [
             { name: "Transactions", label: "Transactions" },
@@ -27,20 +40,12 @@ export const TABS = [
         ],
     },
     {
-        id: "grow", label: "Grow", icon: Sprout,
-        sections: [
-            { name: "Goals Planner", label: "Goals" },
-            { name: "Investments", label: "Investments" },
-            { name: "Net Worth", label: "Net worth" },
-            { name: "Insurance", label: "Insurance" },
-        ],
-    },
-    {
         id: "me", label: "Me", icon: UserRound,
         sections: [
             { name: "Imports", label: "Add data" },
             { name: "OCR Uploads", label: "Receipts" },
             { name: "Executive Reports", label: "Reports" },
+            { name: "Insurance", label: "Insurance" },
             { name: "Settings", label: "Settings" },
         ],
     },
@@ -56,7 +61,18 @@ const RETIRED = {
     "About App": HOME,      // what the app is: that's the landing page's job
     Today: HOME,
     Services: HOME,         // the old mobile hub, replaced by the tabs
-    Discover: "Investments",
+    Discover: "Explore",
+};
+
+/* The Investments page's old tabs, now sections of their own */
+export const INVEST_TAB_SECTION = {
+    "My Portfolio": "Investments",
+    "Future Twin": "Future Twin",
+    "Discover": "Explore",
+    "SIP Tracker": "SIPs",
+    "Mutual Funds": "Explore",
+    "US Stocks": "Explore",
+    "Plan": "Investment Insights",
 };
 
 const KNOWN = new Set([COPILOT, ...TABS.flatMap((t) => t.sections.map((s) => s.name))]);

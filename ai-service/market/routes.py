@@ -52,6 +52,48 @@ async def stock_price_on(symbol: str = Query(..., min_length=1, max_length=40), 
     return result
 
 
+@router.get("/funds/collections")
+async def fund_collections():
+    return data.collections()
+
+
+@router.get("/funds/collections/{key}")
+async def fund_collection(key: str):
+    result = await run_in_threadpool(data.fund_collection, key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Unknown collection")
+    return result
+
+
+_RANGE = r"^(1M|6M|1Y|3Y|5Y|ALL)$"
+
+
+@router.get("/funds/{code}/history")
+async def fund_history(code: str, range: str = Query("1Y", pattern=_RANGE)):
+    if not code.isdigit():
+        raise HTTPException(status_code=400, detail="Scheme code must be numeric")
+    return await run_in_threadpool(data.fund_history, code, range)
+
+
+@router.get("/funds/{code}/navs")
+async def fund_navs(code: str):
+    """The daily NAV series, for the SIP / lump-sum calculator."""
+    if not code.isdigit():
+        raise HTTPException(status_code=400, detail="Scheme code must be numeric")
+    return await run_in_threadpool(data.fund_nav_series, code)
+
+
+@router.get("/stocks/sectors")
+async def stock_sectors(symbols: str = Query(..., max_length=1000)):
+    return await run_in_threadpool(data.stock_sectors, [s for s in symbols.split(",") if s.strip()])
+
+
+@router.get("/stocks/history")
+async def stock_history(symbol: str = Query(..., min_length=1, max_length=40),
+                        range: str = Query("1Y", pattern=r"^(1D|1W|1M|1Y|5Y)$")):
+    return await run_in_threadpool(data.stock_history, symbol, range)
+
+
 @router.get("/funds/{code}")
 async def fund(code: str):
     if not code.isdigit():

@@ -13,6 +13,7 @@ import com.fintwin.repository.FinancialGoalRepository;
 import com.fintwin.repository.FinancialScoreHistoryRepository;
 import com.fintwin.repository.InsurancePolicyRepository;
 import com.fintwin.repository.InvestmentRepository;
+import com.fintwin.repository.SipPlanRepository;
 import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.NotificationRepository;
 import com.fintwin.repository.TransactionRepository;
@@ -76,6 +77,7 @@ public class DemoAccountService {
 
     // The agents' own output, so the demo shows them at work
     @Autowired(required = false) private AgentAlertRepository alerts;
+    @Autowired(required = false) private SipPlanRepository sips;
     @Autowired(required = false) private WatchAgent watch;
 
     public DemoAccountService(@Value("${demo.enabled:true}") boolean enabled,
@@ -145,6 +147,7 @@ public class DemoAccountService {
             User user = demoUser();
             chats.deleteByUser(user);
             transactions.deleteByUser(user);
+            if (sips != null) sips.deleteByUser(user);   // before goals: a SIP can point at one
             goals.deleteByUser(user);
             budgets.deleteByUser(user);
             assets.deleteByUser(user);
@@ -167,6 +170,7 @@ public class DemoAccountService {
             investments.saveAll(data.investments());
             policies.saveAll(data.insurance());
             goals.saveAll(data.goals(monthlySavings(rows)));
+            if (sips != null) sips.saveAll(data.sips());
             profiles.saveScoreSnapshot(user);
             if (alerts != null) {
                 long sorted = rows.stream().filter(t -> com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource())).count();

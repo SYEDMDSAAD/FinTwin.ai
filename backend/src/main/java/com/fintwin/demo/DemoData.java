@@ -5,6 +5,7 @@ import com.fintwin.model.Budget;
 import com.fintwin.model.FinancialGoal;
 import com.fintwin.model.InsurancePolicy;
 import com.fintwin.model.Investment;
+import com.fintwin.model.SipPlan;
 import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
@@ -170,12 +171,40 @@ final class DemoData {
         return List.of(loan, liability("Credit card dues", "Credit Card", 7_800));
     }
 
+    // Funds carry their real AMFI scheme codes (direct, growth), so the demo's
+    // fund pages show real NAV charts; the units roughly match the values.
     List<Investment> investments() {
         return List.of(
-                investment("Parag Parikh Flexi Cap Fund", "Mutual Fund", 60_000, 71_800, 420, null, null),
-                investment("Nippon India Nifty 50 Index Fund", "Mutual Fund", 30_000, 33_900, 300, null, null),
+                investment("Parag Parikh Flexi Cap Fund", "Mutual Fund", 60_000, 71_800, 420, "122639", 744.0),
+                investment("Nippon India Nifty 50 Index Fund", "Mutual Fund", 30_000, 33_900, 300, "118741", 716.0),
                 investment("Tata Consultancy Services", "Stocks", 15_200, 15_800, 200, "TCS.NS", 4.0),
                 investment("Public Provident Fund", "PPF", 48_000, 51_600, 700, null, null));
+    }
+
+    /**
+     * The two SIPs behind the monthly ₹7,000 "Investments" debit in the
+     * transactions: ₹5,000 into the flexi-cap fund on the 5th, ₹2,000 into
+     * the index fund on the 15th. Each next date is the coming one.
+     */
+    List<SipPlan> sips() {
+        return List.of(
+                sip("Parag Parikh Flexi Cap Fund", 5_000, 5),
+                sip("Nippon India Nifty 50 Index Fund", 2_000, 15));
+    }
+
+    private SipPlan sip(String fund, double amount, int day) {
+        LocalDate next = today.withDayOfMonth(Math.min(day, today.lengthOfMonth()));
+        if (next.isBefore(today)) {
+            LocalDate month = today.plusMonths(1);
+            next = month.withDayOfMonth(Math.min(day, month.lengthOfMonth()));
+        }
+        SipPlan p = new SipPlan();
+        p.setUser(user);
+        p.setFundName(fund);
+        p.setAmount(java.math.BigDecimal.valueOf(amount));
+        p.setFrequency("Monthly");
+        p.setNextDebitDate(next);
+        return p;
     }
 
     /** A health cover and a term plan, one of them renewing within the month. */

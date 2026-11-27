@@ -16,7 +16,7 @@ const TONE = {
     good: { Icon: Sparkles, cls: "text-good" },
 };
 
-export default function PortfolioHealthCard({ refreshKey }) {
+export default function PortfolioHealthCard({ refreshKey, showEmpty = false }) {
     const [health, setHealth] = useState(null);
     const [showTax, setShowTax] = useState(false);
 
@@ -27,7 +27,17 @@ export default function PortfolioHealthCard({ refreshKey }) {
     }, [refreshKey]);
 
     const checks = health?.checks || [];
-    if (checks.length === 0) return null;
+    if (checks.length === 0) {
+        if (!showEmpty || !health) return null;
+        return (
+            <section aria-label="Health check" className="mb-6">
+                <SectionHeader title="Health check" />
+                <p className="rounded-card bg-surface border border-line px-4 py-4 text-body text-ink-2">
+                    Nothing to flag. Costs, concentration and prices look fine for what you hold.
+                </p>
+            </section>
+        );
+    }
     const taxLines = health?.tax?.holdings || [];
 
     return (

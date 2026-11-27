@@ -2057,10 +2057,9 @@ function Dashboard() {
                 ========================= */}
 
                 {
-                    activeSection ===
-                    "Investments" && (
+                    ["Investments", "SIPs", "Explore", "Investment Insights", "Future Twin"].includes(activeSection) && (
 
-                        <InvestmentsPage />
+                        <InvestmentsPage view={activeSection} onNavigate={navigateTo} />
 
                     )
                 }

@@ -116,6 +116,19 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
         assertThat(policies.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(JSON.readValue(policies.getBody(), List.class)).hasSize(2);
 
+        // Investing leads Home, so the demo runs SIPs (the monthly ₹7,000 "Investments" debit)
+        ResponseEntity<String> sipRes = call(token, HttpMethod.GET, "/api/v1/sips", null);
+        assertThat(sipRes.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> sipRows = JSON.readValue(sipRes.getBody(), List.class);
+        assertThat(sipRows).hasSize(2);
+        assertThat(sipRows.stream().mapToDouble(r -> ((Number) r.get("amount")).doubleValue()).sum()).isEqualTo(7_000.0);
+        assertThat(sipRows).allSatisfy(r -> assertThat(LocalDate.parse((String) r.get("nextDebitDate")))
+                .isAfterOrEqualTo(LocalDate.now(DemoAccountService.INDIA)));
+
+        // Holdings carry their asset class field (null for hand-added ones)
+        ResponseEntity<String> port = call(token, HttpMethod.GET, "/api/v1/portfolio", null);
+        assertThat(port.getBody()).contains("\"assetClass\"");
+
         // The visit is recorded, with only the cleaned-up details
         Map<String, Object> session = jdbc.queryForMap(
                 "SELECT visitor_id, device, source FROM demo_sessions ORDER BY started_at DESC LIMIT 1");

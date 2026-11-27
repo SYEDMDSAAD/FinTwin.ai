@@ -182,6 +182,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->
 
                         auth
+                                // Spring re-dispatches an error (a 404 for a path that doesn't exist)
+                                // to /error without the JWT filter, so it arrived anonymous and became
+                                // a 401 — and a 401 signs the user out. Let the error page through.
+                                .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
+                                .requestMatchers("/error").permitAll()
 
                                 .requestMatchers(
                                         HttpMethod.OPTIONS,

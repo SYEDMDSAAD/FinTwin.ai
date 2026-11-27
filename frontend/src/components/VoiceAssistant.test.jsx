@@ -56,7 +56,6 @@ describe("VoiceAssistant", () => {
         expect(voice.phrase).toHaveBeenCalledWith("Yes, hi Asha. How can I help you today?");
         expect(voice.play).toHaveBeenCalled();
         expect(localStorage.getItem("activeSection")).toBe("Investments");
-        expect(localStorage.getItem("investmentsTab")).toBe("My Portfolio");
         expect(voice.ask).toHaveBeenCalledWith("show my portfolio");
         expect(voice.speak).toHaveBeenCalledWith("Your portfolio is worth about ₹1.7 lakh, up 11 percent.");
         expect(screen.queryByText(/₹1.7 lakh/)).not.toBeInTheDocument();

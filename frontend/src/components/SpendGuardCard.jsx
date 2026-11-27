@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 import { guard, guardEnabled } from "../services/guardApi";
+import { grown } from "../utils/investMath";
+import { openFutureTwin } from "../hooks/useOwnXirr";
 import { Button } from "./ui";
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
@@ -67,6 +69,14 @@ export default function SpendGuardCard({ onOpen }) {
                         </div>
                     ))}
                 </dl>
+            )}
+            {wallet.savedByPausing > 0 && (
+                <button type="button" onClick={openFutureTwin}
+                        className="mt-3 w-full text-left rounded-control px-3 py-2.5 bg-good/10 text-small text-ink hover:bg-good/15">
+                    <span className="font-semibold">Pause → Invest:</span> the {inr(wallet.savedByPausing)} you kept could be about{" "}
+                    <span className="font-semibold num">{inr(grown(wallet.savedByPausing, 10, 10))}</span> in 10 years at 10% a year.
+                    <span className="text-ink-3"> See it in Future Twin</span>
+                </button>
             )}
             <Button variant="secondary" className="mt-4 w-full" onClick={onOpen}>
                 {used ? "Open Spend Guard" : "Try Spend Guard"} <ArrowRight size={16} aria-hidden />

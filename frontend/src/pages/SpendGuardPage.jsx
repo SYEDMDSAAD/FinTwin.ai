@@ -6,11 +6,10 @@ import { aiStatus, inr } from "../components/guard/format";
 import ScanPanel from "../components/guard/ScanPanel";
 import WalletPanel from "../components/guard/WalletPanel";
 
-/** Investments → Future Twin, where money kept by pausing is shown invested. */
+/** Invest → Future Twin, where money kept by pausing is shown invested. */
 const openTwin = () => {
     try {
-        localStorage.setItem("investmentsTab", "Future Twin");
-        localStorage.setItem("activeSection", "Investments");
+        localStorage.setItem("activeSection", "Future Twin");
     } catch { /* storage blocked: navigation still works */ }
     window.dispatchEvent(new Event("dashboardNav"));
 };

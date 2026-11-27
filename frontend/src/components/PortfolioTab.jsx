@@ -16,11 +16,17 @@ import { IPO_STATUSES } from "../constants/investments";
 import LinkHoldingModal from "./LinkHoldingModal";
 import InvestmentSuggestions from "./InvestmentSuggestions";
 import ImportCas from "./ImportCas";
-import PortfolioHealthCard from "./PortfolioHealthCard";
+import { AllocationCard, TopInsight, TopMovers } from "./home/InvestPieces";
+import useWide from "../hooks/useWide";
+import { sortHoldings } from "../utils/portfolio";
 import PortfolioHistoryChart from "./PortfolioHistoryChart";
 import { useDebouncedSearch } from "./discover/useDebouncedSearch";
 import { Plus, Pencil, Trash2, TrendingUp, RefreshCw, Landmark, Link2 } from "lucide-react";
 import { Button, SectionHeader, EmptyState, IconChip, cx } from "./ui";
+import HoldingPage from "./invest/HoldingPage";
+
+// The page scrolls inside <main>; a holding's page should open at its top
+const mainScrollTop = () => { try { document.querySelector("main")?.scrollTo?.({ top: 0 }); } catch { /* no main in tests */ } };
 
 const INVESTMENT_TYPES = [
     "Stocks", "IPO", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
@@ -69,6 +75,26 @@ function fmt(n) {
 // interest projection, so the UI marks them rather than implying a quote.
 const ESTIMATED_TYPES = new Set(["Fixed Deposit", "PPF", "NPS", "Bonds"]);
 
+// Groww and INDmoney show holdings by kind: funds, then stocks, then the rest
+const TYPE_ORDER = [
+    ["Mutual Fund", "Mutual funds"], ["Stocks", "Stocks"], ["IPO", "IPOs"], ["Fixed Deposit", "Fixed deposits"],
+    ["PPF", "PPF"], ["Bonds", "Bonds"], ["NPS", "NPS"], ["Gold", "Gold"], ["Crypto", "Crypto"],
+];
+function groupByType(list) {
+    const groups = new Map();
+    for (const h of list) {
+        if (!groups.has(h.type)) groups.set(h.type, []);
+        groups.get(h.type).push(h);
+    }
+    const rank = (t) => { const i = TYPE_ORDER.findIndex(([k]) => k === t); return i < 0 ? 99 : i; };
+    return [...groups.entries()]
+        .sort((a, b) => rank(a[0]) - rank(b[0]))
+        .map(([type, items]) => ({
+            type, items, label: TYPE_ORDER.find(([k]) => k === type)?.[1] || type,
+            total: items.reduce((t, h) => t + (Number(h.currentValue) || 0), 0),
+        }));
+}
+
 export default function PortfolioTab() {
     const [summary, setSummary] = useState(_portfolioCache);
     const [loading, setLoading] = useState(!_portfolioCache);
@@ -86,6 +112,10 @@ export default function PortfolioTab() {
     const [netWorth, setNetWorth] = useState(_nwCache);
     const [linking, setLinking] = useState(null);          // the holding being linked
     const [splitting, setSplitting] = useState(null);
+    const [sortBy, setSortBy] = useState("value");
+    const [openId, setOpenId] = useState(null);       // a holding's own page
+    const [health, setHealth] = useState(null);
+    const wide = useWide();
     // Typing a symbol searches the market, so the user picks one that exists
     // rather than a name the exchange has never heard of ("SS RETAIL")
     const symbolSearch = useDebouncedSearch(
@@ -109,6 +139,11 @@ export default function PortfolioTab() {
     };
 
     useEffect(() => { load(); }, []);
+    useEffect(() => {
+        let live = true;
+        API.get("/portfolio/health").then((r) => { if (live) setHealth(r.data); }).catch(() => {});
+        return () => { live = false; };
+    }, [summary?.currentValue]);
 
     const openAdd = () => {
         setEditId(null);
@@ -282,8 +317,6 @@ export default function PortfolioTab() {
     // A lump sum with nothing behind it — typically the amount entered at
     // onboarding. It can't be valued until the user says what it went into.
     const unlinked = holdings.filter(h => h.type === "Other" && !h.tickerCode);
-    const alloc    = summary?.allocationByType || {};
-    const pieData  = Object.entries(alloc).map(([type, pct]) => ({ name: type, value: pct })).sort((x, y) => y.value - x.value);
 
     const pnlPositive = (summary?.totalPnl ?? 0) >= 0;
 
@@ -291,9 +324,18 @@ export default function PortfolioTab() {
     const nwPortfolio = netWorth?.portfolioCurrentValue || 0;
     const nwPct = nwTotal > 0 ? Math.round((nwPortfolio / nwTotal) * 100) : 0;
     const typeColor = (t) => TYPE_COLORS[t] || "var(--text-dim)";
+    const groups = new Set(holdings.map((h) => h.type)).size;
+    const setOpenHolding = (h) => { setOpenId(h.id); mainScrollTop(); };
+    const opened = openId != null ? holdings.find((h) => h.id === openId) : null;
+
+    if (opened) {
+        return <HoldingPage holding={opened} onBack={() => setOpenId(null)}
+                            onEdit={(h) => { setOpenId(null); openEdit(h); }} />;
+    }
 
     return (
-        <div className="max-w-2xl">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-7 lg:items-start">
+        <div className="max-w-2xl min-w-0">
             {/* The number */}
             <section aria-label="Portfolio value" className="px-1 mb-6">
                 <p className="text-small text-ink-3">Portfolio value</p>
@@ -335,7 +377,7 @@ export default function PortfolioTab() {
 
             <PortfolioHistoryChart refreshKey={summary?.currentValue} />
 
-            <PortfolioHealthCard refreshKey={summary?.currentValue} />
+            {!wide && <div className="mb-6"><TopInsight health={health} navigateTo={gotoSection} /></div>}
 
             <InvestmentSuggestions onAdded={load} />
 
@@ -365,30 +407,35 @@ export default function PortfolioTab() {
                             action={<Button icon={Plus} onClick={openAdd}>Add investment</Button>} />
             ) : (
                 <>
-                    {/* Allocation: one split bar, the holdings list carries the detail */}
-                    {pieData.length > 1 && (
-                        <section aria-label="Allocation" className="mb-6 rounded-card bg-surface border border-line p-4">
-                            <p className="text-small text-ink-3 mb-3">Allocation</p>
-                            <div className="flex h-2 gap-0.5 rounded-full overflow-hidden" aria-hidden>
-                                {pieData.map(e => <div key={e.name} style={{ width: `${e.value}%`, background: typeColor(e.name), minWidth: 3 }} />)}
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-                                {pieData.map(e => (
-                                    <span key={e.name} className="inline-flex items-center gap-1.5 text-small text-ink-2">
-                                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: typeColor(e.name) }} />
-                                        {e.name} <span className="text-ink-3 num">{e.value}%</span>
-                                    </span>
+                    {!wide && <div className="mb-6"><AllocationCard holdings={holdings} navigateTo={gotoSection} /></div>}
+
+                    <SectionHeader title="Holdings" subtitle={`${holdings.length} ${holdings.length === 1 ? "holding" : "holdings"}`}
+                        action={
+                            <div role="group" aria-label="Sort holdings" className="flex gap-1">
+                                {[["value", "Value"], ["returns", "Returns"], ["xirr", "XIRR"], ["name", "A–Z"]].map(([k, l]) => (
+                                    <button key={k} type="button" aria-pressed={sortBy === k} onClick={() => setSortBy(k)}
+                                            className={cx("h-8 px-3 rounded-full text-small font-medium transition-colors",
+                                                sortBy === k ? "bg-surface-sunken text-ink" : "text-ink-3 hover:text-ink")}>
+                                        {l}
+                                    </button>
                                 ))}
                             </div>
-                        </section>
+                        } />
+                    {groupByType(sortHoldings(holdings, sortBy)).map((g) => (
+                    <section key={g.type} aria-label={g.label} className="mb-5">
+                    {groups > 1 && (
+                        <div className="flex items-baseline justify-between px-1 mb-1.5">
+                            <h3 className="text-small font-semibold text-ink-2">{g.label} <span className="font-normal text-ink-3">· {g.items.length}</span></h3>
+                            <span className="text-small text-ink-3 num">₹{Math.round(g.total).toLocaleString("en-IN")}</span>
+                        </div>
                     )}
-
-                    <SectionHeader title="Holdings" subtitle={`${holdings.length} ${holdings.length === 1 ? "holding" : "holdings"}`} />
-                    <ul className="mb-6 rounded-card bg-surface border border-line divide-y divide-line">
-                        {holdings.map((h) => {
+                    <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+                        {g.items.map((h) => {
                             const pos = (h.pnl ?? 0) >= 0;
                             return (
                                 <li key={h.id} className="flex items-center gap-3 px-4 py-3">
+                                    <button type="button" onClick={() => setOpenHolding(h)} aria-label={`Open ${h.name}`}
+                                            className="min-w-0 flex-1 flex items-center gap-3 text-left -my-1 py-1 rounded-control hover:bg-surface-sunken/60">
                                     <span aria-hidden className="shrink-0 w-2 h-8 rounded-full" style={{ background: typeColor(h.type) }} />
                                     <span className="min-w-0 flex-1">
                                         <span className="block text-body text-ink truncate">{h.name}</span>
@@ -418,6 +465,7 @@ export default function PortfolioTab() {
                                             </span>
                                         )}
                                     </span>
+                                    </button>
                                     <span className="shrink-0 flex -mr-2">
                                         <button type="button" onClick={() => openEdit(h)} aria-label={`Edit ${h.name}`}
                                                 className="w-8 h-8 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken">
@@ -432,7 +480,19 @@ export default function PortfolioTab() {
                             );
                         })}
                     </ul>
+                    </section>
+                    ))}
                 </>
+            )}
+        </div>
+
+            {/* Wide screens: the facts about the whole portfolio sit beside the holdings */}
+            {wide && holdings.length > 0 && (
+                <aside className="space-y-5 lg:sticky lg:top-6" aria-label="About your portfolio">
+                    <AllocationCard donut holdings={holdings} navigateTo={gotoSection} />
+                    <TopMovers holdings={holdings} />
+                    <TopInsight health={health} navigateTo={gotoSection} />
+                </aside>
             )}
 
             {/* Auto-detect confirm modal */}

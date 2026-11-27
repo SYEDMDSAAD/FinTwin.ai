@@ -14,4 +14,6 @@ public interface SipPlanRepository extends JpaRepository<SipPlan, Long> {
 
     Optional<SipPlan> findByIdAndUser(Long id, User user);
     Optional<SipPlan> findByGoalIdAndUser(Long goalId, User user);
+
+    void deleteByUser(User user);
 }

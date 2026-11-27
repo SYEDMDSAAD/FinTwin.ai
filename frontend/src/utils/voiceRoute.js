@@ -5,10 +5,10 @@
  */
 
 const RULES = [
-    { words: /\b(future twin|my twin|round[- ]?ups?)\b/, section: "Investments", tab: "Future Twin", label: "Future Twin" },
-    { words: /\b(sips?|systematic investment)\b/, section: "Investments", tab: "SIP Tracker", label: "your SIPs" },
-    { words: /\b(tax[- ]?harvest\w*|capital gains?|ltcg|health check)\b/, section: "Investments", tab: "My Portfolio", label: "your portfolio" },
-    { words: /\b(portfolios?|investments?|invested|holdings?|mutual funds?|funds?|stocks?|shares?|xirr|returns?|nifty|cas)\b/, section: "Investments", tab: "My Portfolio", label: "your portfolio" },
+    { words: /\b(future twin|my twin|round[- ]?ups?)\b/, section: "Future Twin", label: "Future Twin" },
+    { words: /\b(sips?|systematic investment)\b/, section: "SIPs", label: "your SIPs" },
+    { words: /\b(tax[- ]?harvest\w*|capital gains?|ltcg|health check)\b/, section: "Investment Insights", label: "your portfolio insights" },
+    { words: /\b(portfolios?|investments?|invested|holdings?|mutual funds?|funds?|stocks?|shares?|xirr|returns?|nifty|cas)\b/, section: "Investments", label: "your portfolio" },
     { words: /\b(net ?worth|assets?|liabilit\w*|loans?|emis?)\b/, section: "Net Worth", label: "net worth" },
     { words: /\b(goals?|saving for|trip|wedding|house fund)\b/, section: "Goals Planner", label: "your goals" },
     { words: /\b(budgets?|limits?|overspen\w*)\b/, section: "Budgeting", label: "your budgets" },
@@ -22,16 +22,15 @@ const RULES = [
 export function routeFor(question) {
     const q = String(question || "").toLowerCase();
     for (const r of RULES) {
-        if (r.words.test(q)) return { section: r.section, tab: r.tab || null, label: r.label };
+        if (r.words.test(q)) return { section: r.section, label: r.label };
     }
     return null;
 }
 
-/** Opens a section (and an Investments tab) the way the sidebar does. */
+/** Opens a section the way the sidebar does. */
 export function openRoute(route) {
     if (!route) return;
     try {
-        if (route.tab) localStorage.setItem("investmentsTab", route.tab);
         localStorage.setItem("activeSection", route.section);
     } catch { /* storage blocked: the event still moves the page */ }
     window.dispatchEvent(new Event("dashboardNav"));

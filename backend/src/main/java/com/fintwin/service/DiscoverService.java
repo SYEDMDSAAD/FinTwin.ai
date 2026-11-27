@@ -70,6 +70,84 @@ public class DiscoverService {
         return getList("/discover/stocks/quotes", "symbols", String.join(",", symbols));
     }
 
+    private static final java.util.regex.Pattern CODE = java.util.regex.Pattern.compile("\\d{1,10}");
+    private static final java.util.Set<String> FUND_RANGES = java.util.Set.of("1M", "6M", "1Y", "3Y", "5Y", "ALL");
+    private static final java.util.Set<String> STOCK_RANGES = java.util.Set.of("1D", "1W", "1M", "1Y", "5Y");
+
+    private static void requireCode(String code) {
+        if (code == null || !CODE.matcher(code).matches()) {
+            throw new com.fintwin.exception.BadRequestException("Scheme code must be numeric");
+        }
+    }
+
+    private static String range(String r, java.util.Set<String> allowed) {
+        String v = r == null ? "1Y" : r.toUpperCase();
+        if (!allowed.contains(v)) throw new com.fintwin.exception.BadRequestException("Unknown range");
+        return v;
+    }
+
+    /** NAVs over a range for the fund page's chart: {code, range, since, change, points[]}. */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public Map<String, Object> fundHistory(String code, String r) {
+        requireCode(code);
+        return getMap(aiUrl + "/discover/funds/" + code + "/history?range=" + range(r, FUND_RANGES), "Unknown scheme code");
+    }
+
+    /** The daily NAV series, for the returns calculator. */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public List<Map<String, Object>> fundNavs(String code) {
+        requireCode(code);
+        try {
+            List<Map<String, Object>> body = ai.exchange(aiUrl + "/discover/funds/" + code + "/navs", HttpMethod.GET, null, LIST).getBody();
+            return body == null ? List.of() : body;
+        } catch (RestClientException e) {
+            throw unavailable(e);
+        }
+    }
+
+    /** Prices over a range for the stock page, with the 52-week high and low. */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public Map<String, Object> stockHistory(String symbol, String r) {
+        if (symbol == null || !symbol.matches("[A-Za-z0-9&.\\-]{1,40}")) {
+            throw new com.fintwin.exception.BadRequestException("Unknown symbol");
+        }
+        return getMap(UriComponentsBuilder.fromHttpUrl(aiUrl + "/discover/stocks/history")
+                .queryParam("symbol", symbol).queryParam("range", range(r, STOCK_RANGES)).build().toUriString(),
+                "No price history for that stock");
+    }
+
+    /** Each stock's sector, for the sector split: {SYMBOL.NS: "Technology" | null}. */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public Map<String, Object> stockSectors(List<String> symbols) {
+        if (symbols == null || symbols.isEmpty()) return Map.of();
+        for (String s : symbols) {
+            if (!s.matches("[A-Za-z0-9&.\\-]{1,40}")) throw new com.fintwin.exception.BadRequestException("Unknown symbol");
+        }
+        return getMap(UriComponentsBuilder.fromHttpUrl(aiUrl + "/discover/stocks/sectors")
+                .queryParam("symbols", String.join(",", symbols.subList(0, Math.min(50, symbols.size())))).build().toUriString(),
+                "No sectors found");
+    }
+
+    /** The collections: plain filters on AMFI categories. */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public List<Map<String, Object>> fundCollections() {
+        try {
+            List<Map<String, Object>> body = ai.exchange(aiUrl + "/discover/funds/collections", HttpMethod.GET, null, LIST).getBody();
+            return body == null ? List.of() : body;
+        } catch (RestClientException e) {
+            throw unavailable(e);
+        }
+    }
+
+    /** One collection, sorted by a stated column, never "recommended". */
+    @PreAuthorize("hasAuthority('READ_OWN_INVESTMENTS')")
+    public Map<String, Object> fundCollection(String key) {
+        if (key == null || !key.matches("[a-z\\-]{2,20}")) {
+            throw new com.fintwin.exception.NotFoundException("Unknown collection");
+        }
+        return getMap(aiUrl + "/discover/funds/collections/" + key, "Unknown collection");
+    }
+
     // ── Prices for valuing a holding: on its purchase date, and today ─────────
 
     /** Close on the date or the next trading day: {symbol, date, price}. */

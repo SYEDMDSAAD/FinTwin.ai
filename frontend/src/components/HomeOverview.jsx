@@ -1,14 +1,20 @@
-import { AlertTriangle, AlertOctagon, CheckCircle2, Info, Target, TrendingUp, Gauge, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, AlertOctagon, CheckCircle2, Info, Target, TrendingUp, Gauge, Wallet } from "lucide-react";
 import { rupees } from "../utils/money";
 import { headline, attentionItems } from "../utils/home";
-import { SectionHeader, Progress, List, ListRow, Button } from "./ui";
+import { SectionHeader, List, ListRow, Button } from "./ui";
+import useInvestData from "../hooks/useInvestData";
+import { PortfolioHero, SpareCard, SipCard, AllocationCard, TopInsight } from "./home/InvestPieces";
 import SpendGuardCard from "./SpendGuardCard";
+import InvestPot from "./home/InvestPot";
 import HomeDesk from "./HomeDesk";
 import useWide from "../hooks/useWide";
 
 /*
- * Home: one number, what needs you, and a way into the rest.
+ * Home: FinTwin is an investing app first, so Home opens on the portfolio —
+ * its value, what's spare to invest this month, the SIPs and where the money
+ * sits — then what needs you, and a way into the rest.
  *
+ * "Left this month" is still here, as a row:
  * The number is what's left of this month's money: what came in minus what
  * went out (transfers between your own accounts already left out by the
  * backend). With no income on record yet it falls back to what's left in
@@ -30,11 +36,11 @@ export default function HomeOverview({
     goals = [],
     scoreData,
     netWorth,
-    monthlyHistory,
     loading,
     navigateTo,
 }) {
     const wide = useWide();
+    const invest = useInvestData();
     const head = headline({ income, spent, budgets });
     const items = attentionItems({ budgets, notifications });
     const negative = head.kind !== "spent" && head.value < 0;
@@ -47,42 +53,24 @@ export default function HomeOverview({
             <HomeDesk head={head} items={items} negative={negative} barTone={barTone}
                       income={income} spent={spent} notifications={notifications}
                       active={active} topGoal={topGoal} scoreData={scoreData} netWorth={netWorth}
-                      monthlyHistory={monthlyHistory} loading={loading} navigateTo={navigateTo} />
+                      invest={invest} loading={loading} navigateTo={navigateTo} />
         );
     }
 
     return (
-        <div className="max-w-2xl space-y-8">
-            {/* The number: no box around it, it's the screen */}
-            <section aria-label={head.label} className="px-1">
-                <p className="text-small text-ink-3">{head.label}</p>
-                {loading ? (
-                    <div className="h-12 w-56 mt-2 rounded-control animate-pulse bg-surface-sunken" />
-                ) : (
-                    <p className={`text-hero num mt-1 ${negative ? "text-bad" : "text-ink"}`}>{rupees(head.value)}</p>
-                )}
-                <p className="mt-2 text-body text-ink-2">{head.note}</p>
-                {head.share != null && <Progress className="mt-5" value={head.share * 100} tone={barTone} label="Share of this month's money spent" />}
+        <div className="max-w-2xl space-y-6">
+            <div className="px-1">
+                <PortfolioHero portfolio={invest.portfolio} history={invest.history} loading={invest.loading} navigateTo={navigateTo} topHoldings={3} />
+            </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                    <button type="button" onClick={() => navigateTo("Analytics")}
-                            className="flex items-center gap-3 rounded-card bg-surface border border-line px-4 py-3 text-left hover:bg-surface-hover">
-                        <span className="w-8 h-8 rounded-full bg-good-soft text-good flex items-center justify-center"><ArrowDownLeft size={16} aria-hidden /></span>
-                        <span className="min-w-0">
-                            <span className="block text-small text-ink-3">Money in</span>
-                            <span className="block text-body font-semibold text-ink num truncate">{rupees(income)}</span>
-                        </span>
-                    </button>
-                    <button type="button" onClick={() => navigateTo("Analytics")}
-                            className="flex items-center gap-3 rounded-card bg-surface border border-line px-4 py-3 text-left hover:bg-surface-hover">
-                        <span className="w-8 h-8 rounded-full bg-surface-sunken text-ink-2 flex items-center justify-center"><ArrowUpRight size={16} aria-hidden /></span>
-                        <span className="min-w-0">
-                            <span className="block text-small text-ink-3">Money out</span>
-                            <span className="block text-body font-semibold text-ink num truncate">{rupees(spent)}</span>
-                        </span>
-                    </button>
-                </div>
-            </section>
+            <div className="grid grid-cols-2 gap-3">
+                <SpareCard income={income} spent={spent} navigateTo={navigateTo} />
+                <SipCard sips={invest.sips} navigateTo={navigateTo} />
+            </div>
+
+            <InvestPot />
+            <AllocationCard holdings={invest.portfolio?.holdings} navigateTo={navigateTo} />
+            <TopInsight health={invest.health} navigateTo={navigateTo} />
 
             {/* What needs you */}
             <section aria-label="Needs your attention">
@@ -118,10 +106,10 @@ export default function HomeOverview({
             <section aria-label="Your money">
                 <SectionHeader title="Your money" />
                 <List>
-                    <ListRow icon={Gauge} title="Health score"
-                             subtitle="What's behind it"
-                             trailing={scoreData?.score != null ? `${scoreData.score}/100` : "—"}
-                             onClick={() => navigateTo("AI Intelligence")} />
+                    <ListRow icon={Wallet} tone={negative ? "bad" : undefined} title={head.label}
+                             subtitle={head.note}
+                             trailing={loading ? "—" : rupees(head.value)}
+                             onClick={() => navigateTo("Analytics")} />
                     <ListRow icon={Target} title="Goals"
                              subtitle={topGoal ? `${topGoal.title} · ${Math.round(topGoal.progressPercent || 0)}% there` : "Set your first goal"}
                              trailing={active.length ? `${active.length} active` : null}
@@ -130,6 +118,10 @@ export default function HomeOverview({
                              subtitle="Owned minus owed"
                              trailing={netWorth?.netWorth != null ? rupees(netWorth.netWorth) : "—"}
                              onClick={() => navigateTo("Net Worth")} />
+                    <ListRow icon={Gauge} title="Health score"
+                             subtitle="What's behind it"
+                             trailing={scoreData?.score != null ? `${scoreData.score}/100` : "—"}
+                             onClick={() => navigateTo("AI Intelligence")} />
                 </List>
             </section>
         </div>

@@ -35,6 +35,36 @@ public class DiscoverController {
         return discover.searchFunds(q);
     }
 
+    @GetMapping("/api/v1/discover/funds/collections")
+    public List<Map<String, Object>> collections() {
+        return discover.fundCollections();
+    }
+
+    @GetMapping("/api/v1/discover/funds/collections/{key}")
+    public Map<String, Object> collection(@PathVariable String key) {
+        return discover.fundCollection(key);
+    }
+
+    @GetMapping("/api/v1/discover/funds/{code}/history")
+    public Map<String, Object> fundHistory(@PathVariable String code, @RequestParam(defaultValue = "1Y") String range) {
+        return discover.fundHistory(code, range);
+    }
+
+    @GetMapping("/api/v1/discover/funds/{code}/navs")
+    public List<Map<String, Object>> fundNavs(@PathVariable String code) {
+        return discover.fundNavs(code);
+    }
+
+    @GetMapping("/api/v1/discover/stocks/sectors")
+    public Map<String, Object> stockSectors(@RequestParam String symbols) {
+        return discover.stockSectors(Arrays.stream(symbols.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList());
+    }
+
+    @GetMapping("/api/v1/discover/stocks/history")
+    public Map<String, Object> stockHistory(@RequestParam String symbol, @RequestParam(defaultValue = "1Y") String range) {
+        return discover.stockHistory(symbol, range);
+    }
+
     @GetMapping("/api/v1/discover/funds/{code}")
     public Map<String, Object> fund(@PathVariable String code) {
         return discover.fund(code);

@@ -32,6 +32,15 @@ describe("LandingPage", () => {
     expect(screen.getByRole("link", { name: "Privacy policy" })).toHaveAttribute("href", "/privacy-policy");
     expect(screen.getByRole("link", { name: "Terms of service" })).toHaveAttribute("href", "/terms");
     expect(screen.queryByText("Careers")).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /FinTwin dashboard with Spend Guard/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /FinTwin portfolio/ })).toBeInTheDocument();
+  });
+
+  it("tells the website's story as investing first", () => {
+    renderPage(<LandingPage />);
+    expect(document.getElementById("hero-heading")).toHaveTextContent("Invest the rest.");
+    expect(screen.getByRole("heading", { name: /Every fund you own/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Your next SIP is hiding in your spending/ })).toBeInTheDocument();
+    // Never a fund pick: facts and the user's own numbers only
+    expect(document.body.textContent).not.toMatch(/recommended fund|we recommend/i);
   });
 });

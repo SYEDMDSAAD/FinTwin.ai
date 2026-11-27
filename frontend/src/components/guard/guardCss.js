@@ -120,6 +120,8 @@ export const GUARD_CSS = `
   .sg-plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
   .sg-linkbtn { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--sg-accent); cursor: pointer; text-decoration: underline; }
   .sg-linkbtn:disabled { opacity: 0.5; cursor: default; }
+  .sg-pi { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sg-border); display: grid; gap: 6px; justify-items: start; }
+  .sg-pi b { color: var(--sg-ink, inherit); font-weight: 650; }
   .sg-confirm { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--sg-border); }
   .sg-message { font-size: 16px; line-height: 1.55; color: var(--sg-ink); margin: 12px 0; }
   .sg-breath { height: 4px; border-radius: 4px; background: var(--sg-track); overflow: hidden; margin: 4px 0 14px; }

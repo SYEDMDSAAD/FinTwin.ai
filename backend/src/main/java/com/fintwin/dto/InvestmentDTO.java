@@ -27,6 +27,8 @@ public class InvestmentDTO {
     private String priceStatus;
     /** CAMS | KFINTECH | NSDL | CDSL when imported from a statement. */
     private String source;
+    /** EQUITY | DEBT | HYBRID | … from the statement; null for holdings added by hand. */
+    private String assetClass;
     private LocalDate unitsAsOf;
     /** Annual return in % (XIRR); null under a year or without a date. */
     private Double xirr;
@@ -48,6 +50,7 @@ public class InvestmentDTO {
         dto.ipoStatus     = inv.getIpoStatus();
         dto.ipoListingId  = inv.getIpoListingId();
         dto.source        = inv.getSource();
+        dto.assetClass    = inv.getAssetClass();
         dto.unitsAsOf     = inv.getUnitsAsOf();
 
         double invested = inv.getInvestedAmount() != null ? inv.getInvestedAmount() : 0;
@@ -62,6 +65,7 @@ public class InvestmentDTO {
 
     // getters
     public String getSource()       { return source; }
+    public String getAssetClass()   { return assetClass; }
     public LocalDate getUnitsAsOf() { return unitsAsOf; }
     public Double getXirr()         { return xirr; }
     public void setXirr(Double xirr) { this.xirr = xirr; }

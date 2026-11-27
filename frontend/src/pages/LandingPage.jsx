@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sun, Moon, CalendarDays, Coffee, Handshake, KeyRound, Landmark, Lock, MessageCircle, PauseCircle, PieChart, RefreshCw, Target, TrendingUp, FileSpreadsheet, Smartphone, QrCode, LineChart } from "lucide-react";
+import { Sun, Moon, CalendarDays, Coffee, Handshake, KeyRound, Landmark, Lock, MessageCircle, PauseCircle, PieChart, RefreshCw, Target, TrendingUp, FileSpreadsheet, Smartphone, QrCode, LineChart, ShieldAlert } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { toLight } from "./landingLightCss";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
@@ -237,6 +237,7 @@ const CSS = `
 .web .hero { min-height: auto; }
 .web .hero-inner { grid-template-columns: 44fr 56fr; gap: 56px; padding: 120px 32px 96px; }
 .web .hero-h1 { font-size: clamp(44px, 5.4vw, 72px); }
+.web .hero-stats { gap: 24px; flex-wrap: nowrap; }
 .pv { position: relative; padding: 0 0 70px 0; margin-right: 40px; }
 .pv-frame { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); border-radius: 18px; overflow: hidden; box-shadow: 0 40px 100px -30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.02); }
 .pv-top { display: flex; align-items: center; gap: 6px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
@@ -267,6 +268,31 @@ const CSS = `
 .pv .gm-facts { display: none; }
 .pv .gm-btn { font-size: 11.5px; padding: 7px 10px; }
 
+.pv-gain { font-size: 11px; font-weight: 600; color: #4ade80; margin-left: 6px; letter-spacing: 0; }
+.pv-line { display: block; width: 100%; height: 70px; margin-top: 10px; }
+.pv-area { fill: rgba(124,58,237,0.16); stroke: none; }
+.pv-stroke { fill: none; stroke: #7c3aed; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.pv-split { display: flex; gap: 2px; height: 7px; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.pv-split b { display: block; height: 100%; }
+.pv-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 10px; color: rgba(148,163,184,0.85); }
+.pv-rows { padding: 4px 12px; }
+.pv-row { display: grid; grid-template-columns: 1fr auto 44px; gap: 10px; padding: 8px 0; font-size: 11.5px; color: rgba(226,232,240,0.85); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.pv-row:last-child { border-bottom: none; }
+.pv-row span:nth-child(2) { font-weight: 600; color: #f1f5f9; }
+.pv-row .pv-gain { margin-left: 0; text-align: right; }
+.pi-chip { background: rgba(74,222,128,0.14); color: #4ade80; }
+.pi-card .gm-msg b { color: #f1f5f9; }
+
+.hold-table { border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; overflow: hidden; }
+.hold-row { display: grid; grid-template-columns: 1.6fr 1fr 0.8fr 0.9fr; gap: 10px; padding: 10px 14px; font-size: 13px; color: rgba(226,232,240,0.85); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.hold-row:last-child { border-bottom: none; }
+.hold-row span:nth-child(2) { font-weight: 600; color: #f1f5f9; }
+.hold-row .pv-gain { margin-left: 0; font-size: 13px; }
+.hold-head { font-size: 11px; font-weight: 600; color: rgba(148,163,184,0.85); background: rgba(255,255,255,0.03); }
+.hold-head span:nth-child(2) { font-weight: 600; color: rgba(148,163,184,0.85); }
+.flag-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.5; color: rgba(226,232,240,0.85); padding: 9px 12px; border-radius: 10px; background: rgba(251,191,36,0.08); margin-top: 8px; }
+.flag-dot { width: 7px; height: 7px; border-radius: 50%; background: #fbbf24; margin-top: 6px; flex-shrink: 0; }
+
 .works { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
 .works-inner { max-width: 1200px; margin: 0 auto; padding: 22px 32px; display: flex; align-items: center; justify-content: center; gap: 14px 34px; flex-wrap: wrap; }
 .works-label { font-size: 12px; font-weight: 600; color: rgba(148,163,184,0.8); }
@@ -292,7 +318,7 @@ const CSS = `
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips span { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: rgba(226,232,240,0.85); }
 .big-fig { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; color: #f1f5f9; }
-.big-fig small { font-size: 14px; font-weight: 600; color: #4ade80; margin-left: 8px; letter-spacing: 0; }
+.big-fig small { display: block; font-size: 14px; font-weight: 600; color: #4ade80; margin-top: 4px; letter-spacing: 0; }
 
 .web .sec-wrap { background: rgba(255,255,255,0.02); }
 .footer-a { font-size: 13px; color: rgba(100,116,139,0.7); text-decoration: none; transition: color 0.15s; }
@@ -448,42 +474,63 @@ function GuardMockup() {
 }
 
 
-/* The website's hero picture: the dashboard, with a pause on top (made-up figures) */
+/* The website's hero picture: the portfolio, with a skipped buy shown invested (made-up figures) */
 function ProductPreview() {
+  const line = [412, 418, 409, 431, 440, 436, 452, 461, 457, 470, 476, 482];
+  const max = 490, min = 400;
+  const pts = line.map((v, i) => `${(i / (line.length - 1)) * 100},${38 - ((v - min) / (max - min)) * 34}`).join(" ");
   return (
-    <div className="pv" role="img" aria-label="The FinTwin dashboard with Spend Guard pausing a ₹2,400 payment">
+    <div className="pv" role="img" aria-label="The FinTwin portfolio: ₹4,82,310 across five funds and stocks, with a skipped ₹2,400 buy shown as what it could grow to">
       <div className="pv-frame" aria-hidden="true">
-        <div className="pv-top"><i /><i /><i /><span className="pv-url">fintwin · Home</span></div>
+        <div className="pv-top"><i /><i /><i /><span className="pv-url">fintwin · Portfolio</span></div>
         <div className="pv-body">
           <div className="pv-side">
-            <span className="on">Home</span><span>Spend</span><span>Grow</span><span>Me</span><span>Copilot</span>
+            <span>Home</span><span className="on">Invest</span><span>Spend</span><span>Me</span><span>Copilot</span>
           </div>
           <div className="pv-main">
-            <div className="pv-card">
-              <div className="pv-k">Left this month</div>
-              <div className="pv-v">₹18,240</div>
-              <div className="pv-track"><b style={{ width: "68%" }} /></div>
-            </div>
-            <div className="pv-card">
-              <div className="pv-k">Net worth</div>
-              <div className="pv-v sm">₹6,08,913</div>
-              <div className="pv-n">↑ 4.2% this quarter</div>
-            </div>
             <div className="pv-card pv-wide">
-              <div className="pv-k">Spending by month</div>
-              <div className="pv-bars">
-                {[58, 72, 64, 80, 61, 52].map((h, i) => <b key={i} className={i === 5 ? "hi" : ""} style={{ height: `${h}%` }} />)}
-              </div>
-              <div className="pv-months">{["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"].map((m) => <span key={m}>{m}</span>)}</div>
+              <div className="pv-k">Portfolio value</div>
+              <div className="pv-v">₹4,82,310 <span className="pv-gain">+₹61,240 · 13.8% a year</span></div>
+              <svg className="pv-line" viewBox="0 0 100 40" preserveAspectRatio="none">
+                <polyline points={`0,40 ${pts} 100,40`} className="pv-area" />
+                <polyline points={pts} className="pv-stroke" />
+              </svg>
             </div>
-            <div className="pv-card pv-wide">
-              <div className="pv-k">Goa trip · 62% there</div>
-              <div className="pv-track"><b style={{ width: "62%", background: "#22c55e" }} /></div>
+            <div className="pv-card">
+              <div className="pv-k">Where it sits</div>
+              <div className="pv-split"><b style={{ width: "64%", background: "#7c3aed" }} /><b style={{ width: "24%", background: "#0ea5a4" }} /><b style={{ width: "12%", background: "#f59e0b" }} /></div>
+              <div className="pv-legend"><span>Equity 64%</span><span>Debt 24%</span><span>Gold 12%</span></div>
+            </div>
+            <div className="pv-card">
+              <div className="pv-k">Next SIP</div>
+              <div className="pv-v sm">₹5,000</div>
+              <div className="pv-n" style={{ color: "inherit", opacity: 0.7 }}>Flexi cap fund · 5 Dec</div>
+            </div>
+            <div className="pv-card pv-rows">
+              {[["Flexi cap fund", "₹1,84,200", "+16.9%"], ["Nifty 50 index fund", "₹1,21,400", "+12.1%"], ["Gold ETF", "₹58,900", "+9.4%"]].map(([n, v, r]) => (
+                <div className="pv-row" key={n}><span>{n}</span><span>{v}</span><span className="pv-gain">{r}</span></div>
+              ))}
             </div>
           </div>
         </div>
       </div>
-      <GuardMockup />
+      <div className="gm-card pi-card">
+        <div className="gm-top">
+          <span className="gm-chip pi-chip">Pause → Invest</span>
+          <span className="gm-time">Skipped today</span>
+        </div>
+        <div className="gm-payee">
+          <div>
+            <div className="gm-name">Urban Threads</div>
+            <div className="gm-sub">₹2,400 you didn't spend</div>
+          </div>
+        </div>
+        <p className="gm-msg">At your SIP's past 11% a year, that's about <b>₹4,040 in 5 years</b>. Past returns aren't a promise.</p>
+        <div className="gm-actions">
+          <span className="gm-btn gm-primary">Add to my SIP plan</span>
+          <span className="gm-btn gm-quiet">Not now</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -491,79 +538,71 @@ function ProductPreview() {
 
 /* The website's feature grid: each card shows a little of the real thing (made-up figures) */
 function FeatureBento() {
-  const cats = [
-    { label: "Rent", pct: 100, val: "₹18k", color: "#7c3aed" },
-    { label: "Groceries", pct: 48, val: "₹8.6k", color: "#22d3ee" },
-    { label: "Food", pct: 46, val: "₹8.3k", color: "#fbbf24" },
-    { label: "Shopping", pct: 44, val: "₹8.0k", color: "#f472b6" },
-    { label: "Transport", pct: 20, val: "₹3.7k", color: "#4ade80" },
+  const rows = [
+    { n: "Flexi cap fund", v: "₹1,84,200", r: "+16.9%", x: "15.2% a yr" },
+    { n: "Nifty 50 index fund", v: "₹1,21,400", r: "+12.1%", x: "12.8% a yr" },
+    { n: "Gold ETF", v: "₹58,900", r: "+9.4%", x: "11.0% a yr" },
+    { n: "Short duration fund", v: "₹42,300", r: "+6.8%", x: "7.1% a yr" },
   ];
   return (
     <div className="bento">
       <Reveal className="bento-2">
         <div className="feat-card">
-          <div className="feat-card-icon" aria-hidden="true"><PieChart size={20} /></div>
-          <div className="feat-card-title">See where it goes</div>
-          <div className="feat-card-desc">Every rupee sorted into clear categories, month by month. FinTwin learns your local shops and remembers your corrections.</div>
-          <div className="bento-viz mini-bar-wrap" aria-hidden="true">
-            {cats.map((c) => (
-              <div className="mini-bar-row" key={c.label}>
-                <span className="mini-bar-label">{c.label}</span>
-                <span className="mini-bar-track"><span className="mini-bar-fill" style={{ display: "block", width: `${c.pct}%`, background: c.color }} /></span>
-                <span className="mini-bar-val" style={{ color: "inherit" }}>{c.val}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Reveal>
-      <Reveal delay={1}>
-        <div className="feat-card">
-          <div className="feat-card-icon" aria-hidden="true"><MessageCircle size={20} /></div>
-          <div className="feat-card-title">Ask about your money</div>
-          <div className="feat-card-desc">Plain answers from your own numbers, typed or spoken.</div>
+          <div className="feat-card-icon" aria-hidden="true"><LineChart size={20} /></div>
+          <div className="feat-card-title">Every holding, valued today</div>
+          <div className="feat-card-desc">One statement brings in every mutual fund you hold, from any app or AMC. Add stocks, FDs, PPF and gold by hand.</div>
           <div className="bento-viz" aria-hidden="true">
-            <div className="mini-chat">
-              <div className="mini-chat-user">Where did most of it go last month?</div>
-              <div className="mini-chat-ai"><div className="mini-chat-ai-tag">FinTwin</div>Rent was ₹18,000. After that, groceries at ₹8,568, up ₹1,354 on October.</div>
+            <div className="hold-table">
+              <div className="hold-row hold-head"><span>Holding</span><span>Value</span><span>Return</span><span>XIRR</span></div>
+              {rows.map((h) => (
+                <div className="hold-row" key={h.n}><span>{h.n}</span><span>{h.v}</span><span className="pv-gain">{h.r}</span><span>{h.x}</span></div>
+              ))}
             </div>
-          </div>
-        </div>
-      </Reveal>
-      <Reveal>
-        <div className="feat-card">
-          <div className="feat-card-icon" aria-hidden="true"><Target size={20} /></div>
-          <div className="feat-card-title">Goals that keep up</div>
-          <div className="feat-card-desc">See when you'll get there, based on what you really save.</div>
-          <div className="bento-viz mini-goal" aria-hidden="true">
-            {[{ n: "Goa trip", p: 62 }, { n: "Emergency fund", p: 35 }].map((g) => (
-              <div className="mini-goal-row" key={g.n}>
-                <div className="mini-goal-info">
-                  <div className="mini-goal-name">{g.n}</div>
-                  <div className="mini-goal-bar-track"><div className="mini-goal-bar-fill" style={{ width: `${g.p}%`, background: "#22c55e" }} /></div>
-                </div>
-                <span className="mini-goal-pct">{g.p}%</span>
-              </div>
-            ))}
+            <div className="chips" style={{ marginTop: 14 }}><span>CAMS</span><span>KFintech</span><span>NSDL</span><span>CDSL</span></div>
           </div>
         </div>
       </Reveal>
       <Reveal delay={1}>
         <div className="feat-card">
           <div className="feat-card-icon" aria-hidden="true"><TrendingUp size={20} /></div>
-          <div className="feat-card-title">Investments, honestly measured</div>
-          <div className="feat-card-desc">Import your mutual-fund statement and see your real yearly return, with tax-saving tips.</div>
+          <div className="feat-card-title">Your real return</div>
+          <div className="feat-card-desc">"+42% total" says nothing without time. XIRR counts when each rupee went in, so you can compare it with an FD or the index.</div>
           <div className="bento-viz" aria-hidden="true">
-            <div className="big-fig">₹1,70,734<small>12.4% a year</small></div>
+            <div className="big-fig">13.8%<small>a year, XIRR</small></div>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><ShieldAlert size={20} /></div>
+          <div className="feat-card-title">A health check</div>
+          <div className="feat-card-desc">What quietly costs you: regular plans, one fund carrying the portfolio, prices gone stale.</div>
+          <div className="bento-viz" aria-hidden="true">
+            <div className="flag-row"><span className="flag-dot" />Regular plan: about ₹6,200 a year more than direct</div>
+            <div className="flag-row"><span className="flag-dot" />One fund is 42% of your portfolio</div>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal delay={1}>
+        <div className="feat-card">
+          <div className="feat-card-icon" aria-hidden="true"><Landmark size={20} /></div>
+          <div className="feat-card-title">Tax-loss and gain harvesting</div>
+          <div className="feat-card-desc">Long-term equity gains up to ₹1.25 lakh a year are tax-free. FinTwin shows which units to sell and buy back to use it.</div>
+          <div className="bento-viz" aria-hidden="true">
+            <div className="big-fig">₹84,000<small>of gains you can book tax-free</small></div>
           </div>
         </div>
       </Reveal>
       <Reveal delay={2}>
         <div className="feat-card">
-          <div className="feat-card-icon" aria-hidden="true"><FileSpreadsheet size={20} /></div>
-          <div className="feat-card-title">Bring your data in once</div>
-          <div className="feat-card-desc">No bank passwords. Import what you already have.</div>
-          <div className="bento-viz chips" aria-hidden="true">
-            <span>CSV</span><span>PDF statement</span><span>Excel</span><span>CAS</span><span>Bank SMS</span><span>Receipts</span>
+          <div className="feat-card-icon" aria-hidden="true"><MessageCircle size={20} /></div>
+          <div className="feat-card-title">Ask about your money</div>
+          <div className="feat-card-desc">Plain answers from your own numbers, typed or spoken.</div>
+          <div className="bento-viz" aria-hidden="true">
+            <div className="mini-chat">
+              <div className="mini-chat-user">How have my funds done this year?</div>
+              <div className="mini-chat-ai"><div className="mini-chat-ai-tag">FinTwin</div>Up ₹38,400 this year. The flexi-cap fund did most of it.</div>
+            </div>
           </div>
         </div>
       </Reveal>
@@ -579,6 +618,15 @@ function Reveal({ children, delay = 0, className = "" }) {
     </div>
   );
 }
+
+const WHY_WEB = [
+  { title: "Money leaks before it's invested",
+    desc: "₹150 here and ₹400 there is a SIP that never started. The leak happens at the counter, not in the portfolio." },
+  { title: "Returns are hard to read",
+    desc: "\"+18%\" means little without time. FinTwin shows XIRR: your real yearly return, counting when each rupee went in." },
+  { title: "Costs hide in plain sight",
+    desc: "A regular plan can cost 0.5–1.5% a year more than the direct one. Over 20 years, that's lakhs." },
+];
 
 const WHY = [
   { icon: Coffee, title: "Small spends add up",
@@ -650,14 +698,65 @@ export default function LandingPage() {
     setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }, []);
 
+  const featuresSection = (
+      <section id="features" aria-labelledby="features-heading">
+        <div className="section">
+          <Reveal>
+            {web ? (<>
+            <div className="section-tag">Investing</div>
+            <h2 className="section-h2" id="features-heading">Every fund you own. Measured honestly.</h2>
+            <p className="section-sub">
+              Import your mutual-fund statement once. FinTwin values every holding, shows your real return,
+              and flags what quietly costs you money.
+            </p>
+            </>) : (<>
+            <div className="section-tag">Your money, in one place</div>
+            <h2 className="section-h2" id="features-heading">Everything behind the pause.</h2>
+            <p className="section-sub">
+              Spend Guard knows your budget because FinTwin knows your money. Bring in your bank statements
+              once and get the full picture.
+            </p>
+            </>)}
+          </Reveal>
+          {web ? <FeatureBento /> : (
+          <div className="feat-grid">
+            {[
+              { icon: PieChart, title: "See where it goes",
+                desc: "Every rupee sorted into clear categories, month by month." },
+              { icon: Target, title: "Goals that keep up",
+                desc: "Set a target and see when you'll get there, based on what you really save." },
+              { icon: MessageCircle, title: "Ask about your money",
+                desc: "\"Where did most of it go last month?\" Plain answers from your own data." },
+              { icon: TrendingUp, title: "Your net worth",
+                desc: "Savings, investments and loans together, so you know where you stand." },
+            ].map((c, i) => (
+              <Reveal key={c.title} delay={(i % 2) + 1}>
+                <div className="feat-card">
+                  <div className="feat-card-icon" aria-hidden="true"><c.icon size={20} /></div>
+                  <div className="feat-card-title">{c.title}</div>
+                  <div className="feat-card-desc">{c.desc}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          )}
+        </div>
+      </section>
+  );
+
   return (
     <div className={`land${isDark ? "" : " light"}${web ? " web" : ""}`}>
       <style>{isDark ? DARK_CSS : LIGHT_CSS}</style>
 
       {/* ── Mobile menu ──────────────────────────────────────── */}
       <div className={`mob-menu${menuOpen ? " open" : ""}`} role="dialog" aria-label="Navigation menu">
+        {web ? (<>
+        <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Investing">Investing</button>
+        <button className="mob-link" onClick={() => scrollTo("spend-guard")} aria-label="Go to Pause → Invest">Pause → Invest</button>
+        </>) : (<>
         <button className="mob-link" onClick={() => scrollTo("spend-guard")} aria-label="Go to Spend Guard">Spend Guard</button>
         <button className="mob-link" onClick={() => scrollTo("features")} aria-label="Go to Features">Features</button>
+        </>)}
         <button className="mob-link" onClick={() => scrollTo("security")} aria-label="Go to Trust">Trust</button>
         <button className="mob-link" onClick={() => scrollTo("pricing")} aria-label="Go to Pricing">Pricing</button>
         <button className="theme-toggle" onClick={toggleTheme} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
@@ -684,8 +783,13 @@ export default function LandingPage() {
             <span className="lnav-wordmark">FinTwin<span> AI</span></span>
           </a>
           <div className="lnav-links" role="menubar">
+            {web ? (<>
+              <button className="lnav-link" role="menuitem" onClick={() => scrollTo("features")}>Investing</button>
+              <button className="lnav-link" role="menuitem" onClick={() => scrollTo("spend-guard")}>Pause → Invest</button>
+            </>) : (<>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("spend-guard")}>Spend Guard <span className="new-pill">New</span></button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("features")}>Features</button>
+            </>)}
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("security")}>Trust</button>
             <button className="lnav-link" role="menuitem" onClick={() => scrollTo("pricing")}>Pricing</button>
           </div>
@@ -717,6 +821,22 @@ export default function LandingPage() {
 
         <div className="hero-inner">
           <div>
+            {web ? (<>
+            <div className="hero-badge h-el-1" aria-label="Product highlights">
+              <span className="new-pill">New</span>
+              Future Twin is live · Made for India
+            </div>
+
+            <h1 className="hero-h1 h-el-2" id="hero-heading">
+              Spend smart.<br />
+              <span className="grad">Invest the rest.</span>
+            </h1>
+
+            <p className="hero-sub h-el-3">
+              Every fund and stock you own in one place, with your real yearly return and what each one costs you.
+              Then FinTwin finds money to invest in your own spending, before it slips away.
+            </p>
+            </>) : (<>
             <div className="hero-badge h-el-1" aria-label="Product highlights">
               <span className="new-pill">New</span>
               Spend Guard is live · Made for India
@@ -731,6 +851,7 @@ export default function LandingPage() {
               FinTwin checks a payment against your budget, your week and your goals before the money leaves.
               Groceries and bills go straight through. The spends you'd regret get a moment's thought.
             </p>
+            </>)}
 
             <div className="hero-ctas h-el-4">
               {isLoggedIn ? (
@@ -755,20 +876,16 @@ export default function LandingPage() {
             )}
 
             <div className="hero-stats h-el-5">
-              <div>
-                <div className="hero-stat-val">₹0</div>
-                <div className="hero-stat-label">Money we hold</div>
-              </div>
-              <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
-              <div>
-                <div className="hero-stat-val">5 sec</div>
-                <div className="hero-stat-label">A pause, not a block</div>
-              </div>
-              <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />
-              <div>
-                <div className="hero-stat-val">You</div>
-                <div className="hero-stat-label">Make the call</div>
-              </div>
+              {(web ? [["1 file", "All your funds"], ["XIRR", "Real yearly return"], ["₹0", "Money we hold"]]
+                    : [["₹0", "Money we hold"], ["5 sec", "A pause, not a block"], ["You", "Make the call"]]).map(([v, l], i) => (
+                <div key={l} style={{ display: "flex", gap: web ? 24 : 32 }}>
+                  {i > 0 && <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />}
+                  <div>
+                    <div className="hero-stat-val">{v}</div>
+                    <div className="hero-stat-label">{l}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -799,17 +916,17 @@ export default function LandingPage() {
           <Reveal>
             <div className="section-tag">Why FinTwin</div>
             <h2 className="section-h2" id="why-heading">
-              Paying got instant.<br />
-              <span className="gt-purple">Thinking about it didn't.</span>
+              Investing apps show your funds.<br />
+              <span className="gt-purple">Nobody shows where the money came from.</span>
             </h2>
             <p className="section-sub">
-              A scan and a PIN, and the money's gone. Budget apps tell you what went wrong at the end of the
-              month. FinTwin helps at the moment it matters: just before you pay.
+              Brokers show what you hold. Budget apps show what you spent. FinTwin joins the two, so the money
+              you'd have wasted ends up working for you.
             </p>
           </Reveal>
           <Reveal delay={1}>
             <ol className="why-list">
-              {WHY.map((c, i) => (
+              {WHY_WEB.map((c, i) => (
                 <li className="why-row" key={c.title}>
                   <span className="why-num" aria-hidden="true">0{i + 1}</span>
                   <div>
@@ -851,25 +968,40 @@ export default function LandingPage() {
       </section>
       )}
 
+      {web && featuresSection}
+
       {/* ════════════════════════════════════════════════════════
           SPEND GUARD: how it works
       ════════════════════════════════════════════════════════ */}
       <section id="spend-guard" aria-labelledby="sg-heading">
         <div className="section">
           <Reveal>
+            {web ? (<>
+            <div className="section-tag">Pause → Invest</div>
+            <h2 className="section-h2" id="sg-heading">Your next SIP is hiding in your spending.</h2>
+            <p className="section-sub">
+              Spend Guard sits between the scan and the payment. When a buy would hurt, it pauses for a second.
+              Skip it, and FinTwin shows that money invested.
+            </p>
+            </>) : (<>
             <div className="section-tag"><span className="new-pill">New feature</span> Spend Guard</div>
             <h2 className="section-h2" id="sg-heading">A second look, in seconds.</h2>
             <p className="section-sub">
               Spend Guard sits between the scan and the payment. Most payments go straight through.
               When one would hurt, it tells you why, in your own numbers.
             </p>
+            </>)}
           </Reveal>
           <ol className="steps" aria-label="How Spend Guard works">
-            {[
+            {(web ? [
+              { n: "1", title: "Pause before you pay", desc: "Scan any UPI QR. Groceries and bills go straight through; a buy that breaks your budget gets a short, honest note." },
+              { n: "2", title: "Keep the difference", desc: "Skip it or wishlist it for 2 days. Round-ups and money left in your week add to the pile." },
+              { n: "3", title: "See it invested", desc: "Future Twin shows that money in your SIPs over 5, 10 and 20 years, at a return you choose." },
+            ] : [
               { n: "1", title: "Scan as usual", desc: "Scan the shop's QR code, or enter a UPI ID. If Spend Guard can't tell what a payment is for, it simply asks." },
               { n: "2", title: "Spend Guard checks", desc: "Your budget, what's left this week, your goals and the time of day, in a few seconds." },
               { n: "3", title: "You decide", desc: "Pay in Google Pay, skip it, or put it on a 2-day wishlist. PhonePe and Paytm work too." },
-            ].map((st, i) => (
+            ]).map((st, i) => (
               <Reveal key={st.n} delay={i + 1}>
                 <li className="step">
                   <div className="step-n" aria-hidden="true">{st.n}</div>
@@ -902,43 +1034,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════════════
-          FEATURES: the rest of FinTwin
-      ════════════════════════════════════════════════════════ */}
-      <section id="features" aria-labelledby="features-heading">
-        <div className="section">
-          <Reveal>
-            <div className="section-tag">Your money, in one place</div>
-            <h2 className="section-h2" id="features-heading">Everything behind the pause.</h2>
-            <p className="section-sub">
-              Spend Guard knows your budget because FinTwin knows your money. Bring in your bank statements
-              once and get the full picture.
-            </p>
-          </Reveal>
-          {web ? <FeatureBento /> : (
-          <div className="feat-grid">
-            {[
-              { icon: PieChart, title: "See where it goes",
-                desc: "Every rupee sorted into clear categories, month by month." },
-              { icon: Target, title: "Goals that keep up",
-                desc: "Set a target and see when you'll get there, based on what you really save." },
-              { icon: MessageCircle, title: "Ask about your money",
-                desc: "\"Where did most of it go last month?\" Plain answers from your own data." },
-              { icon: TrendingUp, title: "Your net worth",
-                desc: "Savings, investments and loans together, so you know where you stand." },
-            ].map((c, i) => (
-              <Reveal key={c.title} delay={(i % 2) + 1}>
-                <div className="feat-card">
-                  <div className="feat-card-icon" aria-hidden="true"><c.icon size={20} /></div>
-                  <div className="feat-card-title">{c.title}</div>
-                  <div className="feat-card-desc">{c.desc}</div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          )}
-        </div>
-      </section>
+      {!web && featuresSection}
 
       {/* ════════════════════════════════════════════════════════
           TRUST
@@ -994,7 +1090,15 @@ export default function LandingPage() {
               <div className="price-amount">₹0 <span>/ month</span></div>
               <p className="price-desc">Full access to every feature. Free, for now.</p>
               <div className="price-features" role="list">
-                {[
+                {(web ? [
+                  "Every fund from one CAS statement, valued daily",
+                  "XIRR: your real yearly return, per fund and overall",
+                  "Health check: plan costs, concentration, stale prices",
+                  "Tax harvesting and SIP tracking",
+                  "Pause → Invest and Future Twin",
+                  "Spending, budgets and Spend Guard",
+                  "Encrypted, private, and never sold",
+                ] : [
                   "Spend Guard: a check before every payment",
                   "Bank and UPI statement import",
                   "Spending by category, month by month",
@@ -1002,7 +1106,7 @@ export default function LandingPage() {
                   "Answers about your money, in plain words",
                   "Net worth: savings, investments and loans",
                   "Encrypted, private, and never sold",
-                ].map(f => (
+                ]).map(f => (
                   <div className="price-feat" key={f} role="listitem">
                     <div className="price-feat-check" aria-hidden="true">✓</div>
                     {f}
@@ -1033,8 +1137,8 @@ export default function LandingPage() {
         <div className="cta-inner">
           <Reveal>
             <h2 className="cta-h2">
-              Spend with a<br />
-              <span className="gt-purple">second thought.</span>
+              {web ? <>Start with one<br /><span className="gt-purple">statement.</span></>
+                   : <>Spend with a<br /><span className="gt-purple">second thought.</span></>}
             </h2>
             <p className="cta-sub">
               Free during beta. Try the live demo in one click, no sign-up needed.
@@ -1058,7 +1162,7 @@ export default function LandingPage() {
                     onClick={() => navigate("/register")}
                     aria-label="Create your free FinTwin account"
                   >
-                    Start understanding your money
+                    {web ? "See your real returns" : "Start understanding your money"}
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button className="btn-hero-ghost" onClick={() => navigate("/login")} aria-label="Log in to existing account">Already have an account</button>

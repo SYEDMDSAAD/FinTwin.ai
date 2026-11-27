@@ -328,3 +328,167 @@ def fund_nav_on(code: str, on: str) -> dict | None:
         return None                               # before the fund existed
     return {"code": str(code), "date": pick[0].date().isoformat(), "nav": pick[1]}
 
+
+
+# ── Charts and collections (fund and stock pages) ───────────────────────────
+
+# Same day counts as fund_returns (round(365.25 × years)), so the chart and
+# the "past returns" row agree
+FUND_RANGES = {"1M": 30, "6M": 183, "1Y": 365, "3Y": 1096, "5Y": 1826, "ALL": None}
+_MAX_POINTS = 240
+
+
+def _thin(points: list, limit: int = _MAX_POINTS) -> list:
+    """Every nth point, always keeping the last, so a 20-year chart stays light."""
+    if len(points) <= limit:
+        return points
+    step = len(points) / limit
+    out = [points[int(i * step)] for i in range(limit)]
+    if out[-1] is not points[-1]:
+        out.append(points[-1])
+    return out
+
+
+def fund_history(code: str, rng: str) -> dict:
+    """NAVs over a range (1M…ALL) for the fund page's chart, plus when the fund began."""
+    points = _nav_history(code)
+    if not points:
+        return {"code": str(code), "range": rng, "points": [], "since": None, "change": None}
+    days = FUND_RANGES.get(rng)
+    window = points if days is None else [p for p in points if p[0] >= points[-1][0] - timedelta(days=days)]
+    window = window or points[-1:]
+    first, last = window[0][1], window[-1][1]
+    return {
+        "code": str(code), "range": rng,
+        "since": points[0][0].date().isoformat(),
+        "change": round((last / first - 1) * 100, 2) if first > 0 else None,
+        "points": [{"date": d.date().isoformat(), "nav": round(v, 4)} for d, v in _thin(window)],
+    }
+
+
+def fund_nav_series(code: str) -> list[dict]:
+    """The full daily NAV series, for the SIP / lump-sum calculator (done in the browser)."""
+    return [{"date": d.date().isoformat(), "nav": round(v, 4)} for d, v in _thin(_nav_history(code), 2000)]
+
+
+STOCK_RANGES = {"1D": ("1d", "5m"), "1W": ("5d", "30m"), "1M": ("1mo", "1d"),
+                "1Y": ("1y", "1d"), "5Y": ("5y", "1wk")}
+_STOCK_HISTORY_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def stock_history(symbol: str, rng: str) -> dict:
+    """Prices over a range for the stock page's chart, with the 52-week high and low."""
+    import yfinance as yf
+    sym = symbol.strip().upper()
+    if "." not in sym:
+        sym += ".NS"
+    key = f"{sym}:{rng}"
+    hit = _STOCK_HISTORY_CACHE.get(key)
+    ttl = 120 if rng in ("1D", "1W") else 3600
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    period, interval = STOCK_RANGES.get(rng, STOCK_RANGES["1Y"])
+    out = {"symbol": sym, "range": rng, "points": [], "high52": None, "low52": None, "change": None}
+    try:
+        t = yf.Ticker(sym)
+        hist = t.history(period=period, interval=interval)
+        pts = [{"t": idx.isoformat(), "price": round(float(row["Close"]), 2)} for idx, row in hist.iterrows()]
+        out["points"] = _thin(pts)
+        if pts and pts[0]["price"] > 0:
+            out["change"] = round((pts[-1]["price"] / pts[0]["price"] - 1) * 100, 2)
+        year = t.history(period="1y", interval="1d") if rng != "1Y" else hist
+        if year is not None and not year.empty:
+            out["high52"] = round(float(year["High"].max()), 2)
+            out["low52"] = round(float(year["Low"].min()), 2)
+    except Exception as e:
+        logger.info("Price history unavailable for %s: %s", sym, e)
+        return out
+    if len(_STOCK_HISTORY_CACHE) > 500:
+        _STOCK_HISTORY_CACHE.clear()
+    _STOCK_HISTORY_CACHE[key] = (time.time(), out)
+    return out
+
+
+import re as _re
+_BROAD_INDEX = _re.compile(r"nifty 50 index|sensex index|next 50|nifty 100 index|midcap 150|smallcap 250|nifty 500 index|total market", _re.I)
+
+# Collections are plain filters on AMFI's own categories. Sorted by a stated
+# column (3-year return), never "recommended": a list, not advice.
+COLLECTIONS = {
+    "index": ("Index funds (broad market)", lambda c, n: "Index Funds" in c and _BROAD_INDEX.search(n) is not None),
+    "elss": ("Tax saving (ELSS)", lambda c, n: "ELSS" in c),
+    "large-cap": ("Large cap", lambda c, n: c.endswith("Large Cap Fund")),
+    "mid-cap": ("Mid cap", lambda c, n: c.endswith("Mid Cap Fund") and "Large" not in c),
+    "small-cap": ("Small cap", lambda c, n: c.endswith("Small Cap Fund")),
+    "flexi-cap": ("Flexi cap", lambda c, n: "Flexi Cap" in c),
+    "liquid": ("Liquid (parking money)", lambda c, n: "Liquid Fund" in c),
+    "gold": ("Gold", lambda c, n: "gold" in n.lower() and not c.startswith("Equity")),
+}
+_COLLECTION_CANDIDATES = 100
+
+
+def _is_direct_growth(name: str) -> bool:
+    n = name.lower()
+    return "direct" in n and "growth" in n and "idcw" not in n and "dividend" not in n and "bonus" not in n
+
+
+def fund_collection(key: str) -> dict | None:
+    from concurrent.futures import ThreadPoolExecutor, wait
+    spec = COLLECTIONS.get(key)
+    if spec is None:
+        return None
+    title, match = spec
+    funds = [f for f in _load_funds().values() if match(f.category, f.name) and _is_direct_growth(f.name)]
+    funds.sort(key=lambda f: f.name)
+    funds = funds[:_COLLECTION_CANDIDATES]
+    returns: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {pool.submit(fund_returns, f.code): f.code for f in funds}
+        done, _ = wait(futures, timeout=15)
+        for fut in done:
+            try:
+                returns[futures[fut]] = fut.result()
+            except Exception:
+                pass
+    rows = []
+    for f in funds:
+        r = returns.get(f.code) or {}
+        rows.append({"code": f.code, "name": f.name, "amc": f.amc, "category": f.category,
+                     "nav": f.nav, "nav_date": f.nav_date, "returns": r})
+    rows.sort(key=lambda x: (x["returns"].get("3y") is None, -(x["returns"].get("3y") or 0)))
+    return {"key": key, "title": title, "sortedBy": "3-year return, highest first",
+            "note": "A list sorted by past returns, not a recommendation. Direct plans, growth option.",
+            "funds": rows}
+
+
+def collections() -> list[dict]:
+    return [{"key": k, "title": t} for k, (t, _) in COLLECTIONS.items()]
+
+
+_SECTOR_CACHE: dict[str, tuple[float, str | None]] = {}
+_SECTOR_TTL = 7 * 24 * 3600       # a company's sector rarely changes
+
+
+def stock_sectors(symbols: list[str]) -> dict[str, str | None]:
+    """Each stock's sector (Yahoo's classification), for the sector split. None when unknown."""
+    import yfinance as yf
+    out: dict[str, str | None] = {}
+    for raw in symbols[:50]:
+        sym = raw.strip().upper()
+        if not sym:
+            continue
+        if "." not in sym:
+            sym += ".NS"
+        hit = _SECTOR_CACHE.get(sym)
+        if hit and time.time() - hit[0] < _SECTOR_TTL:
+            out[sym] = hit[1]
+            continue
+        try:
+            sector = (yf.Ticker(sym).info or {}).get("sector") or None
+        except Exception as e:
+            logger.info("Sector unavailable for %s: %s", sym, e)
+            out[sym] = None
+            continue                              # a failed read isn't cached
+        _SECTOR_CACHE[sym] = (time.time(), sector)
+        out[sym] = sector
+    return out
