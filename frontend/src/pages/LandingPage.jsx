@@ -877,15 +877,13 @@ export default function LandingPage() {
 
             <div className="hero-stats h-el-5">
               {(web ? [["1 file", "All your funds"], ["XIRR", "Real yearly return"], ["₹0", "Money we hold"]]
-                    : [["₹0", "Money we hold"], ["5 sec", "A pause, not a block"], ["You", "Make the call"]]).map(([v, l], i) => (
-                <div key={l} style={{ display: "flex", gap: web ? 24 : 32 }}>
-                  {i > 0 && <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />}
-                  <div>
-                    <div className="hero-stat-val">{v}</div>
-                    <div className="hero-stat-label">{l}</div>
-                  </div>
-                </div>
-              ))}
+                    : [["₹0", "Money we hold"], ["5 sec", "A pause, not a block"], ["You", "Make the call"]]).flatMap(([v, l], i) => [
+                i > 0 && <div key={`sep-${l}`} style={{ width: 1, height: 36, background: "rgba(255,255,255,0.07)", alignSelf: "center" }} aria-hidden="true" />,
+                <div key={l}>
+                  <div className="hero-stat-val">{v}</div>
+                  <div className="hero-stat-label">{l}</div>
+                </div>,
+              ]).filter(Boolean)}
             </div>
           </div>
 

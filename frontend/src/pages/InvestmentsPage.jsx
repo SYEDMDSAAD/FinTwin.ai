@@ -53,7 +53,7 @@ function Insights() {
     const details = useFundDetails(portfolio?.holdings);
     return (
         <div className="desk-cols">
-            <div className="max-w-2xl space-y-5">
+            <div className="max-w-2xl space-y-5 mb-6">
                 <PortfolioHealthCard showEmpty />
                 <BenchmarkCard details={details} />
                 <OverlapCard details={details} />

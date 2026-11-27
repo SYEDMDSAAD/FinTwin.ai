@@ -1,10 +1,10 @@
 /*
- * Whether "Hey FinTwin" listens. On in the Android app (it's an assistant
- * there), off on the website until switched on in Settings: a site asking
- * for the microphone as it loads would feel like spying. Either way the
- * listening happens on the device and nothing is sent until the wake word.
+ * Whether "Hey FinTwin" listens. Off by default, in the app and on the
+ * website, until switched on in Settings: the wake word doesn't yet fire
+ * reliably on real voices, and an always-on microphone costs battery and
+ * shows the mic indicator for nothing. When on, listening happens on the
+ * device and nothing is sent until the wake word.
  */
-import { isNativeApp } from "../native";
 
 const KEY = "fintwin.voice.wake";
 export const VOICE_PREF_EVENT = "fintwin:voice-pref";
@@ -15,7 +15,7 @@ export function wakePref() {
         if (v === "on") return true;
         if (v === "off") return false;
     } catch { /* storage blocked: fall back to the default */ }
-    return isNativeApp();
+    return false;
 }
 
 export function setWakePref(on) {

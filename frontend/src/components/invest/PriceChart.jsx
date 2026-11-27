@@ -29,8 +29,8 @@ export default function PriceChart({ load, ranges, initial = "1Y", format, label
     const stroke = up ? "var(--good)" : "var(--bad)";
     return (
         <section aria-label={`${label} chart`}>
-            <div className="flex items-center justify-between gap-3 mb-2">
-                <span className={cx("text-small font-semibold num", shown?.change == null ? "text-ink-3" : up ? "text-good" : "text-bad")}>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+                <span className={cx("text-small font-semibold num whitespace-nowrap", shown?.change == null ? "text-ink-3" : up ? "text-good" : "text-bad")}>
                     {shown?.change != null ? `${percent(shown.change, { plus: true })} in ${range === "ALL" ? "all time" : range}` : " "}
                 </span>
                 <div role="group" aria-label="Chart range" className="flex gap-0.5">

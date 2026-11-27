@@ -1,4 +1,5 @@
-import { ArrowLeft, Pencil } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui";
 import FundPage from "./FundPage";
 import StockPage from "./StockPage";
@@ -11,13 +12,20 @@ import { pageKind } from "../../utils/investMath";
  * 52-week range, deposits their interest, IPOs their timeline.
  */
 
-export default function HoldingPage({ holding, onBack, onEdit }) {
+export default function HoldingPage({ holding, onBack, onEdit, onDelete }) {
     const kind = pageKind(holding);
+    const [confirming, setConfirming] = useState(false);
     return (
         <div className="max-w-2xl">
             <div className="flex items-center justify-between mb-4 -ml-2">
                 <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={onBack}>Holdings</Button>
-                {onEdit && <Button variant="ghost" size="sm" icon={Pencil} onClick={() => onEdit(holding)}>Edit</Button>}
+                <span className="flex gap-1">
+                    {onEdit && <Button variant="ghost" size="sm" icon={Pencil} onClick={() => onEdit(holding)}>Edit</Button>}
+                    {onDelete && !confirming && <Button variant="ghost" size="sm" icon={Trash2} onClick={() => setConfirming(true)}>Remove</Button>}
+                    {onDelete && confirming && (
+                        <Button variant="ghost" size="sm" className="text-bad" onClick={() => onDelete(holding)}>Remove it from FinTwin?</Button>
+                    )}
+                </span>
             </div>
             {kind === "fund" && <FundPage code={holding.tickerCode.trim()} name={holding.name} holding={holding} />}
             {kind === "stock" && <StockPage symbol={holding.tickerCode.trim()} name={holding.name} holding={holding} />}

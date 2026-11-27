@@ -25,8 +25,7 @@ import { Plus, Pencil, Trash2, TrendingUp, RefreshCw, Landmark, Link2 } from "lu
 import { Button, SectionHeader, EmptyState, IconChip, cx } from "./ui";
 import HoldingPage from "./invest/HoldingPage";
 
-// The page scrolls inside <main>; a holding's page should open at its top
-const mainScrollTop = () => { try { document.querySelector("main")?.scrollTo?.({ top: 0 }); } catch { /* no main in tests */ } };
+import { scrollPageTop as mainScrollTop } from "../utils/scrollTop";
 
 const INVESTMENT_TYPES = [
     "Stocks", "IPO", "Mutual Fund", "Fixed Deposit", "Gold", "PPF", "NPS", "Bonds", "Crypto", "Real Estate", "Other"
@@ -66,6 +65,11 @@ const TYPE_FIELDS = {
     "Real Estate":   { ticker: false,                units: false,          rate: false },
     "Other":         { ticker: false,                units: false,          rate: false },
 };
+
+/** Whole rupees, for lists where paise only crowd the row. */
+function fmt0(n) {
+    return typeof n === "number" ? Math.round(n).toLocaleString("en-IN") : "—";
+}
 
 function fmt(n) {
     return typeof n === "number" ? n.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—";
@@ -330,7 +334,8 @@ export default function PortfolioTab() {
 
     if (opened) {
         return <HoldingPage holding={opened} onBack={() => setOpenId(null)}
-                            onEdit={(h) => { setOpenId(null); openEdit(h); }} />;
+                            onEdit={(h) => { setOpenId(null); openEdit(h); }}
+                            onDelete={async (h) => { setOpenId(null); await handleDelete(h.id); }} />;
     }
 
     return (
@@ -450,13 +455,13 @@ export default function PortfolioTab() {
                                     </span>
                                     <span className="shrink-0 text-right">
                                         <span className="block text-body font-semibold text-ink num">
-                                            ₹{fmt(h.currentValue)}
+                                            ₹{fmt0(h.currentValue)}
                                             {ESTIMATED_TYPES.has(h.type) && (
                                                 <span className="ml-1 text-caption font-normal text-ink-3" title="Projected from the interest rate, not a market price">est.</span>
                                             )}
                                         </span>
                                         <span className={cx("block text-small num", pos ? "text-good" : "text-bad")}>
-                                            {pos ? "+" : "−"}₹{fmt(Math.abs(h.pnl ?? 0))} · {pos ? "+" : ""}{h.pnlPercent}%
+                                            {pos ? "+" : "−"}₹{fmt0(Math.abs(h.pnl ?? 0))} · {pos ? "+" : ""}{h.pnlPercent}%
                                         </span>
                                         {h.xirr != null && (
                                             <span className="block text-caption text-ink-3 num"
@@ -466,7 +471,7 @@ export default function PortfolioTab() {
                                         )}
                                     </span>
                                     </button>
-                                    <span className="shrink-0 flex -mr-2">
+                                    <span className="shrink-0 hidden sm:flex -mr-2">
                                         <button type="button" onClick={() => openEdit(h)} aria-label={`Edit ${h.name}`}
                                                 className="w-8 h-8 rounded-full flex items-center justify-center text-ink-3 hover:bg-surface-sunken">
                                             <Pencil size={15} aria-hidden />

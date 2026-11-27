@@ -4,6 +4,7 @@ import API from "../../services/api";
 import { Button, cx } from "../ui";
 import { percent } from "../../utils/money";
 import FundPage from "./FundPage";
+import { scrollPageTop } from "../../utils/scrollTop";
 
 /*
  * Fund collections, like Groww's "Index funds" or "Tax saving" rows, but as
@@ -67,7 +68,7 @@ export default function Collections() {
                         </li>
                         {shown.funds.map((f) => (
                             <li key={f.code}>
-                                <button type="button" onClick={() => setOpen({ code: f.code, name: f.name })}
+                                <button type="button" onClick={() => { setOpen({ code: f.code, name: f.name }); scrollPageTop(); }}
                                         className="w-full grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_64px_64px_64px] gap-3 items-center px-4 py-3 text-left hover:bg-surface-sunken/60">
                                     <span className="min-w-0">
                                         <span className="block text-body text-ink truncate">{f.name.replace(/ - Direct Plan.*$/i, "").replace(/ Direct.*$/i, "")}</span>

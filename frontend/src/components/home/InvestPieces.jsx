@@ -190,13 +190,13 @@ export function SpareCard({ income, spent, navigateTo }) {
         <button type="button" onClick={() => navigateTo(over ? "Budgeting" : "Future Twin")}
                 className="w-full rounded-card bg-surface border border-line p-5 text-left transition hover:border-line-strong">
             <span className="flex items-center gap-2 text-small text-ink-3">
-                <PiggyBank size={16} aria-hidden className={over ? "text-bad" : "text-good"} /> Spare this month
+                <PiggyBank size={16} aria-hidden className={over ? "text-bad" : "text-good"} /> {over ? "Over this month" : "Spare this month"}
             </span>
             <span className={cx("block mt-1.5 text-[22px] leading-tight font-[650] tracking-[-0.02em] num", over ? "text-bad" : "text-ink")}>
-                {over ? `−${rupees(over)}` : rupees(spare)}
+                {over ? rupees(over) : rupees(spare)}
             </span>
             <span className="block mt-1 text-small text-ink-3">
-                {over ? "Spending ran past income, so nothing is spare yet" : "Money in minus money out, free to invest"}
+                {over ? "More went out than came in, so nothing is spare to invest yet" : "Money in minus money out, free to invest"}
             </span>
         </button>
     );
