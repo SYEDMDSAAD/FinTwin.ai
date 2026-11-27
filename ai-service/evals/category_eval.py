@@ -48,6 +48,15 @@ CASES = {
     "GLOBAL SOLUTIONS PVT LTD": None, "MAHALAXMI AGENCIES": None, "RK INDUSTRIES": None,
     "BALAJI CORPORATION": None, "NEW STAR VENTURES": None, "OM SAI SERVICES": None,
     "AB HOLDINGS": None, "SUNSHINE INTERNATIONAL": None, "JAI HIND MART": None,
+    # People: the sorting agent re-checks names a rule took for a person, so a
+    # real person must never come back sure (None = must not be sure)
+    "RAMESH KUMAR PAWAR": None, "SUNITA DESHPANDE": None, "PRIYA VENKATESAN": None,
+    "MOHD AZMAL": None, "ANIL KUMAR SINGH": None, "FATIMA SHAIKH": None, "GURPREET KAUR": None,
+    "JOSEPH D SOUZA": None, "LAKSHMI NARAYANAN": None, "SURESH BABU": None,
+    # Businesses the person rule misreads, or a single shop word misleads
+    "SUNRISE INTERIORS AND MODULAR KITCHENS": "Housing", "ORIENT FURNITURE MART": "Shopping",
+    "LAKEVIEW DENTAL CARE": "Health", "CHAAYOS": "Food", "LENSKART SOLUTIONS": "Shopping",
+    "WOW MOMO FOODS": "Food", "DECATHLON SPORTS INDIA": "Shopping",
 }
 
 

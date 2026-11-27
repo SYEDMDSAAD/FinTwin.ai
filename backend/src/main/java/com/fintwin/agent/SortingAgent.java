@@ -71,7 +71,7 @@ public class SortingAgent {
         try {
             // Read, ask the model, write: each database step in its own short
             // transaction, and none held open while the model thinks.
-            Map<String, List<Transaction>> groups = writes.execute(s -> unsortedGroups(user));
+            Map<String, List<Transaction>> groups = writes.execute(s -> candidateGroups(user, java.time.LocalDate.now()));
             if (groups.isEmpty()) return Result.NONE;
 
             List<String> merchants = groups.values().stream().map(g -> g.get(0).getMerchant()).toList();
@@ -90,12 +90,17 @@ public class SortingAgent {
             for (Map.Entry<String, List<Transaction>> g : groups.entrySet()) {
                 String category = sure.get(categories.normalizeMerchant(g.getValue().get(0).getMerchant()));
                 if (category == null) continue;
-                payees++;
-                if (names.size() < 3) names.add(MerchantCategorizer.payeeOf(g.getValue().get(0).getMerchant()));
+                boolean any = false;
                 for (Transaction t : g.getValue()) {
+                    // A rule's guess the model agrees with stays as it is
+                    if (category.equalsIgnoreCase(t.getCategory())) continue;
                     t.applyPrediction(new Categorized(category, Categorized.LLM_AUTO));
                     changed.add(t);
+                    any = true;
                 }
+                if (!any) continue;
+                payees++;
+                if (names.size() < 3) names.add(MerchantCategorizer.payeeOf(g.getValue().get(0).getMerchant()));
             }
             if (changed.isEmpty()) return Result.NONE;
 
@@ -119,23 +124,50 @@ public class SortingAgent {
         }
     }
 
-    /** Debits still in Other that nobody chose or reviewed, grouped by payee, biggest spend first. */
-    Map<String, List<Transaction>> unsortedGroups(User user) {
-        Map<String, List<Transaction>> groups = new HashMap<>();
+    /** How far back the agent double-checks the rules' guesses (unsorted rows: any age). */
+    static final int GUESS_DAYS = 60;
+
+    /**
+     * What the agent looks at, grouped by payee, biggest spend first: debits
+     * still in Other, then recent rows where a rule only guessed. Two guesses
+     * go wrong often enough to check:
+     *  - PERSON: "Paid to Sunrise Interiors And Modular Kitchens" read as a
+     *    person's name. A masked contact or phone-number UPI ID is certainly a
+     *    person and is never re-checked; the model has no People category and
+     *    answers Unknown for a name, so a real person stays a person.
+     *  - SHOP_WORD: one word decided it ("…Furniture Mart" as Groceries).
+     * Nothing the user chose, reviewed or taught (USER, SEED, LEARNED) is touched.
+     */
+    Map<String, List<Transaction>> candidateGroups(User user, java.time.LocalDate today) {
+        Map<String, List<Transaction>> unsorted = new HashMap<>(), guessed = new HashMap<>();
+        java.time.LocalDate guessFrom = today.minusDays(GUESS_DAYS);
         for (Transaction t : transactions.findByUser(user)) {
-            if (t.getAmount() == null || t.getAmount() >= 0 || !TransactionService.unsorted(t)) continue;
+            if (t.getAmount() == null || t.getAmount() >= 0) continue;
             if (t.getCategoryReview() != null) continue;
+            if (t.getMerchant() == null || t.getMerchant().isBlank()) continue;
             String src = t.getCategorySource();
             if (Categorized.USER.equals(src) || Categorized.SEED.equals(src)) continue;
-            if (t.getMerchant() == null || t.getMerchant().isBlank()) continue;
-            groups.computeIfAbsent(payeeKey(categories, t.getMerchant()), k -> new ArrayList<>()).add(t);
+            Map<String, List<Transaction>> into;
+            if (TransactionService.unsorted(t)) into = unsorted;
+            else if (isGuess(t) && t.getDate() != null && !t.getDate().isBefore(guessFrom)) into = guessed;
+            else continue;
+            into.computeIfAbsent(payeeKey(categories, t.getMerchant()), k -> new ArrayList<>()).add(t);
         }
+        guessed.keySet().removeAll(unsorted.keySet());
         Map<String, List<Transaction>> ordered = new LinkedHashMap<>();
-        groups.entrySet().stream()
-                .sorted((a, b) -> Double.compare(spend(b.getValue()), spend(a.getValue())))
-                .limit(MAX_PAYEES)
-                .forEach(e -> ordered.put(e.getKey(), e.getValue()));
+        for (Map<String, List<Transaction>> part : List.of(unsorted, guessed)) {
+            part.entrySet().stream()
+                    .sorted((a, b) -> Double.compare(spend(b.getValue()), spend(a.getValue())))
+                    .limit(Math.max(0, MAX_PAYEES - ordered.size()))
+                    .forEach(e -> ordered.put(e.getKey(), e.getValue()));
+        }
         return ordered;
+    }
+
+    static boolean isGuess(Transaction t) {
+        String src = t.getCategorySource();
+        if (Categorized.SHOP_WORD.equals(src)) return true;
+        return Categorized.PERSON.equals(src) && !MerchantCategorizer.isCertainPerson(t.getMerchant());
     }
 
     /**

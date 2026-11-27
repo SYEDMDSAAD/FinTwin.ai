@@ -104,6 +104,42 @@ class ImportAgentsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void doubleChecksTheRulesGuessesButNeverAPersonItIsSureOf() {
+        List<String> asked = new ArrayList<>();
+        org.mockito.Mockito.doAnswer(inv -> {
+            Map<String, String> out = new HashMap<>();
+            for (String m : (Collection<String>) inv.getArgument(0)) {
+                asked.add(m.toUpperCase());
+                if (m.toUpperCase().contains("SUNRISE INTERIORS")) out.put(categories.normalizeMerchant(m), "Housing");
+                if (m.toUpperCase().contains("SRI SAI MEDICALS")) out.put(categories.normalizeMerchant(m), "Health");
+            }
+            return out;   // nothing for people: the model answers Unknown for a name
+        }).when(suggestions).sureSuggestions(any());
+
+        String email = "agent-guess@example.com";
+        String token = seedUserAndGetToken(email, "Test@1234");
+        LocalDate d = LocalDate.now().minusDays(2);
+        importRows(token, List.of(
+                row(d, "Paid to SUNRISE INTERIORS AND MODULAR KITCHENS", -65_000),
+                row(d, "Paid to RAMESH KUMAR PAWAR", -5_000),
+                row(d, "Paid to 9876543210@ybl", -2_000),
+                row(d, "Paid to SRI SAI MEDICALS", -640)));
+
+        // The person rule's misreading is fixed, and shows up for review
+        Transaction interiors = rowsOf(email, "SUNRISE").get(0);
+        assertThat(interiors.getCategory()).isEqualTo("Housing");
+        assertThat(interiors.getCategorySource()).isEqualTo(Categorized.LLM_AUTO);
+        // A person stays a person; a phone-number UPI ID is never even asked about
+        assertThat(rowsOf(email, "RAMESH").get(0).getCategory()).isEqualTo("People");
+        assertThat(rowsOf(email, "9876543210").get(0).getCategory()).isEqualTo("People");
+        assertThat(asked).noneMatch(m -> m.contains("9876543210"));
+        // A guess the model agrees with keeps its rule as the source
+        assertThat(rowsOf(email, "SRI SAI").get(0).getCategorySource()).isNotEqualTo(Categorized.LLM_AUTO);
+
+        assertThat(bell(token)).anyMatch(m -> m.startsWith("FinTwin sorted 1 payment to 1 payee (SUNRISE INTERIORS"));
+    }
+
+    @Test
     void aWrongSortIsCorrectedForEveryPaymentToThatPayeeAndRemembered() {
         String email = "agent-correct@example.com";
         String token = seedUserAndGetToken(email, "Test@1234");
