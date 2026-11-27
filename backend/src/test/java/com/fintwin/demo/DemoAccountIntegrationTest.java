@@ -68,6 +68,7 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private DemoAccountService demo;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.fintwin.repository.WeeklyReportRecordRepository weeklyReports;
 
     @BeforeEach
     void freshDemo() {
@@ -126,6 +127,12 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
     @SuppressWarnings("unchecked")
     void everyAgentHasSomethingToShowInTheDemo() throws Exception {
         String token = startDemo();
+        // This week's report, as the weekly agent stores it on the first visit
+        com.fintwin.model.WeeklyReportRecord report = new com.fintwin.model.WeeklyReportRecord();
+        report.setUser(demo.demoUser());
+        report.setWeekStart(com.fintwin.service.ReportService.weekStart(LocalDate.now(DemoAccountService.INDIA)));
+        report.setReport("{}");
+        if (weeklyReports.findByUserAndWeekStart(report.getUser(), report.getWeekStart()).isEmpty()) weeklyReports.save(report);
 
         ResponseEntity<String> bell = call(token, HttpMethod.GET, "/api/v1/notifications", null);
         assertThat(bell.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -139,7 +146,8 @@ class DemoAccountIntegrationTest extends AbstractIntegrationTest {
         assertThat(lines).anyMatch(l -> l.startsWith("Disney+ Hotstar went up from ₹299 to ₹399"));
         assertThat(lines).anyMatch(l -> l.startsWith("From this salary,"));                       // goal
         assertThat(lines).anyMatch(l -> l.contains("budget of") || l.contains("drafted"));        // budget
-        assertThat(lines).noneMatch(l -> l.contains("Paid to Mom"));                               // not a merchant to cap
+        assertThat(lines).noneMatch(l -> l.contains("Paid to Mom") || l.contains("SIP"));         // nothing to cap
+        assertThat(lines).anyMatch(l -> l.startsWith("Your weekly report is ready"));             // weekly
 
         ResponseEntity<String> sorted = call(token, HttpMethod.GET, "/api/v1/transactions/auto-sorted", null);
         assertThat(sorted.getStatusCode()).isEqualTo(HttpStatus.OK);

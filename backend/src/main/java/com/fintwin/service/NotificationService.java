@@ -105,11 +105,12 @@ public class NotificationService {
         // ── 2. High merchant concentration ───────────────────────────────
         Map<String, Double> merchantTotals = new HashMap<>();
         for (Transaction t : transactions) {
-            // Not rent, EMIs, bills or money to people: a cap on the landlord or
-            // on what you send Mom isn't advice anyone can use
+            // Not rent, EMIs, bills, money to people or investing: a cap on the
+            // landlord, on what you send Mom or on a SIP isn't advice anyone should take
             if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null
                     && !com.fintwin.util.PlanDraftMath.isFixedCost(t.getCategory())
-                    && !"People".equalsIgnoreCase(t.getCategory())) {
+                    && !"People".equalsIgnoreCase(t.getCategory())
+                    && !"Investments".equalsIgnoreCase(t.getCategory())) {
                 merchantTotals.merge(t.getMerchant(), Math.abs(t.getAmount()), Double::sum);
             }
         }
@@ -246,20 +247,24 @@ public class NotificationService {
 
     /** Most lines the bell shows. */
     static final int BELL_SIZE = 12;
-    /** Room kept for each side: the rule alerts above, and the agents. */
-    static final int BELL_SHARE = 7;
+    /**
+     * Places kept for the agents when they have that much to say. Their lines
+     * are specific (this payee, this renewal, this salary); the rule alerts
+     * still get the rest, the most urgent first.
+     */
+    static final int AGENT_SHARE = 8;
 
     /**
      * The bell's list: rule alerts and agent lines each sorted by priority,
-     * each given up to BELL_SHARE places (more when the other side has
-     * fewer), then shown together by priority. Without this, a month with a
+     * the agents given up to AGENT_SHARE places (more when there are few rule
+     * alerts), the rule alerts the rest, then shown together by priority. Without this, a month with a
      * few budgets over the limit filled every place and no agent was heard.
      */
     static List<NotificationDTO> bell(List<NotificationDTO> rules, List<NotificationDTO> agents) {
         Comparator<NotificationDTO> byPriority = Comparator.comparingInt(n -> PRIORITY.getOrDefault(n.getType(), 5));
         List<NotificationDTO> r = rules.stream().sorted(byPriority).toList();
         List<NotificationDTO> a = agents.stream().sorted(byPriority).toList();
-        int fromAgents = Math.min(a.size(), Math.max(BELL_SHARE, BELL_SIZE - r.size()));
+        int fromAgents = Math.min(a.size(), Math.max(AGENT_SHARE, BELL_SIZE - r.size()));
         int fromRules = Math.min(r.size(), BELL_SIZE - fromAgents);
         List<NotificationDTO> out = new ArrayList<>(r.subList(0, fromRules));
         out.addAll(a.subList(0, fromAgents));
