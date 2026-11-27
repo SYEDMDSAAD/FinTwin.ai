@@ -41,6 +41,9 @@ async def fund_latest(code: str):
     fund = funds.get(code)
     if fund is None:
         raise HTTPException(status_code=404, detail="Unknown scheme code")
+    fund = await run_in_threadpool(data._complete, fund)
+    if fund.nav <= 0:
+        raise HTTPException(status_code=404, detail="No NAV for that scheme right now")
     return {"code": fund.code, "name": fund.name, "nav": fund.nav, "date": fund.nav_date}
 
 

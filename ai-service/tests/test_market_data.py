@@ -273,3 +273,40 @@ def test_collections_keep_direct_growth_only_and_sort_by_three_year_return(monke
     assert [f["code"] for f in out["funds"]] == ["4", "1"]
     assert "not a recommendation" in out["note"]
     assert _data.fund_collection("nope") is None
+
+
+def test_falls_back_to_mfapi_names_when_amfi_refuses(monkeypatch):
+    class Resp:
+        def __init__(self, status, body=None, text=""):
+            self.status_code, self._body, self.text, self.encoding = status, body, text, None
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f"{self.status_code} Forbidden")
+        def json(self):
+            return self._body
+
+    def fake_get(url, timeout=None, headers=None):
+        if "amfiindia" in url:
+            return Resp(403)
+        if url.endswith("/mf"):
+            return Resp(200, [{"schemeCode": 122639, "schemeName": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth", "isinGrowth": "INF879O01027"}])
+        return Resp(200, {"meta": {"fund_house": "PPFAS Mutual Fund", "scheme_category": "Equity Scheme - Flexi Cap Fund",
+                                   "scheme_name": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth"},
+                          "data": [{"date": "26-11-2026", "nav": "96.5013"}]})
+
+    monkeypatch.setattr(_data.requests, "get", fake_get)
+    monkeypatch.setattr(_data, "_funds", {})
+    monkeypatch.setattr(_data, "_latest_cache", {})
+    monkeypatch.setattr(_data, "fund_returns", lambda code: {"1y": 12.0})
+    funds = _data._load_funds()
+    assert funds["122639"].category == "Equity Scheme - Flexi Cap Fund"     # guessed from the name
+    assert _data.search_funds("parag")[0]["nav"] is None                    # NAV comes on the fund's page
+    d = _data.fund_details("122639")
+    assert d["nav"] == 96.5013 and d["amc"] == "PPFAS Mutual Fund" and d["nav_date"] == "26-Nov-2026"
+    assert _data.latest_nav("122639") == 96.5013
+
+
+def test_guess_category_reads_index_before_cap_words():
+    assert _data.guess_category("Motilal Oswal Nifty Midcap 150 Index Fund - Direct Plan") == "Other Scheme - Index Funds"
+    assert _data.guess_category("Axis ELSS Tax Saver Fund - Direct Growth") == "Equity Scheme - ELSS"
+    assert _data.guess_category("Kotak Small Cap Fund - Direct") == "Equity Scheme - Small Cap Fund"

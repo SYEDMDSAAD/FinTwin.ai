@@ -25,6 +25,13 @@ import requests
 logger = logging.getLogger(__name__)
 
 AMFI_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
+# AMFI's www host answers some cloud addresses with 403; the portal host
+# serves the same file. Both are tried, and mfapi.in's scheme list is the
+# last resort (names only: NAV and category come per fund, on demand).
+AMFI_URLS = ("https://portal.amfiindia.com/spages/NAVAll.txt", AMFI_URL)
+MFAPI_LIST_URL = "https://api.mfapi.in/mf"
+MFAPI_LATEST_URL = "https://api.mfapi.in/mf/{code}/latest"
+_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) FinTwin/1.0 (+market data)", "Accept": "text/plain,*/*"}
 MFAPI_URL = "https://api.mfapi.in/mf/{code}"
 
 _FUNDS_TTL = 6 * 3600          # AMFI publishes once a day, late evening
@@ -92,17 +99,94 @@ def _load_funds() -> dict[str, Fund]:
     with _funds_lock:
         if _funds and time.time() - _funds_loaded_at < _FUNDS_TTL:
             return _funds
-        try:
-            r = requests.get(AMFI_URL, timeout=20)
-            r.raise_for_status()
-            r.encoding = "utf-8"               # served without a charset; it is UTF-8
-            parsed = parse_navall(r.text)
-            if parsed:
-                _funds, _funds_loaded_at = parsed, time.time()
-        except Exception as e:
-            # Keep serving yesterday's list rather than nothing
-            logger.warning("AMFI NAV file unavailable: %s", e)
+        for url in AMFI_URLS:
+            try:
+                r = requests.get(url, timeout=20, headers=_HEADERS)
+                r.raise_for_status()
+                r.encoding = "utf-8"               # served without a charset; it is UTF-8
+                parsed = parse_navall(r.text)
+                if parsed:
+                    _funds, _funds_loaded_at = parsed, time.time()
+                    return _funds
+            except Exception as e:
+                logger.warning("AMFI NAV file unavailable from %s: %s", url, e)
+        if not _funds:
+            # Keep serving yesterday's list if there is one; else names from mfapi.in
+            listed = _mfapi_list()
+            if listed:
+                _funds, _funds_loaded_at = listed, time.time() - _FUNDS_TTL + 1800   # retry AMFI in 30 min
         return _funds
+
+
+def guess_category(name: str) -> str:
+    """An AMFI-style category from a fund's name, for when only names are known."""
+    n = name.lower()
+    if "index" in n or " etf" in n or n.endswith("etf"):
+        return "Other Scheme - Index Funds"
+    if "elss" in n or "tax saver" in n or "tax saving" in n or "taxsaver" in n:
+        return "Equity Scheme - ELSS"
+    if "large & mid" in n or "large and mid" in n:
+        return "Equity Scheme - Large & Mid Cap Fund"
+    if "large cap" in n or "largecap" in n:
+        return "Equity Scheme - Large Cap Fund"
+    if "mid cap" in n or "midcap" in n:
+        return "Equity Scheme - Mid Cap Fund"
+    if "small cap" in n or "smallcap" in n:
+        return "Equity Scheme - Small Cap Fund"
+    if "flexi cap" in n or "flexicap" in n:
+        return "Equity Scheme - Flexi Cap Fund"
+    if "liquid" in n:
+        return "Debt Scheme - Liquid Fund"
+    return ""
+
+
+def _mfapi_list() -> dict[str, Fund]:
+    try:
+        r = requests.get(MFAPI_LIST_URL, timeout=20, headers=_HEADERS)
+        r.raise_for_status()
+        rows = r.json()
+    except Exception as e:
+        logger.warning("mfapi.in scheme list unavailable: %s", e)
+        return {}
+    out: dict[str, Fund] = {}
+    for x in rows if isinstance(rows, list) else []:
+        code, name = str(x.get("schemeCode") or ""), str(x.get("schemeName") or "")
+        if code.isdigit() and name:
+            out[code] = Fund(code=code, name=name, amc="", category=guess_category(name),
+                             nav=0.0, nav_date="", isin=x.get("isinGrowth") or "")
+    return out
+
+
+_latest_cache: dict[str, tuple[float, Fund]] = {}
+
+
+def _complete(fund: Fund) -> Fund:
+    """A fund from the names-only list gets its NAV, AMC and category from mfapi.in."""
+    if fund.nav > 0:
+        return fund
+    hit = _latest_cache.get(fund.code)
+    if hit and time.time() - hit[0] < _FUNDS_TTL:
+        return hit[1]
+    try:
+        r = requests.get(MFAPI_LATEST_URL.format(code=fund.code), timeout=_HISTORY_TIMEOUT, headers=_HEADERS)
+        r.raise_for_status()
+        body = r.json()
+        meta, data = body.get("meta") or {}, (body.get("data") or [{}])[0]
+        d = data.get("date") or ""
+        try:
+            d = datetime.strptime(d, "%d-%m-%Y").strftime("%d-%b-%Y")
+        except ValueError:
+            pass
+        full = Fund(code=fund.code, name=meta.get("scheme_name") or fund.name, amc=meta.get("fund_house") or "",
+                    category=meta.get("scheme_category") or fund.category, nav=float(data.get("nav") or 0),
+                    nav_date=d, isin=meta.get("isin_growth") or fund.isin)
+    except Exception as e:
+        logger.info("Latest NAV unavailable for %s: %s", fund.code, e)
+        return fund
+    if len(_latest_cache) > 2000:
+        _latest_cache.clear()
+    _latest_cache[fund.code] = (time.time(), full)
+    return full
 
 
 def search_funds(query: str, limit: int = 20) -> list[dict]:
@@ -118,14 +202,20 @@ def search_funds(query: str, limit: int = 20) -> list[dict]:
             rank = (0 if "direct" in f.name.lower() else 1, 0 if "growth" in f.name.lower() else 1, f.name)
             hits.append((rank, f))
     hits.sort(key=lambda x: x[0])
-    return [asdict(f) for _, f in hits[:limit]]
+    out = []
+    for _, f in hits[:limit]:
+        row = asdict(f)
+        if f.nav <= 0:
+            row["nav"] = None                      # names-only list: NAV shown on the fund's page
+        out.append(row)
+    return out
 
 
 def fund_details(code: str) -> dict | None:
     fund = _load_funds().get(str(code))
     if not fund:
         return None
-    out = asdict(fund)
+    out = asdict(_complete(fund))
     out["returns"] = fund_returns(str(code))
     return out
 
@@ -175,7 +265,10 @@ def returns_from_history(history: list[dict]) -> dict:
 
 def latest_nav(code: str) -> float | None:
     fund = _load_funds().get(str(code))
-    return fund.nav if fund else None
+    if not fund:
+        return None
+    nav = _complete(fund).nav
+    return nav if nav > 0 else None
 
 
 # ── Stocks ──────────────────────────────────────────────────────────────────
@@ -392,14 +485,17 @@ def stock_history(symbol: str, rng: str) -> dict:
     try:
         t = yf.Ticker(sym)
         hist = t.history(period=period, interval=interval)
-        pts = [{"t": idx.isoformat(), "price": round(float(row["Close"]), 2)} for idx, row in hist.iterrows()]
+        # Yahoo leaves NaN in rows with no trade; JSON can't carry NaN
+        pts = [{"t": idx.isoformat(), "price": round(float(row["Close"]), 2)} for idx, row in hist.iterrows()
+               if row["Close"] == row["Close"]]
         out["points"] = _thin(pts)
         if pts and pts[0]["price"] > 0:
             out["change"] = round((pts[-1]["price"] / pts[0]["price"] - 1) * 100, 2)
         year = t.history(period="1y", interval="1d") if rng != "1Y" else hist
         if year is not None and not year.empty:
-            out["high52"] = round(float(year["High"].max()), 2)
-            out["low52"] = round(float(year["Low"].min()), 2)
+            hi, lo = float(year["High"].max(skipna=True)), float(year["Low"].min(skipna=True))
+            out["high52"] = round(hi, 2) if hi == hi else None
+            out["low52"] = round(lo, 2) if lo == lo else None
     except Exception as e:
         logger.info("Price history unavailable for %s: %s", sym, e)
         return out
@@ -453,8 +549,10 @@ def fund_collection(key: str) -> dict | None:
     rows = []
     for f in funds:
         r = returns.get(f.code) or {}
+        if not r and f.nav <= 0:
+            continue                               # names-only list: no history means a closed scheme
         rows.append({"code": f.code, "name": f.name, "amc": f.amc, "category": f.category,
-                     "nav": f.nav, "nav_date": f.nav_date, "returns": r})
+                     "nav": f.nav if f.nav > 0 else None, "nav_date": f.nav_date, "returns": r})
     rows.sort(key=lambda x: (x["returns"].get("3y") is None, -(x["returns"].get("3y") or 0)))
     return {"key": key, "title": title, "sortedBy": "3-year return, highest first",
             "note": "A list sorted by past returns, not a recommendation. Direct plans, growth option.",
