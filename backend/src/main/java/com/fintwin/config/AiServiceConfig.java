@@ -74,7 +74,8 @@ public class AiServiceConfig {
     private static final java.util.Set<String> MODEL_ROUTES = java.util.Set.of(
             "/chat", "/spending-coach", "/goal-plan", "/reports/weekly-report",
             "/categories/suggest", "/investment-recommendation",
-            "/guard/check", "/guard/topup", "/guard/rebalance", "/guard/payday", "/guard/hello");
+            "/guard/check", "/guard/topup", "/guard/rebalance", "/guard/payday", "/guard/hello",
+            "/voice/transcribe", "/voice/speak");
 
     static boolean usesTheModel(String path) {
         return path != null && MODEL_ROUTES.stream().anyMatch(path::endsWith);

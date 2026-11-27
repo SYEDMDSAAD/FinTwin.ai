@@ -79,6 +79,7 @@ from "./SpendingCoachPage";
 import SpendGuardPage from "./SpendGuardPage";
 
 import BottomNav from "../components/BottomNav";
+import VoiceAssistant from "../components/VoiceAssistant";
 import CreditScoreCard from "../components/CreditScoreCard";
 import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
 import AutoSorted from "../components/AutoSorted";
@@ -2088,6 +2089,9 @@ function Dashboard() {
 
             {/* Global help widget */}
             <HelpWidget />
+
+            {/* "Hey FinTwin": ask out loud */}
+            <VoiceAssistant />
 
         </div>
     );

@@ -15,6 +15,7 @@ from investments.routes import router as investment_router
 from spending_coach.routes import router as coach_router
 from statements.routes import router as statements_router
 from documents.routes import router as documents_router
+from voice.routes import router as voice_router
 from categories.routes import router as categories_router
 from market.routes import router as market_router
 from utils import llm_usage
@@ -142,5 +143,6 @@ app.include_router(investment_router)
 app.include_router(coach_router)
 app.include_router(statements_router, tags=["Statements"])
 app.include_router(documents_router, tags=["Documents"])
+app.include_router(voice_router, tags=["Voice"])
 app.include_router(market_router, tags=["Discover"])
 app.include_router(categories_router, tags=["Categories"])

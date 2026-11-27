@@ -202,7 +202,27 @@ OUTPUT FORMAT:
   **Summary** [brief personalized summary]
   **Key Risks** [specific risks from their data]
   **Recommendations** [3-5 actionable steps with ₹ amounts]
-  **Verdict** [one-line verdict]"""
+  **Verdict** [one-line verdict]{_voice_rules(mode)}"""
+
+
+# "Hey FinTwin": the answer is read aloud, so it must sound like speech.
+VOICE_MODE = "Voice"
+
+_VOICE_RULES = """
+
+VOICE MODE (this overrides OUTPUT FORMAT above): the user ASKED OUT LOUD and
+your answer will be READ ALOUD by the app's voice.
+- Answer in 2 or 3 short, warm, spoken sentences. No lists, tables, headings,
+  bold text or emoji, and never the Summary/Risks/Recommendations/Verdict template.
+- Round figures the way people say them: "about ₹1.7 lakh", "around ₹8,000",
+  "11 percent". The exact numbers are shown on screen.
+- Lead with the answer. If more detail would help, end with one short line
+  such as "The details are on your screen."
+- Still call the tools for data and still never invent numbers."""
+
+
+def _voice_rules(mode: str) -> str:
+    return _VOICE_RULES if mode == VOICE_MODE else ""
 
 
 def _normalized(text: str) -> str:
@@ -423,7 +443,7 @@ Respond in this format:
 [3-5 actionable steps with ₹ amounts where relevant]
 
 **Verdict**
-[one-line verdict]"""
+[one-line verdict]{_voice_rules(mode)}"""
 
     return ask(prompt, feature="advisor")
 

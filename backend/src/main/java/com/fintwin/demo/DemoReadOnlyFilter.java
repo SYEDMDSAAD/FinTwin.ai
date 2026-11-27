@@ -34,6 +34,8 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
     // app reporting the visit (pages, sign-up clicks) for the admin page
     private static final List<Rule> ALLOWED = List.of(
             new Rule("POST", "/api/v1/transactions/chat"),
+            // "Hey FinTwin": the spoken question and the spoken answer save nothing
+            new Rule("POST", "/api/v1/voice/(transcribe|speak)"),
             new Rule("POST", "/api/v1/demo/event"),
             new Rule("POST", "/api/v1/visits"),
             // The weekly agent writes this week's report once, for every visitor to read

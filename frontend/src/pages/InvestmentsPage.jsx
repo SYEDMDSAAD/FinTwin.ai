@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import InvestmentPlanSection from "../components/InvestmentPlanSection";
 import FutureTwin from "../components/FutureTwin";
 import PortfolioTab from "../components/PortfolioTab";
@@ -22,6 +22,20 @@ function InvestmentsPage() {
             return "My Portfolio";
         }
     });
+
+    // Already on this page when voice (or another screen) asks for a tab
+    useEffect(() => {
+        const onNav = () => {
+            try {
+                const asked = localStorage.getItem("investmentsTab");
+                if (!asked) return;
+                localStorage.removeItem("investmentsTab");
+                if (TABS.includes(asked)) setActiveTab(asked);
+            } catch { /* storage blocked */ }
+        };
+        window.addEventListener("dashboardNav", onNav);
+        return () => window.removeEventListener("dashboardNav", onNav);
+    }, []);
 
     return (
         <div className="mb-10">

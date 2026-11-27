@@ -19,6 +19,8 @@
     "@capacitor/core": "^8.6.2",
     "@capgo/capacitor-social-login": "^8.7.13",
     "@fontsource-variable/inter": "^5.2.6",
+    "@picovoice/porcupine-web": "4.0.1",
+    "@picovoice/web-voice-processor": "4.0.10",
     "@react-oauth/google": "^0.13.5",
     "@tailwindcss/typography": "^0.5.19",
     "axios": "^1.16.1",
