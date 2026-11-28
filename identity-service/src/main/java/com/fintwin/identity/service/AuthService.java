@@ -37,6 +37,11 @@ public class AuthService {
 
     @Value("${google.client.id:}")
     private String googleClientId;
+
+    // The iPhone app signs in with its own iOS OAuth client; tokens issued to
+    // it are accepted too. Empty until that client exists.
+    @Value("${google.ios-client.id:}")
+    private String googleIosClientId;
     @Value("${app.base-url:http://localhost:5173}")
     private String appBaseUrl;
 
@@ -165,6 +170,14 @@ public class AuthService {
 
     // ── Google Login ──────────────────────────────────────────────────────────
 
+    /** The web client, plus the iOS client when one is configured. */
+    static java.util.List<String> googleAudiences(String web, String ios) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (web != null && !web.isBlank()) out.add(web.trim());
+        if (ios != null && !ios.isBlank()) out.add(ios.trim());
+        return out;
+    }
+
     @Transactional
     public AuthResponse googleLogin(String credential) {
         if (credential == null || credential.isBlank())
@@ -173,7 +186,7 @@ public class AuthService {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                    .setAudience(java.util.Collections.singletonList(googleClientId))
+                    .setAudience(googleAudiences(googleClientId, googleIosClientId))
                     .build();
 
             GoogleIdToken idToken = verifier.verify(credential);

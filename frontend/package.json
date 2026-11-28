@@ -12,12 +12,14 @@
     "test:watch": "vitest",
     "build:android": "VITE_API_ORIGIN=https://fintwin-web-dyfbqkjv7q-el.a.run.app vite build && cap sync android",
     "apk": "npm run build:android && cd android && ./gradlew assembleDebug",
-    "aab": "npm run build:android && cd android && ./gradlew bundleRelease"
+    "aab": "npm run build:android && cd android && ./gradlew bundleRelease",
+    "build:ios": "VITE_API_ORIGIN=https://fintwin-web-dyfbqkjv7q-el.a.run.app vite build && cap sync ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
     "@capgo/capacitor-social-login": "^8.7.13",
     "@fontsource-variable/inter": "^5.2.6",
     "@react-oauth/google": "^0.13.5",

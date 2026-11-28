@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { prefetchDashboard } from "../utils/prefetchDashboard";
 import { GoogleLogin } from "@react-oauth/google";
-import { isNativeApp, nativeGoogleIdToken } from "../native";
+import { isNativeApp, nativeGoogleIdToken, nativeGoogleAvailable } from "../native";
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowLeft, AlertOctagon, MessageSquare, X, User } from "lucide-react";
 
 const CSS = `
@@ -457,6 +457,7 @@ function Login() {
                 {loading ? "Signing in…" : "Sign in"}
               </button>
 
+              {nativeGoogleAvailable() && (<>
               <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
                 <div style={{ flex:1, height:1, background:divider }}/>
                 <span style={{ fontSize:11, color:txtSub, }}>or</span>
@@ -474,6 +475,7 @@ function Login() {
                   <GoogleLogin onSuccess={handleGoogleLogin} onError={() => toast.error("Google Login Failed")} theme="filled_black" shape="pill" size="large" width="320"/>
                 )}
               </div>
+              </>)}
 
               <div style={{ display:"flex", flexDirection:"column", gap:10, alignItems:"center" }}>
                 <p style={{ textAlign:"center", fontSize:13, color:txtSub, margin:0 }}>

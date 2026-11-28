@@ -1226,3 +1226,9 @@ body {
 @media (min-width: 1440px) {
     .desk-cols-3 { column-count: 3; }
 }
+
+/* iPhone app: the web view runs under the status bar and notch. Push the page
+   below it; full-height screens shrink by the same amount so nothing hides
+   behind the home indicator (the bottom bar adds its own inset). */
+html.native-ios body { padding-top: env(safe-area-inset-top, 0px); }
+html.native-ios .h-screen { height: calc(100vh - env(safe-area-inset-top, 0px)); }
