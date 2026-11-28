@@ -16,6 +16,10 @@ const sections = [
     body: "We use your data solely to provide FinTwin AI features: generating insights, budgets, anomaly detection, and AI recommendations. We do not sell your data to third parties or use it for advertising.",
   },
   {
+    title: "3a. Phone permissions (Android app)",
+    body: "The app asks for each permission only when you turn on the feature that needs it, and works without them. SMS: if you turn on reading bank SMS, the app reads messages from bank senders that mention an amount (from the last 90 days at first, then new ones) and sends only those to FinTwin, which turns each completed payment into a transaction; the message text itself is not stored or logged, and OTPs, balances and personal messages are left out. Microphone: used only for \"Hey FinTwin\", which is off unless you switch it on; the wake word is spotted on your phone, and only the few seconds of your question after it are sent to be turned into text, then discarded. Camera: used only to scan a payment QR code in Spend Guard; the picture stays on your phone. You can turn any of these off in the app or in your phone's settings.",
+  },
+  {
     title: "4. How FinTwin's AI Uses Your Data",
     body: "FinTwin's AI features (the AI Copilot, Spending Coach, goal plans, reports, category suggestions and Spend Guard) run on Google Cloud's Vertex AI, which processes each request on our behalf and may do so in Google data centres outside India. Each feature sends only what it needs: mostly summary figures such as monthly totals and spending by category, and the Copilot looks up specific transactions (date, merchant, category and amount), budgets, goals or holdings only when your question needs them. Before anything is sent, email addresses, UPI IDs, phone, card, Aadhaar and account numbers, PANs and passwords are masked, and the same is done in our logs and in stored Copilot conversations. Google does not use this data to train its models. The Copilot only answers questions about money and FinTwin, and its answers are guidance, not SEBI-registered investment advice.",
   },

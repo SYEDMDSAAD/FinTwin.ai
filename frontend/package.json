@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:android": "VITE_API_ORIGIN=https://fintwin-web-dyfbqkjv7q-el.a.run.app vite build && cap sync android",
-    "apk": "npm run build:android && cd android && ./gradlew assembleDebug"
+    "apk": "npm run build:android && cd android && ./gradlew assembleDebug",
+    "aab": "npm run build:android && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",
