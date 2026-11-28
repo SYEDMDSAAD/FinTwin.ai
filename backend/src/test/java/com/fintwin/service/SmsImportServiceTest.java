@@ -163,6 +163,20 @@ class SmsImportServiceTest {
     }
 
     @Test
+    void twoSmsForTheSameAmountOnOneDayAreTwoPayments() {
+        // The first ₹20 chai, already saved from an earlier SMS
+        Transaction firstChai = new Transaction();
+        firstChai.setAmount(-20.0);
+        firstChai.setDate(LocalDate.of(2026, 11, 24));
+        firstChai.setExternalId(SmsImportService.EXTERNAL_ID_PREFIX + "earlier");
+        when(transactions.findSince(anyLong(), any())).thenReturn(List.of(firstChai));
+
+        var r = run("VM-HDFCBK", "Sent Rs.20.00 From HDFC Bank A/C *4321 To TEA STALL On 24/11/26");
+        assertThat(r.imported()).isEqualTo(1);
+        assertThat(r.onRecord()).isZero();
+    }
+
+    @Test
     void anOversizedBatchIsRefused() {
         var many = new ArrayList<SmsImportService.Sms>();
         for (int i = 0; i <= SmsImportService.MAX_MESSAGES; i++) many.add(new SmsImportService.Sms("VM-HDFCBK", "x", NOV_24));

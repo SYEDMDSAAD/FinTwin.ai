@@ -66,6 +66,14 @@ public class User {
     @Column(name = "last_recap_seen_at")
     private LocalDateTime lastRecapSeenAt;
 
+    // The Copilot's default mode (one of AiPreferences.MODES); NULL = Savings Advisor
+    @Column(name = "ai_mode", length = 40)
+    private String aiMode;
+
+    // Whether Home shows the daily recap
+    @Column(name = "daily_insights", nullable = false)
+    private boolean dailyInsights = true;
+
     // Secret local part of the user's alert-forwarding address (u-<token>@...)
     @Column(name = "ingest_token", length = 40, unique = true)
     private String ingestToken;
@@ -236,6 +244,11 @@ public class User {
     public void setLastRecapSeenAt(LocalDateTime lastRecapSeenAt) {
         this.lastRecapSeenAt = lastRecapSeenAt;
     }
+
+    public String getAiMode() { return aiMode; }
+    public void setAiMode(String aiMode) { this.aiMode = aiMode; }
+    public boolean isDailyInsights() { return dailyInsights; }
+    public void setDailyInsights(boolean dailyInsights) { this.dailyInsights = dailyInsights; }
 
     public String getIngestToken() { return ingestToken; }
     public void setIngestToken(String ingestToken) { this.ingestToken = ingestToken; }

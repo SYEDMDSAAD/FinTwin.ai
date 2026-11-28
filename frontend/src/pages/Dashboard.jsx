@@ -1,4 +1,5 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
+import { localPrefs, fetchAiPrefs, AI_PREFS_EVENT } from "../services/aiPrefs";
 import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
@@ -191,8 +192,16 @@ function Dashboard() {
     const [messages, setMessages] =
         useState([]);
 
+    // The Copilot opens in the mode chosen in Settings (kept on the server)
     const [selectedMode, setSelectedMode] =
-        useState("Savings Advisor");
+        useState(() => localPrefs().mode);
+    useEffect(() => {
+        let live = true;
+        fetchAiPrefs().then((p) => { if (live) setSelectedMode(p.mode); });
+        const onPrefs = () => setSelectedMode(localPrefs().mode);
+        window.addEventListener(AI_PREFS_EVENT, onPrefs);
+        return () => { live = false; window.removeEventListener(AI_PREFS_EVENT, onPrefs); };
+    }, []);
 
     const [aiLoading, setAiLoading] =
         useState(false);    
@@ -1610,6 +1619,19 @@ function Dashboard() {
     // MARK GOAL COMPLETE
     // =========================
 
+    // "Add money": rupees put towards a goal by hand (negative takes some back)
+    const topUpGoal = async (id, amount) => {
+        try {
+            const { data } = await API.post(`/goals/${id}/top-up`, { amount });
+            setGoals((prev) => prev.map((g) => (g.id === id ? data : g)));
+            toast.success(amount > 0 ? "Added to your goal" : "Taken off your goal");
+            return true;
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Couldn't update the goal. Try again.");
+            return false;
+        }
+    };
+
     const completeGoal = async (id) => {
 
         try {
@@ -1953,6 +1975,7 @@ function Dashboard() {
                             regenerateGoal
                         }
                         completeGoal={completeGoal}
+                        topUpGoal={topUpGoal}
                     />
 
                 </>

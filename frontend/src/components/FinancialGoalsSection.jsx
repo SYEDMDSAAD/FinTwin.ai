@@ -50,7 +50,20 @@ function timeLeft(due) {
 
 const HEALTHY = ["Excellent", "On Track", "Good"];
 
-function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, regenerateGoal, completeGoal }) {
+function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, regenerateGoal, completeGoal, topUpGoal }) {
+
+  // "Add money": which goal's box is open, and what's typed in it
+  const [topUpId, setTopUpId] = useState(null);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [toppingUp, setToppingUp] = useState(false);
+  const submitTopUp = async (goal, sign) => {
+    const amount = Math.round(parseFloat(topUpAmount) * 100) / 100;
+    if (!(amount > 0)) return;
+    setToppingUp(true);
+    try {
+      if (await topUpGoal?.(goal.id, sign * amount)) { setTopUpId(null); setTopUpAmount(""); }
+    } finally { setToppingUp(false); }
+  };
 
   const [title, setTitle] = useState("");
 
@@ -323,8 +336,39 @@ function FinancialGoalsSection({ goals, createGoal, updateGoal, deleteGoal, rege
                     </div>
                   )}
 
+                  {topUpGoal && (
+                    <div className="px-4 pt-4">
+                      {topUpId === goal.id ? (
+                        <div className="p-3 rounded-control bg-surface-sunken space-y-2">
+                          <p className="text-small text-ink-2">
+                            Money you've put towards this goal that FinTwin can't see: savings you already had, cash, a transfer.
+                          </p>
+                          <div className="flex gap-2">
+                            <input className={cx(INPUT, "bg-surface")} type="number" inputMode="decimal" min="1"
+                                   value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)}
+                                   placeholder="Amount ₹" aria-label={`Amount to add to ${goal.title}`} autoFocus />
+                            <Button size="sm" disabled={toppingUp || !(parseFloat(topUpAmount) > 0)}
+                                    onClick={() => submitTopUp(goal, 1)}>Add</Button>
+                          </div>
+                          <div className="flex gap-3">
+                            {goal.manualSaved > 0 && (
+                              <button type="button" className="text-small text-ink-3 underline" disabled={toppingUp || !(parseFloat(topUpAmount) > 0)}
+                                      onClick={() => submitTopUp(goal, -1)}>Take this amount off instead</button>
+                            )}
+                            <button type="button" className="ml-auto text-small text-ink-3" onClick={() => { setTopUpId(null); setTopUpAmount(""); }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="secondary" icon={Plus} onClick={() => { setTopUpId(goal.id); setTopUpAmount(""); }}>
+                          Add money
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   <ul className="divide-y divide-line">
                     {[
+                      goal.manualSaved > 0 && ["Added by you", inr(goal.manualSaved)],
                       ["Left to save", inr(left)],
                       ["Needed each month", inr(goal.monthlyTarget)],
                       ["You save each month", inr(goal.availableSavings)],

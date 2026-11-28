@@ -8,6 +8,7 @@ import {
   Shield, Bell, Edit2, Lock, FileText, FlaskConical
 } from "lucide-react";
 import { AI_MODES } from "../constants/aiModes";
+import { saveAiPrefs } from "../services/aiPrefs";
 import ImportsPage from "./ImportsPage";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -701,12 +702,9 @@ export default function OnboardingPage() {
         if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * manualMonths;
         payload.numberOfMonths = manualMonths;
       }
-      // Store AI preferences locally
-      localStorage.setItem("aiMode", JSON.stringify(aiModes));
-      localStorage.setItem("dailyInsights", String(dailyInsights));
-      // TODO: include aiMode/dailyInsights in payload when backend supports it
-
       await API.post("/onboarding/complete", payload);
+      // The first mode picked becomes the Copilot's default; kept on the server
+      saveAiPrefs({ mode: aiModes[0] || "Savings Advisor", dailyInsights }).catch(() => {});
       sessionStorage.removeItem("ob-step");
       sessionStorage.removeItem("ob-manual");
       sessionStorage.removeItem("ob-stmt-months");

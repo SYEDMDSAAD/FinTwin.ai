@@ -94,6 +94,8 @@ public class ChatService {
         }
         metrics.aiChatCalls.increment();
         User user = resolveCurrentUser();
+        // No mode from the app: the one the user chose in Settings
+        mode = AiPreferencesService.modeFor(user, mode);
         FinancialSummaryDTO summary = aggregator.aggregate(user);
         AIProvider.ChatResult result = callAiProvider(message, mode, summary);
         String reply = com.fintwin.util.PiiRedactor.redact(result.reply());

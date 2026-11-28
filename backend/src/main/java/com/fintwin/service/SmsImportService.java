@@ -45,8 +45,14 @@ public class SmsImportService {
     private static final Pattern BARE_AMOUNT = Pattern.compile(
             "(?i)\\b(debited|credited)\\s+(by|for|with)\\s+(?=[0-9])");
 
-    /** One message as the phone read it. */
-    public record Sms(String sender, String body, Long receivedAt) {}
+    /**
+     * One message as the phone read it. timeGuessed: the sender didn't say
+     * when it arrived (an iPhone Shortcut without a time), so receivedAt is
+     * "now" and can't tell a repeat of the same message from a new one.
+     */
+    public record Sms(String sender, String body, Long receivedAt, boolean timeGuessed) {
+        public Sms(String sender, String body, Long receivedAt) { this(sender, body, receivedAt, false); }
+    }
 
     /**
      * @param notBank        not from a bank we know (sender codes worth adding are in unknownSenders)
@@ -112,7 +118,9 @@ public class SmsImportService {
 
             String externalId = EXTERNAL_ID_PREFIX
                     + digest(SmsSenders.code(sms.sender()) + "|" + sms.receivedAt() + "|" + body);
-            switch (importer.importAlert(user, bank.get(), alert.get(), externalId, SOURCE_SMS).status()) {
+            // With its real arrival time, a different id is a different message,
+            // so another SMS for the same amount that day is another payment
+            switch (importer.importAlert(user, bank.get(), alert.get(), externalId, SOURCE_SMS, !sms.timeGuessed()).status()) {
                 case IMPORTED -> imported++;
                 case DUPLICATE -> duplicates++;
                 case ON_RECORD -> onRecord++;

@@ -6,6 +6,8 @@ import useInvestData from "../hooks/useInvestData";
 import { PortfolioHero, SpareCard, SipCard, AllocationCard, TopInsight } from "./home/InvestPieces";
 import SpendGuardCard from "./SpendGuardCard";
 import InvestPot from "./home/InvestPot";
+import DailyRecap from "./DailyRecap";
+import useDailyInsights from "../hooks/useDailyInsights";
 import HomeDesk from "./HomeDesk";
 import useWide from "../hooks/useWide";
 
@@ -41,6 +43,7 @@ export default function HomeOverview({
 }) {
     const wide = useWide();
     const invest = useInvestData();
+    const recap = useDailyInsights();
     const head = headline({ income, spent, budgets });
     const items = attentionItems({ budgets, notifications });
     const negative = head.kind !== "spent" && head.value < 0;
@@ -68,6 +71,7 @@ export default function HomeOverview({
                 <SipCard sips={invest.sips} navigateTo={navigateTo} />
             </div>
 
+            {recap && <DailyRecap />}
             <InvestPot />
             <AllocationCard holdings={invest.portfolio?.holdings} navigateTo={navigateTo} />
             <TopInsight health={invest.health} navigateTo={navigateTo} />

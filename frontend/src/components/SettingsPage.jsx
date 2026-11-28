@@ -15,6 +15,7 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import DeleteAccountModal from "./DeleteAccountModal";
 import { AI_MODES } from "../constants/aiModes";
 import { wakePref, setWakePref } from "../utils/voicePref";
+import { localPrefs, fetchAiPrefs, saveAiPrefs } from "../services/aiPrefs";
 import { wakeWordConfigured } from "../services/voice";
 
 const TABS = [
@@ -276,8 +277,13 @@ export default function SettingsPage({ navigateTo }) {
   const [connections, setConnections]       = useState([]);
   const [connLoading, setConnLoading]       = useState(false);
 
-  const [aiMode, setAiMode]               = useState(() => localStorage.getItem("aiMode") || "Savings Advisor");
-  const [dailyInsights, setDailyInsights] = useState(() => localStorage.getItem("dailyInsights") !== "false");
+  const [aiMode, setAiMode]               = useState(() => localPrefs().mode);
+  const [dailyInsights, setDailyInsights] = useState(() => localPrefs().dailyInsights);
+  useEffect(() => {
+    let live = true;
+    fetchAiPrefs().then((p) => { if (live) { setAiMode(p.mode); setDailyInsights(p.dailyInsights); } });
+    return () => { live = false; };
+  }, []);
 
   // Opt-in to using anonymised transactions to improve categorisation; off by default
   const [trainingConsent, setTrainingConsent] = useState(null);
@@ -332,11 +338,13 @@ export default function SettingsPage({ navigateTo }) {
     toast.success("Local cache cleared.");
   };
 
-  const handleSaveAI = () => {
-    localStorage.setItem("aiMode", aiMode);
-    localStorage.setItem("dailyInsights", String(dailyInsights));
-    // TODO: POST /profile/ai-preferences when backend endpoint is ready
-    toast.success("AI preferences saved!");
+  const handleSaveAI = async () => {
+    try {
+      await saveAiPrefs({ mode: aiMode, dailyInsights });
+      toast.success("AI preferences saved");
+    } catch {
+      toast.error("Saved on this device only; couldn't reach the server");
+    }
   };
 
   const handleDisconnect = async (id) => {
@@ -684,7 +692,7 @@ export default function SettingsPage({ navigateTo }) {
                       <Bell size={16} color="var(--warn)" />
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Daily AI insights</div>
-                        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Receive a daily financial summary notification</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Show what changed since you last looked, on Home</div>
                       </div>
                     </div>
                     <Toggle on={dailyInsights} onChange={setDailyInsights} />

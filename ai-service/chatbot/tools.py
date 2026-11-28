@@ -173,6 +173,22 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_anomalies",
+            "description": (
+                "Fetch unusual spending in the last 3 months, as FinTwin's checks found it: "
+                "a payment far bigger than usual at a merchant, a category running well above "
+                "its normal level, one very large payment, or a burst of payments in a short "
+                "time. Each item has a ready 'reason' sentence, the amount, the usual amount "
+                "it was compared with and a severity. Use for 'anything unusual', 'any odd "
+                "payments', 'why is my spending high', 'anything suspicious'. An empty list "
+                "means nothing stood out — say so."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
 ]
 
 
@@ -227,6 +243,8 @@ def execute_tool(name: str, args: dict, user_id: int, tool_token: str | None = N
             result = backend_api.get(f"/{user_id}/portfolio", params, tool_token)
         elif name == "get_spend_guard":
             result = backend_api.get(f"/{user_id}/spend-guard", None, tool_token)
+        elif name == "get_anomalies":
+            result = backend_api.get(f"/{user_id}/anomalies", None, tool_token)
         else:
             return json.dumps({"error": f"Unknown tool '{name}'"})
         # ensure_ascii=False: escaped "\u20b9" was copied into answers verbatim

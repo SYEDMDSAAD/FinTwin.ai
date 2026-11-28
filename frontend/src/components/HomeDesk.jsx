@@ -5,6 +5,8 @@ import { rupees } from "../utils/money";
 import { SectionHeader, Progress, List, ListRow, Button } from "./ui";
 import SpendGuardCard from "./SpendGuardCard";
 import InvestPot from "./home/InvestPot";
+import DailyRecap from "./DailyRecap";
+import useDailyInsights from "../hooks/useDailyInsights";
 import { PortfolioHero, SpareCard, SipCard, AllocationCard, TopInsight } from "./home/InvestPieces";
 
 /*
@@ -26,6 +28,7 @@ export default function HomeDesk({
     invest = {}, loading, navigateTo,
 }) {
     const goals = [...active].sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0)).slice(0, 3);
+    const recap = useDailyInsights();
 
     return (
         <div className="space-y-6">
@@ -125,6 +128,7 @@ export default function HomeDesk({
                     </List>
                 </section>
                 <div className="col-span-5 space-y-6">
+                    {recap && <DailyRecap />}
                     <InvestPot />
                     <SpendGuardCard onOpen={() => navigateTo("Spend Guard")} />
                     <button

@@ -281,6 +281,31 @@ public class GoalPlannerService {
     // recalculates progress in-memory on every fetch without persisting it.
     // =========================
 
+    /** Most a single "Add money" can be: catches a typo of extra zeros. */
+    static final double MAX_TOP_UP = 1_00_00_000;
+
+    /**
+     * "Add money": rupees the user put towards the goal by hand. A negative
+     * amount takes some back (a mistaken entry), never below zero.
+     */
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
+    @Audited(action = "WRITE", resource = "goals", description = "Money added to a financial goal by hand")
+    public FinancialGoal topUp(Long id, double amount) {
+        if (!Double.isFinite(amount) || amount == 0 || Math.abs(amount) > MAX_TOP_UP) {
+            throw new com.fintwin.exception.BadRequestException("Enter an amount up to ₹1,00,00,000");
+        }
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        FinancialGoal goal = ownedGoal(id, user, false);
+        if (Boolean.TRUE.equals(goal.getCompleted())) {
+            throw new ConflictException("This goal is already complete.");
+        }
+        double next = Math.max(0, goal.getManualSaved() + amount);
+        goal.setManualSaved(Math.round(next * 100) / 100.0);
+        recomputeProgressFor(user, goal);
+        return goalRepository.save(goal);
+    }
+
     @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "WRITE", resource = "goals", description = "Financial goal marked complete")
     public FinancialGoal completeGoal(Long id) {
@@ -597,7 +622,8 @@ public class GoalPlannerService {
         }
 
         double target = goal.getTargetAmount() != null ? goal.getTargetAmount() : 0.0;
-        double saved = Math.min(allocatedSaved, target);
+        // Money added by hand counts on top of what the measured savings fund
+        double saved = Math.min(allocatedSaved + goal.getManualSaved(), target);
 
         goal.setExpectedSaved(saved);
         goal.setProgressPercent(round1(

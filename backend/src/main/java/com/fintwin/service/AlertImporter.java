@@ -45,6 +45,16 @@ public class AlertImporter {
      */
     public Result importAlert(User user, String bank, BankAlertParser.Alert alert,
                               String externalId, String source) {
+        return importAlert(user, bank, alert, externalId, source, false);
+    }
+
+    /**
+     * @param sameKindIsDistinct true when ids reliably tell messages apart (an SMS with its real
+     *                           arrival time): another message of the same kind for the same
+     *                           amount is then another payment, not this one again
+     */
+    public Result importAlert(User user, String bank, BankAlertParser.Alert alert,
+                              String externalId, String source, boolean sameKindIsDistinct) {
         String accountRef = alert.last4() == null ? bank : bank + " ··" + alert.last4();
 
         if (transactions.findByUserAndExternalId(user, externalId).isPresent()) {
@@ -54,8 +64,12 @@ public class AlertImporter {
         // The same money may already be on record from a statement, a bank
         // link, an email alert or a manual entry: it must not count twice
         List<Transaction> nearby = transactions.findSince(user.getId(), alert.date().minusDays(2));
+        // ...but, when ids are reliable, not another message of the same kind:
+        // two ₹20 SMS on one day are two payments (a re-send is caught by its id above)
+        String kind = sameKindIsDistinct ? alertKind(externalId) : null;
         Optional<Transaction> already = nearby.stream()
                 .filter(t -> t.getAmount() != null && t.getDate() != null)
+                .filter(t -> kind == null || t.getExternalId() == null || !t.getExternalId().startsWith(kind))
                 .filter(t -> Math.abs(t.getAmount() - alert.amount()) < 0.005)
                 .filter(t -> Math.abs(t.getDate().toEpochDay() - alert.date().toEpochDay()) <= 1)
                 .filter(t -> t.getAccountRef() == null || t.getAccountRef().equals(accountRef))
@@ -104,5 +118,12 @@ public class AlertImporter {
     private static String describeChannel(BankAlertParser.Alert alert) {
         String dir = alert.amount() < 0 ? "payment" : "credit";
         return alert.channel() == null ? "Bank " + dir : alert.channel() + " " + dir;
+    }
+
+    /** "SMS:" for an SMS, the email prefix for an email alert: the part of the id before the first colon. */
+    static String alertKind(String externalId) {
+        if (externalId == null) return null;
+        int colon = externalId.indexOf(':');
+        return colon > 0 ? externalId.substring(0, colon + 1) : null;
     }
 }

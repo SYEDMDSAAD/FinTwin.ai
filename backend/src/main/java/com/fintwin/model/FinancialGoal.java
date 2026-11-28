@@ -33,6 +33,11 @@ public class FinancialGoal {
     @Column(name = "current_saved", columnDefinition = "TEXT")
     private BigDecimal currentSaved;
 
+    // Added by hand ("Add money"), counted on top of the measured savings
+    @Convert(converter = EncryptedBigDecimalConverter.class)
+    @Column(name = "manual_saved", columnDefinition = "TEXT")
+    private BigDecimal manualSaved;
+
     private Integer durationMonths;
 
     @Convert(converter = EncryptedBigDecimalConverter.class)
@@ -124,6 +129,9 @@ public class FinancialGoal {
     }
 
     public BigDecimal getCurrentSavedExact() { return currentSaved; }
+
+    public Double getManualSaved() { return manualSaved == null ? 0.0 : manualSaved.doubleValue(); }
+    public void setManualSaved(Double v) { this.manualSaved = v == null ? null : BigDecimal.valueOf(v); }
     public void setCurrentSavedExact(BigDecimal currentSaved) { this.currentSaved = currentSaved; }
 
     public Integer getDurationMonths() {

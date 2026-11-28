@@ -50,6 +50,9 @@ public class InternalAIController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.fintwin.repository.SipPlanRepository sipPlans;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.service.AnomalyService anomalyService;
+
 
     private static final Logger log = LoggerFactory.getLogger(InternalAIController.class);
 
@@ -362,6 +365,45 @@ public class InternalAIController {
         body.put("investments", investments);
         body.put("insurance",   insurance);
         return ResponseEntity.ok(body);
+    }
+
+    // ── Unusual spending: the same checks as the Insights page and watch agent ─
+
+    @GetMapping("/{userId}/anomalies")
+    public ResponseEntity<?> anomalies(
+            @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
+            @PathVariable Long userId
+    ) {
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
+        if (denied != null) return denied;
+        User user = userRepo.findById(userId).orElse(null);
+        if (user == null) return ResponseEntity.notFound().build();
+        List<com.fintwin.dto.AnomalyDTO> found = anomalyService == null ? List.of() : anomalyService.detectFor(user);
+        return ResponseEntity.ok(anomaliesBody(found));
+    }
+
+    /** Ready sentences and rounded rupees, so the model quotes rather than computes. */
+    static Map<String, Object> anomaliesBody(List<com.fintwin.dto.AnomalyDTO> found) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (com.fintwin.dto.AnomalyDTO a : found.stream().limit(10).toList()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("type", a.getType());
+            m.put("severity", a.getSeverity());
+            m.put("merchant", a.getMerchant());
+            m.put("category", a.getCategory());
+            if (a.getAmount() != null) m.put("amount", Math.round(Math.abs(a.getAmount())));
+            if (a.getAvgAmount() != null) m.put("usualAmount", Math.round(Math.abs(a.getAvgAmount())));
+            if (a.getMultiplier() != null) m.put("timesUsual", Math.round(a.getMultiplier() * 10) / 10.0);
+            m.put("reason", a.getReason());
+            items.add(m);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("period", "last 3 months");
+        body.put("count", found.size());
+        body.put("anomalies", items);
+        if (items.isEmpty()) body.put("note", "Nothing in the last 3 months stood out from the user's usual spending.");
+        return body;
     }
 
     // ── Portfolio: holdings with gains worked out, allocation, best/worst ────

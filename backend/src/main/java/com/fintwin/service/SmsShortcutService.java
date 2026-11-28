@@ -81,10 +81,10 @@ public class SmsShortcutService {
         if (message == null || message.isBlank()) {
             throw new BadRequestException("No message");
         }
-        long at = receivedAt != null && receivedAt > 0 && receivedAt <= System.currentTimeMillis() + 60_000
-                ? receivedAt : System.currentTimeMillis();
+        boolean known = receivedAt != null && receivedAt > 0 && receivedAt <= System.currentTimeMillis() + 60_000;
+        long at = known ? receivedAt : System.currentTimeMillis();
         String from = sender == null ? null : sender.trim();
-        return sms.importFor(user, List.of(new SmsImportService.Sms(from, message, at)), true);
+        return sms.importFor(user, List.of(new SmsImportService.Sms(from, message, at, !known)), true);
     }
 
     Optional<User> userFor(String key) {

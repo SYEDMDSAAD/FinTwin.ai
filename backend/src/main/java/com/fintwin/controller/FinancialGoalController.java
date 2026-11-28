@@ -91,6 +91,14 @@ public class FinancialGoalController {
     // MARK GOAL COMPLETE
     // =====================================
 
+    /** "Add money": { "amount": 5000 } — negative takes some back. */
+    @PostMapping("/{id}/top-up")
+    public FinancialGoalDTO topUp(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        Object a = body.get("amount");
+        if (!(a instanceof Number n)) throw new com.fintwin.exception.BadRequestException("amount is required");
+        return FinancialGoalDTO.from(goalService.topUp(id, n.doubleValue()));
+    }
+
     @PostMapping("/{id}/complete")
 
     public FinancialGoalDTO completeGoal(

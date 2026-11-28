@@ -12,7 +12,7 @@ from chatbot.advisor import generate_financial_advice
 def test_tool_schemas_are_well_formed():
     names = [t["function"]["name"] for t in tools.TOOLS]
     assert names == ["get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio",
-                     "get_spend_guard"]
+                     "get_spend_guard", "get_anomalies"]
     for t in tools.TOOLS:
         assert t["type"] == "function"
         assert "description" in t["function"]
@@ -95,8 +95,10 @@ def test_parameterless_tools_route_to_right_endpoints(mock_get):
     tools.execute_tool("get_net_worth", {}, user_id=8)
     tools.execute_tool("get_portfolio", {}, user_id=8)
     tools.execute_tool("get_spend_guard", {}, user_id=8)
+    tools.execute_tool("get_anomalies", {}, user_id=8)
     called_paths = [c.args[0] for c in mock_get.call_args_list]
-    assert called_paths == ["/8/budgets", "/8/goals", "/8/networth", "/8/portfolio", "/8/spend-guard"]
+    assert called_paths == ["/8/budgets", "/8/goals", "/8/networth", "/8/portfolio", "/8/spend-guard",
+                            "/8/anomalies"]
 
 
 @patch("chatbot.tools.backend_api.get")
@@ -104,9 +106,9 @@ def test_every_tool_forwards_the_tool_token(mock_get):
     """The backend refuses a tool call without the token it minted for this user."""
     mock_get.return_value = {}
     for name in ("get_transactions", "get_budgets", "get_goals", "get_net_worth", "get_portfolio",
-                 "get_spend_guard"):
+                 "get_spend_guard", "get_anomalies"):
         tools.execute_tool(name, {}, user_id=8, tool_token="8.999.sig")
-    assert [c.args[2] for c in mock_get.call_args_list] == ["8.999.sig"] * 6
+    assert [c.args[2] for c in mock_get.call_args_list] == ["8.999.sig"] * 7
 
 
 @patch("chatbot.advisor.execute_tool")

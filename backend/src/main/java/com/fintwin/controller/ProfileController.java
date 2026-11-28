@@ -1,6 +1,7 @@
 package com.fintwin.controller;
 
 import com.fintwin.dto.ProfileDTO;
+import com.fintwin.service.AiPreferencesService;
 import com.fintwin.service.ProfileService;
 import com.fintwin.dto.ChangePasswordDTO;
 import com.fintwin.dto.UpdateProfileDTO;
@@ -16,13 +17,30 @@ import org.springframework.web.bind.annotation.*;
 public class ProfileController {
 
     private final ProfileService profileService;
+    private final AiPreferencesService aiPreferences;
 
         public ProfileController(
-                ProfileService profileService
+                ProfileService profileService,
+                AiPreferencesService aiPreferences
         ) {
 
                 this.profileService =
                         profileService;
+                this.aiPreferences = aiPreferences;
+        }
+
+        /** The Copilot's default mode and whether Home shows the daily recap. */
+        @GetMapping("/ai-preferences")
+        public Map<String, Object> getAiPreferences() {
+                return aiPreferences.get();
+        }
+
+        @PutMapping("/ai-preferences")
+        public Map<String, Object> updateAiPreferences(@RequestBody Map<String, Object> body) {
+                Object mode = body.get("mode");
+                Object daily = body.get("dailyInsights");
+                return aiPreferences.update(mode instanceof String m ? m : null,
+                                            daily instanceof Boolean d ? d : null);
         }
 
         @GetMapping
