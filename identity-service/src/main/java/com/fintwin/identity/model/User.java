@@ -96,6 +96,8 @@ public class User {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    /** Only for a sign-up started over on an abandoned row: it's new from now. */
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Boolean getOnboardingCompleted() { return onboardingCompleted; }
     public void setOnboardingCompleted(Boolean v) { this.onboardingCompleted = v; }
     public String getTwoFactorSecret() { return twoFactorSecret; }
