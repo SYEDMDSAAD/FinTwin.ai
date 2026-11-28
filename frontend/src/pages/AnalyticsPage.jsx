@@ -1,31 +1,17 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, RotateCcw, BarChart3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, X, BarChart3 } from "lucide-react";
 import SpendingHeatmap from "../components/SpendingHeatmap";
 import RecurringExpenses from "../components/RecurringExpenses";
 import API from "../services/api";
 import { monthsNeeded } from "./analyticsRange";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, LabelList,
+  Tooltip, ResponsiveContainer,
 } from "recharts";
+import { Button, SectionHeader, cx, xAxis, yAxis, grid, tooltipCursor, ChartTooltip, shortRupees } from "../components/ui";
+import { rupees } from "../utils/money";
 
-// ─── Categories (Wallet-style) ───────────────────────────────────────────────
-const CATEGORIES = [
-  { name: "Food & Drinks",       icon: "🍔", color: "#f87171" },
-  { name: "Shopping",            icon: "🛒", color: "#a78bfa" },
-  { name: "Housing",             icon: "🏠", color: "#22d3ee" },
-  { name: "Transportation",      icon: "🚌", color: "#fbbf24" },
-  { name: "Vehicle",             icon: "🚗", color: "#fb923c" },
-  { name: "Life & Entertainment",icon: "🎭", color: "#f472b6" },
-  { name: "Communication/PC",    icon: "💻", color: "#38bdf8" },
-  { name: "Financial Expenses",  icon: "💰", color: "#4ade80" },
-  { name: "Investments",         icon: "📈", color: "#a3e635" },
-  { name: "Others",              icon: "📦", color: "#94a3b8" },
-  { name: "Unknown",             icon: "❓", color: "#6b7280" },
-];
-
-const RECORD_TYPES = ["All", "Income", "Expense", "Transfer"];
-const RECORD_STATES = ["All", "Cleared", "Pending"];
+const RECORD_TYPES = [["All", "Money in and out"], ["Income", "Money in"], ["Expense", "Money out"]];
 const PERIOD_OPTIONS = ["This month", "Last month", "This year", "Last 12 months", "All time", "Custom"];
 
 
@@ -63,6 +49,7 @@ function filterTransactions(transactions, filters, period, customStart, customEn
     if (endDate && d > endDate) return false;
     if (filters.search && !t.merchant?.toLowerCase().includes(filters.search.toLowerCase())) return false;
     if (filters.category && filters.category !== "All" && t.category !== filters.category) return false;
+    if (filters.includeTransfers === false && t.category === "Transfer") return false;
     if (filters.recordType === "Income" && t.amount <= 0) return false;
     if (filters.recordType === "Expense" && t.amount >= 0) return false;
     if (filters.minAmount && Math.abs(t.amount) < parseFloat(filters.minAmount)) return false;
@@ -89,210 +76,100 @@ function prevPeriodTransactions(transactions, period) {
   });
 }
 
-// ─── Filter Panel (horizontal, matches Transactions page) ───────────────────
-function FilterPanel({ filters, setFilters, open }) {
-  const reset = () => setFilters({
-    search: "", category: "All", recordType: "All", recordState: "All",
-    minAmount: "", maxAmount: "", includeTransfers: true,
-  });
+// ─── Filter panel ─────────────────────────────────────────────────────────────
+const EMPTY_FILTERS = { search: "", category: "All", recordType: "All", minAmount: "", maxAmount: "", includeTransfers: true };
+const INPUT = "w-full h-10 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent";
 
-  if (!open) return null;
-
+function Field({ label, children }) {
   return (
-    <div style={{
-      margin: "0 0 16px", padding: 16,
-      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-      borderRadius: 14, fontFamily: "'DM Sans', system-ui, sans-serif",
-    }}>
-      <style>{`
-        .afp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .afp-grid2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
-        @media (max-width: 640px) {
-          .afp-grid { grid-template-columns: 1fr 1fr; }
-          .afp-grid2 { grid-template-columns: 1fr 1fr; gap: 12px 10px; }
-        }
-      `}</style>
-      <div className="afp-grid">
-        <div>
-          <label style={labelStyle}>Search</label>
-          <input
-            style={inputStyle}
-            placeholder="Search transactions..."
-            value={filters.search}
-            onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Categories</label>
-          <select
-            style={selectStyle}
-            value={filters.category}
-            onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}
-          >
+    <label className="block">
+      <span className="block text-caption text-ink-3 mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function FilterPanel({ filters, setFilters, open, categories }) {
+  if (!open) return null;
+  const set = (k) => (e) => setFilters(f => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  return (
+    <div className="mb-4 p-4 rounded-card bg-surface border border-line space-y-3">
+      <input className={INPUT} placeholder="Search payee" aria-label="Search" value={filters.search} onChange={set("search")} />
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Category">
+          <select className={INPUT} value={filters.category} onChange={set("category")}>
             <option value="All">All categories</option>
-            {CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Record types</label>
-          <select
-            style={selectStyle}
-            value={filters.recordType}
-            onChange={e => setFilters(f => ({ ...f, recordType: e.target.value }))}
-          >
-            {RECORD_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+        </Field>
+        <Field label="Type">
+          <select className={INPUT} value={filters.recordType} onChange={set("recordType")}>
+            {RECORD_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Transfers</label>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
-            <input
-              type="checkbox"
-              checked={filters.includeTransfers}
-              onChange={e => setFilters(f => ({ ...f, includeTransfers: e.target.checked }))}
-              style={{ accentColor: "#a78bfa" }}
-            />
-            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Include transfers</span>
-          </label>
-        </div>
+        </Field>
+        <Field label="Min ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="0" value={filters.minAmount} onChange={set("minAmount")} /></Field>
+        <Field label="Max ₹"><input type="number" inputMode="numeric" className={INPUT} placeholder="Any" value={filters.maxAmount} onChange={set("maxAmount")} /></Field>
       </div>
-      <div className="afp-grid2">
-        <div>
-          <label style={labelStyle}>Min amount</label>
-          <input
-            type="number" placeholder="Min" style={inputStyle}
-            value={filters.minAmount}
-            onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Max amount</label>
-          <input
-            type="number" placeholder="Max" style={inputStyle}
-            value={filters.maxAmount}
-            onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Record States</label>
-          <select
-            style={selectStyle}
-            value={filters.recordState}
-            onChange={e => setFilters(f => ({ ...f, recordState: e.target.value }))}
-          >
-            {RECORD_STATES.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-      </div>
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-        <button
-          onClick={reset}
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "6px 14px", borderRadius: 8, cursor: "pointer",
-            background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)",
-            color: "#f87171", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-          }}
-        >
-          <RotateCcw size={12} /> Reset all filters
-        </button>
-      </div>
+      <label className="flex items-center gap-2 text-small text-ink-2">
+        <input type="checkbox" className="w-4 h-4 accent-[var(--accent)]" checked={filters.includeTransfers} onChange={set("includeTransfers")} />
+        Include transfers between your own accounts
+      </label>
+      <Button variant="ghost" size="sm" icon={X} className="-ml-2" onClick={() => setFilters(EMPTY_FILTERS)}>Clear filters</Button>
     </div>
   );
 }
 
-const labelStyle = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 6 };
-const inputStyle = {
-  width: "100%", padding: "7px 10px", borderRadius: 8,
-  background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
-  color: "var(--text-primary)", fontSize: 12, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
-};
-const selectStyle = {
-  ...inputStyle, appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E")`,
-  backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
-};
+function ReportRow({ label, cur, prev, cls, strong, bar, max }) {
+  return (
+    <li className="px-4 py-3">
+      <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4">
+        <span className={cx("min-w-0 truncate text-body", strong ? "font-semibold text-ink" : "text-ink")}>{label}</span>
+        <span className={cx("text-body font-semibold num text-right w-24", cls || "text-ink")}>{rupees(cur)}</span>
+        <span className="text-small text-ink-3 num text-right w-20">{rupees(prev)}</span>
+      </div>
+      {bar != null && (
+        <div className="mt-1.5 mr-[11rem] h-1 rounded-full bg-surface-sunken overflow-hidden" aria-hidden>
+          <div className="h-full rounded-full bg-accent" style={{ width: `${(bar / max) * 100}%` }} />
+        </div>
+      )}
+    </li>
+    );
+}
 
-// ─── Incomes & Expenses Report Tab ───────────────────────────────────────────
+// ─── Incomes & expenses report ────────────────────────────────────────────────
+// Categories come from the transactions themselves, so every category the
+// app uses shows up (an old fixed list here silently dropped Food, Travel…).
 function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
-  const catSummary = (txns) => {
+  const expenseBy = (txns) => {
     const map = {};
     txns.forEach(t => {
-      const cat = t.category || "Unknown";
-      if (!map[cat]) map[cat] = { income: 0, expense: 0 };
-      if (t.amount > 0) map[cat].income += t.amount;
-      else map[cat].expense += Math.abs(t.amount);
+      if (t.amount < 0) { const cat = t.category || "Other"; map[cat] = (map[cat] || 0) + Math.abs(t.amount); }
     });
     return map;
   };
+  const curMap = expenseBy(current);
+  const prevMap = expenseBy(previous);
+  const cats = [...new Set([...Object.keys(curMap), ...Object.keys(prevMap)])]
+    .sort((a, b) => (curMap[b] || 0) - (curMap[a] || 0) || (prevMap[b] || 0) - (prevMap[a] || 0));
 
-  const curMap  = catSummary(current);
-  const prevMap = catSummary(previous);
-  const totalIncCur  = current.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
-  const totalExpCur  = current.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
-  const totalIncPrev = previous.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
-  const totalExpPrev = previous.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
-
-  const fmt = n => `₹${n.toLocaleString("en-IN",{maximumFractionDigits:0})}`;
+  const inc = (txns) => txns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const exp = (txns) => txns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const incCur = inc(current), expCur = exp(current), incPrev = inc(previous), expPrev = exp(previous);
+  const max = Math.max(1, ...Object.values(curMap));
 
   return (
     <div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Sans', system-ui" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>Category</th>
-              <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#a78bfa" }}>{periodLabel}</th>
-              <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "var(--text-dim)" }}>{prevLabel}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Income section */}
-            <tr style={{ background: "rgba(74,222,128,0.04)" }}>
-              <td colSpan={3} style={{ padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#4ade80", letterSpacing: "0.08em" }}>TOTAL INCOME</td>
-            </tr>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              <td style={{ padding: "10px 16px 10px 32px", fontSize: 13, color: "rgba(148,163,184,0.7)", display: "flex", alignItems: "center", gap: 8 }}>
-                <span>💵</span> Income
-              </td>
-              <td style={{ textAlign: "right", padding: "10px 16px", fontSize: 13, fontWeight: 600, color: "#4ade80" }}>{fmt(totalIncCur)}</td>
-              <td style={{ textAlign: "right", padding: "10px 16px", fontSize: 13, color: "var(--text-dim)" }}>{fmt(totalIncPrev)}</td>
-            </tr>
-
-            {/* Expense section */}
-            <tr style={{ background: "rgba(248,113,113,0.04)" }}>
-              <td colSpan={3} style={{ padding: "8px 16px", fontSize: 11, fontWeight: 700, color: "#f87171", letterSpacing: "0.08em" }}>TOTAL EXPENSE</td>
-            </tr>
-            {CATEGORIES.map(cat => {
-              const curAmt  = (curMap[cat.name]?.expense)  || 0;
-              const prevAmt = (prevMap[cat.name]?.expense) || 0;
-              if (curAmt === 0 && prevAmt === 0) return null;
-              return (
-                <tr key={cat.name} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                  <td style={{ padding: "9px 16px 9px 32px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14 }}>{cat.icon}</span>
-                      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{cat.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ textAlign: "right", padding: "9px 16px", fontSize: 13, fontWeight: 600, color: "#f87171" }}>{curAmt ? fmt(curAmt) : <span style={{color:"var(--text-dimmer)"}}>₹0</span>}</td>
-                  <td style={{ textAlign: "right", padding: "9px 16px", fontSize: 13, color: "var(--text-dim)" }}>{prevAmt ? fmt(prevAmt) : <span style={{color:"var(--text-dimmer)"}}>₹0</span>}</td>
-                </tr>
-              );
-            })}
-            {/* Totals row */}
-            <tr style={{ borderTop: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
-              <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#fff" }}>Net (Income – Expense)</td>
-              <td style={{ textAlign: "right", padding: "12px 16px", fontSize: 13, fontWeight: 700, color: totalIncCur - totalExpCur >= 0 ? "#4ade80" : "#f87171" }}>
-                {fmt(totalIncCur - totalExpCur)}
-              </td>
-              <td style={{ textAlign: "right", padding: "12px 16px", fontSize: 13, fontWeight: 700, color: totalIncPrev - totalExpPrev >= 0 ? "#4ade80" : "#f87171" }}>
-                {fmt(totalIncPrev - totalExpPrev)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 pb-2 text-caption text-ink-3">
+        <span />
+        <span className="w-24 text-right font-medium text-ink-2">{periodLabel}</span>
+        <span className="w-20 text-right">{prevLabel}</span>
       </div>
+      <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+        <ReportRow max={max} label="Money in" cur={incCur} prev={incPrev} cls="text-good" />
+        <ReportRow max={max} label="Money out" cur={expCur} prev={expPrev} strong />
+        {cats.map(c => <ReportRow max={max} key={c} label={c} cur={curMap[c] || 0} prev={prevMap[c] || 0} bar={curMap[c] || 0} />)}
+        <ReportRow max={max} label="Net" cur={incCur - expCur} prev={incPrev - expPrev} strong cls={incCur - expCur < 0 ? "text-bad" : "text-good"} />
+      </ul>
     </div>
   );
 }
@@ -300,11 +177,11 @@ function IncomesExpensesTab({ current, previous, periodLabel, prevLabel }) {
 // ─── Balance Trend Tab ────────────────────────────────────────────────────────
 function BalanceTrendTab({ transactions }) {
   const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
-  let running = 0;
-  const chartData = sorted.map(t => {
-    running += t.amount;
-    return { date: t.date?.slice(0, 10), balance: Math.round(running) };
-  });
+  const chartData = sorted.reduce((acc, t) => {
+    const prev = acc.length ? acc[acc.length - 1].exact : 0;
+    acc.push({ date: t.date?.slice(0, 10), exact: prev + t.amount, balance: Math.round(prev + t.amount) });
+    return acc;
+  }, []);
 
   if (chartData.length === 0) {
     return <EmptyState msg="No transactions in this period to build a balance trend." />;
@@ -312,19 +189,18 @@ function BalanceTrendTab({ transactions }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>RUNNING BALANCE OVER TIME</div>
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
-          <YAxis tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
-          <Tooltip
-            contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 }}
-            formatter={v => [`₹${v.toLocaleString("en-IN")}`, "Balance"]}
-          />
-          <Line type="monotone" dataKey="balance" stroke="#a78bfa" strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
-        </LineChart>
-      </ResponsiveContainer>
+      <p className="text-small text-ink-3 mb-3">Money in minus money out, added up over the period</p>
+      <div className="rounded-card bg-surface border border-line p-4">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 220 }} width="100%" height={240}>
+          <LineChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid {...grid} />
+            <XAxis {...xAxis} dataKey="date" tickFormatter={shortDate} minTickGap={24} />
+            <YAxis {...yAxis} />
+            <Tooltip content={<ChartTooltip />} />
+            <Line type="monotone" dataKey="balance" name="Balance" stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -350,72 +226,55 @@ function CashFlowTab({ transactions }) {
     return <EmptyState msg="No transactions in this period to show cash flow." />;
   }
 
-  // Indian-style compact formatting (k / L / Cr) — also doubles as the direct
-  // bar labels below, since a sqrt-scaled axis still leaves small months only
-  // a few px tall and unreadable without a printed value.
-  const compactINR = v => {
-    if (v >= 1e7) return `₹${(v / 1e7).toFixed(v >= 1e8 ? 0 : 1)}Cr`;
-    if (v >= 1e5) return `₹${(v / 1e5).toFixed(v >= 1e6 ? 0 : 1)}L`;
-    if (v >= 1e3) return `₹${(v / 1e3).toFixed(0)}k`;
-    return `₹${v}`;
-  };
-
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
-      <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={data} barGap={4} margin={{ top: 20, right: 8, left: -5, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }} />
-          {/* sqrt scale: one huge month no longer flattens every other bar to
-              a sliver, while zero still sits at zero (unlike a log scale) */}
-          <YAxis
-            scale="sqrt"
-            domain={[0, "dataMax"]}
-            tick={{ fontSize: 10, fill: "rgba(148,163,184,0.5)" }}
-            tickFormatter={compactINR}
-          />
-          <Tooltip
-            cursor={{ fill: "rgba(255,255,255,0.04)" }}
-            contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12 }}
-            formatter={(v, n) => [`₹${v.toLocaleString("en-IN")}`, n === "income" ? "Income" : "Expenses"]}
-          />
-          <Legend formatter={v => v === "income" ? "Money In" : "Money Out"} />
-          <Bar dataKey="income"   fill="#4ade80" radius={[4,4,0,0]} fillOpacity={0.85}>
-            <LabelList dataKey="income" position="top" formatter={compactINR} style={{ fontSize: 9, fill: "rgba(148,163,184,0.7)" }} />
-          </Bar>
-          <Bar dataKey="expenses" fill="#f87171" radius={[4,4,0,0]} fillOpacity={0.85}>
-            <LabelList dataKey="expenses" position="top" formatter={compactINR} style={{ fontSize: 9, fill: "rgba(148,163,184,0.7)" }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <p className="text-small text-ink-3 mb-3">Money in and out each month</p>
+      <div className="rounded-card bg-surface border border-line p-4">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 220 }} width="100%" height={240}>
+          <BarChart data={data} barGap={3} barCategoryGap="24%" margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid {...grid} />
+            <XAxis {...xAxis} dataKey="month" />
+            {/* sqrt scale: one huge month doesn't flatten every other bar to a sliver */}
+            <YAxis {...yAxis} scale="sqrt" domain={[0, "dataMax"]} tickFormatter={shortRupees} />
+            <Tooltip cursor={tooltipCursor} content={<ChartTooltip />} />
+            <Bar dataKey="income" name="Money in" fill="var(--good)" radius={[4, 4, 0, 0]} maxBarSize={22} />
+            <Bar dataKey="expenses" name="Money out" fill="var(--border-card-hover)" radius={[4, 4, 0, 0]} maxBarSize={22} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex gap-4 text-caption text-ink-3 mt-2">
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-good" /> Money in</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--border-card-hover)" }} /> Money out</span>
+        </div>
+      </div>
     </div>
   );
 }
 
+const shortDate = (iso) => {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+};
+
 function EmptyState({ msg }) {
   return (
-    <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)", fontSize: 13 }}>
-      <BarChart3 size={40} style={{ opacity: 0.2, marginBottom: 12 }} />
-      <div>{msg}</div>
+    <div className="rounded-card bg-surface border border-line px-6 py-12 text-center text-small text-ink-3">
+      <BarChart3 size={28} aria-hidden className="mx-auto mb-2 opacity-40" />
+      {msg}
     </div>
   );
 }
 
 // ─── Main AnalyticsPage ───────────────────────────────────────────────────────
-const TABS = ["Incomes & Expenses Report", "Balance Trend", "Cash Flow"];
+const TABS = [["report", "In and out"], ["balance", "Balance"], ["cashflow", "Cash flow"]];
 
 export default function AnalyticsPage({ transactions = [], recurringExpenses = [], onCategoryChanged }) {
-  const [activeTab, setActiveTab] = useState(TABS[0]);
+  const [activeTab, setActiveTab] = useState("report");
   const [filterOpen, setFilterOpen] = useState(false);
   const [period, setPeriod] = useState("This month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [periodDropOpen, setPeriodDropOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    search: "", category: "All", recordType: "All", recordState: "All",
-    minAmount: "", maxAmount: "", includeTransfers: true,
-  });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   const now = new Date();
 
@@ -465,147 +324,76 @@ export default function AnalyticsPage({ transactions = [], recurringExpenses = [
     if (dir > 0 && idx < PERIOD_OPTIONS.length - 1) setPeriod(PERIOD_OPTIONS[idx + 1]);
   };
 
+  const categories = useMemo(() => [...new Set(source.map(t => t.category).filter(Boolean))].sort(), [source]);
+  const activeFilters = Object.keys(EMPTY_FILTERS).filter(k => filters[k] !== EMPTY_FILTERS[k]).length;
+
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100vh" }}>
-      {/* Page header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <BarChart3 size={18} color="#a78bfa" />
-        </div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.12em" }}>OVERVIEW</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>Analytics</h2>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setFilterOpen(o => !o)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", borderRadius: 10, cursor: "pointer",
-              background: filterOpen ? "rgba(167,139,250,0.12)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${filterOpen ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
-              color: filterOpen ? "#a78bfa" : "rgba(148,163,184,0.6)",
-              fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-            }}
-          >
-            <SlidersHorizontal size={13} /> Filters
+    <section aria-label="Reports" className="max-w-2xl">
+      <SectionHeader
+        title="Analytics"
+        subtitle={loadingRange ? "Loading…" : `${currentTxns.length} transactions`}
+        action={
+          <Button variant={activeFilters ? "soft" : "secondary"} size="sm" icon={SlidersHorizontal} onClick={() => setFilterOpen(o => !o)} aria-expanded={filterOpen}>
+            Filter{activeFilters ? ` (${activeFilters})` : ""}
+          </Button>
+        }
+      />
+
+      <FilterPanel filters={filters} setFilters={setFilters} open={filterOpen} categories={categories} />
+
+      {/* Period: step through, or pick one */}
+      <div className="flex items-center gap-2 mb-3">
+        <button type="button" onClick={() => navigatePeriod(-1)} aria-label="Previous period" className={NAV_BTN}><ChevronLeft size={18} aria-hidden /></button>
+        <div className="relative flex-1">
+          <button type="button" onClick={() => setPeriodDropOpen(o => !o)} aria-expanded={periodDropOpen}
+                  className="w-full h-10 rounded-full bg-surface border border-line flex items-center justify-center gap-1.5 text-body font-medium text-ink">
+            {period}
+            <ChevronDown size={16} aria-hidden className="text-ink-3" />
           </button>
-        </div>
-      </div>
-
-      <FilterPanel filters={filters} setFilters={setFilters} open={filterOpen} />
-
-      <div style={{ display: "flex", gap: 0, minHeight: 600 }}>
-        {/* Main content */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
-          {/* Month navigation */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "10px 16px", marginBottom: 16,
-            background: "rgba(255,255,255,0.018)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 14,
-          }}>
-            <button onClick={() => navigatePeriod(-1)} style={navBtnStyle}><ChevronLeft size={16} /></button>
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setPeriodDropOpen(o => !o)}
-                style={{ ...navBtnStyle, padding: "6px 16px", gap: 6, fontSize: 13, fontWeight: 600, color: "var(--text-primary)", minWidth: 140 }}
-              >
-                {period}
-                <ChevronRight size={12} style={{ transform: "rotate(90deg)" }} />
-              </button>
-              {periodDropOpen && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
-                  background: "var(--bg-floating)", border: "1px solid var(--border-floating)",
-                  borderRadius: 12, overflow: "hidden", minWidth: 160,
-                  boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
-                }}>
-                  {PERIOD_OPTIONS.map(p => (
-                    <button key={p} onClick={() => { setPeriod(p); setPeriodDropOpen(false); }} style={{
-                      display: "block", width: "100%", textAlign: "left",
-                      padding: "10px 16px", background: period === p ? "rgba(167,139,250,0.1)" : "none",
-                      border: "none", color: period === p ? "#a78bfa" : "var(--text-secondary)",
-                      fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
+          {periodDropOpen && (
+            <div className="absolute top-[calc(100%+6px)] inset-x-0 z-50 p-1.5 rounded-[14px] bg-surface border border-line shadow-[0_12px_32px_rgba(17,17,26,0.12)]">
+              {PERIOD_OPTIONS.map(p => (
+                <button key={p} type="button" onClick={() => { setPeriod(p); setPeriodDropOpen(false); }}
+                        className={cx("block w-full text-left px-3 py-2.5 rounded-[10px] text-body", period === p ? "text-accent font-semibold" : "text-ink hover:bg-surface-sunken")}>
+                  {p}
+                </button>
+              ))}
             </div>
-            <button onClick={() => navigatePeriod(1)} style={navBtnStyle}><ChevronRight size={16} /></button>
-            {period === "Custom" && (
-              <div style={{ display: "flex", gap: 6, marginLeft: 8 }}>
-                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} style={{ ...inputStyle, width: 140, fontSize: 12 }} />
-                <span style={{ color: "var(--text-muted)", alignSelf: "center" }}>–</span>
-                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={{ ...inputStyle, width: 140, fontSize: 12 }} />
-              </div>
-            )}
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>
-              {loadingRange ? "loading…" : `${currentTxns.length} transactions`}
-            </span>
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: 2, marginBottom: 0, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderBottom: "none", borderRadius: "14px 14px 0 0", padding: "8px 8px 0", overflow: "hidden" }}>
-            {TABS.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "9px 16px", borderRadius: "10px 10px 0 0",
-                  border: "none", cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 12, fontWeight: 600, transition: "all 0.15s",
-                  background: activeTab === tab ? "rgba(167,139,250,0.12)" : "transparent",
-                  color: activeTab === tab ? "#a78bfa" : "rgba(148,163,184,0.5)",
-                  borderBottom: activeTab === tab ? "2px solid #a78bfa" : "2px solid transparent",
-                }}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div style={{
-            background: "rgba(255,255,255,0.025)",
-            border: "1px solid rgba(255,255,255,0.07)",
-            borderTop: "none",
-            borderRadius: "0 0 14px 14px",
-            padding: 20,
-          }}>
-            {activeTab === "Incomes & Expenses Report" && (
-              <IncomesExpensesTab
-                current={currentTxns}
-                previous={previousTxns}
-                periodLabel={periodLabel}
-                prevLabel={prevLabel}
-              />
-            )}
-            {activeTab === "Balance Trend"  && <BalanceTrendTab transactions={currentTxns} />}
-            {activeTab === "Cash Flow"      && <CashFlowTab transactions={source} />}
-          </div>
-
-          {/* Spending Heatmap */}
-          <div style={{ marginTop: 24 }}>
-            <SpendingHeatmap onCategoryChanged={onCategoryChanged} />
-          </div>
-
-          {/* Recurring Expenses */}
-          <div style={{ marginTop: 24 }}>
-            <RecurringExpenses recurringExpenses={recurringExpenses} />
-          </div>
+          )}
         </div>
+        <button type="button" onClick={() => navigatePeriod(1)} aria-label="Next period" className={NAV_BTN}><ChevronRight size={18} aria-hidden /></button>
       </div>
-    </div>
+      {period === "Custom" && (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <input type="date" aria-label="From" value={customStart} onChange={e => setCustomStart(e.target.value)} className={INPUT} />
+          <input type="date" aria-label="To" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={INPUT} />
+        </div>
+      )}
+
+      <div role="tablist" aria-label="Report" className="grid grid-cols-3 p-1 mb-4 rounded-full bg-surface-sunken">
+        {TABS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setActiveTab(key)}
+                  className={cx("h-9 rounded-full text-small font-medium transition-colors",
+                    activeTab === key ? "bg-surface text-ink shadow-[0_1px_2px_rgba(17,17,26,0.08)]" : "text-ink-3")}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "report" && (
+        <IncomesExpensesTab current={currentTxns} previous={previousTxns} periodLabel={periodLabel} prevLabel={prevLabel} />
+      )}
+      {activeTab === "balance" && <BalanceTrendTab transactions={currentTxns} />}
+      {activeTab === "cashflow" && <CashFlowTab transactions={source} />}
+
+      <div className="mt-8">
+        <SpendingHeatmap onCategoryChanged={onCategoryChanged} />
+      </div>
+      <div className="mt-8">
+        <RecurringExpenses recurringExpenses={recurringExpenses} />
+      </div>
+    </section>
   );
 }
 
-const navBtnStyle = {
-  display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-  padding: "6px 10px", borderRadius: 8,
-  background: "var(--bg-input)", border: "1px solid var(--border-subtle)",
-  color: "var(--text-secondary)", cursor: "pointer", fontFamily: "inherit",
-};
+const NAV_BTN = "shrink-0 w-10 h-10 rounded-full bg-surface border border-line flex items-center justify-center text-ink-2";

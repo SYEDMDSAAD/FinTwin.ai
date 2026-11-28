@@ -1,6 +1,6 @@
 #!/bin/sh
 # Starts Ollama and the AI service in one container (Azure App Service).
-# With LLM_PROVIDER=bedrock, Claude on Bedrock answers and Ollama isn't started.
+# With LLM_PROVIDER=gemini or bedrock, a hosted model answers and Ollama isn't started.
 #
 # Order matters: the model server has to be answering before uvicorn takes
 # traffic, or the first copilot question fails. The model download runs in the
@@ -13,10 +13,10 @@ set -eu
 MODEL="${OLLAMA_MODEL:-qwen2.5:3b}"
 PORT="${PORT:-8000}"
 
-if [ "${LLM_PROVIDER:-ollama}" = "bedrock" ]; then
-    # Claude on Bedrock answers instead: no local model to start or download,
-    # which leaves the plan's memory to the other apps
-    echo "[start] LLM_PROVIDER=bedrock — skipping Ollama"
+if [ "${LLM_PROVIDER:-ollama}" != "ollama" ]; then
+    # Gemini on Vertex AI or Claude on Bedrock answers instead: no local model
+    # to start or download, which leaves the plan's memory to the other apps
+    echo "[start] LLM_PROVIDER=${LLM_PROVIDER} — skipping Ollama"
 else
     echo "[start] ollama serve (models in ${OLLAMA_MODELS:-/home/ollama})"
     ollama serve &

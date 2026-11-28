@@ -29,7 +29,8 @@ COPY . .
 
 # Where Ollama keeps models: App Service persists /home, so a restart doesn't
 # re-download 2 GB
-ENV OLLAMA_MODELS=/home/ollama \
+ENV LLM_PROVIDER=ollama \
+    OLLAMA_MODELS=/home/ollama \
     OLLAMA_HOST=127.0.0.1:11434 \
     OLLAMA_URL=http://127.0.0.1:11434/api/generate \
     OLLAMA_MODEL=qwen2.5:3b \

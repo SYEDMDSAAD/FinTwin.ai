@@ -3,13 +3,16 @@ package com.fintwin.demo;
 import com.fintwin.model.Asset;
 import com.fintwin.model.Budget;
 import com.fintwin.model.FinancialGoal;
+import com.fintwin.model.InsurancePolicy;
 import com.fintwin.model.Investment;
+import com.fintwin.model.SipPlan;
 import com.fintwin.model.Liability;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
 import com.fintwin.util.Categorized;
 import com.fintwin.util.GoalMath;
 
+import com.fintwin.service.SpendGuardLinks;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +32,18 @@ final class DemoData {
     static final double SALARY = 72_000;
     static final int DAYS = 92;
 
+    /** Days ago, payee, amount, category: what the sorting agent sorted on the last import. */
+    static final Object[][] AUTO_SORTED = {
+            {1, "Paid to SHREE SAI HARDWARE", -1_240.0, "Shopping"},
+            {3, "Paid to SHREE SAI HARDWARE", -380.0, "Shopping"},
+            {4, "Paid to PUNE CITY DIAGNOSTICS", -1_800.0, "Health"},
+            {2, "Paid to KAKA HALWAI SWEETS", -560.0, "Food"},
+            {6, "Paid to KAKA HALWAI SWEETS", -320.0, "Food"},
+    };
+    /** The payees above, biggest spend first, as the sorting agent's summary names them. */
+    static final List<String> AUTO_SORTED_PAYEES = List.of("SHREE SAI HARDWARE", "PUNE CITY DIAGNOSTICS",
+            "KAKA HALWAI SWEETS");
+
     private final User user;
     private final LocalDate today;
     private final LocalDate from;
@@ -42,9 +57,12 @@ final class DemoData {
 
     List<Transaction> transactions() {
         List<Transaction> out = new ArrayList<>();
-        // Monthly, on a fixed day: salary, rent, investing, EMI, bills, subscriptions
+        // Monthly, on a fixed day: salary, rent, investing, EMI, bills, subscriptions.
+        // The salary lands the day before today, so the salary-day help (the
+        // goal agent and Spend Guard's Salary day) is always there to see.
+        int salaryDay = today.minusDays(1).getDayOfMonth();
         for (LocalDate month = from.withDayOfMonth(1); !month.isAfter(today); month = month.plusMonths(1)) {
-            monthly(out, month, 1, "BRIGHTWAVE TECHNOLOGIES PVT LTD", SALARY, "Income", Categorized.BRAND);
+            monthly(out, month, salaryDay, "BRIGHTWAVE TECHNOLOGIES PVT LTD", SALARY, "Income", Categorized.BRAND);
             monthly(out, month, 3, "Paid to Netflix", -649, "Entertainment", Categorized.BRAND);
             monthly(out, month, 5, "Paid to Sunita Deshpande", -18_000, "Rent", Categorized.PERSON);
             monthly(out, month, 6, "Paid to Mom", -5_000, "People", Categorized.PERSON);
@@ -84,12 +102,51 @@ final class DemoData {
         add(out, today.minusDays(41), "Croma", -12_999, "Shopping", Categorized.BRAND);
         add(out, today.minusDays(33), "Udemy", -449, "Education", Categorized.BRAND);
         add(out, today.minusDays(18), "MakeMyTrip", -5_420, "Travel", Categorized.BRAND);
+
+        // For the subscription agent: one plan renewing in two days, and one
+        // whose latest charge went up
+        for (int k = 1; k <= 3; k++) {
+            addInWindow(out, today.plusDays(2).minusMonths(k), "YouTube Premium", -149, "Entertainment");
+        }
+        for (int k = 0; k <= 2; k++) {
+            addInWindow(out, today.minusDays(5).minusMonths(k), "Disney+ Hotstar", k == 0 ? -399 : -299,
+                    "Entertainment");
+        }
+
+        // For the watch agent: today's Swiggy order is far above the usual one
+        out.removeIf(t -> today.equals(t.getDate()) && "Swiggy".equals(t.getMerchant()));
+        add(out, today, "Swiggy", -2_840, "Food", Categorized.BRAND);
+
+        // For the sorting agent: payees no rule knew, sorted by FinTwin and
+        // waiting in Transactions for a yes or a fix (see AUTO_SORTED)
+        for (Object[] row : AUTO_SORTED) {
+            add(out, today.minusDays((int) row[0]), (String) row[1], (double) row[2], (String) row[3],
+                    Categorized.LLM_AUTO);
+        }
+
+        // Spend Guard payments, as the Transactions page shows them: one paid
+        // yesterday that no statement has confirmed yet, and one the last
+        // statement didn't show (the user is asked whether they paid)
+        spendGuard(out, today.minusDays(1), "Chai Corner", -450, "Food", "d3e00000000000000001",
+                SpendGuardLinks.SOURCE);
+        spendGuard(out, today.minusDays(4), "Paid to Rohan", -2_000, "People", "d3e00000000000000002",
+                SpendGuardLinks.SOURCE_NOT_IN_STATEMENT);
         return out;
     }
 
+    private void spendGuard(List<Transaction> out, LocalDate date, String merchant, double amount, String category,
+                            String eventId, String source) {
+        add(out, date, merchant, amount, category, Categorized.BRAND);
+        Transaction t = out.get(out.size() - 1);
+        t.setSource(source);
+        t.setExternalId(SpendGuardLinks.EXTERNAL_ID_PREFIX + eventId);
+    }
+
     List<Budget> budgets() {
-        return List.of(budget("Food", 5_000), budget("Groceries", 7_000), budget("Shopping", 3_500),
-                budget("Entertainment", 1_200), budget("Transport", 3_000));
+        // Close to what Riya spends, except Shopping: set too low, so the
+        // budget agent has a limit to question
+        return List.of(budget("Food", 11_000), budget("Groceries", 11_000), budget("Shopping", 3_500),
+                budget("Entertainment", 2_000), budget("Transport", 4_000));
     }
 
     List<FinancialGoal> goals(double monthlySavings) {
@@ -114,20 +171,73 @@ final class DemoData {
         return List.of(loan, liability("Credit card dues", "Credit Card", 7_800));
     }
 
+    // Funds carry their real AMFI scheme codes (direct, growth), so the demo's
+    // fund pages show real NAV charts; the units roughly match the values.
     List<Investment> investments() {
         return List.of(
-                investment("Parag Parikh Flexi Cap Fund", "Mutual Fund", 60_000, 71_800, 420, null, null),
-                investment("Nippon India Nifty 50 Index Fund", "Mutual Fund", 30_000, 33_900, 300, null, null),
+                investment("Parag Parikh Flexi Cap Fund", "Mutual Fund", 60_000, 71_800, 420, "122639", 744.0),
+                investment("Nippon India Nifty 50 Index Fund", "Mutual Fund", 30_000, 33_900, 300, "118741", 716.0),
                 investment("Tata Consultancy Services", "Stocks", 15_200, 15_800, 200, "TCS.NS", 4.0),
                 investment("Public Provident Fund", "PPF", 48_000, 51_600, 700, null, null));
     }
 
+    /**
+     * The two SIPs behind the monthly ₹7,000 "Investments" debit in the
+     * transactions: ₹5,000 into the flexi-cap fund on the 5th, ₹2,000 into
+     * the index fund on the 15th. Each next date is the coming one.
+     */
+    List<SipPlan> sips() {
+        return List.of(
+                sip("Parag Parikh Flexi Cap Fund", 5_000, 5),
+                sip("Nippon India Nifty 50 Index Fund", 2_000, 15));
+    }
+
+    private SipPlan sip(String fund, double amount, int day) {
+        LocalDate next = today.withDayOfMonth(Math.min(day, today.lengthOfMonth()));
+        if (next.isBefore(today)) {
+            LocalDate month = today.plusMonths(1);
+            next = month.withDayOfMonth(Math.min(day, month.lengthOfMonth()));
+        }
+        SipPlan p = new SipPlan();
+        p.setUser(user);
+        p.setFundName(fund);
+        p.setAmount(java.math.BigDecimal.valueOf(amount));
+        p.setFrequency("Monthly");
+        p.setNextDebitDate(next);
+        return p;
+    }
+
+    /** A health cover and a term plan, one of them renewing within the month. */
+    List<InsurancePolicy> insurance() {
+        return List.of(
+                policy("Health", "Star Health", 14_500, "Annually", 500_000, 21, "Family floater for Riya and her parents"),
+                policy("Term", "LIC", 1_150, "Monthly", 10_000_000, 160, "Term cover till 60"));
+    }
+
     // ── Builders ──────────────────────────────────────────────────────────────
+
+    private InsurancePolicy policy(String type, String provider, double premium, String frequency,
+                                   double sumAssured, int renewsInDays, String notes) {
+        InsurancePolicy p = new InsurancePolicy();
+        p.setType(type);
+        p.setProvider(provider);
+        p.setPremium(String.valueOf((long) premium));
+        p.setFrequency(frequency);
+        p.setSumAssured(String.valueOf((long) sumAssured));
+        p.setRenewalDate(today.plusDays(renewsInDays));
+        p.setNotes(notes);
+        p.setUser(user);
+        return p;
+    }
 
     private void monthly(List<Transaction> out, LocalDate month, int day, String merchant, double amount,
                          String category, String source) {
         LocalDate date = month.withDayOfMonth(Math.min(day, month.lengthOfMonth()));
         if (!date.isBefore(from) && !date.isAfter(today)) add(out, date, merchant, amount, category, source);
+    }
+
+    private void addInWindow(List<Transaction> out, LocalDate date, String merchant, double amount, String category) {
+        if (!date.isBefore(from) && !date.isAfter(today)) add(out, date, merchant, amount, category, Categorized.BRAND);
     }
 
     private void add(List<Transaction> out, LocalDate date, String merchant, double amount, String category,

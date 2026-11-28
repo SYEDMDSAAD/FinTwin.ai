@@ -1,67 +1,40 @@
-import GlassCard from "./GlassCard";
+import { lakhs, longDate } from "../utils/money";
+import { SectionHeader, cx } from "./ui";
+import { softenCaps } from "./EnhancedTransactionsTable";
+
+/* The last 3 months (this month and the two before it), as one list. */
+
+const cleanMerchant = (name) => {
+    if (!name) return "—";
+    // Strip UPI-style prefixes like "CARD/CR/123456/MerchantName/CODE"
+    const parts = name.split("/");
+    return softenCaps(parts.length >= 4 ? parts[3] : name);
+};
 
 function MonthlySummaryCard({ summary }) {
     if (!summary) return null;
 
-    const cleanMerchant = (name) => {
-        if (!name) return "—";
-        // Strip UPI-style prefixes like "CARD/CR/123456/MerchantName/CODE"
-        const parts = name.split("/");
-        if (parts.length >= 4) return parts[3];
-        return name;
-    };
+    const rows = [
+        { label: "Money in", value: lakhs(summary.income), cls: "text-good" },
+        { label: "Money out", value: lakhs(summary.expenses) },
+        { label: summary.savings < 0 ? "Overspent" : "Saved", value: lakhs(summary.savings), cls: summary.savings < 0 ? "text-bad" : "" },
+        { label: "Biggest category", value: summary.topCategory || "—" },
+        { label: "Paid most to", value: cleanMerchant(summary.topMerchant), title: summary.topMerchant },
+        { label: "Transactions", value: String(summary.transactionCount ?? 0) },
+    ];
 
     return (
-        <GlassCard className="p-5 mb-8 border border-white/10 bg-white/[0.03] backdrop-blur-xl">
-            <style>{`
-                .ms-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05); }
-                .ms-meta > div { min-width: 0; text-align: center; }
-            `}</style>
-
-            <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500 mb-4">
-                MONTHLY SUMMARY
-            </div>
-
-            {/* Top 3 numbers */}
-            <div className="grid grid-cols-3 gap-3">
-                <div className="text-center">
-                    <h3 className="text-lg font-bold text-green-400">
-                        ₹{(summary.income / 100000).toFixed(2)}L
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-1">Income</p>
-                </div>
-                <div className="text-center">
-                    <h3 className="text-lg font-bold text-red-400">
-                        ₹{(summary.expenses / 100000).toFixed(2)}L
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-1">Expenses</p>
-                </div>
-                <div className="text-center">
-                    <h3 className="text-lg font-bold text-cyan-400">
-                        ₹{(summary.savings / 100000).toFixed(2)}L
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-1">Savings</p>
-                </div>
-            </div>
-
-            {/* Bottom meta */}
-            <div className="ms-meta">
-                <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Top Category</p>
-                    <p className="text-base font-bold text-white truncate">{summary.topCategory || "—"}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Top Merchant</p>
-                    <p className="text-base font-bold text-white truncate" title={summary.topMerchant}>
-                        {cleanMerchant(summary.topMerchant)}
-                    </p>
-                </div>
-                <div className="ms-meta-tx">
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Transactions</p>
-                    <p className="text-base font-bold text-white">{summary.transactionCount}</p>
-                </div>
-            </div>
-        </GlassCard>
+        <section aria-label="Last 3 months" className="max-w-2xl mb-8">
+            <SectionHeader title="Last 3 months" subtitle={summary.periodFrom ? `Since ${longDate(summary.periodFrom)}` : null} />
+            <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+                {rows.map((r) => (
+                    <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <span className="text-body text-ink-2">{r.label}</span>
+                        <span className={cx("min-w-0 truncate text-body font-semibold text-ink num", r.cls)} title={r.title}>{r.value}</span>
+                    </li>
+                ))}
+            </ul>
+        </section>
     );
 }
 

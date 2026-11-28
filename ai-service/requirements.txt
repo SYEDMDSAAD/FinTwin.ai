@@ -4,6 +4,7 @@
 python-dotenv==1.2.2
 requests==2.34.2
 prometheus-client==0.24.1   # /metrics endpoint + AI guardrail counters
+google-genai==2.34.0          # Gemini on Vertex AI, the default provider (utils/gemini_client.py)
 anthropic[bedrock]==1.8.0     # Claude on Amazon Bedrock, used when LLM_PROVIDER=bedrock (utils/bedrock_client.py)
 
 # ── Web framework ────────────────────────────────────────────────────────────
@@ -37,6 +38,15 @@ yfinance==1.4.1
 
 # ── Statement import: PDF / Excel → grid (statements/extract.py) ─────────────
 pdfplumber==0.11.10
+casparser==1.4.1          # CAS statements (CAMS/KFintech/NSDL/CDSL) → holdings; MIT, no model involved
+casparser-isin==2026.6.9  # casparser's ISIN → AMFI code / symbol table
+rapidfuzz==3.14.6         # casparser-isin dependency
+packaging==26.4           # casparser-isin dependency
+rich==15.0.0              # casparser's CLI output (unused here, but required)
+markdown-it-py==4.3.0     # rich dependency
+mdurl==0.1.2              # markdown-it-py dependency
+pygments==2.21.0          # rich dependency
+colorama==0.4.6           # casparser dependency
 pdfminer.six==20260107     # pdfplumber's text layer; opens AES-encrypted bank PDFs
 pypdfium2==5.13.0
 cryptography==50.0.1       # pdfminer.six: AES decryption for password-protected PDFs

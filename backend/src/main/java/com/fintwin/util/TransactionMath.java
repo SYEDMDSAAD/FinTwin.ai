@@ -86,9 +86,9 @@ public final class TransactionMath {
     /**
      * Sources whose debits can be the bank-side leg of a card bill payment:
      * AA-synced bank accounts, uploaded bank statements, and bank-account
-     * alert emails.
+     * alert emails and SMS.
      */
-    private static final java.util.Set<String> BANK_SIDE_SOURCES = java.util.Set.of("BANK", "STATEMENT", "EMAIL");
+    private static final java.util.Set<String> BANK_SIDE_SOURCES = java.util.Set.of("BANK", "STATEMENT", "EMAIL", "SMS");
 
     /**
      * Restamps bank-side debits that are credit-card bill payments, and returns

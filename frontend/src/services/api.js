@@ -1,14 +1,15 @@
 import axios from "axios";
+import { apiUrl } from "./apiOrigin";
 import { showDemoBlocked, storedUserIsDemo } from "../utils/demoGuard";
 
 // ── Main backend — business data (transactions, dashboard, AI, etc.) ──────────
 const API = axios.create({
-    baseURL: "/api/v1"
+    baseURL: apiUrl("/api/v1")
 });
 
 // ── Identity service — auth, 2FA, tokens ─────────────────────────────────────
 export const identityApi = axios.create({
-    baseURL: "/api"
+    baseURL: apiUrl("/api")
 });
 
 // ── Attach access token to every request ─────────────────────────────────────
@@ -85,7 +86,7 @@ function registerRefreshInterceptor(client) {
             }
 
             try {
-                const { data } = await axios.post("/api/auth/refresh", {
+                const { data } = await axios.post(apiUrl("/api/auth/refresh"), {
                     refreshToken,
                 });
                 localStorage.setItem("token", data.accessToken);

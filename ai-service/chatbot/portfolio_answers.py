@@ -132,6 +132,70 @@ def compose(intent: str, data: dict) -> str:
     return body + _valuation_note(data) + note
 
 
+# ── Spoken ("Hey FinTwin") ────────────────────────────────────────────────────
+
+def say_rupees(formatted) -> str:
+    """'₹1,70,733.51' → 'about ₹1.7 lakh': figures as people say them aloud."""
+    digits = re.sub(r"[^0-9.]", "", str(formatted or ""))
+    try:
+        v = abs(float(digits))
+    except ValueError:
+        return str(formatted or "")
+    if v >= 1e7:
+        return f"about ₹{v / 1e7:.1f} crore".replace(".0 ", " ")
+    if v >= 1e5:
+        return f"about ₹{v / 1e5:.1f} lakh".replace(".0 ", " ")
+    if v >= 1000:
+        return f"about ₹{round(v, -2):,.0f}"
+    return f"₹{v:,.0f}"
+
+
+def _pct(p) -> str:
+    try:
+        return f"{abs(float(p)):.0f} percent"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _and(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def spoken(intent: str, data: dict) -> str:
+    """The answer in two or three sentences for the voice; exact figures stay on screen."""
+    if not data.get("holdingCount"):
+        return data.get("note") or "You don't have any investments recorded in FinTwin yet."
+    holdings = data.get("holdings", [])
+    gain = data.get("totalGainPercent", 0) or 0
+    scope = (data["filteredTo"] + " holdings") if data.get("filteredTo") else "portfolio"
+    n = data["holdingCount"]
+    head = (f"Your {scope}{' of ' + str(n) + ' holdings' if n > 1 else ''} is worth "
+            f"{say_rupees(data.get('currentValueFormatted'))}, "
+            f"{'up' if gain >= 0 else 'down'} {_pct(gain)} on the "
+            f"{say_rupees(data.get('totalInvestedFormatted')).replace('about ', '')} you put in.")
+    if intent in ("losing", "gaining"):
+        names = data.get("atLoss" if intent == "losing" else "inProfit", [])
+        state = "at a loss" if intent == "losing" else "in profit"
+        if not names:
+            return f"None of your holdings are {state} right now. {head}"
+        verb = "is" if len(names) == 1 else "are"
+        return f"{_and(names[:3])}{' and ' + str(len(names) - 3) + ' more' if len(names) > 3 else ''} {verb} {state}. {head}"
+    if intent == "allocation":
+        parts = []
+        for a in data.get("allocation", [])[:3]:
+            kind, _, rest = a.partition(":")
+            parts.append(f"{kind.strip()} {_pct(rest.split('%')[0])}")
+        return f"By value, your {scope} is {_and(parts)}. {head}" if parts else head
+    if len(holdings) > 1:
+        best, worst = holdings[0], holdings[-1]
+        line = f"{best['name']} is doing best, up {_pct(best.get('gainPercent'))}"
+        wg = worst.get("gainPercent", 0) or 0
+        line += (f", and {worst['name']} is down {_pct(wg)}." if wg < 0
+                 else f", and {worst['name']} is up the least, at {_pct(wg)}.")
+        return f"{head} {line}"
+    return head
+
+
 # ── Checking the model's answer ───────────────────────────────────────────────
 
 _LOSS = re.compile(r"\b(loss|losses|losing|lost|down|negative|declin\w*|underperform\w*|falling|fell|in the red)\b")

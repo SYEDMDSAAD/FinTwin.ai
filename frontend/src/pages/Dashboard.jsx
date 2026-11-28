@@ -1,5 +1,5 @@
 import { useEffect, useState, useTransition, useCallback, useRef } from "react";
-import { Brain, Sparkles } from "lucide-react";
+import { localPrefs, fetchAiPrefs, AI_PREFS_EVENT } from "../services/aiPrefs";
 import { normalizeMerchant } from "../utils/merchant";
 import SplashScreen from "../components/SplashScreen";
 
@@ -21,7 +21,6 @@ import HelpWidget from "../components/HelpWidget";
 
 import Sidebar from "../components/Sidebar";
 
-import Header from "../components/Header";
 
 
 import AnalyticsCards from "../components/AnalyticsCards";
@@ -34,6 +33,7 @@ import CopilotSection from "../components/CopilotSection";
 import AffordabilitySection from "../components/AffordabilitySection";
 
 import BankConnectionSection from "../components/BankConnectionSection";
+import { BANK_LINK_ENABLED } from "../utils/bankLink";
 
 import SkeletonCard from "../components/SkeletonCard";
 
@@ -66,11 +66,7 @@ from "../components/FinancialGoalsSection";
 import WeeklyReport
 from "../components/WeeklyReport";
 
-import DashboardHero
-from "../components/DashboardHero";
 
-import NetWorthSection
-from "../components/NetWorthSection";
 
 import NetWorthManagement
 from "./NetWorthManagement";
@@ -81,15 +77,21 @@ from "./InvestmentsPage";
 import SpendingCoachPage
 from "./SpendingCoachPage";
 
+import SpendGuardPage from "./SpendGuardPage";
+
 import BottomNav from "../components/BottomNav";
+import VoiceAssistant from "../components/VoiceAssistant";
 import CreditScoreCard from "../components/CreditScoreCard";
 import EnhancedTransactionsTable from "../components/EnhancedTransactionsTable";
+import AutoSorted from "../components/AutoSorted";
 import SortOther from "../components/SortOther";
 import InsurancePage from "./InsurancePage";
 import ImportsPage from "./ImportsPage";
 import AnalyticsPage from "./AnalyticsPage";
-import ServicesPage from "./ServicesPage";
-import AboutPage from "./AboutPage";
+import TabHeader from "../components/TabHeader";
+import HomeOverview from "../components/HomeOverview";
+import { normaliseSection, rememberSection } from "../constants/navigation";
+import { startSmsAutoSync } from "../services/smsSync";
 
 function Dashboard() {
 
@@ -145,24 +147,35 @@ function Dashboard() {
     const [activeSection,
         setActiveSection] =
         useState(() => {
-            const saved = localStorage.getItem("activeSection");
-            // Discover moved into Investments; Today became About App
-            if (saved === "Discover") return "Investments";
-            if (!saved || saved === "Today") return "About App";
-            return saved;
+            // Old names (About App, Services, Discover…) map onto the four tabs
+            return normaliseSection(localStorage.getItem("activeSection"));
         });
 
     const [, startTransition] = useTransition();
-    const navigateTo = useCallback((section) => {
+    const navigateTo = useCallback((requested) => {
+        const section = normaliseSection(requested);
         localStorage.setItem("activeSection", section);
+        rememberSection(section);
         startTransition(() => setActiveSection(section));
+    }, []);
+
+    // The weekly agent: once per visit, write this week's report if it isn't
+    // there yet. Fire and forget; the bell says when it's ready.
+    // The shared demo account asks too: its first visitor of the week writes
+    // the report every later visitor reads.
+    useEffect(() => {
+        try {
+            if (sessionStorage.getItem("fintwin-weekly-ensured")) return;
+            sessionStorage.setItem("fintwin-weekly-ensured", "1");
+        } catch { /* private mode: just ask */ }
+        API.post("/reports/weekly/ensure").catch(() => {});
     }, []);
 
     // Allow child components (NetWorthPage, PortfolioTab) to trigger section navigation
     useEffect(() => {
         const handler = () => {
             const section = localStorage.getItem("activeSection");
-            if (section) startTransition(() => setActiveSection(section));
+            if (section) startTransition(() => setActiveSection(normaliseSection(section)));
         };
         window.addEventListener("dashboardNav", handler);
         return () => window.removeEventListener("dashboardNav", handler);
@@ -179,8 +192,16 @@ function Dashboard() {
     const [messages, setMessages] =
         useState([]);
 
+    // The Copilot opens in the mode chosen in Settings (kept on the server)
     const [selectedMode, setSelectedMode] =
-        useState("Savings Advisor");
+        useState(() => localPrefs().mode);
+    useEffect(() => {
+        let live = true;
+        fetchAiPrefs().then((p) => { if (live) setSelectedMode(p.mode); });
+        const onPrefs = () => setSelectedMode(localPrefs().mode);
+        window.addEventListener(AI_PREFS_EVENT, onPrefs);
+        return () => { live = false; window.removeEventListener(AI_PREFS_EVENT, onPrefs); };
+    }, []);
 
     const [aiLoading, setAiLoading] =
         useState(false);    
@@ -1059,6 +1080,23 @@ function Dashboard() {
             fetchLiabilities();
         };
 
+    // Android app: bank SMS that arrived since the last look become
+    // transactions, on opening and on coming back to the app
+    // A new section starts at its top, not where the last one was scrolled to
+    const mainRef = useRef(null);
+    useEffect(() => {
+        mainRef.current?.scrollTo?.({ top: 0 });
+    }, [activeSection]);
+
+    const refreshRef = useRef(refreshDashboard);
+    refreshRef.current = refreshDashboard;
+    useEffect(() => {
+        const stop = startSmsAutoSync();
+        const onChange = () => refreshRef.current();
+        window.addEventListener("fintwin:transactions-changed", onChange);
+        return () => { stop(); window.removeEventListener("fintwin:transactions-changed", onChange); };
+    }, []);
+
     // =========================
     // Add Expense
     // =========================
@@ -1382,29 +1420,7 @@ function Dashboard() {
     // Analytics
     // =========================
 
-    const income = transactions
-
-        .filter((t) => t.amount > 0)
-
-        .reduce(
-            (acc, curr) =>
-                acc + curr.amount,
-            0
-        );
-
-    const expenses = transactions
-
-        .filter((t) => t.amount < 0)
-
-        .reduce(
-            (acc, curr) =>
-                acc + curr.amount,
-            0
-        );
-
-    const savings = income + expenses;
-
-    // Current-month income/expenses (for the headline cards — savings above stays all-time)
+    // Current-month income/expenses of the loaded rows: the cards' fallback
     const currentMonthKey =
         `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
@@ -1603,6 +1619,19 @@ function Dashboard() {
     // MARK GOAL COMPLETE
     // =========================
 
+    // "Add money": rupees put towards a goal by hand (negative takes some back)
+    const topUpGoal = async (id, amount) => {
+        try {
+            const { data } = await API.post(`/goals/${id}/top-up`, { amount });
+            setGoals((prev) => prev.map((g) => (g.id === id ? data : g)));
+            toast.success(amount > 0 ? "Added to your goal" : "Taken off your goal");
+            return true;
+        } catch (err) {
+            toast.error(err?.response?.data?.message || "Couldn't update the goal. Try again.");
+            return false;
+        }
+    };
+
     const completeGoal = async (id) => {
 
         try {
@@ -1625,7 +1654,7 @@ function Dashboard() {
             );
 
             toast.success(
-                "🎉 Congratulations on achieving your goal!",
+                "Goal reached. Well done!",
                 { duration: 5000 }
             );
 
@@ -1680,146 +1709,38 @@ function Dashboard() {
                     p-4
                     md:p-6
                     xl:p-10
-                    pb-20
+                    pb-28
                     md:pb-6
                     xl:pb-10
+                    lg:px-10
                     overflow-y-auto
                     overflow-x-hidden
                     min-w-0
+                    desk-canvas
                 "
+                ref={mainRef}
             >
+              <div className="desk-page lg:max-w-[1240px] lg:mx-auto">
 
-                <DemoBanner section={activeSection} />
+                <DemoBanner section={activeSection} onOpenGuard={() => navigateTo("Spend Guard")} />
+
+                <TabHeader activeSection={activeSection} navigateTo={navigateTo} notifications={notifications} />
 
                 {activeSection === "Dashboard" && (
-                  <Header
-                    notifications={notifications}
-                    scoreData={scoreData}
-                  />
-                )}
-
-                {/* =========================
-                    About App — the landing section
-                ========================= */}
-
-                {activeSection === "About App" && (
-                    <AboutPage navigateTo={navigateTo} />
-                )}
-
-                
-
-                {/* =========================
-                    Dashboard
-                ========================= */}
-
-                {activeSection ===
-                    "Dashboard" && (
-
-                    <>
-
-                        <DashboardHero
-                            score={scoreData?.score}
-                            savingsRatio={
-                                income > 0
-                                    ? Math.round(
-                                        (savings / income) * 100
-                                    )
-                                    : 0
-                            }
-                            activeGoals={goals.length}
-                            alerts={notifications.length}
-                        />
-
-                        {loading ? (
-
-                            <div className="
-                                grid
-                                grid-cols-1
-                                sm:grid-cols-2
-                                xl:grid-cols-4
-                                gap-6
-                                mb-10
-                            ">
-
-                                <SkeletonCard />
-                                <SkeletonCard />
-                                <SkeletonCard />
-                                <SkeletonCard />
-
-                            </div>
-
-                        ) : (
-
-                            <AnalyticsCards
-                                income={monthlyIncome}
-                                expenses={monthlyExpenses}
-                                savings={savings}
-                                prediction={
-                                    forecast?.predictedExpenses || 0
-                                }
-
-                                incomeTrend={
-                                    monthlySummary?.incomeTrend || 0
-                                }
-
-                                expenseTrend={
-                                    monthlySummary?.expenseTrend || 0
-                                }
-
-                                savingsTrend={
-                                    monthlySummary?.savingsTrend || 0
-                                }
-                            />
-
-                        )}
-
-                        {/* Financial Score */}
-
-                        <FinancialScoreCard
-                            scoreData={scoreData}
-                        />
-
-                        {/* AI Forecast */}
-
-                        <ForecastCard
-                            forecast={forecast}
-                            monthlyHistory={monthlyHistory}
-                        />
-
-                        {/* Category Forecast */}
-
-                        <CategoryForecastCard
-                            categoryForecast={
-                                categoryForecast
-                            }
-                        />
-
-                        {/* Smart Notifications */}
-
-                        <SmartNotifications
-                            notifications={
-                                notifications
-                            }
-                            setNotifications={setNotifications}
-                        />
-
-                        {/* Monthly Summary */}
-
-                        <MonthlySummaryCard
-                            summary={monthlySummary}
-                        />
-                        
-                        {/* Net Worth */}
-
-                        <NetWorthSection
-                            netWorth={netWorth}
-                            assets={assets}
-                            liabilities={liabilities}
-                        />
-
-                        {/* Credit Score */}
-                        <CreditScoreCard />
-                    </>
+                    <HomeOverview
+                        // From the backend, which leaves out transfers between the
+                        // user's own accounts; the loaded rows are a fallback only
+                        income={monthlySummary?.monthIncome ?? monthlyIncome}
+                        spent={Math.abs(monthlySummary?.monthExpenses ?? monthlyExpenses)}
+                        budgets={budgets}
+                        notifications={notifications}
+                        goals={goals}
+                        scoreData={scoreData}
+                        netWorth={netWorth}
+                        monthlyHistory={monthlyHistory}
+                        loading={loading}
+                        navigateTo={navigateTo}
+                    />
                 )}
 
                 {/* =========================
@@ -1830,43 +1751,14 @@ function Dashboard() {
                     "Transactions" && (
 
                     <>
-                        <BankConnectionSection
-                            onSynced={fetchTransactions}
-                        />
+                        {/* Bank linking is off during the beta: don't show a box nobody can use */}
+                        {BANK_LINK_ENABLED && (
+                            <BankConnectionSection
+                                onSynced={fetchTransactions}
+                            />
+                        )}
 
-                        {/* Import nudge banner */}
-                        <div
-                            onClick={() => {
-                                localStorage.setItem("activeSection", "Imports");
-                                window.dispatchEvent(new Event("dashboardNav"));
-                            }}
-                            style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "14px 18px", marginBottom: 12, borderRadius: 14, cursor: "pointer",
-                                background: "rgba(34,211,238,0.05)", border: "1px solid rgba(34,211,238,0.15)",
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(34,211,238,0.09)"; e.currentTarget.style.borderColor = "rgba(34,211,238,0.28)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(34,211,238,0.05)"; e.currentTarget.style.borderColor = "rgba(34,211,238,0.15)"; }}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                                    📂
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>
-                                        Have a bank statement or CSV?
-                                    </div>
-                                    <div style={{ fontSize: 11, color: "rgba(148,163,184,0.6)" }}>
-                                        Import transactions in bulk — supports CSV, Excel and PDF statements
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#22d3ee", flexShrink: 0 }}>
-                                Import file <span style={{ fontSize: 14 }}>→</span>
-                            </div>
-                        </div>
-
+                        {/* Add one by hand, or bring a whole statement in */}
                         <QuickEntryDropdown
                             incomeText={incomeText}
                             setIncomeText={setIncomeText}
@@ -1874,19 +1766,11 @@ function Dashboard() {
                             expenseText={expenseText}
                             setExpenseText={setExpenseText}
                             addExpense={addExpense}
+                            onImport={() => navigateTo("Imports")}
                         />
 
-                        <div role="note" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "-8px 0 20px", padding: "12px 16px", borderRadius: 12, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                            <Sparkles size={15} color="#a78bfa" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
-                            <span style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-                                Day-to-day transactions are messy — a shop name or a UPI ID doesn't always say what you bought.
-                                FinTwin puts each one in its most probable category, but it won't always be right. If you spot a
-                                transaction in the wrong category, change it: FinTwin remembers your choice for that merchant, and
-                                it helps us improve.
-                            </span>
-                        </div>
-
                         {/* Outside the loading swap so it never unmounts and refetches */}
+                        <AutoSorted onChanged={refreshTransactionsQuietly} />
                         <SortOther
                             onSorted={handleCategoryChanged}
                             onBulkChanged={refreshTransactionsQuietly}
@@ -1901,6 +1785,7 @@ function Dashboard() {
                             <EnhancedTransactionsTable
                                 transactions={transactions}
                                 onChanged={handleCategoryChanged}
+                                onReload={() => fetchTransactions(txMonths)}
                                 months={txMonths}
                                 onMonthsChange={(m) => { setTxMonths(m); fetchTransactions(m); }}
                             />
@@ -1990,14 +1875,40 @@ function Dashboard() {
 
                 {activeSection ===
                     "Analytics" && (
-
+                    <>
+                    <div className="desk-cols">
+                    {loading ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+                            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+                        </div>
+                    ) : (
+                        <AnalyticsCards
+                            income={monthlySummary?.monthIncome ?? monthlyIncome}
+                            expenses={monthlySummary?.monthExpenses ?? monthlyExpenses}
+                            savings={monthlySummary?.monthSavings ?? monthlyIncome + monthlyExpenses}
+                            compared={{
+                                from: monthlySummary?.comparedFrom,
+                                to: monthlySummary?.comparedTo,
+                                income: monthlySummary?.comparedIncome,
+                                expenses: monthlySummary?.comparedExpenses,
+                                savings: monthlySummary?.comparedSavings
+                            }}
+                            prediction={forecast?.predictedExpenses || 0}
+                            incomeTrend={monthlySummary?.incomeTrend || 0}
+                            expenseTrend={monthlySummary?.expenseTrend || 0}
+                            savingsTrend={monthlySummary?.savingsTrend || 0}
+                        />
+                    )}
+                    <MonthlySummaryCard summary={monthlySummary} />
+                    <CategoryForecastCard categoryForecast={categoryForecast} />
+                    </div>
                     <AnalyticsPage
                         transactions={transactions}
                         recurringExpenses={recurringExpenses}
                         insights={insights}
                         onCategoryChanged={handleCategoryChanged}
                     />
-
+                    </>
                 )}
 
                 {/* =========================
@@ -2018,23 +1929,7 @@ function Dashboard() {
                 {activeSection ===
                 "AI Intelligence" && (
 
-                <>
-
-                    {/* AI Suite header */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                        <div style={{
-                            width: 40, height: 40, borderRadius: 12,
-                            background: "linear-gradient(135deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))",
-                            border: "1px solid rgba(167,139,250,0.3)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                            <Brain size={18} color="#a78bfa" />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>AI SUITE</div>
-                            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>AI Intelligence</h1>
-                        </div>
-                    </div>
+                <div className="desk-cols">
 
                     <FinancialScoreCard
                         scoreData={scoreData}
@@ -2056,7 +1951,9 @@ function Dashboard() {
                         anomalies={anomalies}
                     />
 
-                </>
+                    <CreditScoreCard />
+
+                </div>
 
                 )}
 
@@ -2078,6 +1975,7 @@ function Dashboard() {
                             regenerateGoal
                         }
                         completeGoal={completeGoal}
+                        topUpGoal={topUpGoal}
                     />
 
                 </>
@@ -2091,7 +1989,7 @@ function Dashboard() {
                 {activeSection ===
                 "Budgeting" && (
 
-                <>
+                <div className="lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-7 lg:items-start">
 
                     <BudgetSection
                         budgets={budgets}
@@ -2104,6 +2002,7 @@ function Dashboard() {
                         updateBudget={
                             updateBudget
                         }
+                        onPlanApplied={fetchBudgets}
                     />
 
                     <AffordabilitySection
@@ -2117,7 +2016,7 @@ function Dashboard() {
                         }
                     />
 
-                </>
+                </div>
 
                 )}
 
@@ -2133,6 +2032,15 @@ function Dashboard() {
 
                     )
                 }
+
+                {/* =========================
+                    Spend Guard (prototype; the page explains itself if it's off)
+                ========================= */}
+
+                {activeSection === "Spend Guard" && (
+                    // A recorded payment or earmarked goal changes the rest of the dashboard
+                    <SpendGuardPage onFinTwinChanged={refreshDashboard} />
+                )}
 
                 {/* =========================
                     Net Worth
@@ -2172,10 +2080,9 @@ function Dashboard() {
                 ========================= */}
 
                 {
-                    activeSection ===
-                    "Investments" && (
+                    ["Investments", "SIPs", "Explore", "Investment Insights", "Future Twin"].includes(activeSection) && (
 
-                        <InvestmentsPage />
+                        <InvestmentsPage view={activeSection} onNavigate={navigateTo} />
 
                     )
                 }
@@ -2193,7 +2100,8 @@ function Dashboard() {
                 ========================= */}
 
                 {activeSection === "Imports" && (
-                    <ImportsPage onImported={refreshDashboard} />
+                    <ImportsPage onImported={refreshDashboard}
+                                 onViewTransactions={() => navigateTo("Transactions")} />
                 )}
 
                 {/* =========================
@@ -2204,14 +2112,7 @@ function Dashboard() {
                     <SettingsPage navigateTo={navigateTo} />
                 )}
 
-                {/* =========================
-                    Services (mobile nav hub)
-                ========================= */}
-
-                {activeSection === "Services" && (
-                    <ServicesPage navigateTo={navigateTo} />
-                )}
-
+              </div>
             </div>
 
             {/* Mobile bottom navigation — hidden on md+ */}
@@ -2222,6 +2123,9 @@ function Dashboard() {
 
             {/* Global help widget */}
             <HelpWidget />
+
+            {/* "Hey FinTwin": ask out loud */}
+            <VoiceAssistant />
 
         </div>
     );

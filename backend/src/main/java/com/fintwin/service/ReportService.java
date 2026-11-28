@@ -39,6 +39,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayOutputStream;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
@@ -217,8 +218,80 @@ public class ReportService {
 
         if (!report.isDegraded()) {
             reportCache.put(cacheKey, report);
+            store(user, report);
         }
         return report;
+    }
+
+    // =====================================
+    // THE WEEKLY AGENT: one stored report per week
+    // =====================================
+
+    private static final java.time.ZoneId INDIA = java.time.ZoneId.of("Asia/Kolkata");
+
+    @Autowired(required = false)
+    private com.fintwin.repository.WeeklyReportRecordRepository weeklyReports;
+
+    @Autowired(required = false)
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    /** The Monday of this week, in India. */
+    public static LocalDate weekStart(LocalDate today) {
+        return today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+    }
+
+    /** Keeps this week's report in the account (the newest generation of the week wins). */
+    private void store(User user, WeeklyReportDTO report) {
+        if (weeklyReports == null || objectMapper == null) return;
+        try {
+            LocalDate week = weekStart(LocalDate.now(INDIA));
+            com.fintwin.model.WeeklyReportRecord r = weeklyReports.findByUserAndWeekStart(user, week)
+                    .orElseGet(com.fintwin.model.WeeklyReportRecord::new);
+            r.setUser(user);
+            r.setWeekStart(week);
+            r.setReport(objectMapper.writeValueAsString(report));
+            weeklyReports.save(r);
+        } catch (Exception e) {
+            // A report that can't be kept is still shown; it just isn't saved.
+            log.warn("Weekly report not stored: {}", e.getClass().getSimpleName());
+        }
+    }
+
+    /** This week's stored report, marked as seen, or empty when the agent hasn't written it yet. */
+    @PreAuthorize("hasAuthority('USE_AI_REPORT')")
+    @org.springframework.transaction.annotation.Transactional
+    public java.util.Optional<WeeklyReportDTO> latestStored() {
+        if (weeklyReports == null || objectMapper == null) return java.util.Optional.empty();
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail()).orElseThrow();
+        return weeklyReports.findByUserAndWeekStart(user, weekStart(LocalDate.now(INDIA))).flatMap(r -> {
+            try {
+                WeeklyReportDTO dto = objectMapper.readValue(r.getReport(), WeeklyReportDTO.class);
+                // The shared demo keeps its "report is ready" line for the next visitor
+                if (r.getViewedAt() == null && !com.fintwin.demo.DemoSession.ROLE.equals(user.getRole())) {
+                    r.setViewedAt(java.time.LocalDateTime.now());
+                    weeklyReports.save(r);
+                }
+                return java.util.Optional.of(dto);
+            } catch (Exception e) {
+                log.warn("Stored weekly report unreadable: {}", e.getClass().getSimpleName());
+                return java.util.Optional.empty();
+            }
+        });
+    }
+
+    /**
+     * The weekly agent: writes this week's report if it isn't there yet.
+     * Called once per visit; returns true when it wrote one.
+     */
+    @PreAuthorize("hasAuthority('USE_AI_REPORT')")
+    public boolean ensureThisWeek() {
+        if (weeklyReports == null) return false;
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail()).orElseThrow();
+        if (weeklyReports.findByUserAndWeekStart(user, weekStart(LocalDate.now(INDIA))).isPresent()) return false;
+        // Nothing to report on without any transactions yet
+        if (transactionRepository.findLatestThreeMonthsTransactions(user.getId()).isEmpty()) return false;
+        WeeklyReportDTO report = generateWeeklyReport();
+        return !report.isDegraded();
     }
 
     // =====================================

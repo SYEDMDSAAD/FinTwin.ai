@@ -34,14 +34,21 @@ public class DemoReadOnlyFilter extends OncePerRequestFilter {
     // app reporting the visit (pages, sign-up clicks) for the admin page
     private static final List<Rule> ALLOWED = List.of(
             new Rule("POST", "/api/v1/transactions/chat"),
+            // "Hey FinTwin": the spoken question and the spoken answer save nothing
+            new Rule("POST", "/api/v1/voice/(transcribe|speak)"),
             new Rule("POST", "/api/v1/demo/event"),
             new Rule("POST", "/api/v1/visits"),
+            // The weekly agent writes this week's report once, for every visitor to read
+            new Rule("POST", "/api/v1/reports/weekly/ensure"),
             // Building and regenerating goals, kept per visitor (GoalPlannerService)
             new Rule("POST", "/api/v1/goals"),
             new Rule("POST", "/api/v1/goals/\\d+/(regenerate|complete)"),
             new Rule("PUT", "/api/v1/goals/\\d+"),
             new Rule("DELETE", "/api/v1/goals/\\d+"),
-            new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"));
+            new Rule("DELETE", "/api/v1/transactions/chat/history(/\\d+)?"),
+            // Spend Guard: each visit has its own records in guard-service's
+            // memory, with made-up data; nothing reaches the shared account
+            new Rule("POST", "/api/v1/guard/[a-z-]+"));
 
     // Writes the app makes by itself (marking things seen). Answered as done
     // without doing them, so visitors don't get error messages they caused

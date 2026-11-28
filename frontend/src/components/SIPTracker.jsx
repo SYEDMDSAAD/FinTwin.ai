@@ -1,14 +1,10 @@
 import { useState, useEffect } from "react";
 import { Plus, X, RefreshCw, Calendar } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { sipApi } from "../services/trackedHoldings";
 
-const STORAGE_KEY = "fintwin-sips";
 const FREQUENCIES  = ["Monthly","Quarterly"];
 const MONTHS_PER_DEBIT = { Monthly: 1, Quarterly: 3 };
-
-function getSIPs() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
-}
-function saveSIPs(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
@@ -70,21 +66,20 @@ export function rollForward(sip, now = new Date()) {
 }
 
 const EMPTY = { fundName: "", amount: "", frequency: "Monthly", nextDebitDate: "", notes: "" };
-const CARD = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" };
+const CARD = { background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 16, padding: "18px 20px", position: "relative", overflow: "hidden" };
 
 function SIPCard({ sip, onDelete }) {
   const days = daysUntil(sip.nextDebitDate);
   const urgent = days != null && days <= 5;
 
   return (
-    <div style={{ ...CARD, borderLeft: "3px solid #a78bfa" }}>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: "linear-gradient(90deg,transparent,rgba(167,139,250,0.3),transparent)" }} />
+    <div style={{ ...CARD }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {sip.fundName}
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-label)" }}>{sip.frequency} SIP</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{sip.frequency} SIP</div>
         </div>
         <button onClick={() => onDelete(sip.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dimmer)", padding: 4, display: "flex" }}>
           <X size={14} />
@@ -92,57 +87,79 @@ function SIPCard({ sip, onDelete }) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>
-            {sip.frequency === "Quarterly" ? "QUARTERLY AMOUNT" : "MONTHLY AMOUNT"}
+          <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>
+            {sip.frequency === "Quarterly" ? "Quarterly amount" : "Monthly amount"}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>₹{parseFloat(sip.amount || 0).toLocaleString("en-IN")}</div>
+          <div style={{ fontSize: 20, fontWeight: 650, color: "var(--accent)" }}>₹{parseFloat(sip.amount || 0).toLocaleString("en-IN")}</div>
           {sip.frequency === "Quarterly" && (
-            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
               ₹{Math.round(monthlyEquivalent(sip)).toLocaleString("en-IN")}/month equivalent
             </div>
           )}
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>NEXT DEBIT</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, color: urgent ? "#f87171" : "var(--text-secondary)", fontSize: 13, fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600, marginBottom: 3 }}>Next debit</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, color: urgent ? "var(--bad)" : "var(--text-secondary)", fontSize: 13, fontWeight: 600 }}>
             <Calendar size={12} />
             {sip.nextDebitDate || "Not set"}
             {days != null && (
-              <span style={{ fontSize: 10, color: urgent ? "#f87171" : "#fbbf24", background: urgent ? "rgba(248,113,113,0.1)" : "rgba(251,191,36,0.1)", borderRadius: 5, padding: "1px 6px" }}>
+              <span style={{ fontSize: 12, color: urgent ? "var(--bad)" : "var(--warn)", background: urgent ? "var(--bad-soft)" : "var(--warn-soft)", borderRadius: 5, padding: "1px 6px" }}>
                 {days === 0 ? "Today!" : days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`}
               </span>
             )}
           </div>
         </div>
       </div>
-      {sip.notes && <div style={{ marginTop: 10, fontSize: 11, color: "var(--text-dim)" }}>{sip.notes}</div>}
+      {sip.notes && <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)" }}>{sip.notes}</div>}
     </div>
   );
 }
 
 export default function SIPTracker() {
-  const [sips, setSIPs] = useState(getSIPs);
+  const [sips, setSIPs] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY);
 
-  // Advance any elapsed debit dates on mount and persist the result.
+  // Load from the account, then advance any elapsed debit dates and save them.
   useEffect(() => {
-    const rolled = sips.map(rollForward);
-    if (rolled.some((s, i) => s.nextDebitDate !== sips[i].nextDebitDate)) {
-      setSIPs(rolled); saveSIPs(rolled);
-    }
+    let cancelled = false;
+    sipApi.list().then((list) => {
+      if (cancelled) return;
+      const rolled = list.map(rollForward);
+      setSIPs(rolled);
+      rolled.forEach((s, i) => {
+        if (s.nextDebitDate !== list[i].nextDebitDate) sipApi.update(s.id, s).catch(() => {});
+      });
+    }).catch(() => {
+      if (!cancelled) toast.error("Couldn't load your SIPs.");
+    }).finally(() => { if (!cancelled) setLoaded(true); });
+    return () => { cancelled = true; };
   }, []);
 
   const totalMonthly = sips.reduce((s, sip) => s + monthlyEquivalent(sip), 0);
 
-  const handleSave = () => {
-    if (!form.fundName.trim() || !form.amount) return;
-    const next = [...sips, { id: Date.now().toString(), ...form }];
-    setSIPs(next); saveSIPs(next); setShowAdd(false); setForm(EMPTY);
+  const handleSave = async () => {
+    if (!form.fundName.trim() || !form.amount || saving) return;
+    setSaving(true);
+    try {
+      const made = await sipApi.create({
+        ...form, amount: parseFloat(form.amount), nextDebitDate: form.nextDebitDate || null, notes: form.notes || null,
+      });
+      setSIPs((prev) => [...prev, made]); setShowAdd(false); setForm(EMPTY);
+    } catch {
+      toast.error("Couldn't save this SIP. Try again.");
+    } finally {
+      setSaving(false);
+    }
   };
-  const handleDelete = (id) => {
-    const next = sips.filter(s => s.id !== id);
-    setSIPs(next); saveSIPs(next);
+  const handleDelete = async (id) => {
+    const before = sips;
+    setSIPs(sips.filter(s => s.id !== id));
+    try { await sipApi.remove(id); } catch {
+      setSIPs(before); toast.error("Couldn't remove this SIP.");
+    }
   };
 
   return (
@@ -150,17 +167,17 @@ export default function SIPTracker() {
       {/* Summary row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 2 }}>TOTAL MONTHLY SIP</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#a78bfa" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 2 }}>Total monthly SIP</div>
+          <div style={{ fontSize: 28, fontWeight: 650, color: "var(--accent)" }}>
             ₹{Math.round(totalMonthly).toLocaleString("en-IN")}
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
-            {sips.length} active SIP{sips.length !== 1 ? "s" : ""} · stored in this browser only
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
+            {sips.length} active SIP{sips.length !== 1 ? "s" : ""}
           </div>
         </div>
         <button
           onClick={() => setShowAdd(o => !o)}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 12, background: "rgba(167,139,250,0.12)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", border: "1px solid rgba(167,139,250,0.25)" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 14px", borderRadius: 999, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: "var(--accent-soft)", color: "var(--accent)", flexShrink: 0 }}
         >
           <Plus size={14} /> Add SIP
         </button>
@@ -168,14 +185,14 @@ export default function SIPTracker() {
 
       {/* Add form */}
       {showAdd && (
-        <div style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 14, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: "var(--accent-soft)", border: "none", borderRadius: 14, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div style={{ gridColumn: "1/-1" }}>
-              <label style={lbl}>Fund Name *</label>
+              <label style={lbl}>Fund name</label>
               <input style={inp} placeholder="e.g. Parag Parikh Flexi Cap Fund" value={form.fundName} onChange={e => setForm({...form, fundName: e.target.value})} />
             </div>
             <div>
-              <label style={lbl}>Monthly Amount (₹) *</label>
+              <label style={lbl}>Amount per debit (₹)</label>
               <input type="number" style={inp} placeholder="5000" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
             </div>
             <div>
@@ -185,20 +202,20 @@ export default function SIPTracker() {
               </select>
             </div>
             <div>
-              <label style={lbl}>Next Debit Date</label>
+              <label style={lbl}>Next debit date</label>
               <input type="date" style={inp} value={form.nextDebitDate} onChange={e => setForm({...form, nextDebitDate: e.target.value})} />
             </div>
             <div>
               <label style={lbl}>Notes</label>
-              <input style={inp} placeholder="AMFI code, folio no., etc." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+              <input style={inp} placeholder="Folio number, AMFI code…" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-card)", background: "none", color: "var(--text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button
               onClick={handleSave}
-              disabled={!form.fundName.trim() || !form.amount}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "rgba(167,139,250,0.15)", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.fundName.trim() && form.amount ? 1 : 0.4 }}
+              disabled={!form.fundName.trim() || !form.amount || saving}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "var(--accent-soft)", color: "var(--accent)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.fundName.trim() && form.amount ? 1 : 0.4 }}
             >
               Add SIP
             </button>
@@ -207,7 +224,7 @@ export default function SIPTracker() {
       )}
 
       {/* SIP list */}
-      {sips.length === 0 ? (
+      {!loaded ? null : sips.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-dimmer)", fontSize: 13 }}>
           <RefreshCw size={36} style={{ opacity: 0.2, marginBottom: 12 }} />
           <div style={{ fontWeight: 600, marginBottom: 4 }}>No SIPs tracked yet</div>
@@ -222,5 +239,5 @@ export default function SIPTracker() {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 5 };
-const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const lbl = { display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6 };
+const inp = { width: "100%", height: 44, padding: "0 12px", borderRadius: "var(--radius-control)", background: "var(--bg-input)", border: "1px solid transparent", color: "var(--text-primary)", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

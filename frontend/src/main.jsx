@@ -1,3 +1,4 @@
+import "@fontsource-variable/inter/opsz.css";
 import React from "react";
 
 import ReactDOM from "react-dom/client";
@@ -12,6 +13,9 @@ import { installDemoToastGuard } from "./utils/demoGuard";
 // In the read-only demo, a blocked action shows one "this is a demo" message
 // rather than that plus the page's own "Failed to …"
 installDemoToastGuard();
+
+import { installNativeHandlers } from "./native";
+installNativeHandlers();
 
 import { AuthProvider }
     from "./context/AuthContext";

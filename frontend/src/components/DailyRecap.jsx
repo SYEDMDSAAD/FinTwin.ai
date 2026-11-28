@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Sparkles, Clock, ArrowRight } from "lucide-react";
 
-import GlassCard from "./GlassCard";
 import API from "../services/api";
 
 export const inr = (value) =>
@@ -49,11 +48,18 @@ const SOURCE_LABEL = {
     MANUAL:    "Added by you",
 };
 
+const SHOWN = 5;
+
+/**
+ * "Since you last looked": a short recap at the top of Home, shown when
+ * daily insights are on (Settings → AI preferences).
+ */
 function DailyRecap() {
 
     const [recap,   setRecap]   = useState(null);
     const [loading, setLoading] = useState(true);
     const [failed,  setFailed]  = useState(false);
+    const [all,     setAll]     = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -77,141 +83,102 @@ function DailyRecap() {
         return () => { cancelled = true; };
     }, []);
 
+    const card = "rounded-card bg-surface border border-line p-5";
+    const kicker = "text-[11px] font-semibold tracking-[0.1em] text-ink-3";
+
     if (loading) {
         return (
-            <GlassCard className="p-8 mb-8 border border-white/10 bg-white/[0.03]">
-                <div className="h-7 w-2/3 rounded-lg bg-white/5 animate-pulse" />
-                <div className="h-4 w-1/2 rounded-lg bg-white/5 animate-pulse mt-4" />
-            </GlassCard>
+            <section className={card} aria-busy="true">
+                <div className="h-5 w-2/3 rounded bg-surface-sunken animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-surface-sunken animate-pulse mt-3" />
+            </section>
         );
     }
 
     if (failed || !recap) {
         return (
-            <GlassCard className="p-8 mb-8 border border-white/10 bg-white/[0.03]">
-                <p className="text-zinc-400">
+            <section className={card}>
+                <p className="text-small text-ink-3">
                     Your recap could not be loaded just now. Your transactions are unaffected.
                 </p>
-            </GlassCard>
+            </section>
         );
     }
 
-    const groups = groupByDay(recap.charges);
+    const charges = recap.charges || [];
+    const groups = groupByDay(all ? charges : charges.slice(0, SHOWN));
 
     return (
-        <>
-            <GlassCard className="p-8 mb-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl">
+        <section className={card} aria-label="Daily recap">
+            <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={14} aria-hidden className="text-accent" />
+                <span className={kicker}>
+                    {recap.firstVisit ? "YOUR FIRST LOOK" : "SINCE YOU LAST LOOKED"}
+                </span>
+            </div>
 
-                <div className="flex items-center gap-2 mb-5">
-                    <Sparkles size={14} className="text-cyan-400" />
-                    <span className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">
-                        {recap.firstVisit ? "YOUR FIRST LOOK" : "SINCE YOU LAST LOOKED"}
-                    </span>
+            <h2 className="text-[18px] leading-snug font-[650] text-ink">{recap.headline}</h2>
+
+            {recap.lines?.length > 0 && (
+                <div className="mt-2 space-y-1">
+                    {recap.lines.map((line, i) => (
+                        <p key={i} className="text-small text-ink-2">{line}</p>
+                    ))}
                 </div>
-
-                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">
-                    {recap.headline}
-                </h1>
-
-                {recap.lines?.length > 0 && (
-                    <div className="mt-5 space-y-2">
-                        {recap.lines.map((line, i) => (
-                            <p key={i} className="text-[15px] text-zinc-300 leading-relaxed">
-                                {line}
-                            </p>
-                        ))}
-                    </div>
-                )}
-
-                {recap.chargeCount > 0 && (
-                    <p className="mt-6 text-xs text-zinc-500">
-                        {recap.chargeCount}
-                        {recap.chargeCount === 1 ? " charge" : " charges"}
-                        {" across every connected account"}
-                    </p>
-                )}
-
-            </GlassCard>
+            )}
 
             {recap.upcoming?.length > 0 && (
-                <GlassCard className="p-6 mb-6 border border-amber-500/15 bg-amber-500/[0.03]">
-
-                    <div className="flex items-center gap-2 mb-4">
-                        <Clock size={14} className="text-amber-400" />
-                        <span className="text-[11px] font-bold tracking-[0.12em] text-amber-400/80">
-                            LANDING THIS WEEK
-                        </span>
+                <div className="mt-4 rounded-xl bg-surface-sunken p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Clock size={13} aria-hidden className="text-warn" />
+                        <span className={kicker}>LANDING THIS WEEK</span>
                     </div>
-
-                    <div className="space-y-2.5">
+                    <div className="space-y-1.5">
                         {recap.upcoming.map((charge, i) => (
-                            <div key={i} className="flex items-center justify-between gap-3">
-                                <span className="text-sm text-zinc-300 truncate">
-                                    {charge.merchant}
-                                </span>
-                                <span className="text-sm font-bold text-white shrink-0">
-                                    {inr(charge.amount)}
-                                </span>
+                            <div key={i} className="flex items-center justify-between gap-3 text-small">
+                                <span className="text-ink-2 truncate">{charge.merchant}</span>
+                                <span className="font-semibold text-ink num shrink-0">{inr(charge.amount)}</span>
                             </div>
                         ))}
                     </div>
-
-                </GlassCard>
+                </div>
             )}
 
             {groups.length > 0 && (
-                <GlassCard className="p-6 mb-8 border border-white/10 bg-white/[0.03]">
-
+                <div className="mt-4">
                     {groups.map((group) => (
-                        <div key={group.label} className="mb-5 last:mb-0">
-
-                            <div className="text-[11px] font-bold tracking-[0.1em] text-zinc-500 mb-2.5">
-                                {group.label.toUpperCase()}
-                            </div>
-
-                            <div className="space-y-1">
-                                {group.charges.map((charge, i) => (
-                                    <div
-                                        key={i}
-                                        className="
-                                            flex items-center justify-between gap-3
-                                            py-2.5 px-3 -mx-3 rounded-lg
-                                            hover:bg-white/[0.03] transition-colors
-                                        "
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="text-sm text-white truncate">
-                                                {charge.merchant}
-                                            </div>
-                                            <div className="text-[11px] text-zinc-500 mt-0.5">
-                                                {charge.category || "Uncategorised"}
-                                                {SOURCE_LABEL[charge.source] && (
-                                                    <> · {SOURCE_LABEL[charge.source]}</>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="text-sm font-bold text-white shrink-0">
-                                            {inr(charge.amount)}
+                        <div key={group.label} className="mb-3 last:mb-0">
+                            <div className={`${kicker} mb-1`}>{group.label.toUpperCase()}</div>
+                            {group.charges.map((charge, i) => (
+                                <div key={i} className="flex items-center justify-between gap-3 py-1.5">
+                                    <div className="min-w-0">
+                                        <div className="text-small text-ink truncate">{charge.merchant}</div>
+                                        <div className="text-[12px] text-ink-3">
+                                            {charge.category || "Uncategorised"}
+                                            {SOURCE_LABEL[charge.source] && <> · {SOURCE_LABEL[charge.source]}</>}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-
+                                    <div className="text-small font-semibold text-ink num shrink-0">{inr(charge.amount)}</div>
+                                </div>
+                            ))}
                         </div>
                     ))}
-
-                </GlassCard>
+                    {charges.length > SHOWN && (
+                        <button type="button" onClick={() => setAll((v) => !v)}
+                                className="mt-1 text-small font-medium text-accent">
+                            {all ? "Show fewer" : `Show all ${charges.length}`}
+                        </button>
+                    )}
+                </div>
             )}
 
             {recap.chargeCount === 0 && (
-                <GlassCard className="p-8 mb-8 border border-white/10 bg-white/[0.02] text-center">
-                    <ArrowRight size={18} className="text-zinc-600 mx-auto mb-3" />
-                    <p className="text-sm text-zinc-400">
-                        Nothing to review. Your accounts are connected and quiet.
-                    </p>
-                </GlassCard>
+                <p className="mt-3 flex items-center gap-2 text-small text-ink-3">
+                    <ArrowRight size={14} aria-hidden />
+                    Nothing to review. Your accounts are connected and quiet.
+                </p>
             )}
-        </>
+        </section>
     );
 }
 

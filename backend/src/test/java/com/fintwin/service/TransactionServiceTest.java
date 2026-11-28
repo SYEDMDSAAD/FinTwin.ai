@@ -511,6 +511,23 @@ class TransactionServiceTest {
     }
 
     @Test
+    void importBatch_statementRowTakesOverABankSmsInsteadOfDoublingIt() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        Transaction sms = fromAlertEmail(-17102.0, "2026-11-25", "SBI ··1234");
+        sms.setSource("SMS");
+        sms.setExternalId(SmsImportService.EXTERNAL_ID_PREFIX + "abc");
+        when(repository.findByUser(user)).thenReturn(List.of(sms));
+
+        TransactionService.ImportResult result = service.importBatch(
+                List.of(row("2026-11-25", "UPI/DR/632923/TRIP COM", -17102.0)), "BANK", "SBI Savings ··1234");
+
+        assertThat(result.imported()).isZero();
+        assertThat(result.reconciled()).isEqualTo(1);
+        assertThat(sms.getSource()).isEqualTo("STATEMENT");
+        assertThat(sms.getExternalId()).startsWith(StatementImport.EXTERNAL_ID_PREFIX);
+    }
+
+    @Test
     void importBatch_anAlertFromADifferentAccountIsNotTakenOver() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(repository.findByUser(user)).thenReturn(List.of(fromAlertEmail(-649.0, "2026-09-21", "HDFC ··1234")));

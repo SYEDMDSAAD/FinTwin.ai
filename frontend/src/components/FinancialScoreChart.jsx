@@ -25,7 +25,7 @@ function FinancialScoreChart({ data }) {
     if (!data || data.length === 0) {
         return (
             <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <p style={{ fontSize: 12, color: "var(--text-dim)", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                <p style={{ fontSize: 12, color: "var(--text-dim)" }}>
                     No score history yet
                 </p>
             </div>
@@ -51,10 +51,10 @@ function FinancialScoreChart({ data }) {
                         </div>
                     </div>
                     <div style={{ textAlign: "center" }}>
-                        <p style={{ fontSize: 12, fontWeight: 600, color: "rgba(167,139,250,0.7)", margin: "0 0 4px", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: "rgba(167,139,250,0.7)", margin: "0 0 4px" }}>
                             First snapshot recorded
                         </p>
-                        <p style={{ fontSize: 11, color: "var(--text-dim)", margin: 0, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                        <p style={{ fontSize: 11, color: "var(--text-dim)", margin: 0 }}>
                             More data will appear next month
                         </p>
                     </div>
@@ -65,7 +65,7 @@ function FinancialScoreChart({ data }) {
 
     return (
         <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis
@@ -81,8 +81,8 @@ function FinancialScoreChart({ data }) {
                         tickLine={false}
                     />
                     <Tooltip
-                        contentStyle={{ background: "#0e1018", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12, fontFamily: "'DM Sans', system-ui, sans-serif" }}
-                        labelStyle={{ color: "rgba(148,163,184,0.7)" }}
+                        contentStyle={{ background: "var(--bg-floating)", border: "1px solid var(--border-floating)", borderRadius: 10, fontSize: 12 }}
+                        labelStyle={{ color: "var(--text-secondary)" }}
                         itemStyle={{ color: "#a78bfa" }}
                     />
                     <Line

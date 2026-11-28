@@ -1,137 +1,81 @@
 import { useState } from "react";
-import API from "../services/api";
-import InvestmentRecommendationSection from "../components/InvestmentRecommendationSection";
+import InvestmentPlanSection from "../components/InvestmentPlanSection";
+import FutureTwin from "../components/FutureTwin";
 import PortfolioTab from "../components/PortfolioTab";
+import PortfolioHealthCard from "../components/PortfolioHealthCard";
 import DiscoverPage from "../components/DiscoverPage";
 import SIPTracker from "../components/SIPTracker";
 import MutualFundsTab from "../components/MutualFundsTab";
 import USStocksTab from "../components/USStocksTab";
 import MarketTicker from "../components/MarketTicker";
+import Collections from "../components/invest/Collections";
+import BenchmarkCard from "../components/invest/BenchmarkCard";
+import useInvestData from "../hooks/useInvestData";
+import useFundDetails from "../hooks/useFundDetails";
+import { OverlapCard, SectorCard } from "../components/invest/OverlapCard";
+import { cx } from "../components/ui";
 
-const TABS = ["My Portfolio", "Discover", "SIP Tracker", "Mutual Funds", "US Stocks", "AI Advisor"];
+/*
+ * The Invest tab's pages. Each used to be a tab inside one Investments page;
+ * now each is a section of its own (see constants/navigation.js), so the
+ * sidebar, the header chips, voice and links all reach them the same way.
+ */
 
-function InvestmentsPage() {
-    const [activeTab, setActiveTab] = useState("My Portfolio");
-    const [recommendation, setRecommendation] = useState(null);
-    const [loadingAI, setLoadingAI] = useState(false);
+const EXPLORE = ["Collections", "IPOs, funds & stocks", "Fund watchlist", "US stocks"];
 
-    const fetchRecommendation = async () => {
-        try {
-            setLoadingAI(true);
-            const res = await API.get("/investments");
-            setRecommendation(res.data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingAI(false);
-        }
-    };
-
+function Explore() {
+    const [view, setView] = useState("Collections");
     return (
-        <div className="mb-10">
-            <MarketTicker />
-
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-500/10 border border-purple-500/20">
-                    📈
-                </div>
-                <div>
-                    <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">PHASE 4</div>
-                    <h2 className="text-lg font-bold">Investment Portfolio</h2>
-                </div>
-            </div>
-
-            {/* Tab bar */}
-            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/10 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-                {TABS.map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                            activeTab === tab
-                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                : "text-zinc-400 hover:text-zinc-200"
-                        }`}
-                    >
-                        {tab}
+        <>
+            <div role="tablist" aria-label="Explore" className="flex gap-1 mb-6 -mx-1 px-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                {EXPLORE.map((v) => (
+                    <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}
+                            className={cx("h-9 px-4 rounded-full text-small font-medium whitespace-nowrap shrink-0 transition-colors",
+                                view === v ? "bg-surface-sunken text-ink" : "text-ink-3 hover:text-ink")}>
+                        {v}
                     </button>
                 ))}
             </div>
-
-            {/* Portfolio tab */}
-            {activeTab === "My Portfolio" && <PortfolioTab />}
-
-            {/* Discover: IPOs, mutual funds and stocks you can invest in */}
-            {activeTab === "Discover" && <DiscoverPage />}
-
-            {/* SIP Tracker tab */}
-            {activeTab === "SIP Tracker" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                    <SIPTracker />
-                </div>
+            {view === "Collections" && <Collections />}
+            {view === "IPOs, funds & stocks" && <DiscoverPage />}
+            {view === "Fund watchlist" && (
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6"><MutualFundsTab /></div>
             )}
-
-            {/* Mutual Funds tab */}
-            {activeTab === "Mutual Funds" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                    <MutualFundsTab />
-                </div>
+            {view === "US stocks" && (
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6"><USStocksTab /></div>
             )}
+        </>
+    );
+}
 
-            {/* US Stocks tab */}
-            {activeTab === "US Stocks" && (
-                <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                    <USStocksTab />
-                </div>
-            )}
-
-            {/* AI Advisor tab */}
-            {activeTab === "AI Advisor" && (
-                <div>
-                    {!recommendation && (
-                        <div className="relative overflow-hidden p-6 border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-2xl mb-6">
-                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                            <p className="text-sm text-zinc-400 mb-5">
-                                Generate personalized investment recommendations based on your financial profile,
-                                savings, spending behaviour and goals.
-                            </p>
-                            <button
-                                onClick={fetchRecommendation}
-                                disabled={loadingAI}
-                                className="px-5 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 hover:opacity-90 transition-all text-sm font-semibold"
-                            >
-                                {loadingAI ? "Generating..." : "Generate Recommendation"}
-                            </button>
-                        </div>
-                    )}
-
-                    {loadingAI && (
-                        <div className="flex items-center justify-center py-20 text-zinc-400">
-                            <div className="px-6 py-4 rounded-xl border border-white/10 bg-white/[0.03]">
-                                Generating AI Portfolio...
-                            </div>
-                        </div>
-                    )}
-
-                    {recommendation && !loadingAI && (
-                        <div>
-                            <button
-                                onClick={fetchRecommendation}
-                                className="mb-6 px-5 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-all text-sm font-semibold"
-                            >
-                                Regenerate
-                            </button>
-                            <InvestmentRecommendationSection recommendation={recommendation} />
-                        </div>
-                    )}
-                </div>
-            )}
+function Insights() {
+    const { portfolio } = useInvestData();
+    const details = useFundDetails(portfolio?.holdings);
+    return (
+        <div className="desk-cols">
+            <div className="max-w-2xl space-y-5 mb-6">
+                <PortfolioHealthCard showEmpty />
+                <BenchmarkCard details={details} />
+                <OverlapCard details={details} />
+                <SectorCard holdings={portfolio?.holdings} />
+            </div>
+            <InvestmentPlanSection />
         </div>
     );
 }
 
-export default InvestmentsPage;
+export default function InvestmentsPage({ view = "Investments", onNavigate }) {
+    return (
+        <div className="mb-10">
+            {(view === "Investments" || view === "Explore") && <MarketTicker />}
+
+            {view === "Investments" && <PortfolioTab />}
+            {view === "SIPs" && (
+                <div className="max-w-2xl rounded-card bg-surface border border-line p-5 mb-6"><SIPTracker /></div>
+            )}
+            {view === "Explore" && <Explore />}
+            {view === "Investment Insights" && <Insights />}
+            {view === "Future Twin" && <FutureTwin onOpenSips={() => onNavigate?.("SIPs")} />}
+        </div>
+    );
+}

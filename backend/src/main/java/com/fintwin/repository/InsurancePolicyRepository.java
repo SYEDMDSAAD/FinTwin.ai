@@ -8,4 +8,8 @@ import java.util.List;
 
 public interface InsurancePolicyRepository extends JpaRepository<InsurancePolicy, Long> {
     List<InsurancePolicy> findByUserOrderByCreatedAtDesc(User user);
+
+    long countByUser(User user);
+
+    void deleteByUser(User user);
 }

@@ -6,6 +6,6 @@ import SpendingCoachPage from "./SpendingCoachPage";
 describe("SpendingCoachPage", () => {
   it("renders without crashing", () => {
     renderPage(<SpendingCoachPage />, { authed: true });
-    expect(screen.getByText("AI Spending Coach")).toBeInTheDocument();
+    expect(screen.getByText("Find what your money is doing")).toBeInTheDocument();
   });
 });

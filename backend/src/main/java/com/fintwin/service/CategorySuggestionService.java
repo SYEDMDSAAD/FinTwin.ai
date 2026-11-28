@@ -18,15 +18,19 @@ import java.util.*;
  * The local model's category suggestion for payees the rules left in Other.
  * A suggestion depends only on the payee's name, so one answer serves every
  * user and is cached: the model is asked about each name once a week at most.
- * Nothing here changes a transaction — the user accepts or changes it.
+ * Nothing here changes a transaction: the user accepts or changes a
+ * suggestion, and the sorting agent applies only the ones the model was sure of.
  */
 @Service
 public class CategorySuggestionService {
 
     private static final Logger log = LoggerFactory.getLogger(CategorySuggestionService.class);
 
-    /** Normalised payee → suggested category, or "" when the model couldn't tell. */
-    private final Cache<String, String> cache = Caffeine.newBuilder()
+    /** What the model said about one payee: a category ("" when it couldn't tell) and whether it was sure. */
+    record Answer(String category, boolean sure) {}
+
+    /** Normalised payee → the model's answer. */
+    private final Cache<String, Answer> cache = Caffeine.newBuilder()
             .maximumSize(20_000)
             .expireAfterWrite(Duration.ofDays(7))
             .build();
@@ -70,16 +74,31 @@ public class CategorySuggestionService {
 
         Map<String, String> out = new LinkedHashMap<>();
         keyOf.forEach((m, k) -> {
-            String s = cache.getIfPresent(k);
-            if (s != null && !s.isEmpty()) out.put(categories.normalizeMerchant(m), s);
+            Answer a = cache.getIfPresent(k);
+            if (a != null && !a.category().isEmpty()) out.put(categories.normalizeMerchant(m), a.category());
         });
         return new Suggestions(out, complete);
     }
 
+    /**
+     * Only the suggestions the model was sure of, keyed by normalised
+     * merchant — what the sorting agent may apply without asking.
+     */
+    public Map<String, String> sureSuggestions(Collection<String> merchants) {
+        suggest(merchants);
+        Map<String, String> out = new LinkedHashMap<>();
+        for (String m : merchants) {
+            if (m == null || m.isBlank()) continue;
+            Answer a = cache.getIfPresent(key(m));
+            if (a != null && a.sure() && !a.category().isEmpty()) out.put(categories.normalizeMerchant(m), a.category());
+        }
+        return out;
+    }
+
     /** The suggestion shown for this merchant, if there is one — to check what a user says they accepted. */
     public Optional<String> shown(String merchant) {
-        String s = cache.getIfPresent(key(merchant));
-        return s == null || s.isEmpty() ? Optional.empty() : Optional.of(s);
+        Answer a = cache.getIfPresent(key(merchant));
+        return a == null || a.category().isEmpty() ? Optional.empty() : Optional.of(a.category());
     }
 
     @SuppressWarnings("unchecked")
@@ -90,10 +109,12 @@ public class CategorySuggestionService {
                     Map.of("payees", payees.subList(0, Math.min(payees.size(), 60))), Map.class);
             if (resp == null) return false;
             Map<String, Object> got = (Map<String, Object>) resp.getOrDefault("suggestions", Map.of());
+            // Absent from older ai-service versions: then nothing counts as sure.
+            Map<String, Object> sure = (Map<String, Object>) resp.getOrDefault("sure", Map.of());
             payeeByKey.forEach((k, payee) -> {
                 if (got.containsKey(payee)) {
                     Object v = got.get(payee);
-                    cache.put(k, v instanceof String s ? s : "");
+                    cache.put(k, new Answer(v instanceof String s ? s : "", Boolean.TRUE.equals(sure.get(payee))));
                 }
             });
             return Boolean.TRUE.equals(resp.get("complete")) && payees.size() <= 60;

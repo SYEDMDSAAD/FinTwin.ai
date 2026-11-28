@@ -23,8 +23,8 @@ describe("SortOther", () => {
     mock.onGet("/transactions/unsorted-payees").reply(200, GROUPS);
     render(<SortOther />);
 
-    expect(await screen.findByText(/₹1,318 in 4 payments is still "Other"/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { expanded: false })).toHaveTextContent("Sort 2 payees");
+    expect(await screen.findByText(/₹1,318 still in "Other"/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { expanded: false })).toHaveTextContent("4 payments · 2 payees to sort");
     expect(screen.queryByText("SARA ENTERPRISES")).not.toBeInTheDocument();
 
     openPanel();
@@ -39,7 +39,7 @@ describe("SortOther", () => {
     const onBulkChanged = vi.fn();
     render(<SortOther onBulkChanged={onBulkChanged} />);
 
-    await screen.findByText(/still "Other"/);
+    await screen.findByText(/still in "Other"/);
     expect(onBulkChanged).toHaveBeenCalledTimes(1);
   });
 
@@ -50,7 +50,7 @@ describe("SortOther", () => {
     const onSorted = vi.fn();
     const onBulkChanged = vi.fn();
     render(<SortOther onSorted={onSorted} onBulkChanged={onBulkChanged} />);
-    await screen.findByText(/still "Other"/);
+    await screen.findByText(/still in "Other"/);
     openPanel();
 
     fireEvent.change(screen.getByLabelText("Category for SARA ENTERPRISES"), { target: { value: "Shopping" } });
@@ -69,7 +69,7 @@ describe("SortOther", () => {
     mock.onPost("/transactions/recategorize").reply(200, { updated: 0 });
     mock.onGet("/transactions/unsorted-payees").reply(200, GROUPS.slice(0, 1));
     render(<SortOther />);
-    await screen.findByText(/still "Other"/);
+    await screen.findByText(/still in "Other"/);
     openPanel();
 
     const options = [...screen.getByLabelText("Category for OTT commerce solutions").querySelectorAll("option")].map(o => o.value);
@@ -94,7 +94,7 @@ describe("SortOther", () => {
     it("are only asked for once the panel is opened", async () => {
       mock.onGet("/transactions/unsorted-payees/suggestions").reply(200, { suggestions: {}, complete: true });
       render(<SortOther />);
-      await screen.findByText(/still "Other"/);
+      await screen.findByText(/still in "Other"/);
       expect(mock.history.get.some(r => r.url.endsWith("/suggestions"))).toBe(false);
 
       openPanel();
@@ -107,7 +107,7 @@ describe("SortOther", () => {
       mock.onPatch("/transactions/11/category").reply(200, {});
       const onSorted = vi.fn();
       render(<SortOther onSorted={onSorted} />);
-      await screen.findByText(/still "Other"/);
+      await screen.findByText(/still in "Other"/);
       openPanel();
 
       fireEvent.click(await screen.findByRole("button", { name: "Accept Entertainment for OTT commerce solutions" }));
@@ -125,7 +125,7 @@ describe("SortOther", () => {
           .reply(200, { suggestions: { "paid to ott commerce solutions": "Entertainment" }, complete: true });
       mock.onPatch("/transactions/11/category").reply(200, {});
       render(<SortOther />);
-      await screen.findByText(/still "Other"/);
+      await screen.findByText(/still in "Other"/);
       openPanel();
       await screen.findByRole("button", { name: /Accept Entertainment/ });
 
@@ -138,7 +138,7 @@ describe("SortOther", () => {
     it("the panel works as before when suggestions are unavailable", async () => {
       mock.onGet("/transactions/unsorted-payees/suggestions").reply(503);
       render(<SortOther />);
-      await screen.findByText(/still "Other"/);
+      await screen.findByText(/still in "Other"/);
       openPanel();
       await waitFor(() => expect(screen.queryByText(/Getting suggestions/)).not.toBeInTheDocument());
       expect(screen.queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();

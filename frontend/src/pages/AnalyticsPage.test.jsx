@@ -34,7 +34,7 @@ describe("AnalyticsPage", () => {
     it("fetches as much history as the chosen period needs", async () => {
         const user = userEvent.setup();
         const { apiMock } = renderAnalytics();
-        await waitFor(() => expect(monthsAskedFor(apiMock)).toContain(1));      // "This month" on load
+        await waitFor(() => expect(monthsAskedFor(apiMock)).toContain(2));      // "This month" and the month it's compared with
 
         await user.click(screen.getByText("This month"));
         await user.click(await screen.findByText("All time"));
@@ -54,6 +54,6 @@ describe("AnalyticsPage", () => {
         await user.click(await screen.findByText("Last month"));
 
         await waitFor(() => expect(screen.getByText(/transactions$/)).toBeInTheDocument());
-        expect(monthsAskedFor(apiMock).filter(m => m !== 1 && m !== 0)).toEqual([]);   // no refetch
+        expect(monthsAskedFor(apiMock).filter(m => m !== 2 && m !== 0)).toEqual([]);   // no refetch
     });
 });

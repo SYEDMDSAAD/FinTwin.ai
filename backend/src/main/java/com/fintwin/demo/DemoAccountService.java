@@ -1,13 +1,19 @@
 package com.fintwin.demo;
 
+import com.fintwin.agent.SortingAgent;
+import com.fintwin.agent.WatchAgent;
+import com.fintwin.model.AgentAlert;
 import com.fintwin.model.Transaction;
 import com.fintwin.model.User;
+import com.fintwin.repository.AgentAlertRepository;
 import com.fintwin.repository.AssetRepository;
 import com.fintwin.repository.BudgetRepository;
 import com.fintwin.repository.ChatHistoryRepository;
 import com.fintwin.repository.FinancialGoalRepository;
 import com.fintwin.repository.FinancialScoreHistoryRepository;
+import com.fintwin.repository.InsurancePolicyRepository;
 import com.fintwin.repository.InvestmentRepository;
+import com.fintwin.repository.SipPlanRepository;
 import com.fintwin.repository.LiabilityRepository;
 import com.fintwin.repository.NotificationRepository;
 import com.fintwin.repository.TransactionRepository;
@@ -17,6 +23,7 @@ import com.fintwin.service.ProfileService;
 import com.fintwin.util.TransactionMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -63,17 +70,23 @@ public class DemoAccountService {
     private final ChatHistoryRepository chats;
     private final NotificationRepository notifications;
     private final FinancialScoreHistoryRepository scores;
+    private final InsurancePolicyRepository policies;
     private final ProfileService profiles;
     private final PasswordEncoder passwords;
     private final TransactionTemplate tx;
+
+    // The agents' own output, so the demo shows them at work
+    @Autowired(required = false) private AgentAlertRepository alerts;
+    @Autowired(required = false) private SipPlanRepository sips;
+    @Autowired(required = false) private WatchAgent watch;
 
     public DemoAccountService(@Value("${demo.enabled:true}") boolean enabled,
                               UserRepository users, TransactionRepository transactions, BudgetRepository budgets,
                               FinancialGoalRepository goals, AssetRepository assets,
                               LiabilityRepository liabilities, InvestmentRepository investments,
                               ChatHistoryRepository chats, NotificationRepository notifications,
-                              FinancialScoreHistoryRepository scores, ProfileService profiles,
-                              PasswordEncoder passwords, TransactionTemplate tx) {
+                              FinancialScoreHistoryRepository scores, InsurancePolicyRepository policies,
+                              ProfileService profiles, PasswordEncoder passwords, TransactionTemplate tx) {
         this.enabled = enabled;
         this.users = users;
         this.transactions = transactions;
@@ -85,6 +98,7 @@ public class DemoAccountService {
         this.chats = chats;
         this.notifications = notifications;
         this.scores = scores;
+        this.policies = policies;
         this.profiles = profiles;
         this.passwords = passwords;
         this.tx = tx;
@@ -106,7 +120,12 @@ public class DemoAccountService {
             User user = demoUser();
             LocalDate latest = transactions.latestTransactionDate(user.getId());
             LocalDate today = LocalDate.now(INDIA);
-            if (latest == null || latest.isBefore(today.minusDays(1))) rebuild();
+            // Also when it was built before it had insurance policies, Spend Guard payments,
+            if (latest == null || latest.isBefore(today.minusDays(1)) || policies.countByUser(user) == 0
+                    || transactions.countByUserAndSource(user, com.fintwin.service.SpendGuardLinks.SOURCE) == 0
+                    || (alerts != null && !alerts.existsByUserAndAgent(user, AgentAlert.SORT))
+                    // ...or before it had SIPs and real fund scheme codes (the fund pages need them)
+                    || (sips != null && sips.findByUserOrderByCreatedAtAsc(user).isEmpty())) rebuild();
         } catch (Exception e) {
             // A demo that fails to build must not take the app down with it
             log.error("Demo account not prepared at startup", e);
@@ -130,13 +149,16 @@ public class DemoAccountService {
             User user = demoUser();
             chats.deleteByUser(user);
             transactions.deleteByUser(user);
+            if (sips != null) sips.deleteByUser(user);   // before goals: a SIP can point at one
             goals.deleteByUser(user);
             budgets.deleteByUser(user);
             assets.deleteByUser(user);
             liabilities.deleteByUser(user);
             investments.deleteByUser(user);
+            policies.deleteByUser(user);
             notifications.deleteByUser(user);
             scores.deleteByUser(user);
+            if (alerts != null) alerts.deleteByUser(user);
             // Hibernate runs inserts before deletes when it flushes, so without
             // this the new budgets collide with the old ones (one per category)
             transactions.flush();
@@ -148,10 +170,19 @@ public class DemoAccountService {
             assets.saveAll(data.assets());
             liabilities.saveAll(data.liabilities());
             investments.saveAll(data.investments());
+            policies.saveAll(data.insurance());
             goals.saveAll(data.goals(monthlySavings(rows)));
+            if (sips != null) sips.saveAll(data.sips());
             profiles.saveScoreSnapshot(user);
+            if (alerts != null) {
+                long sorted = rows.stream().filter(t -> com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource())).count();
+                alerts.save(SortingAgent.summary(user, DemoData.AUTO_SORTED_PAYEES.size(), (int) sorted,
+                        DemoData.AUTO_SORTED_PAYEES));
+            }
             log.info("Demo account rebuilt: {} transactions", rows.size());
         });
+        // After the commit: the watch agent reads in a transaction of its own
+        if (watch != null) watch.run(demoUser());
     }
 
     private User createUser() {

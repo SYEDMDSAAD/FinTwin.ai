@@ -81,6 +81,7 @@ services:
       METRICS_TOKEN:   ${METRICS_TOKEN:-}   # unset: /metrics stays closed
       REDIS_URL:       redis://redis:6379
       BACKEND_URL:     http://backend:8080
+      LLM_PROVIDER:    ${LLM_PROVIDER:-ollama}   # this stack ships its own Ollama; gemini needs GOOGLE_CLOUD_PROJECT + credentials
       OLLAMA_URL:      http://ollama:11434/api/generate
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
     deploy:

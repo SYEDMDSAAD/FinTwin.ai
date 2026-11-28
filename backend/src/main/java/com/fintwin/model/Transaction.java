@@ -53,11 +53,12 @@ public class Transaction {
 
     // "MANUAL", "BANK" (AA sync), "CARD" (AA card sync, card statement or card
     // alert email), "STATEMENT" (uploaded bank statement), "EMAIL" (bank-account
-    // alert email) — null treated as MANUAL for legacy rows
+    // alert email), "SMS" (bank-account SMS read on the Android app) — null
+    // treated as MANUAL for legacy rows
     private String source;
 
     // Dedupe key: Setu txnId ("CARD:" prefix for cards), a statement-row hash
-    // ("STMT:"), or an alert email's Message-ID hash ("MAIL:")
+    // ("STMT:"), or an alert email's Message-ID hash ("MAIL:"), or a bank SMS hash ("SMS:")
     @Column(name = "external_id")
     private String externalId;
 

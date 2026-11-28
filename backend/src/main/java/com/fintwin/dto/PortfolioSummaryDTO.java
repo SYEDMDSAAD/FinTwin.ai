@@ -15,6 +15,8 @@ public class PortfolioSummaryDTO {
     // Only set by the refresh endpoint: number of holdings that received a
     // live price, or null when the market-data call failed outright.
     private Integer pricesUpdated;
+    /** The whole portfolio's annual return in % (XIRR); null under a year. */
+    private Double xirr;
 
     public double getTotalInvested()       { return totalInvested; }
     public void setTotalInvested(double v) { this.totalInvested = v; }
@@ -36,4 +38,6 @@ public class PortfolioSummaryDTO {
 
     public Integer getPricesUpdated()          { return pricesUpdated; }
     public void setPricesUpdated(Integer n)    { this.pricesUpdated = n; }
+    public Double getXirr() { return xirr; }
+    public void setXirr(Double xirr) { this.xirr = xirr; }
 }

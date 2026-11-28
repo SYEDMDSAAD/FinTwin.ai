@@ -66,6 +66,16 @@ public class SpendingCoachService {
                     .maximumSize(2_000)
                     .build();
 
+    /**
+     * Only an answer whose message the model wrote is kept. When the AI service
+     * rejected the model's message and sent its own computed one instead, the
+     * next request (the page's Regenerate) should ask the model again rather
+     * than get the same fallback for six hours.
+     */
+    static boolean worthCaching(SpendingCoachResponseDTO body) {
+        return body != null && "ai".equals(body.getCoachMessageSource());
+    }
+
     @PreAuthorize("hasAuthority('USE_AI_SPENDING_COACH')")
     public SpendingCoachResponseDTO
     getCoachInsights() {
@@ -138,7 +148,9 @@ public class SpendingCoachService {
                     );
             if (response.getBody() != null) {
                 metrics.aiCoachCalls.increment();
-                coachCache.put(cacheKey, response.getBody());
+                if (worthCaching(response.getBody())) {
+                    coachCache.put(cacheKey, response.getBody());
+                }
                 return response.getBody();
             }
         } catch (Exception e) {

@@ -16,35 +16,43 @@ const sections = [
     body: "We use your data solely to provide FinTwin AI features: generating insights, budgets, anomaly detection, and AI recommendations. We do not sell your data to third parties or use it for advertising.",
   },
   {
-    title: "4. Improving FinTwin's AI (optional)",
+    title: "3a. Phone permissions (Android app)",
+    body: "The app asks for each permission only when you turn on the feature that needs it, and works without them. SMS: if you turn on reading bank SMS, the app reads messages from bank senders that mention an amount (from the last 90 days at first, then new ones) and sends only those to FinTwin, which turns each completed payment into a transaction; the message text itself is not stored or logged, and OTPs, balances and personal messages are left out. Microphone: used only for \"Hey FinTwin\", which is off unless you switch it on; the wake word is spotted on your phone, and only the few seconds of your question after it are sent to be turned into text, then discarded. Camera: used only to scan a payment QR code in Spend Guard; the picture stays on your phone. You can turn any of these off in the app or in your phone's settings.",
+  },
+  {
+    title: "4. How FinTwin's AI Uses Your Data",
+    body: "FinTwin's AI features (the AI Copilot, Spending Coach, goal plans, reports, category suggestions and Spend Guard) run on Google Cloud's Vertex AI, which processes each request on our behalf and may do so in Google data centres outside India. Each feature sends only what it needs: mostly summary figures such as monthly totals and spending by category, and the Copilot looks up specific transactions (date, merchant, category and amount), budgets, goals or holdings only when your question needs them. Before anything is sent, email addresses, UPI IDs, phone, card, Aadhaar and account numbers, PANs and passwords are masked, and the same is done in our logs and in stored Copilot conversations. Google does not use this data to train its models. The Copilot only answers questions about money and FinTwin, and its answers are guidance, not SEBI-registered investment advice.",
+  },
+  {
+    title: "5. Improving FinTwin's AI (optional)",
     body: "To measure how well FinTwin's AI works, we record which method chose each transaction's category and whether you later changed or kept it, how each AI Copilot answer was produced, whether you marked an anomaly alert as right or a false alarm (with the amounts it showed), and — when you import a statement — its column headings and which columns you chose (never its rows). When you rate a Copilot answer 👍 or 👎, that question and answer are kept with your rating, even after older chat messages are cleared automatically; deleting the message or clearing your chat deletes them too. All of this stays in your account like the rest of your data. Only if you opt in (Settings → Account → Data & privacy) may our team read the answers you rated to fix what went wrong, and may your transaction descriptions, the categories you chose, your rated answers, your anomaly verdicts and your statements' column layouts be used to train FinTwin's AI — with people's names, phone numbers and UPI IDs removed first. It is off unless you turn it on. You can turn it off at any time, and from then on your data is left out of any new training. We never sell this data or share it with third parties.",
   },
   {
-    title: "5. Data Security",
+    title: "6. Data Security",
     body: "All sensitive fields (emails, financial amounts, notes) are encrypted at rest using AES-256 GCM encryption. Passwords are hashed with BCrypt. Data is transmitted over TLS 1.2+. We maintain audit logs for all sensitive operations as required by PCI-DSS.",
   },
   {
-    title: "6. Data Retention",
+    title: "7. Data Retention",
     body: "Your data is retained for as long as your account is active. You may request deletion at any time from Settings → Account → Delete Account. Upon deletion, your data is permanently removed within 30 days.",
   },
   {
-    title: "7. Your Rights",
+    title: "8. Your Rights",
     body: "You have the right to access, correct, export, or delete your personal data. To exercise these rights, use the in-app settings or contact us at support@fintwin.ai.",
   },
   {
-    title: "8. Account Aggregator",
+    title: "9. Account Aggregator",
     body: "Bank data is fetched via the RBI's Account Aggregator framework operated by Setu. FinTwin AI acts as a Financial Information User (FIU). You can revoke consent anytime from Settings → Connections.",
   },
   {
-    title: "9. Cookies and visit counts",
+    title: "10. Cookies and visit counts",
     body: "We use minimal essential cookies for authentication (JWT tokens). We do not use tracking or advertising cookies. To count how many people visit, your browser keeps an anonymous random ID (in local storage, not a cookie), and when you open our home page we record that ID with the site you came from and whether you're on a phone or a computer. If you try the demo account, we also record which pages you open and the questions you ask its copilot, which are about the demo's sample data. None of this includes your name, email or IP address, and it isn't linked to any account you create.",
   },
   {
-    title: "10. Changes to This Policy",
+    title: "11. Changes to This Policy",
     body: "We may update this policy from time to time. We will notify you of significant changes via email or in-app notification.",
   },
   {
-    title: "11. Contact",
+    title: "12. Contact",
     body: "For privacy questions or requests, contact us at support@fintwin.ai.",
   },
 ];
@@ -53,28 +61,28 @@ export default function PrivacyPolicyPage() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
 
-  const pageBg = isDark ? "#080a0f" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
-  const txt    = isDark ? "#e2e8f0" : "#0f172a";
-  const txtSub = isDark ? "rgba(148,163,184,0.6)" : "rgba(71,85,105,0.7)";
-  const cardBg = isDark ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.9)";
-  const cardBdr= isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)";
+  const pageBg = isDark ? "var(--bg-base)" : "linear-gradient(135deg, #eef2fa 0%, #e3eaf7 48%, #ede8fb 100%)";
+  const txt    = isDark ? "var(--text-primary)" : "#0f172a";
+  const txtSub = isDark ? "var(--text-dim)" : "var(--text-dim)";
+  const cardBg = isDark ? "var(--bg-input)" : "rgba(255,255,255,0.9)";
+  const cardBdr= isDark ? "1px solid var(--border-card)" : "1px solid rgba(15,23,42,0.08)";
 
   return (
-    <div style={{ minHeight:"100vh", background:pageBg, fontFamily:"'DM Sans', system-ui, sans-serif", padding:"40px 20px" }}>
+    <div style={{ minHeight:"100vh", background:pageBg, padding:"40px 20px" }}>
       <div style={{ maxWidth:720, margin:"0 auto" }}>
 
         {/* Back button */}
         <button onClick={() => navigate(-1)}
-          style={{ display:"inline-flex", alignItems:"center", gap:7, background:"none", border:"none", color:isDark?"#a78bfa":"#7c3aed", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", marginBottom:28, padding:0 }}>
+          style={{ display:"inline-flex", alignItems:"center", gap:7, background:"none", border:"none", color:isDark?"var(--accent)":"var(--accent-strong)", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", marginBottom:28, padding:0 }}>
           <ArrowLeft size={15}/> Back
         </button>
 
         {/* Header */}
         <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:32 }}>
-          <div style={{ width:44, height:44, borderRadius:13, background:"linear-gradient(135deg,#a78bfa,#22d3ee)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", flexShrink:0 }}>F</div>
+          <div style={{ width:44, height:44, borderRadius:13, background:"var(--accent-strong)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight: 650, color:"#fff", flexShrink:0 }}>F</div>
           <div>
-            <div style={{ fontSize:22, fontWeight:800, color:txt, letterSpacing:"-0.02em" }}>Privacy Policy</div>
-            <div style={{ fontSize:12, color:txtSub }}>FinTwin AI · Last updated October 2026</div>
+            <div style={{ fontSize:22, fontWeight: 650, color:txt, letterSpacing:"-0.02em" }}>Privacy Policy</div>
+            <div style={{ fontSize:12, color:txtSub }}>FinTwin AI · Last updated November 2026</div>
           </div>
         </div>
 

@@ -8,8 +8,7 @@ import ImportsPage from "./ImportsPage";
 describe("ImportsPage", () => {
   it("renders without crashing", () => {
     renderPage(<ImportsPage onImported={vi.fn()} />, { authed: true });
-    expect(screen.getByText("Import Transactions")).toBeInTheDocument();
-    expect(screen.getByText("Upload File")).toBeInTheDocument();
+    expect(screen.getByText("Choose file")).toBeInTheDocument();
   });
 });
 
@@ -26,8 +25,8 @@ describe("ImportsPage — statement import", () => {
   beforeEach(() => { mock = new MockAdapter(API); });
   afterEach(() => { mock.restore(); });
 
-  async function uploadAndPreview({ card = false } = {}) {
-    const { container } = render(<ImportsPage onImported={vi.fn()} />);
+  async function uploadAndPreview({ card = false, onViewTransactions } = {}) {
+    const { container } = render(<ImportsPage onImported={vi.fn()} onViewTransactions={onViewTransactions} />);
     const input = container.querySelector("#csv-upload");
     fireEvent.change(input, {
       target: { files: [new File([STATEMENT], "HDFC_Sept.csv", { type: "text/csv" })] },
@@ -36,7 +35,7 @@ describe("ImportsPage — statement import", () => {
     // Columns are guessed, so preview is available without touching a select
     await screen.findByText(/skipped 1 header lines/);
     if (card) fireEvent.click(screen.getByText("Credit card"));
-    fireEvent.click(screen.getByText(/Preview →/));
+    fireEvent.click(screen.getByText(/^Preview \d+ rows/));
     await screen.findByText(/2 transactions from 2026-09-01 to 2026-09-02/);
   }
 
@@ -48,12 +47,31 @@ describe("ImportsPage — statement import", () => {
     expect(screen.getAllByText("Auto")).toHaveLength(2);
   });
 
+  it("offers a way to the transactions once the import is done", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
+    const onViewTransactions = vi.fn();
+    await uploadAndPreview({ onViewTransactions });
+    expect(screen.queryByText("Check transactions")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Import 2 transactions"));
+    fireEvent.click(await screen.findByText("Check transactions"));
+    expect(onViewTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no such button where there is nowhere to go (onboarding)", async () => {
+    mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
+    await uploadAndPreview();
+    fireEvent.click(screen.getByText("Import 2 transactions"));
+    await screen.findByText("Import complete");
+    expect(screen.queryByText("Check transactions")).not.toBeInTheDocument();
+  });
+
   it("posts normalised rows without a placeholder category", async () => {
     mock.onPost("/transactions/batch").reply(200, { imported: 2, duplicates: 0, skipped: 0 });
     await uploadAndPreview();
 
-    fireEvent.click(screen.getByText("Import 2 Transactions"));
-    await screen.findByText("Import Complete!");
+    fireEvent.click(screen.getByText("Import 2 transactions"));
+    await screen.findByText("Import complete");
 
     const req = mock.history.post[0];
     // the account label is guessed from the file name and the statement header
@@ -69,8 +87,8 @@ describe("ImportsPage — statement import", () => {
     mock.onPost("/imports/mapping-feedback").reply(200, { changed: false });
     await uploadAndPreview();
 
-    fireEvent.click(screen.getByText("Import 2 Transactions"));
-    await screen.findByText("Import Complete!");
+    fireEvent.click(screen.getByText("Import 2 transactions"));
+    await screen.findByText("Import complete");
 
     await waitFor(() => expect(mock.history.post.some(r => r.url === "/imports/mapping-feedback")).toBe(true));
     const body = JSON.parse(mock.history.post.find(r => r.url === "/imports/mapping-feedback").data);
@@ -85,15 +103,15 @@ describe("ImportsPage — statement import", () => {
     mock.onPost("/transactions/batch").reply(200, { imported: 2 });
     mock.onPost("/imports/mapping-feedback").reply(500);
     await uploadAndPreview();
-    fireEvent.click(screen.getByText("Import 2 Transactions"));
-    expect(await screen.findByText("Import Complete!")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Import 2 transactions"));
+    expect(await screen.findByText("Import complete")).toBeInTheDocument();
   });
 
   it("marks card statements and reports rows that were already imported", async () => {
     mock.onPost("/transactions/batch").reply(200, { imported: 1, duplicates: 1, skipped: 0 });
     await uploadAndPreview({ card: true });
 
-    fireEvent.click(screen.getByText("Import 2 Transactions"));
+    fireEvent.click(screen.getByText("Import 2 transactions"));
     await waitFor(() => expect(mock.history.post.filter(r => r.url === "/transactions/batch")).toHaveLength(1));
     expect(mock.history.post[0].params).toEqual({ accountType: "CARD", account: "HDFC ··1234" });
     expect(await screen.findByText(/1 already imported earlier, skipped/)).toBeInTheDocument();
@@ -129,8 +147,8 @@ describe("ImportsPage — accounts and alert emails", () => {
     const field = screen.getByLabelText("ACCOUNT");
     expect(field).toHaveValue("HDFC ··1234");
     fireEvent.change(field, { target: { value: "HDFC Salary ··1234" } });
-    fireEvent.click(screen.getByText(/Preview →/));
-    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+    fireEvent.click(screen.getByText(/^Preview \d+ rows/));
+    fireEvent.click(await screen.findByText("Import 2 transactions"));
 
     await waitFor(() => expect(mock.history.post.filter(r => r.url === "/transactions/batch")).toHaveLength(1));
     expect(mock.history.post[0].params.account).toBe("HDFC Salary ··1234");
@@ -139,8 +157,8 @@ describe("ImportsPage — accounts and alert emails", () => {
   it("says when statement rows confirmed transactions already added from alert emails", async () => {
     mock.onPost("/transactions/batch").reply(200, { imported: 1, duplicates: 0, skipped: 0, reconciled: 1 });
     await preview();
-    fireEvent.click(screen.getByText(/Preview →/));
-    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+    fireEvent.click(screen.getByText(/^Preview \d+ rows/));
+    fireEvent.click(await screen.findByText("Import 2 transactions"));
 
     expect(await screen.findByText(/1 already added from alert emails/)).toBeInTheDocument();
   });
@@ -151,8 +169,8 @@ describe("ImportsPage — accounts and alert emails", () => {
     await preview();
     await waitFor(() => expect(mock.history.get.filter(r => r.url === "/data-coverage")).toHaveLength(1));
 
-    fireEvent.click(screen.getByText(/Preview →/));
-    fireEvent.click(await screen.findByText("Import 2 Transactions"));
+    fireEvent.click(screen.getByText(/^Preview \d+ rows/));
+    fireEvent.click(await screen.findByText("Import 2 transactions"));
 
     await waitFor(() => expect(mock.history.get.filter(r => r.url === "/data-coverage")).toHaveLength(2));
   });
@@ -179,7 +197,7 @@ describe("ImportsPage — PDF and Excel statements", () => {
     expect(form.get("file").name).toBe("HDFC_Sept.pdf");
     expect(form.has("password")).toBe(false);
 
-    fireEvent.click(screen.getByText(/Preview →/));
+    fireEvent.click(screen.getByText(/^Preview \d+ rows/));
     expect(await screen.findByText(/₹1,250 out · ₹1,20,000 in/)).toBeInTheDocument();
   });
 
@@ -218,7 +236,7 @@ describe("ImportsPage — PDF and Excel statements", () => {
     choose(container, "scan.pdf");
 
     await waitFor(() => expect(mock.history.post).toHaveLength(1));
-    expect(screen.getByText("STEP 1 — UPLOAD STATEMENT")).toBeInTheDocument();
+    expect(screen.getByText("Choose a statement")).toBeInTheDocument();
     expect(screen.queryByLabelText(/password-protected/)).not.toBeInTheDocument();
   });
 });

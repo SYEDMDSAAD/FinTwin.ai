@@ -5,8 +5,9 @@ const SEP_2026 = new Date(2026, 8, 22);        // September
 
 describe("monthsNeeded", () => {
     it("asks for as much history as the period covers", () => {
-        expect(monthsNeeded("This month", "", SEP_2026)).toBe(1);
-        expect(monthsNeeded("Last month", "", SEP_2026)).toBe(2);
+        // the period plus the month before, which the table compares it with
+        expect(monthsNeeded("This month", "", SEP_2026)).toBe(2);
+        expect(monthsNeeded("Last month", "", SEP_2026)).toBe(3);
         expect(monthsNeeded("This year", "", SEP_2026)).toBe(9);       // Jan–Sep
         expect(monthsNeeded("Last 12 months", "", SEP_2026)).toBe(12);
         expect(monthsNeeded("All time", "", SEP_2026)).toBe(0);        // 0 = everything imported

@@ -48,6 +48,9 @@ public enum Role {
             Permission.USE_AI_FORECAST,
             Permission.USE_AI_REPORT,
             Permission.USE_AI_SPENDING_COACH,
+            // Not given to DEMO: Spend Guard keeps a wallet and history per user,
+            // and everyone shares the demo account
+            Permission.USE_SPEND_GUARD,
 
             Permission.CONNECT_BANK_ACCOUNT,
             Permission.READ_OWN_BANK_CONNECTIONS,

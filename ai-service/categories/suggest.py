@@ -3,8 +3,9 @@ Category suggestions for payees the backend's rules couldn't place.
 
 The model only sees payee names (never amounts, dates or account details),
 answers from a fixed list, and may say "Unknown". Anything outside the list
-is dropped. Suggestions are shown to the user to accept or change — never
-applied on their own — so a wrong guess costs a click, not a wrong budget.
+is dropped. Each answer also says whether the model is sure: the backend's
+sorting agent applies only sure answers (marked, reviewable, undoable) and
+shows the rest as suggestions for the user to accept or change.
 """
 
 import json
@@ -51,19 +52,21 @@ Allowed categories:
 
 For each numbered payee, give the most likely category from the allowed list, judged only from the name. If the name does not make the kind of business clear, answer "Unknown". Never invent a category outside the list.
 
+Also say whether you are sure. Be sure only when the name is a well-known brand or plainly names the kind of business (like "City Hospital" or "Fresh Vegetables"). A guess from a vague word, a person's name or an unfamiliar company is not sure.
+
 Examples:
-"Swiggy" -> Food
-"Apollo Pharmacy" -> Health
-"Groww" -> Investments
-"DMart" -> Groceries
-"Airtel" -> Bills
-"Bajaj Finance" -> EMI
+"Swiggy" -> Food, sure
+"Apollo Pharmacy" -> Health, sure
+"Groww" -> Investments, sure
+"Airtel" -> Bills, sure
+"Bajaj Finance" -> EMI, sure
+"Krishna Enterprises" -> Shopping, not sure
 "Sharma Traders" -> Unknown
 
 Payees:
 {lines}
 
-Reply with JSON only, mapping each number to a category, like {{"1": "Food", "2": "Unknown"}}."""
+Reply with JSON only, mapping each number to its category and whether you are sure, like {{"1": {{"category": "Food", "sure": true}}, "2": {{"category": "Unknown", "sure": false}}}}."""
 
 
 def _clean(payee: str) -> str:
@@ -72,25 +75,39 @@ def _clean(payee: str) -> str:
     return re.sub(r"\s+", " ", p).strip()[:80]
 
 
-def parse(raw: str, count: int) -> list[str | None]:
-    """The model's JSON → one allowed category (or None) per payee, in order."""
+def parse_with_sure(raw: str, count: int) -> list[tuple[str | None, bool]]:
+    """The model's JSON → (allowed category or None, sure) per payee, in order.
+
+    A bare string answer (the older format) counts as not sure.
+    """
     try:
         data = json.loads(raw)
     except ValueError:
-        return [None] * count
+        return [(None, False)] * count
     if not isinstance(data, dict):
-        return [None] * count
+        return [(None, False)] * count
     out = []
     for i in range(count):
         v = data.get(str(i + 1))
-        out.append(_BY_LOWER.get(v.strip().lower()) if isinstance(v, str) else None)
+        sure = False
+        if isinstance(v, dict):
+            sure = v.get("sure") is True
+            v = v.get("category")
+        category = _BY_LOWER.get(v.strip().lower()) if isinstance(v, str) else None
+        out.append((category, sure and category is not None))
     return out
 
 
+def parse(raw: str, count: int) -> list[str | None]:
+    """The model's JSON → one allowed category (or None) per payee, in order."""
+    return [c for c, _ in parse_with_sure(raw, count)]
+
+
 def suggest(payees: list[str]) -> dict:
-    """{"suggestions": {payee: category or None}, "complete": bool}."""
+    """{"suggestions": {payee: category or None}, "sure": {payee: bool}, "complete": bool}."""
     unique = list(dict.fromkeys(p for p in payees if isinstance(p, str) and p.strip()))[:MAX_PAYEES]
     result: dict[str, str | None] = {}
+    sure: dict[str, bool] = {}
     deadline = time.monotonic() + BUDGET_SECONDS
     complete = True
 
@@ -102,13 +119,14 @@ def suggest(payees: list[str]) -> dict:
             break
         cleaned = [_clean(p) for p in batch]
         try:
-            raw = ask(_prompt(cleaned), max_tokens=20 + 12 * len(batch), timeout=remaining,
+            raw = ask(_prompt(cleaned), max_tokens=20 + 30 * len(batch), timeout=remaining,
                       num_ctx=2048, temperature=0.0, json_mode=True, feature="category_suggest")
         except (RuntimeError, requests.exceptions.RequestException) as e:
             logger.warning("Category suggestions failed for a batch of %d: %s", len(batch), e)
             complete = False
             break
-        for payee, name, category in zip(batch, cleaned, parse(raw, len(batch))):
+        for payee, name, (category, is_sure) in zip(batch, cleaned, parse_with_sure(raw, len(batch))):
             result[payee] = category if name else None
+            sure[payee] = bool(name) and is_sure
 
-    return {"suggestions": result, "complete": complete}
+    return {"suggestions": result, "sure": sure, "complete": complete}

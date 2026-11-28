@@ -47,6 +47,10 @@ public class TransactionService {
     private static final Logger log =
             LoggerFactory.getLogger(TransactionService.class);
 
+    /** Tells the import agents (sorting, watch) that new rows were saved. */
+    @Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher events;
+
     @Autowired
     private TransactionRepository repository;
 
@@ -432,9 +436,12 @@ public class TransactionService {
      * {@code reconciled} counts rows that were already on record from alert
      * emails: the statement row took them over rather than adding a second copy.
      */
-    public record ImportResult(int imported, int duplicates, int skipped, int reconciled) {
+    public record ImportResult(int imported, int duplicates, int skipped, int reconciled, int notInStatement) {
         public ImportResult(int imported, int duplicates, int skipped) {
-            this(imported, duplicates, skipped, 0);
+            this(imported, duplicates, skipped, 0, 0);
+        }
+        public ImportResult(int imported, int duplicates, int skipped, int reconciled) {
+            this(imported, duplicates, skipped, reconciled, 0);
         }
     }
 
@@ -460,6 +467,8 @@ public class TransactionService {
 
         Map<String, String> learnedRules = categoryService.learnedRulesFor(user);
         Set<String> existingIds = new HashSet<>(repository.findExternalIdsByUser(user));
+        Set<String> idsBeforeThisFile = Set.copyOf(existingIds);
+        List<Transaction> onRecord = repository.findByUser(user);
         boolean cardDataPresent = isCard || repository.countByUserAndSource(user, ACCOUNT_CARD) > 0;
 
         Map<String, Integer> siblingCounts = new HashMap<>();
@@ -467,16 +476,26 @@ public class TransactionService {
         List<Transaction> takenOver = new ArrayList<>();
         int duplicates = 0;
         int skipped = 0;
+        LocalDate firstDay = null, lastDay = null;       // the dates this file covers
 
-        // Transactions that arrived from alert emails and no statement has
-        // claimed yet. A statement row for the same money replaces them.
-        List<Transaction> fromAlerts = new ArrayList<>(repository.findByUser(user).stream()
+        // Transactions that arrived from alert emails, bank SMS or Spend Guard payments and
+        // no statement has claimed yet. A statement row for the same money
+        // replaces them, keeping any name or category the user fixed.
+        List<Transaction> fromAlerts = new ArrayList<>(onRecord.stream()
                 .filter(t -> t.getExternalId() != null
-                        && t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX))
+                        && (t.getExternalId().startsWith(InboundEmailService.EXTERNAL_ID_PREFIX)
+                            || t.getExternalId().startsWith(SmsImportService.EXTERNAL_ID_PREFIX)
+                            || t.getExternalId().startsWith(SpendGuardLinks.EXTERNAL_ID_PREFIX)))
                 .filter(t -> t.getAmount() != null && t.getDate() != null)
                 .toList());
 
-        for (Map<String, Object> row : rows) {
+        // Rows that repeat a payment an earlier statement of this account brought
+        // in under another description (another app or bank's file)
+        Set<Integer> overlapping = overlappingRows(rows, onRecord, idsBeforeThisFile,
+                                                   isCard ? ACCOUNT_CARD : "STATEMENT", accountRef);
+
+        for (int index = 0; index < rows.size(); index++) {
+            Map<String, Object> row = rows.get(index);
             try {
                 // A bulk import carries its own dates; a row without one is not
                 // a transaction that happened today, it is a row we cannot
@@ -492,6 +511,8 @@ public class TransactionService {
                     skipped++;
                     continue;
                 }
+                if (firstDay == null || date.isBefore(firstDay)) firstDay = date;
+                if (lastDay == null || date.isAfter(lastDay)) lastDay = date;
 
                 Double amount = StatementImport.parseAmount(row.get("amount"));
                 if (amount == null || amount == 0.0) {
@@ -530,6 +551,11 @@ public class TransactionService {
                     continue;
                 }
 
+                if (overlapping.contains(index)) {
+                    duplicates++;
+                    continue;
+                }
+
                 Transaction t = new Transaction();
                 t.setDate(date);
                 t.setMerchant(merchant);
@@ -554,9 +580,25 @@ public class TransactionService {
             repository.saveAll(takenOver);
         }
 
+        // Spend Guard payments dated inside this statement that no row matched:
+        // the user may not have paid, or paid from another account. They're
+        // flagged for the user to answer (keep or remove), never deleted here.
+        List<Transaction> notInStatement = new ArrayList<>();
+        for (Transaction t : fromAlerts) {
+            if (SpendGuardLinks.SOURCE.equals(t.getSource()) && firstDay != null
+                    && !t.getDate().isBefore(firstDay) && !t.getDate().isAfter(lastDay)) {
+                t.setSource(SpendGuardLinks.SOURCE_NOT_IN_STATEMENT);
+                notInStatement.add(t);
+            }
+        }
+        if (!notInStatement.isEmpty()) {
+            repository.saveAll(notInStatement);
+        }
+
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
             applyPaymentPatterns(user);
+            if (events != null) events.publishEvent(new com.fintwin.agent.TransactionsImported(user.getId(), "STATEMENT"));
 
             // The first card statement makes bank-side bill payments already on
             // record duplicates of these purchases — restamp them, as the AA
@@ -574,7 +616,86 @@ public class TransactionService {
             profileService.saveScoreSnapshot(user);
         }
 
-        return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size());
+        if (!overlapping.isEmpty()) {
+            log.info("Statement import: {} rows matched earlier statement rows by date and amount for user #{}",
+                     overlapping.size(), user.getId());
+        }
+        return new ImportResult(toSave.size(), duplicates, skipped, takenOver.size(), notInStatement.size());
+    }
+
+    /**
+     * Positions of rows that repeat a payment an earlier statement import of the
+     * same account already holds, described in other words (a UPI app's
+     * "Paid to X" against a bank's "UPI/DR/412233/X/..."), so their exact key
+     * misses. Decided over the whole file, so the result never depends on row
+     * order (banks often list newest first):
+     *   1. rows whose exact key is on record use up their own earlier row;
+     *   2. the rest match an earlier row with the same amount on the same day;
+     *   3. what is still unmatched may match one a day either side, as banks
+     *      post a late-night payment the next day.
+     * Each earlier row is matched once, so two real ₹20 chais on one day stay
+     * two, and only earlier rows inside this file's dates count, so a payment on
+     * the file's first day is never taken for one the day before it.
+     */
+    private static Set<Integer> overlappingRows(List<Map<String, Object>> rows, List<Transaction> onRecord,
+                                                Set<String> idsBefore, String source, String accountRef) {
+        record Row(int index, LocalDate date, double amount, String externalId) {}
+        List<Row> parsed = new ArrayList<>();
+        Map<String, Integer> siblings = new HashMap<>();
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            try {
+                LocalDate date = row.get("date") != null ? DateNormalizer.parseFlexible(row.get("date").toString()) : null;
+                Double amount = StatementImport.parseAmount(row.get("amount"));
+                if (date == null || amount == null || amount == 0.0) continue;
+                String merchant = row.get("merchant") != null && !row.get("merchant").toString().isBlank()
+                        ? row.get("merchant").toString().trim() : "Unknown";
+                Double balance = StatementImport.parseAmount(row.get("balance"));
+                int ordinal = siblings.merge(StatementImport.siblingKey(date, amount, merchant, balance), 1, Integer::sum) - 1;
+                parsed.add(new Row(i, date, amount, StatementImport.externalId(date, amount, merchant, balance, ordinal)));
+            } catch (Exception e) {
+                // the import loop skips and counts this row
+            }
+        }
+        if (parsed.isEmpty()) return Set.of();
+        LocalDate first = parsed.stream().map(Row::date).min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = parsed.stream().map(Row::date).max(LocalDate::compareTo).orElseThrow();
+
+        Map<String, Integer> earlier = new HashMap<>();
+        Map<String, String> earlierKeyById = new HashMap<>();
+        for (Transaction t : onRecord) {
+            if (source.equals(t.getSource()) && t.getDate() != null && t.getAmount() != null
+                    && !t.getDate().isBefore(first) && !t.getDate().isAfter(last)
+                    && t.getExternalId() != null && t.getExternalId().startsWith(StatementImport.EXTERNAL_ID_PREFIX)
+                    && StatementImport.sameAccount(t.getAccountRef(), accountRef)) {
+                String key = StatementImport.overlapKey(t.getDate(), t.getAmount());
+                earlier.merge(key, 1, Integer::sum);
+                earlierKeyById.put(t.getExternalId(), key);
+            }
+        }
+        if (earlier.isEmpty()) return Set.of();
+
+        List<Row> unmatched = new ArrayList<>();
+        for (Row r : parsed) {
+            if (idsBefore.contains(r.externalId())) {
+                String key = earlierKeyById.get(r.externalId());
+                if (key != null) StatementImport.takeOne(earlier, key);
+            } else {
+                unmatched.add(r);
+            }
+        }
+        Set<Integer> out = new HashSet<>();
+        for (Row r : unmatched) {
+            if (StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date(), r.amount()))) out.add(r.index());
+        }
+        for (Row r : unmatched) {
+            if (out.contains(r.index())) continue;
+            if (StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date().minusDays(1), r.amount()))
+                    || StatementImport.takeOne(earlier, StatementImport.overlapKey(r.date().plusDays(1), r.amount()))) {
+                out.add(r.index());
+            }
+        }
+        return out;
     }
 
     /**
@@ -670,7 +791,7 @@ public class TransactionService {
 
     private static final Set<String> UNSORTED = Set.of("other", "others", "uncategorized", "uncategorised");
 
-    private static boolean unsorted(Transaction t) {
+    public static boolean unsorted(Transaction t) {
         return t.getCategory() == null || UNSORTED.contains(t.getCategory().trim().toLowerCase());
     }
 
@@ -751,6 +872,106 @@ public class TransactionService {
                     return m;
                 })
                 .toList();
+    }
+
+    /**
+     * Payees the sorting agent placed on its own and the user hasn't looked
+     * at yet, biggest spend first. Changing one goes through the usual
+     * category edit (applyToSimilar), which also teaches a rule.
+     */
+    @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
+    public List<Map<String, Object>> autoSortedPayees(int limit) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        Map<String, Object[]> groups = new LinkedHashMap<>();   // key → {name, count, total, sampleId, merchant, category}
+        for (Transaction t : repository.findByUser(user)) {
+            if (!com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource()) || t.getCategoryReview() != null) continue;
+            if (t.getAmount() == null || t.getAmount() >= 0) continue;
+            String key = com.fintwin.agent.SortingAgent.payeeKey(categoryService, t.getMerchant()) + "|" + t.getCategory();
+            Object[] g = groups.computeIfAbsent(key, k -> new Object[] {
+                    com.fintwin.util.MerchantCategorizer.payeeOf(t.getMerchant() == null ? "Unknown" : t.getMerchant()),
+                    0, 0.0, t.getId(), t.getMerchant(), t.getCategory()});
+            g[1] = (int) g[1] + 1;
+            g[2] = (double) g[2] - t.getAmount();
+        }
+        return groups.values().stream()
+                .sorted((a, b) -> Double.compare((double) b[2], (double) a[2]))
+                .limit(Math.max(1, Math.min(limit, 100)))
+                .map(g -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("payee", g[0]);
+                    m.put("count", g[1]);
+                    m.put("total", Math.round((double) g[2] * 100) / 100.0);
+                    m.put("sampleId", g[3]);
+                    m.put("merchant", g[4]);
+                    m.put("category", g[5]);
+                    return m;
+                })
+                .toList();
+    }
+
+    /**
+     * "These are right": marks the agent's choice for these payees as
+     * confirmed and remembers each as a rule, so they no longer need review.
+     * Returns how many transactions were confirmed.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public int confirmAutoSorted(List<String> merchants) {
+        return reviewAutoSorted(merchants, null);
+    }
+
+    /**
+     * The agent got this payee wrong: move every payment it auto-sorted for
+     * them to {@code category}, record the correction (a training label) and
+     * remember the right category for next time.
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "user-insights",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()"),
+        @CacheEvict(value = "user-score",
+                    key = "T(com.fintwin.security.SecurityUtils).getCurrentUserEmail()")
+    })
+    @PreAuthorize("hasAuthority('WRITE_OWN_TRANSACTIONS')")
+    @Transactional
+    public int correctAutoSorted(String merchant, String category) {
+        String c = category == null ? "" : category.trim();
+        if (c.isEmpty() || c.length() > 50) throw new IllegalArgumentException("Choose a category");
+        if (merchant == null || merchant.isBlank()) throw new IllegalArgumentException("Which payee?");
+        return reviewAutoSorted(List.of(merchant), c);
+    }
+
+    /** Confirms (chosen = null) or corrects the agent's rows for these payees; returns rows changed. */
+    private int reviewAutoSorted(List<String> merchants, String chosen) {
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        if (merchants == null || merchants.isEmpty()) return 0;
+        Set<String> keys = new HashSet<>();
+        for (String m : merchants.stream().limit(100).toList())
+            if (m != null && !m.isBlank()) keys.add(com.fintwin.agent.SortingAgent.payeeKey(categoryService, m));
+
+        List<Transaction> changed = new ArrayList<>();
+        Map<String, String> rules = new LinkedHashMap<>();
+        for (Transaction t : repository.findByUser(user)) {
+            if (!com.fintwin.util.Categorized.LLM_AUTO.equals(t.getCategorySource()) || t.getCategoryReview() != null) continue;
+            if (!keys.contains(com.fintwin.agent.SortingAgent.payeeKey(categoryService, t.getMerchant()))) continue;
+            String category = chosen == null ? t.getCategory() : chosen;
+            t.recordReview(category, false);   // same as predicted → CONFIRMED, else CORRECTED
+            changed.add(t);
+            // The payee's name, not this row's text with its bank reference, so
+            // the rule (a substring match) also catches the next payment.
+            String payee = com.fintwin.util.MerchantCategorizer.payeeOf(t.getMerchant());
+            rules.putIfAbsent(payee != null && payee.trim().length() >= 5 ? payee : t.getMerchant(), category);
+        }
+        if (!changed.isEmpty()) repository.saveAll(changed);
+        rules.forEach((merchant, category) -> categoryService.rememberRule(user, merchant, category));
+        return changed.size();
     }
 
     /**

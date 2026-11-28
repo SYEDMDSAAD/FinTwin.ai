@@ -44,6 +44,22 @@ public final class GoalMath {
             List<FinancialGoal> goals,
             Map<YearMonth, Double> netSavingsByMonth,
             YearMonth currentMonth) {
+        return allocateSavings(goals, netSavingsByMonth, currentMonth, Map.of());
+    }
+
+    /**
+     * The same split, with earmarks: money an approved salary plan set aside for
+     * a goal in a month (goal id → rupees, per month). Earmarked goals take from
+     * that month's savings first, up to the earmark and what they still need;
+     * when the savings don't cover every earmark, each gets the same fraction of
+     * its earmark. Whatever is left splits as usual. An earmark is a priority,
+     * not extra money: a month with no savings funds nothing.
+     */
+    public static Map<Long, Double> allocateSavings(
+            List<FinancialGoal> goals,
+            Map<YearMonth, Double> netSavingsByMonth,
+            YearMonth currentMonth,
+            Map<YearMonth, Map<Long, Double>> earmarks) {
 
         Map<Long, Double> allocated = new HashMap<>();
         YearMonth start = null;
@@ -59,6 +75,8 @@ public final class GoalMath {
                 month = month.plusMonths(1)) {
 
             double pool = Math.max(0.0, netSavingsByMonth.getOrDefault(month, 0.0));
+            pool -= fundEarmarks(goals, earmarks.getOrDefault(month, Map.of()), month,
+                                 currentMonth, pool, allocated);
 
             while (pool > EPSILON) {
                 List<FinancialGoal> open = new ArrayList<>();
@@ -86,6 +104,33 @@ public final class GoalMath {
             }
         }
         return allocated;
+    }
+
+    /** Gives earmarked goals their share of this month's pool; returns what it gave. */
+    private static double fundEarmarks(List<FinancialGoal> goals, Map<Long, Double> marks,
+                                       YearMonth month, YearMonth currentMonth,
+                                       double pool, Map<Long, Double> allocated) {
+        if (marks.isEmpty() || pool <= EPSILON) return 0.0;
+        Map<Long, Double> asks = new HashMap<>();
+        double askSum = 0.0;
+        for (FinancialGoal g : goals) {
+            Double mark = marks.get(g.getId());
+            if (mark == null || mark <= 0 || !accruesIn(g, month, currentMonth)) continue;
+            double target = g.getTargetAmount() != null ? g.getTargetAmount() : 0.0;
+            double ask = Math.min(mark, Math.max(0.0, target - allocated.get(g.getId())));
+            if (ask <= EPSILON) continue;
+            asks.put(g.getId(), ask);
+            askSum += ask;
+        }
+        if (askSum <= EPSILON) return 0.0;
+        double scale = Math.min(1.0, pool / askSum);
+        double given = 0.0;
+        for (Map.Entry<Long, Double> a : asks.entrySet()) {
+            double take = a.getValue() * scale;
+            allocated.merge(a.getKey(), take, Double::sum);
+            given += take;
+        }
+        return given;
     }
 
     private static boolean accruesIn(FinancialGoal goal, YearMonth month,

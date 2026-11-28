@@ -8,6 +8,7 @@ import {
   Shield, Bell, Edit2, Lock, FileText, FlaskConical
 } from "lucide-react";
 import { AI_MODES } from "../constants/aiModes";
+import { saveAiPrefs } from "../services/aiPrefs";
 import ImportsPage from "./ImportsPage";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -41,26 +42,26 @@ function getPreviousMonthLabels(n) {
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
   .ob-page * { box-sizing:border-box; }
-  .ob-page { font-family:'DM Sans',system-ui,sans-serif; }
+  .ob-page { font-family:inherit; }
 
-  .ob-input { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:13px; padding:13px 16px; color:#e2e8f0; font-size:14px; outline:none; font-family:inherit; transition:all 0.2s; }
-  .ob-input:focus { border-color:rgba(167,139,250,0.45); box-shadow:0 0 0 3px rgba(167,139,250,0.07); }
-  .ob-input::placeholder { color:rgba(100,116,139,0.4); }
+  .ob-input { width:100%; background:var(--bg-input); border:1px solid var(--border-card); border-radius:13px; padding:13px 16px; color:var(--text-primary); font-size:14px; outline:none; font-family:inherit; transition:all 0.2s; }
+  .ob-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .ob-input::placeholder { color:var(--text-dim); }
   .ob-input::-webkit-inner-spin-button { -webkit-appearance:none; }
 
-  .goal-chip { padding:9px 18px; border-radius:100px; border:1px solid rgba(255,255,255,0.09); background:rgba(255,255,255,0.03); color:rgba(148,163,184,0.7); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-  .goal-chip:hover { border-color:rgba(167,139,250,0.3); color:#e2e8f0; background:rgba(167,139,250,0.06); }
-  .goal-chip.active { background:rgba(167,139,250,0.18); border-color:rgba(167,139,250,0.45); color:#fff; font-weight:700; }
+  .goal-chip { padding:9px 18px; border-radius:100px; border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-dim); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+  .goal-chip:hover { border-color:var(--accent); color:var(--text-primary); background:var(--accent-soft); }
+  .goal-chip.active { background:var(--accent-soft); border-color:var(--accent); color:#fff; font-weight:700; }
 
-  .ai-mode-card { padding:14px 16px; border-radius:14px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:14px; }
-  .ai-mode-card:hover:not(.selected) { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.14); }
-  .ai-mode-card.selected { background:rgba(167,139,250,0.1); border-color:rgba(167,139,250,0.4); }
+  .ai-mode-card { padding:14px 16px; border-radius:14px; border:1px solid var(--border-card); background:var(--bg-input); cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:14px; }
+  .ai-mode-card:hover:not(.selected) { background:var(--bg-input); border-color:var(--border-card); }
+  .ai-mode-card.selected { background:var(--accent-soft); border-color:var(--accent); }
 
   .ob-toggle { width:46px; height:26px; border-radius:99px; border:none; cursor:pointer; position:relative; transition:background 0.3s; flex-shrink:0; }
   .ob-toggle-thumb { position:absolute; top:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform 0.3s; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
 
-  .otp-box { width:44px; height:52px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); color:#e2e8f0; font-size:20px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
-  .otp-box:focus { border-color:rgba(167,139,250,0.5); box-shadow:0 0 0 3px rgba(167,139,250,0.07); }
+  .otp-box { width:44px; height:52px; border-radius:12px; background:var(--bg-input); border:1px solid var(--border-card); color:var(--text-primary); font-size:20px; font-weight:700; text-align:center; outline:none; font-family:inherit; transition:all 0.2s; }
+  .otp-box:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
 
   @keyframes obFade { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
   .ob-fade { animation:obFade 0.35s ease both; }
@@ -81,16 +82,16 @@ const CSS = `
 
   @keyframes bounceDot { 0%,80%,100%{transform:scale(0)} 40%{transform:scale(1)} }
 
-  .ob-breadcrumb-bar { display:flex; align-items:center; justify-content:space-between; padding:0 48px; height:56px; border-bottom:1px solid rgba(255,255,255,0.06); position:sticky; top:0; background:rgba(8,10,15,0.95); backdrop-filter:blur(20px); z-index:10; }
+  .ob-breadcrumb-bar { display:flex; align-items:center; justify-content:space-between; padding:0 48px; height:56px; border-bottom:1px solid var(--bg-input); position:sticky; top:0; background:rgba(8,10,15,0.95); backdrop-filter:blur(20px); z-index:10; }
   @media(max-width:640px) { .ob-breadcrumb-bar { padding:0 16px; overflow-x:auto; } }
 
   .ob-grid { display:grid; grid-template-columns:1fr 360px; gap:48px; padding:48px 48px; max-width:1140px; margin:0 auto; }
   @media(max-width:900px) { .ob-grid { grid-template-columns:1fr; } .ob-right-panel { display:none!important; } }
   @media(max-width:640px) { .ob-grid { padding:32px 20px; } }
 
-  .review-card { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px 20px; position:relative; }
-  .review-card-edit { position:absolute; top:14px; right:16px; font-size:12px; font-weight:600; color:#a78bfa; background:none; border:none; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:5px; }
-  .review-card-edit:hover { color:#c4b5fd; }
+  .review-card { background:var(--bg-input); border:1px solid var(--border-card); border-radius:16px; padding:18px 20px; position:relative; }
+  .review-card-edit { position:absolute; top:14px; right:16px; font-size:12px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:5px; }
+  .review-card-edit:hover { color:var(--accent); }
 `;
 
 // ── Breadcrumb ─────────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ function Breadcrumb({ step, onNavigate }) {
               cursor: i < step ? "pointer" : "default",
               fontSize: 13,
               fontWeight: i === step ? 700 : 500,
-              color: i === step ? "#e2e8f0" : i < step ? "#a78bfa" : "rgba(148,163,184,0.35)",
+              color: i === step ? "var(--text-primary)" : i < step ? "var(--accent)" : "var(--text-dim)",
               fontFamily: "inherit",
               textDecoration: i === step ? "underline" : "none",
               textUnderlineOffset: 3,
@@ -117,7 +118,7 @@ function Breadcrumb({ step, onNavigate }) {
             {label}
           </button>
           {i < 5 && (
-            <span style={{ fontSize: 12, color: "rgba(148,163,184,0.25)" }}>›</span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>›</span>
           )}
         </div>
       ))}
@@ -129,12 +130,12 @@ function Breadcrumb({ step, onNavigate }) {
 
 function ProgressBar({ step }) {
   return (
-    <div style={{ height: 2, background: "rgba(255,255,255,0.06)" }}>
+    <div style={{ height: 2, background: "var(--bg-input)" }}>
       <div
         style={{
           height: "100%",
           width: `${(step / 5) * 100}%`,
-          background: "linear-gradient(90deg,#a78bfa,#22d3ee)",
+          background: "linear-gradient(90deg,var(--accent),var(--info))",
           transition: "width 0.4s ease",
         }}
       />
@@ -150,34 +151,34 @@ function SecurityPanel() {
       <div className="shield-glow" style={{ position: "relative" }}>
         <div style={{
           width: 160, height: 160, borderRadius: "50%",
-          background: "radial-gradient(circle,rgba(167,139,250,0.18) 0%,transparent 70%)",
+          background: "radial-gradient(circle,var(--accent-soft) 0%,transparent 70%)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <div style={{
             width: 96, height: 96, borderRadius: "50%",
-            background: "rgba(167,139,250,0.12)",
-            border: "1px solid rgba(167,139,250,0.3)",
+            background: "var(--accent-soft)",
+            border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 0 48px rgba(167,139,250,0.2)",
+            boxShadow: "0 0 48px var(--accent)",
           }}>
-            <Shield size={44} color="#a78bfa" />
+            <Shield size={44} color="var(--accent)" />
           </div>
         </div>
       </div>
       <div style={{
-        background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(167,139,250,0.22)",
+        background: "var(--bg-input)",
+        border: "1px solid var(--accent)",
         borderRadius: 16,
         padding: "18px 22px",
         textAlign: "center",
         maxWidth: 280,
-        boxShadow: "0 4px 24px rgba(167,139,250,0.10)",
+        boxShadow: "0 4px 24px var(--accent-soft)",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginBottom: 8 }}>
-          <Lock size={13} color="#a78bfa" />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", letterSpacing: "0.01em" }}>AES-256 Encrypted</span>
+          <Lock size={13} color="var(--accent)" />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>AES-256 Encrypted</span>
         </div>
-        <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", lineHeight: 1.65 }}>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.65 }}>
           Every field in your financial profile is encrypted at rest. 2FA adds an extra layer of protection.
         </div>
       </div>
@@ -202,25 +203,25 @@ function BankPanel({ data }) {
   const other       = assets - depository - investments - realEstate;
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "24px", transition: "all 0.4s ease" }}>
+    <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 20, padding: "24px", transition: "all 0.4s ease" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em" }}>LIVE SNAPSHOT</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)" }}>Live snapshot</div>
         {isLoaded && (
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", color: "#4ade80" }}>
-            SYNCED
+          <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: "var(--good-soft)", border: "1px solid var(--good-soft)", color: "var(--good)" }}>
+            Synced
           </span>
         )}
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: "rgba(148,163,184,0.5)", marginBottom: 4 }}>Total net worth</div>
-        <div style={{ fontSize: 32, fontWeight: 800, color: isLoaded ? "#fff" : "rgba(255,255,255,0.2)", transition: "color 0.4s" }}>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Total net worth</div>
+        <div style={{ fontSize: 32, fontWeight: 650, color: isLoaded ? "#fff" : "var(--border-card)", transition: "color 0.4s" }}>
           {isLoaded ? fmt(nw) : "Syncing…"}
         </div>
         {isLoaded && (
           <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: "#4ade80" }}>● Assets {fmt(assets)}</span>
-            <span style={{ fontSize: 12, color: "#f87171" }}>● Debts {fmt(liabs)}</span>
+            <span style={{ fontSize: 12, color: "var(--good)" }}>● Assets {fmt(assets)}</span>
+            <span style={{ fontSize: 12, color: "var(--bad)" }}>● Debts {fmt(liabs)}</span>
           </div>
         )}
       </div>
@@ -231,16 +232,16 @@ function BankPanel({ data }) {
         { label: "Real estate", val: isLoaded ? realEstate  : 0 },
         { label: "Other",       val: isLoaded ? Math.max(0, other) : 0 },
       ].map(r => (
-        <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 12 }}>
-          <span style={{ color: "rgba(148,163,184,0.6)" }}>{r.label}</span>
-          <span style={{ color: isLoaded ? "rgba(255,255,255,0.7)" : "rgba(148,163,184,0.3)" }}>
+        <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--bg-input)", fontSize: 12 }}>
+          <span style={{ color: "var(--text-dim)" }}>{r.label}</span>
+          <span style={{ color: isLoaded ? "rgba(255,255,255,0.7)" : "var(--text-dim)" }}>
             {isLoaded ? fmt(r.val) : "—"}
           </span>
         </div>
       ))}
 
       {!isLoaded && (
-        <p style={{ fontSize: 11, color: "rgba(148,163,184,0.35)", marginTop: 12, textAlign: "center" }}>
+        <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 12, textAlign: "center" }}>
           Real numbers appear once sync completes
         </p>
       )}
@@ -252,21 +253,21 @@ function ProfilePanel({ income, expenses }) {
   const savings = Math.max(0, (Number(income) || 0) - (Number(expenses) || 0));
   const rate    = income > 0 ? Math.round((savings / Number(income)) * 100) : 0;
   return (
-    <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "24px" }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 16 }}>LIVE PREVIEW</div>
+    <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 20, padding: "24px" }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 16 }}>Live preview</div>
       {[
-        { label: "Monthly Income",   value: income,   color: "#4ade80" },
-        { label: "Monthly Expenses", value: expenses,  color: "#f87171" },
-        { label: "Est. Savings",     value: String(savings), color: "#a78bfa" },
+        { label: "Monthly Income",   value: income,   color: "var(--good)" },
+        { label: "Monthly Expenses", value: expenses,  color: "var(--bad)" },
+        { label: "Est. Savings",     value: String(savings), color: "var(--accent)" },
       ].map(r => (
         <div key={r.label} style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{r.label}</span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{r.label}</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: r.color }}>
               ₹{Number(r.value || 0).toLocaleString("en-IN")}
             </span>
           </div>
-          <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 99 }}>
+          <div style={{ height: 4, background: "var(--bg-input)", borderRadius: 99 }}>
             <div style={{
               height: "100%", borderRadius: 99,
               background: r.color,
@@ -277,9 +278,9 @@ function ProfilePanel({ income, expenses }) {
         </div>
       ))}
       {income > 0 && (
-        <div style={{ background: rate >= 20 ? "rgba(74,222,128,0.07)" : "rgba(251,191,36,0.07)", border: `1px solid ${rate >= 20 ? "rgba(74,222,128,0.2)" : "rgba(251,191,36,0.2)"}`, borderRadius: 10, padding: "10px 14px", marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>Savings rate </span>
-          <span style={{ fontSize: 14, fontWeight: 800, color: rate >= 20 ? "#4ade80" : "#fbbf24" }}>{rate}%</span>
+        <div style={{ background: rate >= 20 ? "var(--good-soft)" : "var(--warn-soft)", border: `1px solid ${rate >= 20 ? "var(--good-soft)" : "var(--warn-soft)"}`, borderRadius: 10, padding: "10px 14px", marginTop: 8 }}>
+          <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Savings rate </span>
+          <span style={{ fontSize: 14, fontWeight: 650, color: rate >= 20 ? "var(--good)" : "var(--warn)" }}>{rate}%</span>
         </div>
       )}
     </div>
@@ -293,10 +294,10 @@ function AIPanel({ aiModes }) {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 20 }}>
       <div style={{
         width: 100, height: 100, borderRadius: "50%",
-        background: "rgba(34,211,238,0.08)",
-        border: "1px solid rgba(34,211,238,0.2)",
+        background: "var(--info-soft)",
+        border: "1px solid var(--info-soft)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 0 48px rgba(34,211,238,0.15)",
+        boxShadow: "0 0 48px var(--info-soft)",
         fontSize: 44,
       }}>
         🧠
@@ -304,12 +305,12 @@ function AIPanel({ aiModes }) {
       <div style={{ textAlign: "center", width: "100%" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 10 }}>
           {selected.map(id => (
-            <span key={id} style={{ fontSize: 11, fontWeight: 700, color: "#22d3ee", background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.2)", borderRadius: 8, padding: "3px 10px" }}>
+            <span key={id} style={{ fontSize: 12, fontWeight: 700, color: "var(--info)", background: "var(--info-soft)", border: "1px solid var(--info-soft)", borderRadius: 8, padding: "3px 10px" }}>
               {modeMap[id]?.icon} {id}
             </span>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 }}>
           Your AI will personalise responses based on the modes you select. You can change this anytime from Settings.
         </div>
       </div>
@@ -346,9 +347,9 @@ export function StatementSnapshot({ months, refreshKey }) {
   return (
     <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: 20, padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.1em" }}>FROM YOUR STATEMENTS</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)" }}>From your statements</div>
         {has && (
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", color: "#4ade80" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 8px", borderRadius: 100, background: "var(--good-soft)", border: "1px solid var(--good-soft)", color: "var(--good)" }}>
             {months.length} {months.length === 1 ? "MONTH" : "MONTHS"}
           </span>
         )}
@@ -362,15 +363,15 @@ export function StatementSnapshot({ months, refreshKey }) {
         </p>
       ) : (
         <>
-          <div style={{ fontSize: 11, color: "var(--text-label)", marginBottom: 4 }}>Last 3 months</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Last 3 months</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Money in</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#4ade80" }}>{fmt(summary.income)}</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Money in</div>
+              <div style={{ fontSize: 20, fontWeight: 650, color: "var(--good)" }}>{fmt(summary.income)}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Money out</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#f87171" }}>{fmt(summary.expenses)}</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Money out</div>
+              <div style={{ fontSize: 20, fontWeight: 650, color: "var(--bad)" }}>{fmt(summary.expenses)}</div>
             </div>
           </div>
           {[
@@ -378,12 +379,12 @@ export function StatementSnapshot({ months, refreshKey }) {
             { label: "Top category",  val: summary.topCategory || "—" },
             { label: "Top merchant",  val: summary.topMerchant || "—" },
           ].map(r => (
-            <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--border-subtle)", fontSize: 13 }}>
+            <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--border-card)", fontSize: 13 }}>
               <span style={{ color: "var(--text-secondary)" }}>{r.label}</span>
               <span style={{ color: "var(--text-primary)", fontWeight: 600, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 190 }}>{r.val}</span>
             </div>
           ))}
-          <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "12px 0 0", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "12px 0 0", lineHeight: 1.5 }}>
             Transfers between your own accounts and card bill payments aren't counted as spending.
           </p>
         </>
@@ -395,7 +396,7 @@ export function StatementSnapshot({ months, refreshKey }) {
 // How many months the uploaded statements cover, against the 2–3 FinTwin needs
 export function StatementProgress({ months }) {
   const n = months.length;
-  const tone = n >= 2 ? "#4ade80" : n === 1 ? "#fbbf24" : "rgba(148,163,184,0.6)";
+  const tone = n >= 2 ? "var(--good)" : n === 1 ? "var(--warn)" : "var(--text-dim)";
   const text = n === 0
     ? "Nothing imported yet — start with your main bank account."
     : n === 1
@@ -404,12 +405,12 @@ export function StatementProgress({ months }) {
         ? "2 months in — good to go. A third month makes trends sharper."
         : `${n} months in — great, that's enough to see your patterns.`;
   return (
-    <div role="status" style={{ padding: "14px 16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: `1px solid ${n ? tone + "55" : "rgba(255,255,255,0.07)"}`, marginBottom: 20 }}>
+    <div role="status" style={{ padding: "14px 16px", borderRadius: 14, background: "var(--bg-input)", border: `1px solid ${n ? tone + "55" : "var(--border-card)"}`, marginBottom: 20 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: tone, marginBottom: n ? 8 : 0 }}>{text}</div>
       {n > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {months.map(m => (
-            <span key={m} style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: 999, padding: "3px 10px" }}>
+            <span key={m} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", background: "var(--accent-soft)", border: "none", borderRadius: 999, padding: "3px 10px" }}>
               {monthLabel(m)}
             </span>
           ))}
@@ -647,18 +648,18 @@ export default function OnboardingPage() {
           <div style={{
             display: "flex", flexDirection: "column", gap: 10,
             background: "linear-gradient(135deg,#1a1025,#0f1520)",
-            border: "1px solid rgba(167,139,250,0.35)",
+            border: "1px solid var(--accent)",
             borderRadius: 16, padding: "16px 18px",
             maxWidth: 340, width: "100%",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.1)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--accent-soft)",
             opacity: t.visible ? 1 : 0,
             transition: "opacity 0.2s",
           }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🤖</div>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--accent-soft)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🤖</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 3 }}>AI-generated transactions</div>
-                <div style={{ fontSize: 12, color: "rgba(148,163,184,0.65)", lineHeight: 1.55 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 3 }}>AI-generated transactions</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.55 }}>
                   FinTwin AI will create {manualMonths * 2} months of realistic transaction history from your data.
                 </div>
               </div>
@@ -666,13 +667,13 @@ export default function OnboardingPage() {
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button
                 onClick={() => { toast.dismiss(t.id); setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
-                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--info-soft)", background: "var(--info-soft)", color: "var(--info)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
               >
                 Upload statement →
               </button>
               <button
                 onClick={() => toast.dismiss(t.id)}
-                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.6)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
               >
                 OK
               </button>
@@ -701,12 +702,9 @@ export default function OnboardingPage() {
         if (monthlyExpenses && Number(monthlyExpenses) > 0) payload.expensesLast3Months = Number(monthlyExpenses) * manualMonths;
         payload.numberOfMonths = manualMonths;
       }
-      // Store AI preferences locally
-      localStorage.setItem("aiMode", JSON.stringify(aiModes));
-      localStorage.setItem("dailyInsights", String(dailyInsights));
-      // TODO: include aiMode/dailyInsights in payload when backend supports it
-
       await API.post("/onboarding/complete", payload);
+      // The first mode picked becomes the Copilot's default; kept on the server
+      saveAiPrefs({ mode: aiModes[0] || "Savings Advisor", dailyInsights }).catch(() => {});
       sessionStorage.removeItem("ob-step");
       sessionStorage.removeItem("ob-manual");
       sessionStorage.removeItem("ob-stmt-months");
@@ -751,16 +749,16 @@ export default function OnboardingPage() {
     return (
       <>
         <style>{CSS}</style>
-        <div className="ob-page" style={{ minHeight: "100vh", background: "#080a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ position: "fixed", top: "-10%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle,rgba(167,139,250,0.1) 0%,transparent 70%)", pointerEvents: "none" }} />
-          <div style={{ width: "100%", maxWidth: 480, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 24, padding: "44px 40px", textAlign: "center" }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>🧠</div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Building Your Financial Twin</h2>
-            <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", margin: "0 0 32px" }}>Personalizing your financial experience...</p>
+        <div className="ob-page" style={{ minHeight: "100vh", background: "var(--bg-base)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ position: "fixed", top: "-10%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle,var(--accent-soft) 0%,transparent 70%)", pointerEvents: "none" }} />
+          <div style={{ width: "100%", maxWidth: 480, background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 24, padding: "44px 40px", textAlign: "center" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--accent-soft)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>🧠</div>
+            <h2 style={{ fontSize: 20, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 6px" }}>Building Your Financial Twin</h2>
+            <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 32px" }}>Personalizing your financial experience...</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {LOADING_STEPS.map((s, i) => (
-                <div key={s} className="loading-step" style={{ animationDelay: `${i * 0.3}s`, display: "flex", alignItems: "center", gap: 10, background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.14)", borderRadius: 10, padding: "10px 14px", textAlign: "left" }}>
-                  <CheckCircle size={14} color="#4ade80" />
+                <div key={s} className="loading-step" style={{ animationDelay: `${i * 0.3}s`, display: "flex", alignItems: "center", gap: 10, background: "var(--accent-soft)", border: "none", borderRadius: 10, padding: "10px 14px", textAlign: "left" }}>
+                  <CheckCircle size={14} color="var(--good)" />
                   <span style={{ fontSize: 12, color: "#d1d5db" }}>{s}</span>
                 </div>
               ))}
@@ -775,23 +773,23 @@ export default function OnboardingPage() {
   return (
     <>
       <style>{CSS}</style>
-      <div className="ob-page" style={{ minHeight: "100vh", background: "#080a0f", position: "relative" }}>
+      <div className="ob-page" style={{ minHeight: "100vh", background: "var(--bg-base)", position: "relative" }}>
 
         {/* Ambient glows */}
-        <div style={{ position: "fixed", top: "-15%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle,rgba(167,139,250,0.08) 0%,transparent 70%)", pointerEvents: "none" }} />
-        <div style={{ position: "fixed", bottom: "-10%", right: "5%",  width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,rgba(34,211,238,0.05) 0%,transparent 70%)",  pointerEvents: "none" }} />
+        <div style={{ position: "fixed", top: "-15%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle,var(--accent-soft) 0%,transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "fixed", bottom: "-10%", right: "5%",  width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,var(--info-soft) 0%,transparent 70%)",  pointerEvents: "none" }} />
 
         {/* ── Breadcrumb bar ── */}
         <div className="ob-breadcrumb-bar">
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginRight: 24 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,#a78bfa,#22d3ee)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#fff" }}>F</div>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>FinTwin AI</span>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent-strong)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 650, color: "#fff" }}>F</div>
+            <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-primary)" }}>FinTwin AI</span>
           </div>
 
           <Breadcrumb step={step} onNavigate={setStep} />
 
-          <div style={{ flexShrink: 0, marginLeft: 24, fontSize: 11, color: "rgba(148,163,184,0.4)" }}>
+          <div style={{ flexShrink: 0, marginLeft: 24, fontSize: 12, color: "var(--text-dim)" }}>
             Step {step + 1} of 6
           </div>
         </div>
@@ -808,17 +806,17 @@ export default function OnboardingPage() {
             {/* ══ STEP 0 — SECURITY ══ */}
             {step === 0 && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(167,139,250,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 1 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Secure your financial twin</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 32px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>Step 1 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Secure your financial twin</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 32px", lineHeight: 1.7 }}>
                   Your data is protected with AES-256 encryption at rest. Adding 2FA means a one-time code is required every time you log in.
                 </p>
 
                 {/* 2FA setup card */}
-                <div style={{ background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 18, overflow: "hidden", marginBottom: 16 }}>
-                  <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(167,139,250,0.1)", display: "flex", alignItems: "center", gap: 12 }}>
-                    <Shield size={16} color="#a78bfa" />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Set up 2FA with an authenticator app</span>
+                <div style={{ background: "var(--accent-soft)", border: "none", borderRadius: 18, overflow: "hidden", marginBottom: 16 }}>
+                  <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--accent-soft)", display: "flex", alignItems: "center", gap: 12 }}>
+                    <Shield size={16} color="var(--accent)" />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Set up 2FA with an authenticator app</span>
                   </div>
                   <div style={{ padding: "20px" }}>
                     {/* Steps */}
@@ -828,18 +826,18 @@ export default function OnboardingPage() {
                       "Scan the QR code below or enter the setup key manually",
                     ].map((s, i) => (
                       <div key={s} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#a78bfa", flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
-                        <span style={{ fontSize: 13, color: "rgba(148,163,184,0.7)", lineHeight: 1.5 }}>{s}</span>
+                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--accent-soft)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--accent)", flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                        <span style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>{s}</span>
                       </div>
                     ))}
 
                     {/* ── 2FA already active ── */}
                     {twoFaAlreadyOn ? (
-                      <div style={{ marginTop: 20, background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 14, padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
-                        <CheckCircle size={28} color="#4ade80" style={{ flexShrink: 0 }} />
+                      <div style={{ marginTop: 20, background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 14, padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
+                        <CheckCircle size={28} color="var(--good)" style={{ flexShrink: 0 }} />
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#4ade80", marginBottom: 3 }}>2FA is already enabled</div>
-                          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>Your account is secured. Click Continue below.</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--good)", marginBottom: 3 }}>2FA is already enabled</div>
+                          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Your account is secured. Click Continue below.</div>
                         </div>
                       </div>
                     ) : (
@@ -847,38 +845,38 @@ export default function OnboardingPage() {
                         {/* QR code + setup key */}
                         <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginTop: 20, flexWrap: "wrap" }}>
                           {/* QR box */}
-                          <div style={{ width: 128, height: 128, background: qrData ? "#fff" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+                          <div style={{ width: 128, height: 128, background: qrData ? "#fff" : "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
                             {qrLoading ? (
-                              <div style={{ fontSize: 11, color: "rgba(148,163,184,0.4)" }}>Loading…</div>
+                              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Loading…</div>
                             ) : qrData ? (
                               <img src={`data:image/png;base64,${qrData.qrCodeBase64}`} alt="Scan with authenticator" width={120} height={120} style={{ display: "block" }} />
                             ) : (
-                              <div style={{ fontSize: 11, color: "rgba(248,113,113,0.6)", textAlign: "center", padding: 8 }}>Failed to load</div>
+                              <div style={{ fontSize: 12, color: "var(--bad)", textAlign: "center", padding: 8 }}>Failed to load</div>
                             )}
                           </div>
 
                           {/* Setup key */}
                           <div style={{ flex: 1, minWidth: 160 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 6 }}>SETUP KEY</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 6 }}>Setup key</div>
                             {qrData ? (
                               <>
-                                <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 14px", fontFamily: "monospace", fontSize: 11, color: "#a78bfa", letterSpacing: "0.1em", wordBreak: "break-all", marginBottom: 8 }}>
+                                <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 10, padding: "10px 14px", fontFamily: "monospace", fontSize: 12, color: "var(--accent)", wordBreak: "break-all", marginBottom: 8 }}>
                                   {qrData.secret}
                                 </div>
-                                <p style={{ fontSize: 11, color: "rgba(100,116,139,0.5)", margin: 0 }}>Keep this key safe. Use it if you lose access to your authenticator app.</p>
+                                <p style={{ fontSize: 12, color: "var(--text-dim)", margin: 0 }}>Keep this key safe. Use it if you lose access to your authenticator app.</p>
                               </>
                             ) : qrError ? (
                               <>
-                                <p style={{ fontSize: 12, color: "rgba(248,113,113,0.7)", margin: "0 0 10px" }}>Could not load QR code.</p>
+                                <p style={{ fontSize: 12, color: "var(--bad)", margin: "0 0 10px" }}>Could not load QR code.</p>
                                 <button
                                   onClick={loadQR}
-                                  style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)", color: "#a78bfa", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                                  style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--accent-soft)", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                                 >
                                   Retry
                                 </button>
                               </>
                             ) : (
-                              <div style={{ fontSize: 12, color: "rgba(148,163,184,0.3)" }}>Loading…</div>
+                              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Loading…</div>
                             )}
                           </div>
                         </div>
@@ -886,7 +884,7 @@ export default function OnboardingPage() {
                         {/* OTP input — only show once QR is ready */}
                         {qrData && (
                           <div style={{ marginTop: 24 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>ENTER THE 6-DIGIT CODE TO CONFIRM</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 12 }}>Enter the 6-digit code to confirm</div>
                             <div style={{ display: "flex", gap: 10 }}>
                               {otpCode.map((digit, i) => (
                                 <input
@@ -914,7 +912,7 @@ export default function OnboardingPage() {
                   {twoFaAlreadyOn ? (
                     <button
                       onClick={() => setStep(1)}
-                      style={{ padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      style={{ padding: "14px", borderRadius: 14, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
                       <CheckCircle size={16} /> Continue →
                     </button>
@@ -923,13 +921,13 @@ export default function OnboardingPage() {
                       <button
                         onClick={handleSecureAccount}
                         disabled={securing || !qrData || otpCode.join("").length < 6}
-                        style={{ padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (securing || !qrData || otpCode.join("").length < 6) ? 0.5 : 1 }}
+                        style={{ padding: "14px", borderRadius: 14, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (securing || !qrData || otpCode.join("").length < 6) ? 0.5 : 1 }}
                       >
                         {securing ? "Verifying…" : <><Shield size={16} /> Secure My Account</>}
                       </button>
                       <button
                         onClick={() => setStep(1)}
-                        style={{ padding: "12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "rgba(148,163,184,0.6)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        style={{ padding: "12px", borderRadius: 14, border: "1px solid var(--border-card)", background: "transparent", color: "var(--text-dim)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                       >
                         Skip for now — set up 2FA later from Settings
                       </button>
@@ -942,26 +940,26 @@ export default function OnboardingPage() {
             {/* ══ STEP 1 — BANK CONNECTION ══ */}
             {step === 1 && bankPhase === "connect" && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Add your transactions</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 24px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--info)", marginBottom: 8 }}>Step 2 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Add your transactions</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 24px", lineHeight: 1.7 }}>
                   FinTwin is in beta. Choose how to bring your data in — you can add more any time from <strong style={{ color: "var(--text-primary)" }}>Imports</strong>.
                 </p>
 
                 {/* Option 1 — statements (recommended) */}
-                <div style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 16, padding: 22, marginBottom: 14 }}>
+                <div style={{ background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 16, padding: 22, marginBottom: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <FileText size={18} color="#4ade80" />
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "var(--good-soft)", border: "1px solid var(--good-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FileText size={18} color="var(--good)" />
                     </div>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>OPTION 1</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Upload your bank statements</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)" }}>Option 1</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Upload your bank statements</div>
                     </div>
-                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", whiteSpace: "nowrap" }}>RECOMMENDED</span>
+                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "var(--good-soft)", border: "1px solid var(--good-soft)", color: "var(--good)", whiteSpace: "nowrap" }}>Recommended</span>
                   </div>
                   <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 12px", lineHeight: 1.65 }}>
-                    Download your statement from net banking — PDF, Excel or CSV — and upload it here. Add <strong style={{ color: "#fff" }}>at least 2–3 months</strong> so FinTwin can see your patterns, recurring payments and spending pace.
+                    Download your statement from net banking — PDF, Excel or CSV — and upload it here. Add <strong style={{ color: "var(--text-primary)" }}>at least 2–3 months</strong> so FinTwin can see your patterns, recurring payments and spending pace.
                     These are your real transactions, so this is the best way to test the app.
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 16 }}>
@@ -971,43 +969,43 @@ export default function OnboardingPage() {
                   </div>
                   <button
                     onClick={() => { setIsManualPath(false); setBankPhase("statements"); }}
-                    style={{ padding: "12px 20px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#4ade80,#16a34a)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
+                    style={{ padding: "12px 20px", borderRadius: 12, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 13, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
                   >
                     Upload statements <ChevronRight size={15} />
                   </button>
                 </div>
 
                 {/* Option 2 — Setu sandbox (demo) */}
-                <div style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 16, padding: 22, marginBottom: 22 }}>
+                <div style={{ background: "var(--warn-soft)", border: "1px solid var(--warn-soft)", borderRadius: 16, padding: 22, marginBottom: 22 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <FlaskConical size={18} color="#fbbf24" />
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: "var(--warn-soft)", border: "1px solid var(--warn-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <FlaskConical size={18} color="var(--warn)" />
                     </div>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em" }}>OPTION 2</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Try the Setu bank-link sandbox</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)" }}>Option 2</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Try the Setu bank-link sandbox</div>
                     </div>
-                    <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", whiteSpace: "nowrap" }}>DEMO ONLY</span>
+                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: "var(--warn-soft)", border: "1px solid var(--warn-soft)", color: "var(--warn)", whiteSpace: "nowrap" }}>Demo only</span>
                   </div>
                   <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 4px", lineHeight: 1.65 }}>
-                    Automatic bank linking is <strong style={{ color: "#fbbf24" }}>a demo for now and isn't switched on during the beta</strong>, so it may not work if you try it. It only links Setu's test banks, never your real accounts.
+                    Automatic bank linking is <strong style={{ color: "var(--warn)" }}>a demo for now and isn't switched on during the beta</strong>, so it may not work if you try it. It only links Setu's test banks, never your real accounts.
                   </p>
-                  <p style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", margin: "0 0 14px", lineHeight: 1.6 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 14px", lineHeight: 1.6 }}>
                     Please upload a statement with option 1 instead. It takes a minute and gives you insights on your own spending.
                   </p>
 
                   {!setuOpen ? (
                     <button
-                      onClick={() => BANK_LINK_ENABLED ? setSetuOpen(true) : toast(BANK_LINK_OFF_MESSAGE, { icon: "🧪", duration: 6000 })}
+                      onClick={() => BANK_LINK_ENABLED ? setSetuOpen(true) : toast(BANK_LINK_OFF_MESSAGE, { duration: 6000 })}
                       aria-disabled={!BANK_LINK_ENABLED}
-                      style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.06)", color: "#fbbf24", fontSize: 13, fontWeight: 700, cursor: BANK_LINK_ENABLED ? "pointer" : "not-allowed", opacity: BANK_LINK_ENABLED ? 1 : 0.5, fontFamily: "inherit" }}
+                      style={{ padding: "11px 18px", borderRadius: 12, border: "1px solid var(--warn-soft)", background: "var(--warn-soft)", color: "var(--warn)", fontSize: 13, fontWeight: 700, cursor: BANK_LINK_ENABLED ? "pointer" : "not-allowed", opacity: BANK_LINK_ENABLED ? 1 : 0.5, fontFamily: "inherit" }}
                     >
                       {/* in a span: light mode darkens amber text, but not on buttons */}
-                      <span style={{ color: "#fbbf24" }}>{BANK_LINK_ENABLED ? "Use the sandbox" : "Not available in the beta"}</span>
+                      <span style={{ color: "var(--warn)" }}>{BANK_LINK_ENABLED ? "Use the sandbox" : "Not available in the beta"}</span>
                     </button>
                   ) : (
                     <>
-                      <label htmlFor="ob-mobile" style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 7 }}>MOBILE NUMBER FOR THE SANDBOX CONSENT</label>
+                      <label htmlFor="ob-mobile" style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", display: "block", marginBottom: 7 }}>Mobile number for the sandbox consent</label>
                       <div style={{ display: "flex", gap: 8 }}>
                         <input
                           id="ob-mobile"
@@ -1022,13 +1020,13 @@ export default function OnboardingPage() {
                         <button
                           onClick={handleBankConnect}
                           disabled={bankConnecting}
-                          style={{ padding: "13px 20px", borderRadius: 13, border: "none", background: "linear-gradient(135deg,#fbbf24,#d97706)", color: "#111827", fontSize: 13, fontWeight: 800, cursor: bankConnecting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: bankConnecting ? 0.7 : 1, whiteSpace: "nowrap" }}
+                          style={{ padding: "13px 20px", borderRadius: 13, border: "none", background: "linear-gradient(135deg,var(--warn),#d97706)", color: "#111827", fontSize: 13, fontWeight: 650, cursor: bankConnecting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: bankConnecting ? 0.7 : 1, whiteSpace: "nowrap" }}
                         >
                           {bankConnecting ? "Connecting…" : "Connect sandbox →"}
                         </button>
                       </div>
-                      {mobileError && <div style={{ fontSize: 11, color: "#f87171", marginTop: 6 }}>{mobileError}</div>}
-                      <div style={{ fontSize: 11, color: "rgba(148,163,184,0.45)", marginTop: 8 }}>
+                      {mobileError && <div style={{ fontSize: 12, color: "var(--bad)", marginTop: 6 }}>{mobileError}</div>}
+                      <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 8 }}>
                         Sample transactions from the sandbox appear in your dashboard like real ones — remember they aren't yours.
                       </div>
                     </>
@@ -1037,9 +1035,9 @@ export default function OnboardingPage() {
 
                 {/* Nav */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <button onClick={() => setStep(0)} style={{ fontSize: 13, fontWeight: 600, color: "rgba(148,163,184,0.5)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={() => setStep(0)} style={{ fontSize: 13, fontWeight: 600, color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
                   {stmtMonths.length === 0 && (
-                    <button onClick={handleManualPath} style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={handleManualPath} style={{ fontSize: 13, color: "var(--text-dim)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
                       Skip — I'll add manually →
                     </button>
                   )}
@@ -1050,9 +1048,9 @@ export default function OnboardingPage() {
             {/* STEP 1 — statement upload phase */}
             {step === 1 && bankPhase === "statements" && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Upload your bank statements</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 20px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--info)", marginBottom: 8 }}>Step 2 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Upload your bank statements</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 20px", lineHeight: 1.7 }}>
                   Import the last 2–3 months for each account you use. Upload as many files as you like — one per account or per month is fine, and anything already imported is skipped.
                 </p>
 
@@ -1061,11 +1059,11 @@ export default function OnboardingPage() {
                 <ImportsPage compact onImported={handleStatementImported} />
 
                 <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                  <button onClick={() => setBankPhase("connect")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Other options</button>
+                  <button onClick={() => setBankPhase("connect")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Other options</button>
                   <button
                     onClick={() => setStep(2)}
                     disabled={stmtMonths.length === 0}
-                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: stmtMonths.length ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.04)", color: stmtMonths.length ? "#fff" : "rgba(148,163,184,0.3)", fontSize: 14, fontWeight: 800, cursor: stmtMonths.length ? "pointer" : "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: stmtMonths.length ? "var(--accent-strong)" : "var(--bg-input)", color: stmtMonths.length ? "#fff" : "var(--text-dim)", fontSize: 14, fontWeight: 650, cursor: stmtMonths.length ? "pointer" : "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                   >
                     {stmtMonths.length === 0 ? "Upload a statement to continue" : stmtMonths.length === 1 ? "Continue with 1 month" : "Continue to Profile"} <ChevronRight size={16} />
                   </button>
@@ -1076,33 +1074,33 @@ export default function OnboardingPage() {
             {/* STEP 1 — syncing phase */}
             {step === 1 && bankPhase === "syncing" && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 2 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Syncing your account</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 28px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--info)", marginBottom: 8 }}>Step 2 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Syncing your account</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 28px", lineHeight: 1.7 }}>
                   Complete the bank consent in the tab that just opened, then return here.
                 </p>
 
                 {/* Status card */}
-                <div style={{ background: syncStatus === "synced" ? "rgba(74,222,128,0.07)" : "rgba(167,139,250,0.05)", border: `1px solid ${syncStatus === "synced" ? "rgba(74,222,128,0.2)" : "rgba(167,139,250,0.15)"}`, borderRadius: 16, padding: "28px 24px", marginBottom: 24, textAlign: "center" }}>
+                <div style={{ background: syncStatus === "synced" ? "var(--good-soft)" : "var(--accent-soft)", border: `1px solid ${syncStatus === "synced" ? "var(--good-soft)" : "var(--accent-soft)"}`, borderRadius: 16, padding: "28px 24px", marginBottom: 24, textAlign: "center" }}>
                   {syncStatus === "synced" ? (
                     <>
-                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                        <CheckCircle size={26} color="#4ade80" />
+                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--good-soft)", border: "1px solid var(--good-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                        <CheckCircle size={26} color="var(--good)" />
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginBottom: 6 }}>Transactions Imported!</div>
-                      <div style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>Your bank account is connected and transactions are ready.</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--good)", marginBottom: 6 }}>Transactions Imported!</div>
+                      <div style={{ fontSize: 13, color: "var(--text-dim)" }}>Your bank account is connected and transactions are ready.</div>
                     </>
                   ) : (
                     <>
-                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                        <RefreshCw size={22} color="#a78bfa" className="spin" />
+                      <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--accent-soft)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                        <RefreshCw size={22} color="var(--accent)" className="spin" />
                       </div>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0", marginBottom: 8 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>
                         {syncStatus === "consented" ? "Fetching transactions from your bank…" : "Waiting for consent…"}
                       </div>
-                      <div style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", marginBottom: 16 }}>{syncMsg}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 16 }}>{syncMsg}</div>
                       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
-                        {[0, 1, 2].map(i => <div key={i} className="sync-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "#a78bfa" }} />)}
+                        {[0, 1, 2].map(i => <div key={i} className="sync-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />)}
                       </div>
                     </>
                   )}
@@ -1115,27 +1113,27 @@ export default function OnboardingPage() {
                     { label: "Consent approved by user", done: syncStatus === "consented" || syncStatus === "synced" },
                     { label: "Transactions fetched",     done: syncStatus === "synced" },
                   ].map(({ label, done }) => (
-                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, background: done ? "rgba(74,222,128,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${done ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)"}` }}>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", background: done ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${done ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {done && <CheckCircle size={11} color="#4ade80" />}
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, background: done ? "var(--good-soft)" : "var(--bg-input)", border: `1px solid ${done ? "var(--good-soft)" : "var(--bg-input)"}` }}>
+                      <div style={{ width: 20, height: 20, borderRadius: "50%", background: done ? "var(--good-soft)" : "var(--bg-input)", border: `1px solid ${done ? "var(--good-soft)" : "var(--border-card)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {done && <CheckCircle size={11} color="var(--good)" />}
                       </div>
-                      <span style={{ fontSize: 13, color: done ? "#e2e8f0" : "rgba(148,163,184,0.4)" }}>{label}</span>
+                      <span style={{ fontSize: 13, color: done ? "var(--text-primary)" : "var(--text-dim)" }}>{label}</span>
                     </div>
                   ))}
                 </div>
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setBankPhase("connect")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={() => setBankPhase("connect")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
                   <button
                     onClick={() => setStep(2)}
                     disabled={!canContinueSync}
-                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: canContinueSync ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.04)", color: canContinueSync ? "#fff" : "rgba(148,163,184,0.3)", fontSize: 14, fontWeight: 800, cursor: canContinueSync ? "pointer" : "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.3s" }}
+                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: canContinueSync ? "var(--accent-strong)" : "var(--bg-input)", color: canContinueSync ? "#fff" : "var(--text-dim)", fontSize: 14, fontWeight: 650, cursor: canContinueSync ? "pointer" : "not-allowed", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.3s" }}
                   >
                     {syncStatus === "synced" ? "Continue to Profile" : skipVisible ? "Skip Sync & Continue" : "Waiting for sync…"} <ChevronRight size={16} />
                   </button>
                 </div>
                 {skipVisible && syncStatus !== "synced" && (
-                  <p style={{ textAlign: "center", fontSize: 12, color: "rgba(100,116,139,0.5)", margin: "12px 0 0" }}>Transactions will auto-sync once you complete bank consent. You can continue now and they'll appear on your dashboard.</p>
+                  <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-dim)", margin: "12px 0 0" }}>Transactions will auto-sync once you complete bank consent. You can continue now and they'll appear on your dashboard.</p>
                 )}
               </div>
             )}
@@ -1143,16 +1141,16 @@ export default function OnboardingPage() {
             {/* ══ STEP 2 — FINANCIAL PROFILE ══ */}
             {step === 2 && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(74,222,128,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 3 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Your financial profile</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 28px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--good)", marginBottom: 8 }}>Step 3 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Your financial profile</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 28px", lineHeight: 1.7 }}>
                   A few numbers to set up your net worth, forecasts, and AI insights. All optional — update anytime from your dashboard.
                 </p>
 
                 {/* Month count selector — manual path only */}
                 {isManualPath && (
                   <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 10 }}>HOW MANY MONTHS OF DATA ARE YOU ADDING?</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 10 }}>HOW MANY MONTHS OF DATA ARE YOU ADDING?</div>
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                       {[2, 3, 4, 5, 6].map(n => (
                         <button
@@ -1160,9 +1158,9 @@ export default function OnboardingPage() {
                           onClick={() => setManualMonths(n)}
                           style={{
                             padding: "8px 16px", borderRadius: 100,
-                            border: `1px solid ${manualMonths === n ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.09)"}`,
-                            background: manualMonths === n ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.03)",
-                            color: manualMonths === n ? "#fff" : "rgba(148,163,184,0.6)",
+                            border: `1px solid ${manualMonths === n ? "var(--accent)" : "var(--border-card)"}`,
+                            background: manualMonths === n ? "var(--accent-soft)" : "var(--bg-input)",
+                            color: manualMonths === n ? "#fff" : "var(--text-dim)",
                             fontSize: 13, fontWeight: manualMonths === n ? 700 : 500,
                             cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
                           }}
@@ -1171,15 +1169,15 @@ export default function OnboardingPage() {
                         </button>
                       ))}
                     </div>
-                    <div style={{ fontSize: 12, color: "rgba(148,163,184,0.45)", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "rgba(167,139,250,0.6)" }}>Covering:</span>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "var(--accent)" }}>Covering:</span>
                       {getPreviousMonthLabels(manualMonths).map((lbl, i, arr) => (
-                        <span key={lbl} style={{ color: "rgba(226,232,240,0.7)" }}>
+                        <span key={lbl} style={{ color: "var(--text-secondary)" }}>
                           {lbl}{i < arr.length - 1 ? " →" : ""}
                         </span>
                       ))}
                     </div>
-                    <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
                       Enter your average monthly income and expenses for this period.
                     </div>
                   </div>
@@ -1187,63 +1185,63 @@ export default function OnboardingPage() {
 
                 {/* Income + expenses */}
                 <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>MONTHLY CASH FLOW</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 12 }}>Monthly cash flow</div>
 
                   {isManualPath ? (
                     /* Manual path: editable required inputs */
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💰 INCOME</label>
+                        <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 8 }}>Monthly income</label>
                         <input
                           className="ob-input"
                           type="number"
                           placeholder="₹ 50,000"
                           value={monthlyIncome}
                           onChange={e => { setMonthlyIncome(e.target.value); setManualErrors(p => ({ ...p, income: undefined })); }}
-                          style={manualErrors.income ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
+                          style={manualErrors.income ? { borderColor: "var(--bad-soft)" } : {}}
                         />
                         {manualErrors.income
-                          ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.income}</div>
-                          : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>Salary, freelance, business…</div>
+                          ? <div style={{ fontSize: 12, color: "var(--bad)", marginTop: 5 }}>{manualErrors.income}</div>
+                          : <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 5 }}>Salary, freelance, business…</div>
                         }
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>💸 EXPENSES</label>
+                        <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 8 }}>Monthly spending</label>
                         <input
                           className="ob-input"
                           type="number"
                           placeholder="₹ 35,000"
                           value={monthlyExpenses}
                           onChange={e => { setMonthlyExpenses(e.target.value); setManualErrors(p => ({ ...p, expenses: undefined })); }}
-                          style={manualErrors.expenses ? { borderColor: "rgba(248,113,113,0.5)" } : {}}
+                          style={manualErrors.expenses ? { borderColor: "var(--bad-soft)" } : {}}
                         />
                         {manualErrors.expenses
-                          ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 5 }}>{manualErrors.expenses}</div>
-                          : <div style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", marginTop: 5 }}>Rent, food, bills, subscriptions…</div>
+                          ? <div style={{ fontSize: 12, color: "var(--bad)", marginTop: 5 }}>{manualErrors.expenses}</div>
+                          : <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 5 }}>Rent, food, bills, subscriptions…</div>
                         }
                       </div>
                     </div>
                   ) : (
                     /* Bank path: read-only auto-detected values — user cannot manually enter */
-                    <div style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.15)", borderRadius: 14, padding: "18px 20px" }}>
+                    <div style={{ background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 14, padding: "18px 20px" }}>
                       {summaryData ? (
                         <div style={{ display: "flex", gap: 32 }}>
                           <div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.45)", letterSpacing: "0.08em", marginBottom: 4 }}>💰 INCOME</div>
-                            <div style={{ fontSize: 20, fontWeight: 800, color: "#4ade80" }}>₹{Number(monthlyIncome || 0).toLocaleString("en-IN")}</div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-dim)", marginBottom: 4 }}>Monthly income</div>
+                            <div style={{ fontSize: 20, fontWeight: 650, color: "var(--good)" }}>₹{Number(monthlyIncome || 0).toLocaleString("en-IN")}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.45)", letterSpacing: "0.08em", marginBottom: 4 }}>💸 EXPENSES</div>
-                            <div style={{ fontSize: 20, fontWeight: 800, color: "#f87171" }}>₹{Number(monthlyExpenses || 0).toLocaleString("en-IN")}</div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-dim)", marginBottom: 4 }}>Monthly spending</div>
+                            <div style={{ fontSize: 20, fontWeight: 650, color: "var(--bad)" }}>₹{Number(monthlyExpenses || 0).toLocaleString("en-IN")}</div>
                           </div>
                           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 6, padding: "3px 8px" }}>AUTO-DETECTED FROM BANK</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--good)", background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 6, padding: "3px 8px" }}>Auto-detected from bank</span>
                           </div>
                         </div>
                       ) : (
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <RefreshCw size={14} color="#a78bfa" className="spin" />
-                          <span style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>Cash flow will be auto-calculated from your imported transactions</span>
+                          <RefreshCw size={14} color="var(--accent)" className="spin" />
+                          <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Cash flow will be auto-calculated from your imported transactions</span>
                         </div>
                       )}
                     </div>
@@ -1252,17 +1250,17 @@ export default function OnboardingPage() {
 
                 {/* Savings/investments/debt */}
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", marginBottom: 12 }}>NET WORTH SNAPSHOT</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 12 }}>Net worth snapshot</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                     {[
-                      ...(isManualPath ? [{ key: "savings", label: "Total Assets", sublabel: "Cash, savings, FDs, gold…", placeholder: "₹ 2,00,000", icon: "🏦" }] : []),
-                      { key: "investments", label: "Investments", sublabel: "Stocks, MF, PF…", placeholder: "₹ 1,50,000", icon: "📊" },
-                      { key: "debt", label: "Existing Debt", sublabel: "Loans, credit cards…", placeholder: "₹ 50,000", icon: "💳", full: !isManualPath },
+                      ...(isManualPath ? [{ key: "savings", label: "Savings and cash", sublabel: "Cash, savings, FDs, gold…", placeholder: "₹ 2,00,000" }] : []),
+                      { key: "investments", label: "Investments", sublabel: "Stocks, MF, PF…", placeholder: "₹ 1,50,000" },
+                      { key: "debt", label: "Loans and cards", sublabel: "Loans, credit cards…", placeholder: "₹ 50,000", full: !isManualPath },
                     ].map(f => (
                       <div key={f.key} style={f.full ? { gridColumn: "1 / -1" } : {}}>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                          <span>{f.icon}</span> {f.label.toUpperCase()}
-                          <span style={{ fontSize: 11, color: "rgba(100,116,139,0.45)", fontWeight: 400 }}>({f.sublabel})</span>
+                        <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                          {f.label}
+                          <span style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 400 }}>({f.sublabel})</span>
                         </label>
                         <input
                           className="ob-input"
@@ -1278,17 +1276,17 @@ export default function OnboardingPage() {
 
                 {/* Bank connect nudge — manual path only */}
                 {isManualPath && (
-                  <div style={{ background: "rgba(34,211,238,0.04)", border: "1px solid rgba(34,211,238,0.18)", borderRadius: 14, padding: "16px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Building2 size={16} color="#22d3ee" />
+                  <div style={{ background: "var(--info-soft)", border: "1px solid var(--info-soft)", borderRadius: 14, padding: "16px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--info-soft)", border: "1px solid var(--info-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Building2 size={16} color="var(--info)" />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>Better insights with a statement</div>
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Upload a bank or UPI statement for real transaction data instead of estimates.</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>Better insights with a statement</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Upload a bank or UPI statement for real transaction data instead of estimates.</div>
                     </div>
                     <button
                       onClick={() => { setIsManualPath(false); setBankPhase("connect"); setStep(1); }}
-                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.35)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--info-soft)", background: "var(--info-soft)", color: "var(--info)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
                     >
                       Upload →
                     </button>
@@ -1296,8 +1294,8 @@ export default function OnboardingPage() {
                 )}
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(1)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
-                  <button onClick={handleProfileContinue} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <button onClick={() => setStep(1)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={handleProfileContinue} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     Continue <ChevronRight size={16} />
                   </button>
                 </div>
@@ -1307,12 +1305,12 @@ export default function OnboardingPage() {
             {/* ══ STEP 3 — GOALS ══ */}
             {step === 3 && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(251,191,36,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 4 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>What are your goals?</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 8px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--warn)", marginBottom: 8 }}>Step 4 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>What are your goals?</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 8px", lineHeight: 1.7 }}>
                   Select the financial goals you want FinTwin to help you achieve.
                 </p>
-                <p style={{ fontSize: 13, color: "rgba(167,139,250,0.7)", margin: "0 0 28px" }}>
+                <p style={{ fontSize: 13, color: "var(--accent)", margin: "0 0 28px" }}>
                   FinTwin AI will build a personalised savings plan for each goal you select.
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 36 }}>
@@ -1324,13 +1322,13 @@ export default function OnboardingPage() {
                   ))}
                 </div>
                 {goals.length > 0 && (
-                  <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: 12, padding: "12px 16px", marginBottom: 24, fontSize: 12, color: "rgba(167,139,250,0.8)" }}>
-                    ✨ {goals.length} goal{goals.length > 1 ? "s" : ""} selected — AI will prioritise these in your dashboard
+                  <div style={{ background: "var(--accent-soft)", border: "none", borderRadius: 12, padding: "12px 16px", marginBottom: 24, fontSize: 12, color: "var(--accent)" }}>
+                    {goals.length} goal{goals.length > 1 ? "s" : ""} selected. FinTwin plans around these first. in your dashboard
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(2)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
-                  <button onClick={() => setStep(4)} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#a78bfa,#7c3aed)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <button onClick={() => setStep(2)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={() => setStep(4)} style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "var(--accent-strong)", color: "#fff", fontSize: 14, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     Continue <ChevronRight size={16} />
                   </button>
                 </div>
@@ -1340,13 +1338,13 @@ export default function OnboardingPage() {
             {/* ══ STEP 4 — AI SETUP ══ */}
             {step === 4 && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(34,211,238,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 5 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Choose your AI Copilot</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 28px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--info)", marginBottom: 8 }}>Step 5 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Choose your AI Copilot</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 28px", lineHeight: 1.7 }}>
                   Pick a default advisor personality. Your AI will tailor every insight, suggestion, and response based on this mode. You can switch anytime.
                 </p>
 
-                <div style={{ fontSize: 12, color: "rgba(148,163,184,0.45)", marginBottom: 12, marginTop: -16 }}>Select one or more — your AI will blend all chosen styles.</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12, marginTop: -16 }}>Select one or more — your AI will blend all chosen styles.</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
                   {AI_MODES.map(m => {
                     const on = aiModes.includes(m.id);
@@ -1362,32 +1360,32 @@ export default function OnboardingPage() {
                       >
                         <span style={{ fontSize: 24, flexShrink: 0 }}>{m.icon}</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: on ? "#a78bfa" : "#e2e8f0", marginBottom: 2 }}>{m.id}</div>
-                          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{m.desc}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: on ? "var(--accent)" : "var(--text-primary)", marginBottom: 2 }}>{m.id}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{m.desc}</div>
                         </div>
-                        {on && <CheckCircle size={16} color="#a78bfa" style={{ flexShrink: 0 }} />}
+                        {on && <CheckCircle size={16} color="var(--accent)" style={{ flexShrink: 0 }} />}
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Toggles */}
-                <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+                <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
                   {[
-                    { label: "Daily AI insights",      desc: "Receive a daily financial summary",        icon: <Bell size={15} color="#fbbf24" />,    val: dailyInsights, set: setDailyInsights },
+                    { label: "Daily AI insights",      desc: "Receive a daily financial summary",        icon: <Bell size={15} color="var(--warn)" />,    val: dailyInsights, set: setDailyInsights },
                   ].map((t, i, arr) => (
-                    <div key={t.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 18px", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                    <div key={t.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 18px", borderBottom: i < arr.length - 1 ? "1px solid var(--bg-input)" : "none" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         {t.icon}
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{t.label}</div>
-                          <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>{t.desc}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{t.label}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{t.desc}</div>
                         </div>
                       </div>
                       <button
                         className="ob-toggle"
                         onClick={() => t.set(!t.val)}
-                        style={{ background: t.val ? "linear-gradient(135deg,#a78bfa,#7c3aed)" : "rgba(255,255,255,0.1)" }}
+                        style={{ background: t.val ? "var(--accent-strong)" : "var(--border-card)" }}
                       >
                         <div className="ob-toggle-thumb" style={{ transform: t.val ? "translateX(23px)" : "translateX(3px)" }} />
                       </button>
@@ -1396,11 +1394,11 @@ export default function OnboardingPage() {
                 </div>
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(3)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={() => setStep(3)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
                   <button
                     onClick={() => setStep(5)}
                     disabled={aiModes.length === 0}
-                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: aiModes.length === 0 ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#a78bfa,#7c3aed)", color: aiModes.length === 0 ? "rgba(148,163,184,0.4)" : "#fff", fontSize: 14, fontWeight: 800, cursor: aiModes.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: aiModes.length === 0 ? "var(--bg-input)" : "var(--accent-strong)", color: aiModes.length === 0 ? "var(--text-dim)" : "#fff", fontSize: 14, fontWeight: 650, cursor: aiModes.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                   >
                     Continue <ChevronRight size={16} />
                   </button>
@@ -1411,9 +1409,9 @@ export default function OnboardingPage() {
             {/* ══ STEP 5 — REVIEW ══ */}
             {step === 5 && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(74,222,128,0.7)", letterSpacing: "0.1em", marginBottom: 8 }}>STEP 6 OF 6</div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Review your financial twin</h1>
-                <p style={{ fontSize: 14, color: "rgba(148,163,184,0.5)", margin: "0 0 28px", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--good)", marginBottom: 8 }}>Step 6 of 6</div>
+                <h1 style={{ fontSize: 30, fontWeight: 650, color: "var(--text-primary)", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Review your financial twin</h1>
+                <p style={{ fontSize: 14, color: "var(--text-dim)", margin: "0 0 28px", lineHeight: 1.7 }}>
                   Let's confirm everything is accurate before we build your AI profile.
                 </p>
 
@@ -1422,78 +1420,78 @@ export default function OnboardingPage() {
                   {/* Financial Profile */}
                   <div className="review-card">
                     <button className="review-card-edit" onClick={() => setStep(2)}><Edit2 size={11} /> Edit</button>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 8 }}>FINANCIAL PROFILE</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>Financial profile</div>
                     {isManualPath ? (
                       <>
-                        <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", marginBottom: 4 }}>Monthly income</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginBottom: 8 }}>₹{Number(monthlyIncome || 0).toLocaleString("en-IN")}</div>
-                        <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", marginBottom: 4 }}>Monthly expenses</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#f87171", marginBottom: 8 }}>₹{Number(monthlyExpenses || 0).toLocaleString("en-IN")}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Monthly income</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--good)", marginBottom: 8 }}>₹{Number(monthlyIncome || 0).toLocaleString("en-IN")}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Monthly expenses</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--bad)", marginBottom: 8 }}>₹{Number(monthlyExpenses || 0).toLocaleString("en-IN")}</div>
                       </>
                     ) : (
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Connected via bank auto-sync</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Connected via bank auto-sync</div>
                     )}
-                    <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", marginBottom: 4 }}>Investments</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#a78bfa" }}>₹{Number(form.investments || 0).toLocaleString("en-IN")}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Investments</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--accent)" }}>₹{Number(form.investments || 0).toLocaleString("en-IN")}</div>
                   </div>
 
                   {/* Goals */}
                   <div className="review-card">
                     <button className="review-card-edit" onClick={() => setStep(3)}><Edit2 size={11} /> Edit</button>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 8 }}>GOALS</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>Goals</div>
                     {goals.length > 0 ? (
                       <>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#fbbf24", marginBottom: 8 }}>{goals.length} goal{goals.length > 1 ? "s" : ""} selected</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--warn)", marginBottom: 8 }}>{goals.length} goal{goals.length > 1 ? "s" : ""} selected</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {goals.map(g => (
-                            <span key={g} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 100, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
+                            <span key={g} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 100, background: "var(--warn-soft)", border: "1px solid var(--warn-soft)", color: "var(--warn)" }}>
                               {GOAL_ICONS[g]} {g}
                             </span>
                           ))}
                         </div>
                       </>
                     ) : (
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.4)" }}>No goals selected — you can add them from the Goals Planner</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>No goals selected — you can add them from the Goals Planner</div>
                     )}
                   </div>
 
                   {/* Bank Connections */}
                   <div className="review-card">
                     <button className="review-card-edit" onClick={() => { setBankPhase("connect"); setStep(1); }}><Edit2 size={11} /> Edit</button>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 8 }}>BANK CONNECTION</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>Bank connection</div>
                     {!isManualPath ? (
                       <>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: syncStatus === "synced" ? "#4ade80" : "#fbbf24" }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: syncStatus === "synced" ? "#4ade80" : "#fbbf24" }}>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: syncStatus === "synced" ? "var(--good)" : "var(--warn)" }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: syncStatus === "synced" ? "var(--good)" : "var(--warn)" }}>
                             {syncStatus === "synced" ? "Bank connected" : "Consent pending"}
                           </span>
                         </div>
-                        <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Via Setu Account Aggregator</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Via Setu Account Aggregator</div>
                       </>
                     ) : (
-                      <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>Manual entry — add transactions from the Transactions page</div>
+                      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Manual entry — add transactions from the Transactions page</div>
                     )}
                   </div>
 
                   {/* AI Setup */}
                   <div className="review-card">
                     <button className="review-card-edit" onClick={() => setStep(4)}><Edit2 size={11} /> Edit</button>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 8 }}>AI COPILOT</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 8 }}>AI copilot</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
-                      {aiModes.map(id => <span key={id} style={{ fontSize: 13, fontWeight: 700, color: "#22d3ee" }}>{id}</span>).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key={`sep-${i}`} style={{ color: "rgba(148,163,184,0.3)", fontSize: 13 }}>·</span>, el], [])}
+                      {aiModes.map(id => <span key={id} style={{ fontSize: 13, fontWeight: 700, color: "var(--info)" }}>{id}</span>).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key={`sep-${i}`} style={{ color: "var(--text-dim)", fontSize: 13 }}>·</span>, el], [])}
                     </div>
-                    <div style={{ fontSize: 12, color: "rgba(148,163,184,0.5)" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
                       {dailyInsights ? "🔔 Daily insights on" : "🔕 Daily insights off"}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(4)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "rgba(148,163,184,0.6)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
+                  <button onClick={() => setStep(4)} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid var(--border-card)", background: "var(--bg-input)", color: "var(--text-dim)", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>← Back</button>
                   <button
                     onClick={handleSubmit}
-                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#4ade80,#22d3ee)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    style={{ flex: 1, padding: "14px", borderRadius: 14, border: "none", background: "linear-gradient(135deg,var(--good),var(--info))", color: "#fff", fontSize: 14, fontWeight: 650, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                   >
                     Create My Financial Twin <Sparkles size={16} />
                   </button>
@@ -1511,12 +1509,12 @@ export default function OnboardingPage() {
               : <StatementSnapshot months={stmtMonths} refreshKey={stmtImports} />)}
             {step === 2 && <ProfilePanel income={monthlyIncome} expenses={monthlyExpenses} />}
             {step === 3 && (
-              <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "24px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,0.5)", letterSpacing: "0.1em", marginBottom: 14 }}>YOUR GOALS</div>
+              <div style={{ background: "var(--bg-input)", border: "1px solid var(--border-card)", borderRadius: 20, padding: "24px" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", marginBottom: 14 }}>Your goals</div>
                 {goals.length === 0
-                  ? <p style={{ fontSize: 13, color: "rgba(148,163,184,0.4)", textAlign: "center", padding: "24px 0" }}>Select goals on the left to see them here</p>
+                  ? <p style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "24px 0" }}>Select goals on the left to see them here</p>
                   : goals.map(g => (
-                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13, color: "#e2e8f0" }}>
+                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid var(--bg-input)", fontSize: 13, color: "var(--text-primary)" }}>
                       <span style={{ fontSize: 18 }}>{GOAL_ICONS[g]}</span> {g}
                     </div>
                   ))
@@ -1526,13 +1524,13 @@ export default function OnboardingPage() {
             {step === 4 && <AIPanel aiModes={aiModes} />}
             {step === 5 && (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", padding: "24px" }}>
-                <div style={{ fontSize: 48 }}>🎉</div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0 }}>Almost there!</h3>
-                <p style={{ fontSize: 13, color: "rgba(148,163,184,0.5)", lineHeight: 1.6 }}>Once you create your twin, FinTwin AI will start building personalised insights, forecasts, and a savings strategy just for you.</p>
+                <div style={{ width: 56, height: 56, borderRadius: 99, background: "var(--good-soft)", color: "var(--good)", display: "flex", alignItems: "center", justifyContent: "center" }}><CheckCircle size={26} aria-hidden /></div>
+                <h3 style={{ fontSize: 18, fontWeight: 650, color: "var(--text-primary)", margin: 0 }}>Almost there</h3>
+                <p style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>Once you create your twin, FinTwin AI will start building personalised insights, forecasts, and a savings strategy just for you.</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                  {["AI Financial Score", "6-month Spending Forecast", "Personalised Budget Alerts", "Goal Progress Tracking"].map(f => (
-                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "rgba(148,163,184,0.7)" }}>
-                      <CheckCircle size={13} color="#4ade80" /> {f}
+                  {["A health score", "Next month's spending, predicted", "Budget alerts", "Progress on your goals"].map(f => (
+                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-dim)" }}>
+                      <CheckCircle size={13} color="var(--good)" /> {f}
                     </div>
                   ))}
                 </div>

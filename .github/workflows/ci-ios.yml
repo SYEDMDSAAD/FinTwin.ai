@@ -1,0 +1,69 @@
+name: CI — iOS
+
+# Builds the iPhone app for the simulator, unsigned, to prove the Xcode
+# project and the web build fit together. Signing and TestFlight need the
+# Apple Developer account and are done from Xcode (docs/ios-release.md).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop, 'feature/**', 'release/**']
+    paths:
+      - 'frontend/ios/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/capacitor.config.json'
+      - 'frontend/src/native.js'
+      - '.github/workflows/ci-ios.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/ios/**'
+      - 'frontend/package.json'
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-build:
+    name: Simulator build
+    runs-on: macos-15
+    timeout-minutes: 40
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Web build and sync into the iOS project
+        working-directory: frontend
+        run: npm run build:ios
+
+      - name: Xcode build (simulator, unsigned)
+        working-directory: frontend/ios/App
+        shell: bash   # -eo pipefail: a failed xcodebuild fails the step despite | tail
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -40
+          test -d build/Build/Products/Debug-iphonesimulator/App.app
+
+      - name: Keep the simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: FinTwin-simulator-app
+          path: frontend/ios/App/build/Build/Products/Debug-iphonesimulator/App.app
+          retention-days: 7

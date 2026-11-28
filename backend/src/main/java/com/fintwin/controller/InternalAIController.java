@@ -47,6 +47,13 @@ import java.util.Map;
 @RequestMapping("/internal/ai")
 public class InternalAIController {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.SipPlanRepository sipPlans;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.service.AnomalyService anomalyService;
+
+
     private static final Logger log = LoggerFactory.getLogger(InternalAIController.class);
 
     @Value("${ai.service.internal-key}")
@@ -209,16 +216,23 @@ public class InternalAIController {
         if (user == null) return ResponseEntity.notFound().build();
 
         List<Map<String, Object>> budgets = new ArrayList<>();
-        budgetService.getBudgetStatusFor(user).forEach(b -> {
+        budgetService.getBudgetStatusFor(user).stream().filter(b -> b.getStartsOn() == null).forEach(b -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("category",  b.getCategory());
             row.put("limit",     b.getLimit());
             row.put("spent",     b.getSpent());
             row.put("remaining", b.getRemaining());
             row.put("exceeded",  b.getExceeded());
+            row.put("adjustment", b.getAdjustment());
             budgets.add(row);
         });
-        return ResponseEntity.ok(Map.of("budgets", budgets));
+        // SIPs leave every month before any spending: Spend Guard's salary split
+        // sets them aside with rent and bills
+        double sipMonthly = sipPlans == null ? 0 : sipPlans.findByUserOrderByCreatedAtAsc(user).stream()
+                .filter(s -> s.getAmount() != null)
+                .mapToDouble(s -> s.getAmount().doubleValue() / ("Quarterly".equals(s.getFrequency()) ? 3 : 1))
+                .sum();
+        return ResponseEntity.ok(Map.of("budgets", budgets, "sipMonthly", Math.round(sipMonthly)));
     }
 
     // ── Goals ─────────────────────────────────────────────────────────────────
@@ -351,6 +365,45 @@ public class InternalAIController {
         body.put("investments", investments);
         body.put("insurance",   insurance);
         return ResponseEntity.ok(body);
+    }
+
+    // ── Unusual spending: the same checks as the Insights page and watch agent ─
+
+    @GetMapping("/{userId}/anomalies")
+    public ResponseEntity<?> anomalies(
+            @RequestHeader(value = "X-Internal-Key", required = false) String key,
+            @RequestHeader(value = "X-Tool-Token", required = false) String toolToken,
+            @PathVariable Long userId
+    ) {
+        ResponseEntity<?> denied = requireAccess(key, toolToken, userId);
+        if (denied != null) return denied;
+        User user = userRepo.findById(userId).orElse(null);
+        if (user == null) return ResponseEntity.notFound().build();
+        List<com.fintwin.dto.AnomalyDTO> found = anomalyService == null ? List.of() : anomalyService.detectFor(user);
+        return ResponseEntity.ok(anomaliesBody(found));
+    }
+
+    /** Ready sentences and rounded rupees, so the model quotes rather than computes. */
+    static Map<String, Object> anomaliesBody(List<com.fintwin.dto.AnomalyDTO> found) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (com.fintwin.dto.AnomalyDTO a : found.stream().limit(10).toList()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("type", a.getType());
+            m.put("severity", a.getSeverity());
+            m.put("merchant", a.getMerchant());
+            m.put("category", a.getCategory());
+            if (a.getAmount() != null) m.put("amount", Math.round(Math.abs(a.getAmount())));
+            if (a.getAvgAmount() != null) m.put("usualAmount", Math.round(Math.abs(a.getAvgAmount())));
+            if (a.getMultiplier() != null) m.put("timesUsual", Math.round(a.getMultiplier() * 10) / 10.0);
+            m.put("reason", a.getReason());
+            items.add(m);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("period", "last 3 months");
+        body.put("count", found.size());
+        body.put("anomalies", items);
+        if (items.isEmpty()) body.put("note", "Nothing in the last 3 months stood out from the user's usual spending.");
+        return body;
     }
 
     // ── Portfolio: holdings with gains worked out, allocation, best/worst ────
@@ -496,7 +549,30 @@ public class InternalAIController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Invalid or expired tool token"));
         }
+        auditAiRead(userId);
         return null;
+    }
+
+    // Action log for the AI itself: which of a user's data the copilot read,
+    // and when — kept with every other audited action (audit_log, written off
+    // the request thread). Which question it was for is in that exchange's
+    // trace in chat_history, by time.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.audit.AuditService auditService;
+
+    private void auditAiRead(Long userId) {
+        if (auditService == null) return;
+        try {
+            var attrs = (org.springframework.web.context.request.ServletRequestAttributes)
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            String uri = attrs != null ? attrs.getRequest().getRequestURI() : null;
+            String what = uri == null ? "data" : uri.substring(uri.lastIndexOf('/') + 1);
+            auditService.log(userId, "AI_READ", "ai-copilot-tools",
+                    "AI Copilot read the user's " + what + " to answer a question",
+                    null, "fintwin-ai-service", "GET", uri, true, null);
+        } catch (Exception e) {
+            log.warn("Could not audit an AI data read: {}", e.getClass().getSimpleName());
+        }
     }
 
     private String nullSafe(String v) {

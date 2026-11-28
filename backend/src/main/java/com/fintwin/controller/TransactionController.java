@@ -97,6 +97,7 @@ public class TransactionController {
                 "duplicates", result.duplicates(),
                 "skipped",    result.skipped(),
                 "reconciled", result.reconciled(),
+                "notInStatement", result.notInStatement(),
                 "success",    true));
     }
 
@@ -135,6 +136,29 @@ public class TransactionController {
     }
 
     /** The local model's category suggestions for the payees still in Other. */
+    /** Payees FinTwin's sorting agent placed on its own, for the user to check. */
+    @GetMapping("/auto-sorted")
+    public List<Map<String, Object>> autoSorted(@RequestParam(defaultValue = "30") int limit) {
+        return service.autoSortedPayees(limit);
+    }
+
+    public record ConfirmAutoSorted(List<String> merchants) {}
+
+    public record CorrectAutoSorted(String merchant, String category) {}
+
+    /** The agent got this payee wrong: move all its auto-sorted payments to this category. */
+    @PostMapping("/auto-sorted/correct")
+    public Map<String, Object> correctAutoSorted(@RequestBody CorrectAutoSorted body) {
+        if (body == null) throw new IllegalArgumentException("Which payee?");
+        return Map.of("corrected", service.correctAutoSorted(body.merchant(), body.category()));
+    }
+
+    /** "These are right": confirm the agent's choice for these payees. */
+    @PostMapping("/auto-sorted/confirm")
+    public Map<String, Object> confirmAutoSorted(@RequestBody ConfirmAutoSorted body) {
+        return Map.of("confirmed", service.confirmAutoSorted(body == null ? null : body.merchants()));
+    }
+
     @GetMapping("/unsorted-payees/suggestions")
     public Map<String, Object> unsortedPayeeSuggestions(@RequestParam(defaultValue = "30") int limit) {
         return service.unsortedPayeeSuggestions(limit);

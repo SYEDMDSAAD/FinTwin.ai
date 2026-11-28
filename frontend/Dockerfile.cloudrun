@@ -1,0 +1,25 @@
+# The React app plus the front-door proxy, for Google Cloud Run.
+# Build from the REPO ROOT:
+#   docker build -f frontend/Dockerfile.cloudrun -t fintwin-web .
+
+FROM node:26-alpine AS build
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+ARG VITE_GOOGLE_CLIENT_ID=""
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+# The wake word's WebAssembly and model, compressed once here for gzip_static
+RUN for f in /usr/share/nginx/html/voice/kws/*.wasm /usr/share/nginx/html/voice/kws/*.data /usr/share/nginx/html/voice/kws/*.js; do \
+      gzip -9 -c "$f" > "$f.gz"; \
+    done
+COPY nginx/nginx.cloudrun.conf.template /etc/nginx/templates/default.conf.template
+
+ENV PORT=8080 \
+    NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+
+EXPOSE 8080

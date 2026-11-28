@@ -65,7 +65,7 @@ describe("Landing page visits", () => {
 
     it("counts a visit with the anonymous visitor id", async () => {
         const { apiMock } = renderPage(<LandingPage />);
-        await screen.findByText(/Try a demo account/);
+        await screen.findByText(/No sign-up for the demo/);
         const visit = apiMock.history.post.find(r => r.url === "/visits");
         expect(visit).toBeTruthy();
         expect(JSON.parse(visit.data).visitorId).toBe(localStorage.getItem("fintwin_visitor"));

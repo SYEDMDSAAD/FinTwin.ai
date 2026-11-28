@@ -14,9 +14,12 @@ from report_routes import router as report_router
 from investments.routes import router as investment_router
 from spending_coach.routes import router as coach_router
 from statements.routes import router as statements_router
+from documents.routes import router as documents_router
+from voice.routes import router as voice_router
 from categories.routes import router as categories_router
 from market.routes import router as market_router
 from utils import llm_usage
+from utils.redact import install_log_redaction, trace_id, trace_id_from
 
 _INTERNAL_KEY = os.environ.get("AI_INTERNAL_KEY", "")
 if not _INTERNAL_KEY:
@@ -30,6 +33,11 @@ _ALLOWED_ORIGINS = [
     for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
     if o.strip()
 ]
+
+# Every log line is masked (emails, UPI IDs, phone/card/account numbers,
+# credentials) before any handler writes it. uvicorn sets up its own logging
+# before it imports this module, in every worker, so its handlers exist here.
+install_log_redaction()
 
 app = FastAPI(
     title="FinTwin AI API",
@@ -81,6 +89,15 @@ async def verify_internal_key(request: Request, call_next):
 # X-LLM-Usage header so the backend can attribute them to the user it knows
 # the request is for. See utils/llm_usage.py.
 @app.middleware("http")
+async def carry_trace_id(request: Request, call_next):
+    token = trace_id.set(trace_id_from(request.headers))
+    try:
+        return await call_next(request)
+    finally:
+        trace_id.reset(token)
+
+
+@app.middleware("http")
 async def report_llm_usage(request: Request, call_next):
     tally = llm_usage.start()
     response = await call_next(request)
@@ -125,5 +142,7 @@ app.include_router(report_router, prefix="/reports")
 app.include_router(investment_router)
 app.include_router(coach_router)
 app.include_router(statements_router, tags=["Statements"])
+app.include_router(documents_router, tags=["Documents"])
+app.include_router(voice_router, tags=["Voice"])
 app.include_router(market_router, tags=["Discover"])
 app.include_router(categories_router, tags=["Categories"])

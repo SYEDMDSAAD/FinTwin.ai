@@ -38,6 +38,10 @@ public class AuthService {
     @Value("${google.client.id:}")
     private String googleClientId;
 
+    // The iPhone app signs in with its own iOS OAuth client; tokens issued to
+    // it are accepted too. Empty until that client exists.
+    @Value("${google.ios-client.id:}")
+    private String googleIosClientId;
     @Value("${app.base-url:http://localhost:5173}")
     private String appBaseUrl;
 
@@ -65,10 +69,18 @@ public class AuthService {
             throw new IllegalArgumentException("Full name must not be empty");
 
         String normalized = req.getEmail().toLowerCase().trim();
-        if (userRepository.findByEmail(normalized).isPresent())
+        User existing = userRepository.findByEmail(normalized).orElse(null);
+        // A sign-up nobody finished doesn't hold the email: signing up again
+        // starts over on the same row (nothing in it is lost, it never logged in)
+        if (existing != null && !isAbandonedSignup(existing))
             throw new RuntimeException("An account with this email already exists");
 
-        User user = new User();
+        User user = existing != null ? existing : new User();
+        if (existing != null) {
+            user.setCreatedAt(LocalDateTime.now());
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+        }
         user.setFullName(req.getFullName().trim());
         user.setEmail(normalized);
         user.setEmailHash(EmailHashUtil.hash(normalized));
@@ -90,6 +102,14 @@ public class AuthService {
             result.put("devNote", "Email not configured — use this OTP directly for testing");
         }
         return result;
+    }
+
+    /** Never verified, never logged in, never onboarded, a plain user: it holds nothing. */
+    static boolean isAbandonedSignup(User u) {
+        return !Boolean.TRUE.equals(u.getEmailVerified())
+                && u.getLastLoginAt() == null
+                && !Boolean.TRUE.equals(u.getOnboardingCompleted())
+                && "USER".equals(u.getRole());
     }
 
     // ── Login ─────────────────────────────────────────────────────────────────
@@ -150,6 +170,14 @@ public class AuthService {
 
     // ── Google Login ──────────────────────────────────────────────────────────
 
+    /** The web client, plus the iOS client when one is configured. */
+    static java.util.List<String> googleAudiences(String web, String ios) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (web != null && !web.isBlank()) out.add(web.trim());
+        if (ios != null && !ios.isBlank()) out.add(ios.trim());
+        return out;
+    }
+
     @Transactional
     public AuthResponse googleLogin(String credential) {
         if (credential == null || credential.isBlank())
@@ -158,7 +186,7 @@ public class AuthService {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                    .setAudience(Collections.singletonList(googleClientId))
+                    .setAudience(googleAudiences(googleClientId, googleIosClientId))
                     .build();
 
             GoogleIdToken idToken = verifier.verify(credential);

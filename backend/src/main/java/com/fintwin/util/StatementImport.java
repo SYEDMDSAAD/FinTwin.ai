@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -89,6 +90,31 @@ public final class StatementImport {
                 balance == null ? "" : String.format(Locale.ROOT, "%.2f", balance),
                 Integer.toString(ordinal));
         return EXTERNAL_ID_PREFIX + sha256(key).substring(0, 40);
+    }
+
+    /**
+     * Day and amount: how a row is recognised against an earlier statement of
+     * the same account when the descriptions differ (a UPI app's "Paid to X"
+     * against a bank's "UPI/DR/412233/X/..."). Within the days an earlier import
+     * covered, the same account can't show the same amount on the same day
+     * without it being the same payment, unless it happened twice; each earlier
+     * row is matched once, so two real ₹20 chais on one day stay two.
+     */
+    public static String overlapKey(LocalDate date, double amount) {
+        return date + "|" + Math.round(amount * 100);
+    }
+
+    /** Uses up one of the rows counted under this key; false when none are left. */
+    public static boolean takeOne(Map<String, Integer> counts, String key) {
+        Integer left = counts.get(key);
+        if (left == null || left <= 0) return false;
+        if (left == 1) counts.remove(key); else counts.put(key, left - 1);
+        return true;
+    }
+
+    /** Rows without an account name count as the same account as any other. */
+    public static boolean sameAccount(String a, String b) {
+        return a == null || b == null || a.equalsIgnoreCase(b);
     }
 
     /** The dedupe key without the ordinal — used to count identical siblings. */

@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { Plus, X, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, X, TrendingUp } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { apiUrl } from "../services/apiOrigin";
+import { usHoldingApi } from "../services/trackedHoldings";
 
 const INDICES = [
-  { label: "S&P 500",   symbol: "^GSPC", color: "#4ade80" },
-  { label: "NASDAQ",    symbol: "^IXIC",  color: "#22d3ee" },
-  { label: "Dow Jones", symbol: "^DJI",   color: "#a78bfa" },
+  { label: "S&P 500",   symbol: "^GSPC", color: "var(--good)" },
+  { label: "NASDAQ",    symbol: "^IXIC",  color: "var(--info)" },
+  { label: "Dow Jones", symbol: "^DJI",   color: "var(--accent)" },
 ];
-
-const STORAGE_KEY = "fintwin-us-holdings";
-function getHoldings() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
-function saveHoldings(h) { localStorage.setItem(STORAGE_KEY, JSON.stringify(h)); }
 
 const EMPTY = { name: "", ticker: "", units: "", buyPrice: "", buyDate: "" };
 
@@ -21,7 +20,7 @@ function IndexCard({ idx }) {
     const fetch_ = async () => {
       try {
         const res = await fetch(
-          `/api/v1/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`,
+          apiUrl(`/api/v1/market/quotes?symbols=${encodeURIComponent(idx.symbol)}`),
           { signal: AbortSignal.timeout(10000) }
         );
         const quotes = await res.json();
@@ -40,91 +39,100 @@ function IndexCard({ idx }) {
   const up = (data?.change ?? 0) >= 0;
   return (
     <div style={{
-      position: "relative", overflow: "hidden",
-      background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 16, padding: "16px 20px", flex: 1, minWidth: 160,
-      borderTop: `3px solid ${idx.color}`,
+      background: "var(--bg-card)", border: "1px solid var(--border-card)",
+      borderRadius: "var(--radius-control)", padding: "8px 12px", flexShrink: 0, minWidth: 132,
     }}>
-      <div style={{ position: "absolute", inset: "0 0 auto", height: 1, background: `linear-gradient(90deg,transparent,${idx.color}30,transparent)` }} />
-      <div style={{ fontSize: 11, fontWeight: 700, color: idx.color, marginBottom: 8 }}>{idx.label}</div>
+      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{idx.label}</div>
       {data ? (
         <>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
             {data.price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 12, fontWeight: 600, color: up ? "#4ade80" : "#f87171" }}>
-            {up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-            {up ? "+" : ""}{data.change?.toFixed(2)} ({up ? "+" : ""}{data.pct?.toFixed(2)}%)
+          <div style={{ fontSize: 12, fontWeight: 500, color: up ? "var(--good)" : "var(--bad)", fontVariantNumeric: "tabular-nums" }}>
+            {up ? "+" : "−"}{Math.abs(data.pct ?? 0).toFixed(2)}%
           </div>
         </>
       ) : (
-        <div style={{ fontSize: 12, color: "var(--text-dimmer)", paddingTop: 8 }}>Loading...</div>
+        <div style={{ fontSize: 15, color: "var(--text-dim)" }}>—</div>
       )}
     </div>
   );
 }
 
 export default function USStocksTab() {
-  const [holdings, setHoldings] = useState(getHoldings);
+  const [holdings, setHoldings] = useState([]);
+  // Live prices by ticker; not stored, fetched each visit.
+  const [prices, setPrices] = useState({});
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Live-price the holdings that have a ticker; without this, currentPrice
-  // stays frozen at buyPrice and P&L reads 0 forever.
+  // Without live prices P&L reads 0 forever, so price every ticker we hold.
   const refreshHoldingPrices = async (list) => {
     const tickers = [...new Set(list.map(h => h.ticker).filter(Boolean))];
     if (!tickers.length) return;
     setRefreshing(true);
     try {
       const res = await fetch(
-        `/api/v1/market/quotes?symbols=${encodeURIComponent(tickers.join(","))}`,
+        apiUrl(`/api/v1/market/quotes?symbols=${encodeURIComponent(tickers.join(","))}`),
         { signal: AbortSignal.timeout(10000) }
       );
       const quotes = await res.json();
-      const bySymbol = Object.fromEntries(
-        (Array.isArray(quotes) ? quotes : []).map(q => [q.symbol, q])
-      );
-      const next = list.map(h => {
-        const q = h.ticker ? bySymbol[h.ticker] : null;
-        return q?.price != null ? { ...h, currentPrice: q.price } : h;
-      });
-      setHoldings(next); saveHoldings(next);
+      const next = {};
+      (Array.isArray(quotes) ? quotes : []).forEach(q => { if (q?.price != null) next[q.symbol] = q.price; });
+      setPrices(p => ({ ...p, ...next }));
     } catch {} finally {
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { refreshHoldingPrices(getHoldings()); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    usHoldingApi.list().then((list) => {
+      if (cancelled) return;
+      setHoldings(list);
+      refreshHoldingPrices(list);
+    }).catch(() => { if (!cancelled) toast.error("Couldn't load your US holdings."); });
+    return () => { cancelled = true; };
+  }, []);
 
-  const handleSave = () => {
-    if (!form.name.trim() || !form.buyPrice) return;
-    const h = {
-      id: Date.now().toString(),
-      ...form,
-      units: parseFloat(form.units) || 0,
-      buyPrice: parseFloat(form.buyPrice) || 0,
-      currentPrice: parseFloat(form.buyPrice) || 0,
-    };
-    const next = [...holdings, h];
-    setHoldings(next); saveHoldings(next); setShowAdd(false); setForm(EMPTY);
-    refreshHoldingPrices(next);
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.buyPrice || saving) return;
+    setSaving(true);
+    try {
+      const made = await usHoldingApi.create({
+        name: form.name, ticker: form.ticker || null,
+        units: parseFloat(form.units) || 0, buyPrice: parseFloat(form.buyPrice) || 0,
+        buyDate: form.buyDate || null,
+      });
+      const next = [...holdings, made];
+      setHoldings(next); setShowAdd(false); setForm(EMPTY);
+      refreshHoldingPrices([made]);
+    } catch {
+      toast.error("Couldn't save this holding. Check the ticker and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
-  const handleDelete = (id) => {
-    const next = holdings.filter(h => h.id !== id);
-    setHoldings(next); saveHoldings(next);
+  const handleDelete = async (id) => {
+    const before = holdings;
+    setHoldings(holdings.filter(h => h.id !== id));
+    try { await usHoldingApi.remove(id); } catch {
+      setHoldings(before); toast.error("Couldn't remove this holding.");
+    }
   };
 
+  const priceOf = (h) => (h.ticker && prices[h.ticker] != null ? prices[h.ticker] : h.buyPrice);
   const totalInvested = holdings.reduce((s,h) => s + (h.units * h.buyPrice), 0);
-  const totalCurrent  = holdings.reduce((s,h) => s + (h.units * (h.currentPrice || h.buyPrice)), 0);
+  const totalCurrent  = holdings.reduce((s,h) => s + (h.units * priceOf(h)), 0);
   const totalPnl = totalCurrent - totalInvested;
 
   return (
     <div>
       {/* US Indices */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 12 }}>US MARKET INDICES (LIVE)</div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none", margin: "0 -4px", padding: "0 4px" }} aria-label="US markets today">
           {INDICES.map(idx => <IndexCard key={idx.symbol} idx={idx} />)}
         </div>
       </div>
@@ -132,21 +140,17 @@ export default function USStocksTab() {
       {/* My US Holdings */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.1em", marginBottom: 2 }}>
-            MY US STOCK HOLDINGS
-            <span style={{ fontWeight: 500, letterSpacing: 0, textTransform: "none", marginLeft: 8, color: "var(--text-dimmer)" }}>
-              stored in this browser only
-            </span>
-          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)" }}>US stocks</div>
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>Prices in US dollars</div>
           {holdings.length > 0 && (
             <div style={{ display: "flex", gap: 16 }}>
               <div>
-                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Invested: </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>${totalInvested.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+                <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Invested: </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>${totalInvested.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: "var(--text-dim)" }}>P&L: </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}>
+                <span style={{ fontSize: 12, color: "var(--text-dim)" }}>P&L: </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? "var(--good)" : "var(--bad)" }}>
                   {totalPnl >= 0 ? "+" : ""}${totalPnl.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -158,23 +162,23 @@ export default function USStocksTab() {
             <button
               onClick={() => refreshHoldingPrices(holdings)}
               disabled={refreshing}
-              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 11, border: "1px solid rgba(34,211,238,0.25)", background: "rgba(34,211,238,0.08)", color: "#22d3ee", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: refreshing ? 0.6 : 1 }}
+              style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 14px", borderRadius: 999, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: "var(--bg-input)", color: "var(--text-primary)", opacity: refreshing ? 0.6 : 1 }}
             >
-              {refreshing ? "Refreshing..." : "Refresh Prices"}
+              {refreshing ? "Updating…" : "Update prices"}
             </button>
           )}
           <button
             onClick={() => setShowAdd(o => !o)}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 11, border: "1px solid rgba(74,222,128,0.25)", background: "rgba(74,222,128,0.08)", color: "#4ade80", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 14px", borderRadius: 999, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: "var(--accent-soft)", color: "var(--accent)" }}
           >
-            <Plus size={13} /> Add Holding
+            <Plus size={14} /> Add
           </button>
         </div>
       </div>
 
       {/* Add form */}
       {showAdd && (
-        <div style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.12)", borderRadius: 14, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 14, padding: 16, marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Company Name *</label>
@@ -198,13 +202,13 @@ export default function USStocksTab() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => { setShowAdd(false); setForm(EMPTY); }} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border-card)", background: "none", color: "var(--text-dim)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button
               onClick={handleSave}
-              disabled={!form.name.trim() || !form.buyPrice}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "rgba(74,222,128,0.15)", color: "#4ade80", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.name.trim() && form.buyPrice ? 1 : 0.4 }}
+              disabled={!form.name.trim() || !form.buyPrice || saving}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "var(--good-soft)", color: "var(--good)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.name.trim() && form.buyPrice ? 1 : 0.4 }}
             >
-              Add Holding
+              Add holding
             </button>
           </div>
         </div>
@@ -221,35 +225,35 @@ export default function USStocksTab() {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <tr style={{ borderBottom: "1px solid var(--border-card)" }}>
                 {["Name","Ticker","Units","Buy Price","Current","Value","P&L",""].map(h => (
-                  <th key={h} style={{ textAlign: h === "P&L" || h === "Value" ? "right" : "left", padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--text-dim)", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ textAlign: h === "P&L" || h === "Value" ? "right" : "left", padding: "8px 12px", fontSize: 12, fontWeight: 700, color: "var(--text-dim)", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {holdings.map(h => {
                 const invested = h.units * h.buyPrice;
-                const current  = h.units * (h.currentPrice || h.buyPrice);
+                const current  = h.units * priceOf(h);
                 const pnl = current - invested;
                 const pct = invested ? (pnl / invested * 100).toFixed(1) : 0;
                 const pos = pnl >= 0;
                 return (
-                  <tr key={h.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                    <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 600, color: "#fff" }}>{h.name}</td>
+                  <tr key={h.id} style={{ borderBottom: "1px solid var(--border-card)" }}>
+                    <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{h.name}</td>
                     <td style={{ padding: "11px 12px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 5, padding: "2px 7px" }}>{h.ticker || "—"}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--good)", background: "var(--good-soft)", border: "1px solid var(--good-soft)", borderRadius: 5, padding: "2px 7px" }}>{h.ticker || "—"}</span>
                     </td>
                     <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--text-secondary)" }}>{h.units}</td>
                     <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--text-secondary)" }}>${h.buyPrice}</td>
-                    <td style={{ padding: "11px 12px", fontSize: 12, color: "#22d3ee" }}>${(h.currentPrice || h.buyPrice)?.toFixed(2)}</td>
-                    <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 700, color: "#fff", textAlign: "right" }}>${current.toFixed(2)}</td>
+                    <td style={{ padding: "11px 12px", fontSize: 12, color: "var(--info)" }}>${Number(priceOf(h)).toFixed(2)}</td>
+                    <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)", textAlign: "right" }}>${current.toFixed(2)}</td>
                     <td style={{ padding: "11px 12px", textAlign: "right" }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: pos ? "#4ade80" : "#f87171" }}>{pos?"+":""}${Math.abs(pnl).toFixed(2)}</div>
-                      <div style={{ fontSize: 10, color: pos ? "#4ade80" : "#f87171" }}>{pos?"+":""}{pct}%</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: pos ? "var(--good)" : "var(--bad)" }}>{pos?"+":""}${Math.abs(pnl).toFixed(2)}</div>
+                      <div style={{ fontSize: 12, color: pos ? "var(--good)" : "var(--bad)" }}>{pos?"+":""}{pct}%</div>
                     </td>
                     <td style={{ padding: "11px 12px" }}>
-                      <button onClick={() => handleDelete(h.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(248,113,113,0.4)", padding: 4, display: "flex" }}>
+                      <button onClick={() => handleDelete(h.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--bad)", padding: 4, display: "flex" }}>
                         <X size={13} />
                       </button>
                     </td>
@@ -264,5 +268,5 @@ export default function USStocksTab() {
   );
 }
 
-const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: "var(--text-label)", letterSpacing: "0.08em", marginBottom: 5 };
-const inp = { width: "100%", padding: "8px 11px", borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+const lbl = { display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6 };
+const inp = { width: "100%", height: 44, padding: "0 12px", borderRadius: "var(--radius-control)", background: "var(--bg-input)", border: "1px solid transparent", color: "var(--text-primary)", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };

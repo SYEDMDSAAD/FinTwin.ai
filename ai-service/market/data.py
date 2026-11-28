@@ -25,6 +25,13 @@ import requests
 logger = logging.getLogger(__name__)
 
 AMFI_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
+# AMFI's www host answers some cloud addresses with 403; the portal host
+# serves the same file. Both are tried, and mfapi.in's scheme list is the
+# last resort (names only: NAV and category come per fund, on demand).
+AMFI_URLS = ("https://portal.amfiindia.com/spages/NAVAll.txt", AMFI_URL)
+MFAPI_LIST_URL = "https://api.mfapi.in/mf"
+MFAPI_LATEST_URL = "https://api.mfapi.in/mf/{code}/latest"
+_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) FinTwin/1.0 (+market data)", "Accept": "text/plain,*/*"}
 MFAPI_URL = "https://api.mfapi.in/mf/{code}"
 
 _FUNDS_TTL = 6 * 3600          # AMFI publishes once a day, late evening
@@ -92,17 +99,94 @@ def _load_funds() -> dict[str, Fund]:
     with _funds_lock:
         if _funds and time.time() - _funds_loaded_at < _FUNDS_TTL:
             return _funds
-        try:
-            r = requests.get(AMFI_URL, timeout=20)
-            r.raise_for_status()
-            r.encoding = "utf-8"               # served without a charset; it is UTF-8
-            parsed = parse_navall(r.text)
-            if parsed:
-                _funds, _funds_loaded_at = parsed, time.time()
-        except Exception as e:
-            # Keep serving yesterday's list rather than nothing
-            logger.warning("AMFI NAV file unavailable: %s", e)
+        for url in AMFI_URLS:
+            try:
+                r = requests.get(url, timeout=20, headers=_HEADERS)
+                r.raise_for_status()
+                r.encoding = "utf-8"               # served without a charset; it is UTF-8
+                parsed = parse_navall(r.text)
+                if parsed:
+                    _funds, _funds_loaded_at = parsed, time.time()
+                    return _funds
+            except Exception as e:
+                logger.warning("AMFI NAV file unavailable from %s: %s", url, e)
+        if not _funds:
+            # Keep serving yesterday's list if there is one; else names from mfapi.in
+            listed = _mfapi_list()
+            if listed:
+                _funds, _funds_loaded_at = listed, time.time() - _FUNDS_TTL + 1800   # retry AMFI in 30 min
         return _funds
+
+
+def guess_category(name: str) -> str:
+    """An AMFI-style category from a fund's name, for when only names are known."""
+    n = name.lower()
+    if "index" in n or " etf" in n or n.endswith("etf"):
+        return "Other Scheme - Index Funds"
+    if "elss" in n or "tax saver" in n or "tax saving" in n or "taxsaver" in n:
+        return "Equity Scheme - ELSS"
+    if "large & mid" in n or "large and mid" in n:
+        return "Equity Scheme - Large & Mid Cap Fund"
+    if "large cap" in n or "largecap" in n:
+        return "Equity Scheme - Large Cap Fund"
+    if "mid cap" in n or "midcap" in n:
+        return "Equity Scheme - Mid Cap Fund"
+    if "small cap" in n or "smallcap" in n:
+        return "Equity Scheme - Small Cap Fund"
+    if "flexi cap" in n or "flexicap" in n:
+        return "Equity Scheme - Flexi Cap Fund"
+    if "liquid" in n:
+        return "Debt Scheme - Liquid Fund"
+    return ""
+
+
+def _mfapi_list() -> dict[str, Fund]:
+    try:
+        r = requests.get(MFAPI_LIST_URL, timeout=20, headers=_HEADERS)
+        r.raise_for_status()
+        rows = r.json()
+    except Exception as e:
+        logger.warning("mfapi.in scheme list unavailable: %s", e)
+        return {}
+    out: dict[str, Fund] = {}
+    for x in rows if isinstance(rows, list) else []:
+        code, name = str(x.get("schemeCode") or ""), str(x.get("schemeName") or "")
+        if code.isdigit() and name:
+            out[code] = Fund(code=code, name=name, amc="", category=guess_category(name),
+                             nav=0.0, nav_date="", isin=x.get("isinGrowth") or "")
+    return out
+
+
+_latest_cache: dict[str, tuple[float, Fund]] = {}
+
+
+def _complete(fund: Fund) -> Fund:
+    """A fund from the names-only list gets its NAV, AMC and category from mfapi.in."""
+    if fund.nav > 0:
+        return fund
+    hit = _latest_cache.get(fund.code)
+    if hit and time.time() - hit[0] < _FUNDS_TTL:
+        return hit[1]
+    try:
+        r = requests.get(MFAPI_LATEST_URL.format(code=fund.code), timeout=_HISTORY_TIMEOUT, headers=_HEADERS)
+        r.raise_for_status()
+        body = r.json()
+        meta, data = body.get("meta") or {}, (body.get("data") or [{}])[0]
+        d = data.get("date") or ""
+        try:
+            d = datetime.strptime(d, "%d-%m-%Y").strftime("%d-%b-%Y")
+        except ValueError:
+            pass
+        full = Fund(code=fund.code, name=meta.get("scheme_name") or fund.name, amc=meta.get("fund_house") or "",
+                    category=meta.get("scheme_category") or fund.category, nav=float(data.get("nav") or 0),
+                    nav_date=d, isin=meta.get("isin_growth") or fund.isin)
+    except Exception as e:
+        logger.info("Latest NAV unavailable for %s: %s", fund.code, e)
+        return fund
+    if len(_latest_cache) > 2000:
+        _latest_cache.clear()
+    _latest_cache[fund.code] = (time.time(), full)
+    return full
 
 
 def search_funds(query: str, limit: int = 20) -> list[dict]:
@@ -118,14 +202,20 @@ def search_funds(query: str, limit: int = 20) -> list[dict]:
             rank = (0 if "direct" in f.name.lower() else 1, 0 if "growth" in f.name.lower() else 1, f.name)
             hits.append((rank, f))
     hits.sort(key=lambda x: x[0])
-    return [asdict(f) for _, f in hits[:limit]]
+    out = []
+    for _, f in hits[:limit]:
+        row = asdict(f)
+        if f.nav <= 0:
+            row["nav"] = None                      # names-only list: NAV shown on the fund's page
+        out.append(row)
+    return out
 
 
 def fund_details(code: str) -> dict | None:
     fund = _load_funds().get(str(code))
     if not fund:
         return None
-    out = asdict(fund)
+    out = asdict(_complete(fund))
     out["returns"] = fund_returns(str(code))
     return out
 
@@ -175,7 +265,10 @@ def returns_from_history(history: list[dict]) -> dict:
 
 def latest_nav(code: str) -> float | None:
     fund = _load_funds().get(str(code))
-    return fund.nav if fund else None
+    if not fund:
+        return None
+    nav = _complete(fund).nav
+    return nav if nav > 0 else None
 
 
 # ── Stocks ──────────────────────────────────────────────────────────────────
@@ -271,9 +364,16 @@ def stock_price_on(symbol: str, on: str) -> dict | None:
     return {"symbol": sym, "date": pick[0].isoformat(), "price": round(pick[1], 4)}
 
 
-def fund_nav_on(code: str, on: str) -> dict | None:
-    """NAV on `on` (YYYY-MM-DD), or the next business day's — the NAV units are allotted at."""
-    day = datetime.strptime(on, "%Y-%m-%d")
+_HISTORY_CACHE: dict[str, tuple[float, list]] = {}
+_HISTORY_TTL_S = 6 * 3600
+
+
+def _nav_history(code: str) -> list[tuple[datetime, float]]:
+    """A fund's NAV history from mfapi.in, oldest first; cached for a few hours."""
+    import time
+    hit = _HISTORY_CACHE.get(code)
+    if hit and time.monotonic() - hit[0] < _HISTORY_TTL_S:
+        return hit[1]
     history = None
     for attempt in range(2):                      # mfapi.in sometimes stalls once
         try:
@@ -284,13 +384,34 @@ def fund_nav_on(code: str, on: str) -> dict | None:
         except Exception as e:
             logger.info("NAV history attempt %d failed for %s: %s", attempt + 1, code, e)
     if not history:
-        return None
+        return []
     points = []
     for h in history:
         try:
             points.append((datetime.strptime(h["date"], "%d-%m-%Y"), float(h["nav"])))
         except (KeyError, ValueError):
             continue
+    points.sort()
+    if len(_HISTORY_CACHE) > 500:
+        _HISTORY_CACHE.clear()
+    _HISTORY_CACHE[code] = (time.monotonic(), points)
+    return points
+
+
+def fund_monthly_navs(code: str, since: str) -> list[dict]:
+    """The last NAV of each month from `since` (YYYY-MM) to now, for a value-over-time chart."""
+    start = datetime.strptime(since + "-01", "%Y-%m-%d")
+    last: dict[str, float] = {}
+    for d, nav in _nav_history(code):
+        if d >= start:
+            last[d.strftime("%Y-%m")] = nav        # sorted, so the month's last NAV wins
+    return [{"month": m, "nav": v} for m, v in sorted(last.items())]
+
+
+def fund_nav_on(code: str, on: str) -> dict | None:
+    """NAV on `on` (YYYY-MM-DD), or the next business day's — the NAV units are allotted at."""
+    day = datetime.strptime(on, "%Y-%m-%d")
+    points = list(_nav_history(code))
     if not points:
         return None
     points.sort()
@@ -300,3 +421,172 @@ def fund_nav_on(code: str, on: str) -> dict | None:
         return None                               # before the fund existed
     return {"code": str(code), "date": pick[0].date().isoformat(), "nav": pick[1]}
 
+
+
+# ── Charts and collections (fund and stock pages) ───────────────────────────
+
+# Same day counts as fund_returns (round(365.25 × years)), so the chart and
+# the "past returns" row agree
+FUND_RANGES = {"1M": 30, "6M": 183, "1Y": 365, "3Y": 1096, "5Y": 1826, "ALL": None}
+_MAX_POINTS = 240
+
+
+def _thin(points: list, limit: int = _MAX_POINTS) -> list:
+    """Every nth point, always keeping the last, so a 20-year chart stays light."""
+    if len(points) <= limit:
+        return points
+    step = len(points) / limit
+    out = [points[int(i * step)] for i in range(limit)]
+    if out[-1] is not points[-1]:
+        out.append(points[-1])
+    return out
+
+
+def fund_history(code: str, rng: str) -> dict:
+    """NAVs over a range (1M…ALL) for the fund page's chart, plus when the fund began."""
+    points = _nav_history(code)
+    if not points:
+        return {"code": str(code), "range": rng, "points": [], "since": None, "change": None}
+    days = FUND_RANGES.get(rng)
+    window = points if days is None else [p for p in points if p[0] >= points[-1][0] - timedelta(days=days)]
+    window = window or points[-1:]
+    first, last = window[0][1], window[-1][1]
+    return {
+        "code": str(code), "range": rng,
+        "since": points[0][0].date().isoformat(),
+        "change": round((last / first - 1) * 100, 2) if first > 0 else None,
+        "points": [{"date": d.date().isoformat(), "nav": round(v, 4)} for d, v in _thin(window)],
+    }
+
+
+def fund_nav_series(code: str) -> list[dict]:
+    """The full daily NAV series, for the SIP / lump-sum calculator (done in the browser)."""
+    return [{"date": d.date().isoformat(), "nav": round(v, 4)} for d, v in _thin(_nav_history(code), 2000)]
+
+
+STOCK_RANGES = {"1D": ("1d", "5m"), "1W": ("5d", "30m"), "1M": ("1mo", "1d"),
+                "1Y": ("1y", "1d"), "5Y": ("5y", "1wk")}
+_STOCK_HISTORY_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def stock_history(symbol: str, rng: str) -> dict:
+    """Prices over a range for the stock page's chart, with the 52-week high and low."""
+    import yfinance as yf
+    sym = symbol.strip().upper()
+    if "." not in sym:
+        sym += ".NS"
+    key = f"{sym}:{rng}"
+    hit = _STOCK_HISTORY_CACHE.get(key)
+    ttl = 120 if rng in ("1D", "1W") else 3600
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    period, interval = STOCK_RANGES.get(rng, STOCK_RANGES["1Y"])
+    out = {"symbol": sym, "range": rng, "points": [], "high52": None, "low52": None, "change": None}
+    try:
+        t = yf.Ticker(sym)
+        hist = t.history(period=period, interval=interval)
+        # Yahoo leaves NaN in rows with no trade; JSON can't carry NaN
+        pts = [{"t": idx.isoformat(), "price": round(float(row["Close"]), 2)} for idx, row in hist.iterrows()
+               if row["Close"] == row["Close"]]
+        out["points"] = _thin(pts)
+        if pts and pts[0]["price"] > 0:
+            out["change"] = round((pts[-1]["price"] / pts[0]["price"] - 1) * 100, 2)
+        year = t.history(period="1y", interval="1d") if rng != "1Y" else hist
+        if year is not None and not year.empty:
+            hi, lo = float(year["High"].max(skipna=True)), float(year["Low"].min(skipna=True))
+            out["high52"] = round(hi, 2) if hi == hi else None
+            out["low52"] = round(lo, 2) if lo == lo else None
+    except Exception as e:
+        logger.info("Price history unavailable for %s: %s", sym, e)
+        return out
+    if len(_STOCK_HISTORY_CACHE) > 500:
+        _STOCK_HISTORY_CACHE.clear()
+    _STOCK_HISTORY_CACHE[key] = (time.time(), out)
+    return out
+
+
+import re as _re
+_BROAD_INDEX = _re.compile(r"nifty 50 index|sensex index|next 50|nifty 100 index|midcap 150|smallcap 250|nifty 500 index|total market", _re.I)
+
+# Collections are plain filters on AMFI's own categories. Sorted by a stated
+# column (3-year return), never "recommended": a list, not advice.
+COLLECTIONS = {
+    "index": ("Index funds (broad market)", lambda c, n: "Index Funds" in c and _BROAD_INDEX.search(n) is not None),
+    "elss": ("Tax saving (ELSS)", lambda c, n: "ELSS" in c),
+    "large-cap": ("Large cap", lambda c, n: c.endswith("Large Cap Fund")),
+    "mid-cap": ("Mid cap", lambda c, n: c.endswith("Mid Cap Fund") and "Large" not in c),
+    "small-cap": ("Small cap", lambda c, n: c.endswith("Small Cap Fund")),
+    "flexi-cap": ("Flexi cap", lambda c, n: "Flexi Cap" in c),
+    "liquid": ("Liquid (parking money)", lambda c, n: "Liquid Fund" in c),
+    "gold": ("Gold", lambda c, n: "gold" in n.lower() and not c.startswith("Equity")),
+}
+_COLLECTION_CANDIDATES = 100
+
+
+def _is_direct_growth(name: str) -> bool:
+    n = name.lower()
+    return "direct" in n and "growth" in n and "idcw" not in n and "dividend" not in n and "bonus" not in n
+
+
+def fund_collection(key: str) -> dict | None:
+    from concurrent.futures import ThreadPoolExecutor, wait
+    spec = COLLECTIONS.get(key)
+    if spec is None:
+        return None
+    title, match = spec
+    funds = [f for f in _load_funds().values() if match(f.category, f.name) and _is_direct_growth(f.name)]
+    funds.sort(key=lambda f: f.name)
+    funds = funds[:_COLLECTION_CANDIDATES]
+    returns: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {pool.submit(fund_returns, f.code): f.code for f in funds}
+        done, _ = wait(futures, timeout=15)
+        for fut in done:
+            try:
+                returns[futures[fut]] = fut.result()
+            except Exception:
+                pass
+    rows = []
+    for f in funds:
+        r = returns.get(f.code) or {}
+        if not r and f.nav <= 0:
+            continue                               # names-only list: no history means a closed scheme
+        rows.append({"code": f.code, "name": f.name, "amc": f.amc, "category": f.category,
+                     "nav": f.nav if f.nav > 0 else None, "nav_date": f.nav_date, "returns": r})
+    rows.sort(key=lambda x: (x["returns"].get("3y") is None, -(x["returns"].get("3y") or 0)))
+    return {"key": key, "title": title, "sortedBy": "3-year return, highest first",
+            "note": "A list sorted by past returns, not a recommendation. Direct plans, growth option.",
+            "funds": rows}
+
+
+def collections() -> list[dict]:
+    return [{"key": k, "title": t} for k, (t, _) in COLLECTIONS.items()]
+
+
+_SECTOR_CACHE: dict[str, tuple[float, str | None]] = {}
+_SECTOR_TTL = 7 * 24 * 3600       # a company's sector rarely changes
+
+
+def stock_sectors(symbols: list[str]) -> dict[str, str | None]:
+    """Each stock's sector (Yahoo's classification), for the sector split. None when unknown."""
+    import yfinance as yf
+    out: dict[str, str | None] = {}
+    for raw in symbols[:50]:
+        sym = raw.strip().upper()
+        if not sym:
+            continue
+        if "." not in sym:
+            sym += ".NS"
+        hit = _SECTOR_CACHE.get(sym)
+        if hit and time.time() - hit[0] < _SECTOR_TTL:
+            out[sym] = hit[1]
+            continue
+        try:
+            sector = (yf.Ticker(sym).info or {}).get("sector") or None
+        except Exception as e:
+            logger.info("Sector unavailable for %s: %s", sym, e)
+            out[sym] = None
+            continue                              # a failed read isn't cached
+        _SECTOR_CACHE[sym] = (time.time(), sector)
+        out[sym] = sector
+    return out

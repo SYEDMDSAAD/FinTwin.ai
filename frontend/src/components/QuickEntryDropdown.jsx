@@ -1,149 +1,56 @@
 import { useState } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
+import { Button, cx } from "./ui";
 
-function QuickEntryDropdown({
-    incomeText,
-    setIncomeText,
-    addIncome,
-    expenseText,
-    setExpenseText,
-    addExpense,
-}) {
+/*
+ * Adding money by hand: "Swiggy 450" or "Salary 50000", out or in. Folded
+ * behind one button next to the statement import, so the list stays first.
+ */
+function QuickEntryDropdown({ incomeText, setIncomeText, addIncome, expenseText, setExpenseText, addExpense, onImport }) {
     const [open, setOpen] = useState(false);
-
-    const card = {
-        background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: 18,
-        marginBottom: 16,
-        overflow: "hidden",
-    };
-
-    const inputStyle = {
-        flex: 1,
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 10,
-        padding: "10px 14px",
-        color: "#fff",
-        fontSize: 13,
-        outline: "none",
-        fontFamily: "inherit",
-    };
-
-    const handleIncomeKey = (e) => { if (e.key === "Enter") addIncome(); };
-    const handleExpenseKey = (e) => { if (e.key === "Enter") addExpense(); };
+    const [kind, setKind] = useState("out");
+    const out = kind === "out";
+    const value = out ? expenseText : incomeText;
+    const setValue = out ? setExpenseText : setIncomeText;
+    const add = out ? addExpense : addIncome;
 
     return (
-        <div style={card}>
-            {/* Toggle header */}
-            <button
-                onClick={() => setOpen((o) => !o)}
-                style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 20px",
-                    background: "transparent",
-                    border: "none",
-                    color: "#fff",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Plus size={15} color="#a78bfa" />
-                    <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-label, #71717a)" }}>
-                        ADD MANUAL ENTRY
-                    </span>
-                </div>
-                <ChevronDown
-                    size={16}
-                    color="#71717a"
-                    style={{
-                        transform: open ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 0.2s",
-                    }}
-                />
-            </button>
+        <div className="mb-6">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button variant={open ? "soft" : "secondary"} icon={Plus} onClick={() => setOpen((o) => !o)} aria-expanded={open} className="min-w-0">
+                    Add
+                </Button>
+                {onImport && (
+                    <Button variant="secondary" icon={Upload} onClick={onImport} className="min-w-0">
+                        Import
+                    </Button>
+                )}
+            </div>
 
-            {/* Collapsible body */}
             {open && (
-                <div style={{ padding: "0 20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-                    {/* Income row */}
-                    <div>
-                        <label style={{ display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#4ade80", marginBottom: 6 }}>
-                            ADD INCOME
-                        </label>
-                        <div style={{ display: "flex", gap: 8 }}>
-                            <input
-                                type="text"
-                                value={incomeText}
-                                onChange={(e) => setIncomeText(e.target.value)}
-                                onKeyDown={handleIncomeKey}
-                                placeholder="e.g. Salary 50000"
-                                style={inputStyle}
-                            />
-                            <button
-                                onClick={addIncome}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    padding: "10px 18px",
-                                    borderRadius: 10,
-                                    background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                                    border: "none",
-                                    color: "#fff",
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                <Plus size={14} /> Add
+                <div className="mt-3 p-4 rounded-card bg-surface border border-line">
+                    <div role="radiogroup" aria-label="Money in or out" className="inline-flex p-1 rounded-full bg-surface-sunken">
+                        {[["out", "Money out"], ["in", "Money in"]].map(([k, label]) => (
+                            <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)}
+                                    className={cx("h-8 px-4 rounded-full text-small font-medium transition-colors",
+                                        kind === k ? "bg-surface text-ink shadow-[0_1px_2px_rgba(17,17,26,0.08)]" : "text-ink-3")}>
+                                {label}
                             </button>
-                        </div>
+                        ))}
                     </div>
-
-                    {/* Expense row */}
-                    <div>
-                        <label style={{ display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#f87171", marginBottom: 6 }}>
-                            ADD EXPENSE
-                        </label>
-                        <div style={{ display: "flex", gap: 8 }}>
-                            <input
-                                type="text"
-                                value={expenseText}
-                                onChange={(e) => setExpenseText(e.target.value)}
-                                onKeyDown={handleExpenseKey}
-                                placeholder="e.g. Swiggy 450"
-                                style={inputStyle}
-                            />
-                            <button
-                                onClick={addExpense}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    padding: "10px 18px",
-                                    borderRadius: 10,
-                                    background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                                    border: "none",
-                                    color: "#fff",
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                <Plus size={14} /> Add
-                            </button>
-                        </div>
+                    <div className="mt-3 flex gap-2">
+                        <input
+                            type="text"
+                            value={value}
+                            onChange={(e) => setValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+                            placeholder={out ? "Swiggy 450" : "Salary 50000"}
+                            aria-label={out ? "Add expense" : "Add income"}
+                            className="flex-1 min-w-0 h-11 rounded-control bg-surface-sunken border border-transparent px-3 text-body text-ink placeholder:text-ink-3 focus:outline-none focus:border-accent"
+                        />
+                        <Button onClick={add}>Add</Button>
                     </div>
+                    <p className="mt-2 text-caption text-ink-3">Name and amount. FinTwin picks the category.</p>
                 </div>
             )}
         </div>

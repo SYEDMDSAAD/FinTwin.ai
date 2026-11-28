@@ -42,6 +42,10 @@ public class GoalPlannerService {
     @Autowired
     private ProfileService profileService;
 
+    // Optional so unit tests that build this service by hand still work
+    @Autowired(required = false)
+    private com.fintwin.repository.GoalEarmarkRepository earmarkRepository;
+
     @Value("${ai.service.url}")
     private String aiServiceUrl;
 
@@ -276,6 +280,31 @@ public class GoalPlannerService {
     // rather than trusting the possibly-stale stored value, since getGoals()
     // recalculates progress in-memory on every fetch without persisting it.
     // =========================
+
+    /** Most a single "Add money" can be: catches a typo of extra zeros. */
+    static final double MAX_TOP_UP = 1_00_00_000;
+
+    /**
+     * "Add money": rupees the user put towards the goal by hand. A negative
+     * amount takes some back (a mistaken entry), never below zero.
+     */
+    @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
+    @Audited(action = "WRITE", resource = "goals", description = "Money added to a financial goal by hand")
+    public FinancialGoal topUp(Long id, double amount) {
+        if (!Double.isFinite(amount) || amount == 0 || Math.abs(amount) > MAX_TOP_UP) {
+            throw new com.fintwin.exception.BadRequestException("Enter an amount up to ₹1,00,00,000");
+        }
+        User user = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        FinancialGoal goal = ownedGoal(id, user, false);
+        if (Boolean.TRUE.equals(goal.getCompleted())) {
+            throw new ConflictException("This goal is already complete.");
+        }
+        double next = Math.max(0, goal.getManualSaved() + amount);
+        goal.setManualSaved(Math.round(next * 100) / 100.0);
+        recomputeProgressFor(user, goal);
+        return goalRepository.save(goal);
+    }
 
     @PreAuthorize("hasAuthority('WRITE_OWN_GOALS')")
     @Audited(action = "WRITE", resource = "goals", description = "Financial goal marked complete")
@@ -542,12 +571,29 @@ public class GoalPlannerService {
         Map<Long, Double> allocated = com.fintwin.util.GoalMath.allocateSavings(
                 goals,
                 com.fintwin.util.TransactionMath.netSavingsByMonth(transactions),
-                java.time.YearMonth.now()
+                java.time.YearMonth.now(),
+                earmarksFor(user)
         );
 
         for (FinancialGoal goal : goals) {
             applyProgress(goal, allocated.getOrDefault(goal.getId(), 0.0));
         }
+    }
+
+    /** Money approved Spend Guard salary plans set aside, per month and goal. */
+    private Map<java.time.YearMonth, Map<Long, Double>> earmarksFor(User user) {
+        if (earmarkRepository == null || user.getId() == null) return Map.of();
+        Map<java.time.YearMonth, Map<Long, Double>> out = new java.util.HashMap<>();
+        for (com.fintwin.model.GoalEarmark e : earmarkRepository.findByUser(user)) {
+            if (e.getAmount() == null || e.getGoal() == null) continue;
+            try {
+                out.computeIfAbsent(java.time.YearMonth.parse(e.getMonth()), m -> new java.util.HashMap<>())
+                   .merge(e.getGoal().getId(), e.getAmount().doubleValue(), Double::sum);
+            } catch (java.time.format.DateTimeParseException ignored) {
+                // a malformed month can't be placed; leave it out
+            }
+        }
+        return out;
     }
 
     // Allocation is cross-goal, so recomputing one goal still needs the whole
@@ -576,7 +622,8 @@ public class GoalPlannerService {
         }
 
         double target = goal.getTargetAmount() != null ? goal.getTargetAmount() : 0.0;
-        double saved = Math.min(allocatedSaved, target);
+        // Money added by hand counts on top of what the measured savings fund
+        double saved = Math.min(allocatedSaved + goal.getManualSaved(), target);
 
         goal.setExpectedSaved(saved);
         goal.setProgressPercent(round1(

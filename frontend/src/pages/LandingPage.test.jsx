@@ -25,4 +25,22 @@ describe("LandingPage", () => {
     expect(localStorage.getItem("fintwin-theme")).toBe("dark");          // the dashboard follows
     expect(screen.getAllByRole("button", { name: "Switch to light mode" }).length).toBeGreaterThan(0);
   });
+
+  it("gives the website real legal links and the product picture", () => {
+    renderPage(<LandingPage />);
+    expect(document.querySelector(".land")).toHaveClass("web");
+    expect(screen.getByRole("link", { name: "Privacy policy" })).toHaveAttribute("href", "/privacy-policy");
+    expect(screen.getByRole("link", { name: "Terms of service" })).toHaveAttribute("href", "/terms");
+    expect(screen.queryByText("Careers")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /FinTwin portfolio/ })).toBeInTheDocument();
+  });
+
+  it("tells the website's story as investing first", () => {
+    renderPage(<LandingPage />);
+    expect(document.getElementById("hero-heading")).toHaveTextContent("Invest the rest.");
+    expect(screen.getByRole("heading", { name: /Every fund you own/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Your next SIP is hiding in your spending/ })).toBeInTheDocument();
+    // Never a fund pick: facts and the user's own numbers only
+    expect(document.body.textContent).not.toMatch(/recommended fund|we recommend/i);
+  });
 });

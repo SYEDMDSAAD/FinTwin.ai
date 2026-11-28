@@ -10,11 +10,13 @@ import com.fintwin.model.User;
 import com.fintwin.repository.*;
 import com.fintwin.security.SecurityUtils;
 import com.fintwin.util.CoverageMath;
+import com.fintwin.util.PlanDraftMath;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.time.YearMonth;
 import java.util.*;
 
 @Service
@@ -39,6 +41,9 @@ public class NotificationService {
     private static final Map<String, Integer> PRIORITY =
             Map.of("danger", 1, "warning", 2, "success", 3, "info", 4);
 
+    /** How many days after the salary lands the "split it" nudge stays up. */
+    static final int SALARY_NUDGE_DAYS = 3;
+
     @PreAuthorize("hasAuthority('READ_OWN_PROFILE')")
     public List<NotificationDTO> generateNotifications() {
 
@@ -61,19 +66,28 @@ public class NotificationService {
         double monthlyIncome = income / 3.0;
 
         // ── 1. Budget alerts (specific numbers) ──────────────────────────
+        YearMonth thisMonth = YearMonth.now(java.time.ZoneId.of("Asia/Kolkata"));
         for (Budget budget : budgets) {
             if (budget.getLimitAmount() == null || budget.getLimitAmount() <= 0) continue;
+            if (!budget.countsIn(thisMonth)) continue;
 
+            // A budget is monthly: this month's spending only (it used to add up three months)
             double spent = transactions.stream()
+                    .filter(t -> t.getDate() != null && YearMonth.from(t.getDate()).equals(thisMonth))
                     .filter(t -> t.getCategory() != null
                             && t.getCategory().equalsIgnoreCase(budget.getCategory())
-                            && t.getAmount() != null && t.getAmount() < 0)
+                            && t.getAmount() != null && t.getAmount() < 0
+                            && !com.fintwin.util.TransactionMath.isSelfTransfer(t))
                     .mapToDouble(t -> Math.abs(t.getAmount())).sum();
 
             double pct = (spent / budget.getLimitAmount()) * 100;
             long overshoot = Math.round(spent - budget.getLimitAmount());
 
-            if (pct >= 100) {
+            // Rent or a bill paid in full is done for the month, not an alert
+            boolean fixedCost = com.fintwin.util.PlanDraftMath.isFixedCost(budget.getCategory());
+            if (fixedCost && overshoot <= 0) continue;
+
+            if (overshoot > 0) {
                 notifications.add(new NotificationDTO("danger",
                         budget.getCategory() + " budget exceeded — ₹" + fmt(overshoot)
                         + " over the ₹" + fmt(Math.round(budget.getLimitAmount()))
@@ -91,7 +105,12 @@ public class NotificationService {
         // ── 2. High merchant concentration ───────────────────────────────
         Map<String, Double> merchantTotals = new HashMap<>();
         for (Transaction t : transactions) {
-            if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null) {
+            // Not rent, EMIs, bills, money to people or investing: a cap on the
+            // landlord, on what you send Mom or on a SIP isn't advice anyone should take
+            if (t.getAmount() != null && t.getAmount() < 0 && t.getMerchant() != null
+                    && !com.fintwin.util.PlanDraftMath.isFixedCost(t.getCategory())
+                    && !"People".equalsIgnoreCase(t.getCategory())
+                    && !"Investments".equalsIgnoreCase(t.getCategory())) {
                 merchantTotals.merge(t.getMerchant(), Math.abs(t.getAmount()), Double::sum);
             }
         }
@@ -206,13 +225,97 @@ public class NotificationService {
             ));
         }
 
-        notifications.sort((a, b) -> Integer.compare(
-                PRIORITY.getOrDefault(a.getType(), 5),
-                PRIORITY.getOrDefault(b.getType(), 5)
-        ));
+        // ── 8. Salary day ────────────────────────────────────────────────
+        // The salary just landed: the moment to split it, before it's spent
+        PlanDraftMath.Salary salary = PlanDraftMath.detectSalary(transactions, today);
+        if (salary != null && !salary.lastPaid().isAfter(today)
+                && salary.lastPaid().isAfter(today.minusDays(SALARY_NUDGE_DAYS + 1))) {
+            notifications.add(new NotificationDTO("success",
+                    "Salary of ₹" + fmt(Math.round(salary.lastAmount())) + " arrived. Split it into bills, goals and"
+                    + " weekly spending before it goes: open Spend Guard → Salary day."
+            ));
+        }
 
-        return notifications.stream().limit(7).toList();
+        // ── 9. What the agents did or noticed (last 7 days) ──────────────
+        // Watch alerts sort with warnings; the sorting summary with info.
+        List<NotificationDTO> agents = new ArrayList<>(agentNotifications(user));
+        if (nudgeAgents != null) {
+            agents.addAll(nudgeAgents.all(user, transactions, today, !budgets.isEmpty()));
+        }
+        return bell(notifications, agents);
     }
+
+    /** Most lines the bell shows. */
+    static final int BELL_SIZE = 12;
+    /**
+     * Places kept for the agents when they have that much to say. Their lines
+     * are specific (this payee, this renewal, this salary); the rule alerts
+     * still get the rest, the most urgent first.
+     */
+    static final int AGENT_SHARE = 8;
+
+    /**
+     * The bell's list: rule alerts and agent lines each sorted by priority,
+     * the agents given up to AGENT_SHARE places (more when there are few rule
+     * alerts), the rule alerts the rest, then shown together by priority. Without this, a month with a
+     * few budgets over the limit filled every place and no agent was heard.
+     */
+    static List<NotificationDTO> bell(List<NotificationDTO> rules, List<NotificationDTO> agents) {
+        Comparator<NotificationDTO> byPriority = Comparator.comparingInt(n -> PRIORITY.getOrDefault(n.getType(), 5));
+        List<NotificationDTO> r = rules.stream().sorted(byPriority).toList();
+        List<NotificationDTO> a = agents.stream().sorted(byPriority).toList();
+        int fromAgents = Math.min(a.size(), Math.max(AGENT_SHARE, BELL_SIZE - r.size()));
+        int fromRules = Math.min(r.size(), BELL_SIZE - fromAgents);
+        List<NotificationDTO> out = new ArrayList<>(r.subList(0, fromRules));
+        out.addAll(a.subList(0, fromAgents));
+        out.sort(byPriority);
+        return out;
+    }
+
+    /** How long an agent's alert stays in the bell. */
+    static final int AGENT_ALERT_DAYS = 7;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.AgentAlertRepository agentAlerts;
+
+    /** Weekly, budget, subscription and goal agents (worked out on each bell load). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.agent.NudgeAgents nudgeAgents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.fintwin.repository.DismissedAnomalyRepository dismissedAnomalies;
+
+    /**
+     * The agents' recent alerts, newest first. A watch alert disappears once
+     * the user dismisses its anomaly on the Insights page ("that's fine").
+     */
+    List<NotificationDTO> agentNotifications(User user) {
+        if (agentAlerts == null) return List.of();
+        Set<String> dismissed = new HashSet<>();
+        if (dismissedAnomalies != null) {
+            dismissedAnomalies.findByUser(user).forEach(p ->
+                    dismissed.add(p.getAnomalyType() + "|" + (p.getMerchant() == null ? "" : p.getMerchant())));
+        }
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays(AGENT_ALERT_DAYS);
+        List<NotificationDTO> out = new ArrayList<>();
+        boolean sortShown = false;
+        int watchShown = 0;
+        for (com.fintwin.model.AgentAlert a : agentAlerts.findByUserAndCreatedAtAfterOrderByCreatedAtDesc(user, since)) {
+            if (com.fintwin.model.AgentAlert.WATCH.equals(a.getAgent())) {
+                // The newest two: the Anomalies page has the rest, and the other agents need room too
+                if (watchShown >= WATCH_IN_BELL) continue;
+                String key = a.getAnomalyType() + "|" + (a.getMerchant() == null ? "" : a.getMerchant());
+                if (!dismissed.contains(key)) { out.add(new NotificationDTO("warning", a.getMessage())); watchShown++; }
+            } else if (!sortShown) {
+                // Only the latest sorting summary: older ones are covered by it.
+                out.add(new NotificationDTO("info", a.getMessage()));
+                sortShown = true;
+            }
+        }
+        return out;
+    }
+
+    static final int WATCH_IN_BELL = 2;
 
     @PreAuthorize("hasAuthority('WRITE_OWN_PROFILE')")
     public void deleteNotification(int index) {

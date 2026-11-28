@@ -1,5 +1,6 @@
 package com.fintwin.service;
 
+import com.fintwin.dto.SpendingCoachResponseDTO;
 import com.fintwin.model.Transaction;
 import org.junit.jupiter.api.Test;
 
@@ -53,5 +54,18 @@ class SpendingCoachServiceTest {
         t.setCategory(category);
         t.setDate(date);
         return t;
+    }
+
+    @Test
+    void onlyAnswersTheModelWroteAreCached() {
+        SpendingCoachResponseDTO written = new SpendingCoachResponseDTO();
+        written.setCoachMessageSource("ai");
+        SpendingCoachResponseDTO computed = new SpendingCoachResponseDTO();
+        computed.setCoachMessageSource("analysis");
+
+        assertThat(SpendingCoachService.worthCaching(written)).isTrue();
+        assertThat(SpendingCoachService.worthCaching(computed)).isFalse();
+        assertThat(SpendingCoachService.worthCaching(new SpendingCoachResponseDTO())).isFalse();
+        assertThat(SpendingCoachService.worthCaching(null)).isFalse();
     }
 }

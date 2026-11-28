@@ -348,3 +348,55 @@ def test_coach_message_is_not_credited_to_the_model_when_it_was_rejected(mock_as
 def test_coach_message_is_not_credited_to_the_model_when_it_is_offline(mock_ask):
     mock_ask.side_effect = RuntimeError("Ollama unavailable")
     assert generate_spending_coach(_multi_month_transactions())["coachMessageSource"] == "analysis"
+
+
+# ── one fresh attempt when the first answer can't be used ────────────────────
+
+@patch("spending_coach.coach_engine.ask")
+def test_a_rejected_message_gets_one_fresh_attempt(mock_ask):
+    mock_ask.side_effect = [
+        json.dumps({"coachMessage": "You saved ₹987,654 last month.", "tips": []}),   # ungrounded
+        json.dumps({"coachMessage": "You are doing well.", "tips": []}),
+    ]
+    result = generate_spending_coach(_multi_month_transactions())
+
+    assert mock_ask.call_count == 2
+    assert result["coachMessage"] == "You are doing well."
+    assert result["coachMessageSource"] == "ai"
+
+
+@patch("spending_coach.coach_engine.ask")
+def test_an_answer_that_wont_parse_gets_one_fresh_attempt(mock_ask):
+    mock_ask.side_effect = ["not json at all", json.dumps({"coachMessage": "You are doing well.", "tips": []})]
+    result = generate_spending_coach(_multi_month_transactions())
+
+    assert mock_ask.call_count == 2
+    assert result["coachMessageSource"] == "ai"
+
+
+@patch("spending_coach.coach_engine.ask")
+def test_two_unusable_answers_fall_back_and_a_third_is_never_asked_for(mock_ask):
+    mock_ask.return_value = json.dumps({"coachMessage": "You saved ₹987,654 last month.", "tips": []})
+    result = generate_spending_coach(_multi_month_transactions())
+
+    assert mock_ask.call_count == 2
+    assert result["coachMessageSource"] == "analysis"
+
+
+@patch("spending_coach.coach_engine.ask")
+def test_a_model_that_is_down_is_not_asked_again(mock_ask):
+    mock_ask.side_effect = RuntimeError("offline")
+    result = generate_spending_coach(_multi_month_transactions())
+
+    assert mock_ask.call_count == 1
+    assert result["coachMessageSource"] == "analysis"
+
+
+@patch("spending_coach.coach_engine.ask")
+def test_no_second_attempt_without_time_for_it(mock_ask):
+    from spending_coach import coach_engine
+    mock_ask.return_value = json.dumps({"coachMessage": "You saved ₹987,654 last month.", "tips": []})
+    with patch.object(coach_engine, "LLM_TIMEOUT_S", 2.0):   # less than RETRY_MIN_SECONDS
+        generate_spending_coach(_multi_month_transactions())
+
+    assert mock_ask.call_count == 1

@@ -41,6 +41,8 @@ public enum Permission {
     USE_AI_FORECAST,
     USE_AI_REPORT,
     USE_AI_SPENDING_COACH,
+    // Spend Guard: the AI checks a payment or top-up before the user pays (prototype)
+    USE_SPEND_GUARD,
 
     // ── Bank Connections (Setu AA) ───────────────────────────────────
     CONNECT_BANK_ACCOUNT,

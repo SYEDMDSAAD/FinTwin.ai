@@ -71,6 +71,28 @@ public class Investment {
     @Column(name = "ipo_listing_id")
     private Long ipoListingId;
 
+    // CAS imports only: the fund or share's ISIN and the folio's last 4 digits,
+    // which together tell one holding from another on the next statement.
+    @Convert(converter = EncryptionConverter.class)
+    @Column(length = 512)
+    private String isin;
+
+    @Convert(converter = EncryptionConverter.class)
+    @Column(name = "folio_tail", length = 512)
+    private String folioTail;
+
+    /** CAMS | KFINTECH | NSDL | CDSL when imported from a statement; null when added by hand. */
+    @Column(length = 20)
+    private String source;
+
+    /** The statement date the units are from. */
+    @Column(name = "units_as_of")
+    private LocalDate unitsAsOf;
+
+    /** EQUITY, DEBT, HYBRID… as the statement classifies the fund; decides how gains are taxed. */
+    @Column(name = "asset_class", length = 20)
+    private String assetClass;
+
     // getters & setters
 
     public Long getId() { return id; }
@@ -114,4 +136,15 @@ public class Investment {
 
     public Double getInterestRate() { return interestRate; }
     public void setInterestRate(Double interestRate) { this.interestRate = interestRate; }
+
+    public String getIsin() { return isin; }
+    public void setIsin(String isin) { this.isin = isin; }
+    public String getFolioTail() { return folioTail; }
+    public void setFolioTail(String folioTail) { this.folioTail = folioTail; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+    public LocalDate getUnitsAsOf() { return unitsAsOf; }
+    public String getAssetClass() { return assetClass; }
+    public void setAssetClass(String assetClass) { this.assetClass = assetClass; }
+    public void setUnitsAsOf(LocalDate unitsAsOf) { this.unitsAsOf = unitsAsOf; }
 }

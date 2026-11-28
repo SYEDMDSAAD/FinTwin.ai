@@ -1,3 +1,4 @@
+import pytest
 """Discover-page market data: AMFI fund list, returns from NAV history, stocks."""
 from unittest.mock import MagicMock, patch
 
@@ -159,6 +160,13 @@ def test_no_price_history_means_no_answer():
         assert data.stock_price_on("NOPE", "2026-01-01") is None
 
 
+@pytest.fixture(autouse=True)
+def _fresh_nav_history():
+    data._HISTORY_CACHE.clear()
+    yield
+    data._HISTORY_CACHE.clear()
+
+
 def _mfapi(points):
     resp = MagicMock()
     resp.json.return_value = {"data": [{"date": d, "nav": n} for d, n in points]}
@@ -199,3 +207,106 @@ def test_latest_nav_route_skips_return_history(monkeypatch):
                         "nav": 88.4567, "date": "21-Sep-2026"}
     assert called == []
 
+
+
+def test_monthly_navs_keep_each_months_last_nav_and_cache_the_history():
+    resp = _mfapi([("31-10-2026", "90.0"), ("30-10-2026", "89.0"), ("29-09-2026", "85.0"),
+                   ("28-08-2026", "80.0"), ("02-09-2026", "81.0")])
+    with patch.object(data.requests, "get", return_value=resp) as get:
+        assert data.fund_monthly_navs("122640", "2026-09") == [
+            {"month": "2026-09", "nav": 85.0}, {"month": "2026-10", "nav": 90.0}]
+        data.fund_nav_on("122640", "2026-10-30")
+        assert get.call_count == 1
+
+
+def test_monthly_route_checks_the_code_and_month(monkeypatch):
+    monkeypatch.setattr(data, "fund_monthly_navs", lambda c, s: [{"month": s, "nav": 1.0}])
+    assert client.get("/discover/funds/abc/monthly", params={"since": "2026-01"}, headers=KEY).status_code == 400
+    assert client.get("/discover/funds/1/monthly", params={"since": "2026-1"}, headers=KEY).status_code == 422
+    assert client.get("/discover/funds/1/monthly", params={"since": "2026-01"}, headers=KEY).json() == [{"month": "2026-01", "nav": 1.0}]
+
+
+# ── Fund page charts and collections ────────────────────────────────────────
+
+from datetime import datetime as _dt, timedelta as _td
+from market import data as _data
+
+
+def _series(days, start_nav=10.0, step=0.01):
+    base = _dt(2020, 1, 1)
+    return [(base + _td(days=i), start_nav + i * step) for i in range(days)]
+
+
+def test_fund_history_cuts_to_the_range_and_reports_the_change(monkeypatch):
+    pts = _series(2000)
+    monkeypatch.setattr(_data, "_nav_history", lambda code: pts)
+    one_year = _data.fund_history("1", "1Y")
+    assert one_year["since"] == "2020-01-01"
+    first = _dt.fromisoformat(one_year["points"][0]["date"])
+    assert (pts[-1][0] - first).days <= 366
+    assert one_year["change"] > 0
+    assert len(_data.fund_history("1", "ALL")["points"]) <= _data._MAX_POINTS + 1
+
+
+def test_fund_history_is_empty_not_an_error_without_navs(monkeypatch):
+    monkeypatch.setattr(_data, "_nav_history", lambda code: [])
+    assert _data.fund_history("1", "1Y")["points"] == []
+
+
+def test_thin_keeps_the_last_point():
+    pts = list(range(1000))
+    out = _data._thin(pts, 100)
+    assert out[-1] == 999 and len(out) <= 101
+
+
+def test_collections_keep_direct_growth_only_and_sort_by_three_year_return(monkeypatch):
+    F = _data.Fund
+    funds = {
+        "1": F("1", "A Nifty Index Fund - Direct Plan - Growth", "A", "Other Scheme - Index Funds", 10, "", ""),
+        "2": F("2", "B Nifty Index Fund - Regular Plan - Growth", "B", "Other Scheme - Index Funds", 10, "", ""),
+        "3": F("3", "C Sensex Index Fund - Direct Plan - IDCW", "C", "Other Scheme - Index Funds", 10, "", ""),
+        "4": F("4", "D Next 50 Index Fund - Direct Plan - Growth", "D", "Other Scheme - Index Funds", 10, "", ""),
+    }
+    monkeypatch.setattr(_data, "_load_funds", lambda: funds)
+    monkeypatch.setattr(_data, "fund_returns", lambda code: {"1": {"3y": 12.0}, "4": {"3y": 18.0}}[code])
+    out = _data.fund_collection("index")
+    assert [f["code"] for f in out["funds"]] == ["4", "1"]
+    assert "not a recommendation" in out["note"]
+    assert _data.fund_collection("nope") is None
+
+
+def test_falls_back_to_mfapi_names_when_amfi_refuses(monkeypatch):
+    class Resp:
+        def __init__(self, status, body=None, text=""):
+            self.status_code, self._body, self.text, self.encoding = status, body, text, None
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f"{self.status_code} Forbidden")
+        def json(self):
+            return self._body
+
+    def fake_get(url, timeout=None, headers=None):
+        if "amfiindia" in url:
+            return Resp(403)
+        if url.endswith("/mf"):
+            return Resp(200, [{"schemeCode": 122639, "schemeName": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth", "isinGrowth": "INF879O01027"}])
+        return Resp(200, {"meta": {"fund_house": "PPFAS Mutual Fund", "scheme_category": "Equity Scheme - Flexi Cap Fund",
+                                   "scheme_name": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth"},
+                          "data": [{"date": "26-11-2026", "nav": "96.5013"}]})
+
+    monkeypatch.setattr(_data.requests, "get", fake_get)
+    monkeypatch.setattr(_data, "_funds", {})
+    monkeypatch.setattr(_data, "_latest_cache", {})
+    monkeypatch.setattr(_data, "fund_returns", lambda code: {"1y": 12.0})
+    funds = _data._load_funds()
+    assert funds["122639"].category == "Equity Scheme - Flexi Cap Fund"     # guessed from the name
+    assert _data.search_funds("parag")[0]["nav"] is None                    # NAV comes on the fund's page
+    d = _data.fund_details("122639")
+    assert d["nav"] == 96.5013 and d["amc"] == "PPFAS Mutual Fund" and d["nav_date"] == "26-Nov-2026"
+    assert _data.latest_nav("122639") == 96.5013
+
+
+def test_guess_category_reads_index_before_cap_words():
+    assert _data.guess_category("Motilal Oswal Nifty Midcap 150 Index Fund - Direct Plan") == "Other Scheme - Index Funds"
+    assert _data.guess_category("Axis ELSS Tax Saver Fund - Direct Growth") == "Equity Scheme - ELSS"
+    assert _data.guess_category("Kotak Small Cap Fund - Direct") == "Equity Scheme - Small Cap Fund"

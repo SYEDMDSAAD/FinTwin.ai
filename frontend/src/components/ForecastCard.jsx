@@ -1,425 +1,78 @@
-import GlassCard from "./GlassCard";
+import { Sparkles } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
+import { rupees } from "../utils/money";
+import { xAxis, yAxis, grid, ChartTooltip, tooltipCursor, cx } from "./ui";
 
-import {
-    Sparkles
-} from "lucide-react";
+/* Next month's spending, predicted from the last three, with the months it came from. */
 
-import {
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    Tooltip
-} from "recharts";
+const monthLabel = (ym) => new Date(`${ym}-01T00:00:00`).toLocaleString("en-IN", { month: "short" });
 
-function ForecastCard({
-
-    forecast,
-    monthlyHistory
-
-}) {
-
+function ForecastCard({ forecast, monthlyHistory }) {
     if (!forecast) return null;
 
-    const visibleHistory =
-        (monthlyHistory || []).slice(-3);
+    const history = (monthlyHistory || []).slice(-3);
+    const last = history[history.length - 1];
+    const next = last
+        ? new Date(new Date(`${last.month}-01T00:00:00`).setMonth(new Date(`${last.month}-01T00:00:00`).getMonth() + 1))
+        : new Date(new Date().setMonth(new Date().getMonth() + 1));
+    const nextLabel = next.toLocaleString("en-IN", { month: "short" });
 
-    const lastItem = visibleHistory[visibleHistory.length - 1];
-
-    const nextMonthLabel = lastItem
-        ? new Date(
-              new Date(lastItem.month + "-01")
-                  .setMonth(new Date(lastItem.month + "-01").getMonth() + 1)
-          ).toLocaleString("en-US", { month: "short" })
-        : new Date(
-              new Date().setMonth(new Date().getMonth() + 1)
-          ).toLocaleString("en-US", { month: "short" });
-
-    const chartData = [
-        ...visibleHistory.map(item => ({
-            month: new Date(item.month + "-01").toLocaleString("en-US", { month: "short" }),
-            amount: item.expense,
-        })),
-        {
-            month: nextMonthLabel,
-            amount: forecast?.predictedExpenses || 0,
-        },
+    const data = [
+        ...history.map((h) => ({ month: monthLabel(h.month), amount: h.expense, forecast: false })),
+        { month: nextLabel, amount: forecast.predictedExpenses || 0, forecast: true },
     ];
 
+    const over = forecast.predictedSavings < 0;
+    const growth = Number(forecast.expenseGrowth) || 0;
+
     return (
-
-        <GlassCard
-            className="
-                relative
-                overflow-hidden
-                p-7
-                mb-8
-                border
-                border-white/10
-                bg-white/[0.03]
-                backdrop-blur-xl
-            "
-        >
-
-            {/* Header */}
-
-            <div
-                className="
-                    absolute
-                    -top-20
-                    -right-20
-                    w-52
-                    h-52
-                    rounded-full
-                    bg-purple-500/10
-                    blur-3xl
-                "
-            />
-
-            <div
-                className="
-                    text-[11px]
-                    font-bold
-                    tracking-[0.12em]
-                    text-zinc-500
-                    mb-5
-                "
-            >
-                AI FORECAST
-            </div>
-
-            <div
-                className="
-                    flex
-                    items-center
-                    gap-3
-                    mb-6
-                "
-            >
-
-                <div
-                    className="
-                        w-10
-                        h-10
-                        rounded-xl
-                        flex
-                        items-center
-                        justify-center
-                        bg-gradient-to-r
-                        from-purple-500/30
-                        to-cyan-500/20
-                        border
-                        border-purple-500/20
-                    "
-                >
-                    <Sparkles size={18} />
-                </div>
-
-                <div>
-
-                    <h2
-                        className="
-                            text-lg
-                            font-bold
-                            text-white
-                        "
-                    >
-                        AI Forecast Simulator
-                    </h2>
-
-                    <p
-                        className="
-                            text-xs
-                            text-zinc-500
-                        "
-                    >
-                        XGBoost Powered
-                    </p>
-
-                </div>
-
-            </div>
-
-            {/* Hero Card */}
-
-            <div
-                className="
-                    mb-6
-                "
-            >
-
-                <div
-                    className="
-                        text-xs
-                        tracking-wide
-                        text-zinc-500
-                        mb-2
-                    "
-                >
-                    PREDICTED NEXT MONTH
-                </div>
-
-                <h1
-                    className="
-                        text-5xl
-                        font-black
-                        tracking-tight
-                        text-white
-                    "
-                >
-                    ₹{
-                        forecast.predictedExpenses
-                            ?.toLocaleString("en-IN")
-                    }
-                </h1>
-
-                <p
-                    className="
-                        text-sm
-                        text-zinc-500
-                        mt-2
-                    "
-                >
-                    AI estimated expense forecast
+        <section aria-label="Next month" className="max-w-2xl mb-8">
+            <div className="rounded-card bg-surface border border-line p-5">
+                <p className="text-small text-ink-3">Next month's spending, predicted</p>
+                <p className="text-display text-ink num mt-1">{rupees(forecast.predictedExpenses)}</p>
+                <p className="text-small text-ink-3 mt-1">
+                    {growth === 0 ? "About the same as recent months" : `${growth > 0 ? "Up" : "Down"} ${Math.abs(growth)}% on recent months`}
                 </p>
 
-            </div>
-
-            {/* Stats */}
-
-            <div
-                className="
-                    grid
-                    grid-cols-2
-                    gap-4
-                    mb-6
-                "
-            >
-
-                {/* Negative predicted savings = projected overspend — the most
-                    important warning a forecast can give. Style it as one
-                    instead of showing "₹-7,000" in green. */}
-                {forecast.predictedSavings < 0 ? (
-                    <div
-                        className="
-                            rounded-2xl
-                            border
-                            border-red-500/20
-                            bg-red-500/[0.06]
-                            p-4
-                        "
-                    >
-                        <div
-                            className="
-                                text-[10px]
-                                tracking-widest
-                                text-red-400
-                                mb-2
-                            "
-                        >
-                            PROJECTED OVERSPEND
-                        </div>
-                        <h3
-                            className="
-                                text-xl
-                                font-bold
-                                text-red-400
-                            "
-                        >
-                            ₹{
-                                Math.abs(forecast.predictedSavings)
-                                    .toLocaleString("en-IN")
-                            }
-                        </h3>
-                        <p className="text-[11px] text-red-300/70 mt-1">
-                            Spending is on track to exceed income next month.
-                        </p>
-                    </div>
-                ) : (
-                    <div
-                        className="
-                            rounded-2xl
-                            border
-                            border-green-500/15
-                            bg-green-500/[0.05]
-                            p-4
-                        "
-                    >
-                        <div
-                            className="
-                                text-[10px]
-                                tracking-widest
-                                text-green-400
-                                mb-2
-                            "
-                        >
-                            PREDICTED SAVINGS
-                        </div>
-                        <h3
-                            className="
-                                text-xl
-                                font-bold
-                                text-green-400
-                            "
-                        >
-                            ₹{
-                                forecast.predictedSavings
-                                    ?.toLocaleString("en-IN")
-                            }
-                        </h3>
-                    </div>
-                )}
-
-                <div
-                    className="
-                        rounded-2xl
-                        border
-                        border-yellow-500/15
-                        bg-yellow-500/[0.05]
-                        p-4
-                    "
-                >
-
-                    <div
-                        className="
-                            text-[10px]
-                            tracking-widest
-                            text-yellow-400
-                            mb-2
-                        "
-                    >
-                        EXPENSE GROWTH
-                    </div>
-
-                    <h3
-                        className="
-                            text-xl
-                            font-bold
-                            text-yellow-400
-                        "
-                    >
-                        {forecast.expenseGrowth}%
-                    </h3>
-
-                </div>
-
-            </div>
-
-            {/* Forecast Chart */}
-
-            <div className="
-                rounded-2xl
-                p-6
-                mb-8
-                border
-                border-purple-500/20
-                bg-zinc-900/40
-            ">
-
-                <div className="
-                    flex
-                    items-center
-                    justify-between
-                    mb-6
-                ">
-
-                    <h3 className="
-                        text-2xl
-                        font-bold
-                    ">
-                        Forecast Expense Trend
-                    </h3>
-
-                    <span className="
-                        text-purple-400
-                    ">
-                        AI Projection
-                    </span>
-
-                </div>
-
-                <div className="
-                    h-[180px]
-                ">
-
-                    <ResponsiveContainer
-                        width="100%"
-                        height="100%"
-                    >
-
-                        <LineChart
-                            data={chartData}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
-                        >
-
-                            <XAxis
-                                dataKey="month"
-                            />
-
-                            <YAxis
-                                width={48}
-                                tickFormatter={(value) => {
-                                    if (value >= 100000) return "₹" + (value / 100000).toFixed(1) + "L";
-                                    if (value >= 1000) return "₹" + (value / 1000).toFixed(0) + "k";
-                                    return "₹" + value;
-                                }}
-                            />
-
-                            <Tooltip />
-
-                            <Line
-                                type="monotone"
-                                dataKey="amount"
-                                stroke="#a855f7"
-                                strokeWidth={4}
-                            />
-
-                        </LineChart>
-
+                <div className="h-44 mt-5 -ml-2">
+                    <ResponsiveContainer initialDimension={{ width: 320, height: 176 }} width="100%" height="100%">
+                        <BarChart data={data} barCategoryGap="28%">
+                            <CartesianGrid {...grid} />
+                            <XAxis {...xAxis} dataKey="month" />
+                            <YAxis {...yAxis} />
+                            <Tooltip cursor={tooltipCursor} content={<ChartTooltip />} />
+                            <Bar dataKey="amount" radius={[6, 6, 6, 6]} maxBarSize={44}>
+                                {data.map((d) => (
+                                    <Cell key={d.month} fill={d.forecast ? "var(--accent)" : "var(--border-card-hover)"} />
+                                ))}
+                            </Bar>
+                        </BarChart>
                     </ResponsiveContainer>
-
                 </div>
-
+                <div className="flex gap-4 text-caption text-ink-3 mt-1">
+                    <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--border-card-hover)" }} /> Spent</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-accent" /> Predicted</span>
+                </div>
             </div>
 
-            {/* Insight */}
-
-            <div
-                className="
-                    rounded-2xl
-                    border
-                    border-purple-500/15
-                    bg-purple-500/[0.05]
-                    p-5
-                "
-            >
-
-                <div
-                    className="
-                        text-xs
-                        font-semibold
-                        tracking-wide
-                        text-purple-400
-                        mb-2
-                    "
-                >
-                    AI INSIGHT
-                </div>
-
-                <p
-                    className="
-                        text-sm
-                        leading-7
-                        text-zinc-300
-                    "
-                >
-                    {forecast.insight}
-                </p>
-
-            </div>
-
-        </GlassCard>
+            <ul className="mt-4 rounded-card bg-surface border border-line divide-y divide-line">
+                <li className="flex items-center justify-between gap-3 px-4 py-3.5">
+                    <span className="min-w-0">
+                        <span className="block text-body text-ink">{over ? "Likely overspend" : "Likely left over"}</span>
+                        <span className="block text-small text-ink-3">{over ? "Spending on track to pass income" : "Income minus predicted spending"}</span>
+                    </span>
+                    <span className={cx("text-body font-semibold num", over ? "text-bad" : "text-good")}>
+                        {rupees(Math.abs(forecast.predictedSavings || 0))}
+                    </span>
+                </li>
+                {forecast.insight && (
+                    <li className="flex items-start gap-3 px-4 py-3.5">
+                        <Sparkles size={16} aria-hidden className="shrink-0 mt-0.5 text-accent" />
+                        <span className="text-small text-ink-2">{forecast.insight}</span>
+                    </li>
+                )}
+            </ul>
+        </section>
     );
 }
 

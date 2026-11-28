@@ -132,11 +132,14 @@ public class AnomalyService {
 
     @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
     public List<AnomalyDTO> detectAnomalies() {
-
         String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
+        return detectFor(user);
+    }
 
+    /** The same checks for a given user — for the watch agent, which runs without a login. */
+    public List<AnomalyDTO> detectFor(User user) {
         Set<String> dismissed = dismissedRepository.findByUser(user).stream()
                 .map(p -> p.getAnomalyType() + "|" + (p.getMerchant() != null ? p.getMerchant() : ""))
                 .collect(Collectors.toSet());

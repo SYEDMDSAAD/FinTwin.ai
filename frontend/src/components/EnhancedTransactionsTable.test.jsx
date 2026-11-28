@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import EnhancedTransactionsTable from "./EnhancedTransactionsTable";
+import EnhancedTransactionsTable, { softenCaps } from "./EnhancedTransactionsTable";
 
 // One a day, newest first — so "SHOP 400" really is older than the first chunk
 const txns = (n) => Array.from({ length: n }, (_, i) => ({
@@ -32,7 +32,7 @@ describe("EnhancedTransactionsTable", () => {
         fireEvent.click(screen.getByRole("button", { name: /show more \(7 older\)/i }));
 
         expect(screen.getByText("Showing 10 of 12")).toBeInTheDocument();
-        expect(screen.getAllByText("Paid to SHOP 7").length).toBeGreaterThan(0);   // desktop row + mobile card
+        expect(screen.getAllByText("Paid to SHOP 7").length).toBeGreaterThan(0);   // one row per transaction now
 
         fireEvent.click(screen.getByRole("button", { name: /show more \(2 older\)/i }));
         expect(screen.getByText("Showing 12 of 12")).toBeInTheDocument();
@@ -42,5 +42,14 @@ describe("EnhancedTransactionsTable", () => {
     it("has no range selector when the page doesn't offer one", () => {
         render(<EnhancedTransactionsTable transactions={txns(2)} />);
         expect(screen.queryByLabelText("How far back to show")).not.toBeInTheDocument();
+    });
+});
+
+describe("softenCaps", () => {
+    it("calms shouting bank names but keeps acronyms and mixed case", () => {
+        expect(softenCaps("ACME PVT LTD")).toBe("Acme Pvt Ltd");
+        expect(softenCaps("HDFC BANK")).toBe("HDFC Bank");
+        expect(softenCaps("UPI-PAYTM")).toBe("UPI-Paytm");
+        expect(softenCaps("Paid to SHOP 7")).toBe("Paid to SHOP 7");
     });
 });

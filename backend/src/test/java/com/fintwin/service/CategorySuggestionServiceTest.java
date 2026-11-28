@@ -48,6 +48,26 @@ class CategorySuggestionServiceTest {
     }
 
     @Test
+    void onlyAnswersTheModelWasSureOfCanBeAppliedOnTheirOwn() {
+        when(ai.postForObject(eq("http://ai/categories/suggest"), any(), eq(Map.class)))
+                .thenReturn(Map.of("suggestions", Map.of("Swiggy", "Food", "Krishna Enterprises", "Shopping"),
+                        "sure", Map.of("Swiggy", true, "Krishna Enterprises", false), "complete", true));
+
+        var sure = service.sureSuggestions(List.of("Paid to Swiggy", "Paid to Krishna Enterprises"));
+
+        assertThat(sure).containsExactlyEntriesOf(Map.of("paid to swiggy", "Food"));
+        // Both are still offered as suggestions for the user
+        assertThat(service.shown("Paid to Krishna Enterprises")).contains("Shopping");
+    }
+
+    @Test
+    void anOlderAiServiceWithoutTheSureFlagMeansNothingIsAppliedOnItsOwn() {
+        aiReplies(Map.of("Swiggy", "Food"), true);
+        assertThat(service.sureSuggestions(List.of("Paid to Swiggy"))).isEmpty();
+        assertThat(service.shown("Paid to Swiggy")).contains("Food");
+    }
+
+    @Test
     void theModelIsNotAskedAgainAboutANameItAlreadyAnswered() {
         aiReplies(Map.of("Dominos Pizza", "Food"), true);
         service.suggest(List.of("Paid to Dominos Pizza"));

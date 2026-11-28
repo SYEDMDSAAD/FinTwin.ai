@@ -1,173 +1,124 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { percent } from "../utils/money";
+import { Badge, Progress, cx } from "./ui";
 
-function CircleScore({ score }) {
-    const radius = 54;
-    const circumference = 2 * Math.PI * radius;
-    const [progress, setProgress] = useState(0);
+/* The health score: the number, what it means, and what's behind it. */
 
+function tone(score) {
+    if (score >= 70) return "good";
+    if (score >= 50) return "warn";
+    return "bad";
+}
+
+const RING = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" };
+
+function Ring({ score, color }) {
+    const r = 34;
+    const c = 2 * Math.PI * r;
+    const [shown, setShown] = useState(0);
     useEffect(() => {
-        const t = setTimeout(() => setProgress(score), 300);
+        const t = setTimeout(() => setShown(score), 150);
         return () => clearTimeout(t);
     }, [score]);
-
-    const dash = circumference * (progress / 100);
-
     return (
-        <svg width="140" height="140" className="-rotate-90">
-            <circle cx="70" cy="70" r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
-            <circle cx="70" cy="70" r={radius} fill="none" stroke="url(#scoreGrad)" strokeWidth="10"
-                strokeLinecap="round" strokeDasharray={`${dash} ${circumference}`}
-                style={{ transition: "stroke-dasharray 1.4s cubic-bezier(0.34,1.56,0.64,1)" }} />
-            <defs>
-                <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%"   stopColor="#22d3ee" />
-                    <stop offset="100%" stopColor="#a78bfa" />
-                </linearGradient>
-            </defs>
+        <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90 shrink-0" aria-hidden>
+            <circle cx="42" cy="42" r={r} fill="none" stroke="var(--bg-input)" strokeWidth="8" />
+            <circle cx="42" cy="42" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+                    strokeDasharray={`${c * (shown / 100)} ${c}`}
+                    style={{ transition: "stroke-dasharray 900ms cubic-bezier(0.22,1,0.36,1)" }} />
         </svg>
     );
 }
 
-function scoreColor(score) {
-    if (score >= 85) return "#4ade80";
-    if (score >= 70) return "#22d3ee";
-    if (score >= 50) return "#fbbf24";
-    return "#f87171";
-}
+const SUMMARY = (score) =>
+    score >= 85 ? "Strong savings and steady budgets. Money left over each month could start working for you."
+    : score >= 70 ? "Stable. Tightening one or two categories would lift you into the top band."
+    : score >= 50 ? "Middling. The lowest factors below are where small changes count most."
+    : "At risk. Bring spending under 80% of income and set a budget for your biggest category first.";
 
-function FactorBar({ factor }) {
-    const pct = factor.maxPoints > 0 ? (factor.points / factor.maxPoints) * 100 : 0;
-    const color = factor.status === "good"    ? "#4ade80"
-                : factor.status === "warning" ? "#fbbf24"
-                : factor.status === "poor"    ? "#f87171"
-                : "#94a3b8";
-
-    return (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{factor.label}</span>
-                    <span style={{ fontSize: 10, color: "var(--text-dim)" }}>
-                        {factor.impact} impact · {factor.points}/{factor.maxPoints}
-                    </span>
-                </div>
-                <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
-                    <div style={{
-                        height: "100%", width: `${pct}%`, background: color,
-                        borderRadius: 3, transition: "width 1s ease",
-                    }} />
-                </div>
-                <div style={{ fontSize: 11, color: "rgba(148,163,184,0.6)", lineHeight: 1.5 }}>{factor.desc}</div>
-            </div>
-        </div>
-    );
-}
+const FACTOR_TONE = { good: "good", warning: "warn", poor: "bad" };
 
 function FinancialScoreCard({ scoreData }) {
-    // Collapsed by default — only matters on mobile (`lg:` forces it open below).
-    const [factorsOpen, setFactorsOpen] = useState(false);
-
+    const [open, setOpen] = useState(true);
     if (!scoreData) return null;
 
-    const color = scoreColor(scoreData.score);
+    const t = tone(scoreData.score);
+    const savings = Number(scoreData.savingsRatio);
+    const rows = [
+        { label: "Savings rate", note: "last 3 months", value: percent(scoreData.savingsRatio), cls: savings < 0 ? "text-bad" : "text-ink" },
+        { label: "Budget discipline", note: "this month", value: `${scoreData.budgetDiscipline}%`, cls: "text-ink" },
+        { label: "Recurring payments", note: "subscriptions, bills, EMIs", value: String(scoreData.recurringExpenseCount ?? 0), cls: "text-ink" },
+    ];
 
     return (
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-7 mb-8"
-             style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-
-            <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl" />
-
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-                <div className="text-[11px] font-bold tracking-[0.12em] text-zinc-500">FINTWIN SCORE™</div>
-                <div style={{
-                    fontSize: 12, fontWeight: 700, color,
-                    background: color + "18", border: `1px solid ${color}30`,
-                    borderRadius: 8, padding: "4px 12px",
-                }}>
-                    {scoreData.rating}
-                </div>
-            </div>
-
-            {/* Score Ring + Factors */}
-            <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-start">
-
-                {/* Left — ring */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <section aria-label="Health score" className="max-w-2xl mb-8 space-y-4">
+            <div className="rounded-card bg-surface border border-line p-5">
+                <div className="flex items-center gap-4">
                     <div className="relative">
-                        <CircleScore score={scoreData.score} />
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <h1 style={{ fontSize: 40, fontWeight: 900, color, letterSpacing: "-0.04em", lineHeight: 1, filter: `drop-shadow(0 0 10px ${color}50)` }}>
-                                {scoreData.score}
-                            </h1>
-                            <span className="text-xs text-zinc-500">/100</span>
-                        </div>
+                        <Ring score={scoreData.score} color={RING[t]} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[22px] font-[650] tracking-[-0.03em] text-ink num">
+                            {scoreData.score}
+                        </span>
                     </div>
-
-                    {/* Mini stats */}
-                    <div style={{ marginTop: 16, width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
-                        {[
-                            { label: "Savings Rate",   value: scoreData.savingsRatio + "%",          color: "#4ade80" },
-                            { label: "Budget Score",   value: scoreData.budgetDiscipline + "%",       color: "#22d3ee" },
-                            { label: "Recurring",      value: scoreData.recurringExpenseCount + " items", color: "#f87171" },
-                        ].map(s => (
-                            <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <span style={{ fontSize: 12, color: "rgba(148,163,184,0.6)" }}>{s.label}</span>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</span>
-                            </div>
-                        ))}
+                    <div className="min-w-0">
+                        <p className="text-small text-ink-3">Health score</p>
+                        <p className="text-title text-ink mt-0.5">
+                            {scoreData.score}<span className="text-ink-3 text-heading font-medium"> / 100</span>
+                        </p>
+                        <Badge tone={t} className="mt-1.5">{scoreData.rating}</Badge>
                     </div>
                 </div>
-
-                {/* Right — factor bars. Collapsible on mobile — a long factor list
-                    pushed everything below it off-screen; desktop keeps it expanded
-                    since there's room next to the score ring. */}
-                {scoreData.factors?.length > 0 && (
-                    <div>
-                        <button
-                            type="button"
-                            onClick={() => setFactorsOpen(o => !o)}
-                            className="lg:pointer-events-none lg:!bg-transparent lg:!border-0 lg:!p-0 lg:!rounded-none"
-                            style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                width: "100%", cursor: "pointer", fontFamily: "inherit",
-                                fontSize: 11, fontWeight: 800, color: "var(--text-primary)",
-                                letterSpacing: "0.1em", marginBottom: 12,
-                                background: "var(--bg-subtle)",
-                                border: "1px solid var(--border-subtle)",
-                                borderRadius: 10,
-                                padding: "10px 14px",
-                            }}
-                        >
-                            <span>SCORE FACTORS</span>
-                            <ChevronDown
-                                size={16}
-                                strokeWidth={3}
-                                className="lg:hidden"
-                                style={{ transition: "transform 0.2s ease", transform: factorsOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                            />
-                        </button>
-                        <div
-                            className="lg:!flex"
-                            style={{ display: factorsOpen ? "flex" : "none", flexDirection: "column", gap: 14 }}
-                        >
-                            {scoreData.factors.map(f => <FactorBar key={f.label} factor={f} />)}
-                        </div>
-                    </div>
-                )}
+                <p className="mt-4 text-body text-ink-2">{SUMMARY(scoreData.score)}</p>
             </div>
 
-            {/* Recommendation */}
-            <div className="mt-6 rounded-2xl border border-purple-500/15 bg-purple-500/5 p-5">
-                <p className="text-sm leading-7 text-zinc-300">
-                    {scoreData.score >= 85 && "🚀 Excellent financial health. Your savings habits and budget discipline are outstanding. Consider deploying surplus into investments."}
-                    {scoreData.score >= 70 && scoreData.score < 85 && "✅ Good financial stability. Tightening one or two spending categories could push you into the Excellent tier."}
-                    {scoreData.score >= 50 && scoreData.score < 70 && "⚠️ Average financial health. Focus on your lowest-scoring factors above — small consistent improvements compound quickly."}
-                    {scoreData.score < 50 && "❌ Financial risk detected. Prioritise reducing expenses below 80% of income and set at least one category budget to start building discipline."}
-                </p>
-            </div>
-        </div>
+            <ul className="rounded-card bg-surface border border-line divide-y divide-line">
+                {rows.map((r) => (
+                    <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                        <span className="min-w-0">
+                            <span className="block text-body text-ink">{r.label}</span>
+                            <span className="block text-small text-ink-3">{r.note}</span>
+                        </span>
+                        <span className={cx("text-body font-semibold num", r.cls)}>{r.value}</span>
+                    </li>
+                ))}
+            </ul>
+
+            {scoreData.factors?.length > 0 && (
+                <div className="rounded-card bg-surface border border-line">
+                    <button
+                        type="button"
+                        onClick={() => setOpen((o) => !o)}
+                        aria-expanded={open}
+                        className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+                    >
+                        <span>
+                            <span className="block text-heading text-ink">What's behind the score</span>
+                            <span className="block text-small text-ink-3">Last 3 months</span>
+                        </span>
+                        <ChevronDown size={18} aria-hidden className={cx("text-ink-3 transition-transform", open && "rotate-180")} />
+                    </button>
+                    {open && (
+                        <ul className="divide-y divide-line border-t border-line">
+                            {scoreData.factors.map((f) => {
+                                const pct = f.maxPoints > 0 ? (f.points / f.maxPoints) * 100 : 0;
+                                const ft = FACTOR_TONE[f.status] || "accent";
+                                return (
+                                    <li key={f.label} className="px-4 py-3.5">
+                                        <div className="flex items-baseline justify-between gap-3">
+                                            <span className="text-body text-ink">{f.label}</span>
+                                            <span className="text-small text-ink-3 num shrink-0">{f.points} of {f.maxPoints}</span>
+                                        </div>
+                                        <Progress className="mt-2" value={pct} tone={ft} label={f.label} />
+                                        {f.desc && <p className="mt-2 text-small text-ink-3">{f.desc}</p>}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+            )}
+        </section>
     );
 }
 

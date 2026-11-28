@@ -26,6 +26,10 @@ public class Budget {
     @Column(name = "limit_amount", columnDefinition = "TEXT")
     private BigDecimal limitAmount;
 
+    /** First day this budget counts; null = from the start. */
+    @Column(name = "starts_on")
+    private java.time.LocalDate startsOn;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
@@ -66,6 +70,19 @@ public class Budget {
 
     public void setLimitAmountExact(BigDecimal limitAmount) {
         this.limitAmount = limitAmount;
+    }
+
+    public java.time.LocalDate getStartsOn() {
+        return startsOn;
+    }
+
+    public void setStartsOn(java.time.LocalDate startsOn) {
+        this.startsOn = startsOn;
+    }
+
+    /** False for a month before the budget starts. */
+    public boolean countsIn(java.time.YearMonth month) {
+        return startsOn == null || !java.time.YearMonth.from(startsOn).isAfter(month);
     }
 
     public User getUser() {

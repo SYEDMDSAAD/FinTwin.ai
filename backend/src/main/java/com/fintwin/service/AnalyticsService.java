@@ -40,19 +40,27 @@ public class AnalyticsService {
                         .findByEmail(email)
                         .orElseThrow();
 
-        List<Transaction> transactions =
-            transactionRepository.findLatestThreeMonthsTransactions(user.getId());
+        return summarize(transactionRepository.findByUser(user), LocalDate.now());
+    }
 
-        LocalDate cutoffDate =
-                LocalDate.now()
-                        .minusMonths(2)
-                        .withDayOfMonth(1);
+    /**
+     * The dashboard's figures, each over a stated period:
+     * <ul>
+     *   <li>income, expenses, savings, top category and merchant: the last 3 months
+     *       (this month and the two before it);</li>
+     *   <li>month*: this calendar month so far;</li>
+     *   <li>compared*: the same days of last month (1–20 Oct on 20 Nov), which the
+     *       trends are measured against, so a part month isn't set against a whole one;</li>
+     *   <li>allTime*: everything on record.</li>
+     * </ul>
+     * Transfers between the user's own accounts count in none of them.
+     */
+    static MonthlySummaryDTO summarize(List<Transaction> all, LocalDate today) {
 
-        transactions = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return d != null && !d.isBefore(cutoffDate);
-                })
+        LocalDate threeMonthsFrom = today.minusMonths(2).withDayOfMonth(1);
+
+        List<Transaction> transactions = all.stream()
+                .filter(t -> t.getDate() != null && !t.getDate().isBefore(threeMonthsFrom))
                 .toList();
 
         MonthlySummaryDTO dto = new MonthlySummaryDTO();
@@ -62,55 +70,23 @@ public class AnalyticsService {
 
         double savings = income - expenses;
 
-        LocalDate currentMonthStart  = LocalDate.now().withDayOfMonth(1);
+        LocalDate currentMonthStart  = today.withDayOfMonth(1);
         LocalDate previousMonthStart = currentMonthStart.minusMonths(1);
-        LocalDate previousMonthEnd   = currentMonthStart.minusDays(1);
+        LocalDate comparedTo         = sameDayLastMonth(today);
 
-        double currentIncome = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
-                            && t.getAmount() != null && t.getAmount() > 0
-                            && d != null && !d.isBefore(currentMonthStart);
-                })
-                .mapToDouble(Transaction::getAmount)
-                .sum();
+        List<Transaction> thisMonth = between(all, currentMonthStart, null);
+        List<Transaction> lastMonthSoFar = between(all, previousMonthStart, comparedTo);
 
-        double currentExpenses = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
-                            && t.getAmount() != null && t.getAmount() < 0
-                            && d != null && !d.isBefore(currentMonthStart);
-                })
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
+        double currentIncome   = com.fintwin.util.TransactionMath.income(thisMonth);
+        double currentExpenses = com.fintwin.util.TransactionMath.expenses(thisMonth);
+        double currentSavings  = currentIncome - currentExpenses;
 
-        double currentSavings = currentIncome - currentExpenses;
+        double previousIncome   = com.fintwin.util.TransactionMath.income(lastMonthSoFar);
+        double previousExpenses = com.fintwin.util.TransactionMath.expenses(lastMonthSoFar);
+        double previousSavings  = previousIncome - previousExpenses;
 
-        double previousIncome = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
-                            && t.getAmount() != null && t.getAmount() > 0
-                            && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
-                })
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        double previousExpenses = transactions.stream()
-                .filter(t -> {
-                    LocalDate d = t.getDate();
-                    return !com.fintwin.util.TransactionMath.isSelfTransfer(t)
-                            && t.getAmount() != null && t.getAmount() < 0
-                            && d != null && !d.isBefore(previousMonthStart) && !d.isAfter(previousMonthEnd);
-                })
-                .mapToDouble(t -> Math.abs(t.getAmount()))
-                .sum();
-
-        double previousSavings =
-                previousIncome -
-                previousExpenses;                    
+        double allTimeIncome   = com.fintwin.util.TransactionMath.income(all);
+        double allTimeExpenses = com.fintwin.util.TransactionMath.expenses(all);
 
         // =========================
         // Top Category
@@ -137,44 +113,58 @@ public class AnalyticsService {
         // =========================
 
         dto.setIncome(income);
-
         dto.setExpenses(expenses);
-
         dto.setSavings(savings);
+        dto.setPeriodFrom(threeMonthsFrom);
 
         dto.setTopCategory(topCategory);
-
         dto.setTopMerchant(topMerchant);
+        dto.setTransactionCount(transactions.size());
 
-        dto.setTransactionCount(
-            transactions.size()
-        );
+        dto.setMonthFrom(currentMonthStart);
+        dto.setMonthIncome(currentIncome);
+        dto.setMonthExpenses(currentExpenses);
+        dto.setMonthSavings(currentSavings);
 
-        dto.setIncomeTrend(
+        dto.setComparedFrom(previousMonthStart);
+        dto.setComparedTo(comparedTo);
+        dto.setComparedIncome(previousIncome);
+        dto.setComparedExpenses(previousExpenses);
+        dto.setComparedSavings(previousSavings);
 
-                calculateTrend(
-                        currentIncome,
-                        previousIncome
-                )
-        );
+        dto.setIncomeTrend(calculateTrend(currentIncome, previousIncome));
+        dto.setExpenseTrend(calculateTrend(currentExpenses, previousExpenses));
+        dto.setSavingsTrend(calculateTrend(currentSavings, previousSavings));
 
-        dto.setExpenseTrend(
-
-                calculateTrend(
-                        currentExpenses,
-                        previousExpenses
-                )
-        );
-
-        dto.setSavingsTrend(
-
-                calculateTrend(
-                        currentSavings,
-                        previousSavings
-                )
-        );
+        dto.setAllTimeFrom(all.stream()
+                .map(Transaction::getDate)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElse(null));
+        dto.setAllTimeIncome(allTimeIncome);
+        dto.setAllTimeExpenses(allTimeExpenses);
+        dto.setAllTimeSavings(allTimeIncome - allTimeExpenses);
 
         return dto;
+    }
+
+    /**
+     * The last day of the comparison window: today's day of last month, or the end
+     * of last month when it is shorter (31 Mar compares with all of February).
+     */
+    static LocalDate sameDayLastMonth(LocalDate today) {
+        LocalDate lastMonth = today.withDayOfMonth(1).minusMonths(1);
+        return lastMonth.withDayOfMonth(Math.min(today.getDayOfMonth(), lastMonth.lengthOfMonth()));
+    }
+
+    /** Transactions dated from {@code from} on, and up to {@code to} when it is given. */
+    private static List<Transaction> between(List<Transaction> all, LocalDate from, LocalDate to) {
+        return all.stream()
+                .filter(t -> {
+                    LocalDate d = t.getDate();
+                    return d != null && !d.isBefore(from) && (to == null || !d.isAfter(to));
+                })
+                .toList();
     }
 
     @PreAuthorize("hasAuthority('READ_OWN_TRANSACTIONS')")
@@ -215,7 +205,11 @@ public class AnalyticsService {
         return dto;
     }
 
-    private double calculateTrend(
+    /**
+     * Percentage change from the same days of last month. Divides by the size of that figure, so
+     * savings that go from -₹6,550 to +₹13,804 show as a rise, not a -312% fall.
+     */
+    static double calculateTrend(
             double current,
             double previous
     ) {
@@ -227,7 +221,7 @@ public class AnalyticsService {
         return Math.round(
 
                 ((current - previous)
-                        / previous)
+                        / Math.abs(previous))
 
                         * 1000
 

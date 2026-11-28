@@ -34,6 +34,7 @@ public class ProfileService {
     @Autowired private InvestmentRepository investmentRepository;
     @Autowired private CryptoConnectionRepository cryptoConnectionRepository;
     @Autowired private NotificationRepository notificationRepository;
+    @Autowired private TrackedHoldingsService trackedHoldingsService;
 
     // @Lazy breaks the instantiation cycle:
     // ProfileService ← BudgetService ← FinancialScoreService ← (this field)
@@ -187,6 +188,9 @@ public class ProfileService {
         export.put("budgets",        budgetRepository.findByUser(user));
         export.put("assets",         assetRepository.findByUser(user));
         export.put("liabilities",    liabilityRepository.findByUser(user));
+        export.put("sips",           trackedHoldingsService.listSips());
+        export.put("usHoldings",     trackedHoldingsService.listUsHoldings());
+        export.put("fundWatchlist",  trackedHoldingsService.listWatchlist());
         export.put("scoreHistory",   financialScoreHistoryRepository.findByUserOrderByMonthAsc(user));
         return export;
     }

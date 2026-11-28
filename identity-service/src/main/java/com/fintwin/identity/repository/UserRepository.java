@@ -39,6 +39,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByPasswordResetToken(String hashedToken);
 
+    /**
+     * Sign-ups nobody finished: never verified, never logged in, never
+     * onboarded, a plain user, and older than the cutoff. They can't log in,
+     * hold no data, and only squat the email (see UnverifiedSignupCleanup).
+     */
+    @Query("SELECT u FROM User u WHERE COALESCE(u.emailVerified, false) = false "
+         + "AND u.lastLoginAt IS NULL AND COALESCE(u.onboardingCompleted, false) = false "
+         + "AND u.role = 'USER' AND u.createdAt < :before")
+    List<User> findAbandonedSignups(@Param("before") LocalDateTime before, Pageable page);
+
     Page<User> findAll(Pageable pageable);
 
     long countByEnabledTrue();

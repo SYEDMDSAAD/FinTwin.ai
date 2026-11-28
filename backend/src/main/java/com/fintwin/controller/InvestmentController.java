@@ -17,10 +17,36 @@ public class InvestmentController {
 
     private final InvestmentService service;
     private final com.fintwin.service.HoldingLinkService linkService;
+    private final com.fintwin.service.CasImportService casImport;
+    private final com.fintwin.service.PortfolioHealthService health;
 
-    public InvestmentController(InvestmentService service, com.fintwin.service.HoldingLinkService linkService) {
+    public InvestmentController(InvestmentService service, com.fintwin.service.HoldingLinkService linkService,
+                                com.fintwin.service.CasImportService casImport,
+                                com.fintwin.service.PortfolioHealthService health) {
         this.service = service;
         this.linkService = linkService;
+        this.casImport = casImport;
+        this.health = health;
+    }
+
+    /** Facts worth knowing about the portfolio, and long-term gains that could be booked tax-free this year. */
+    /** Month-end value and money put in, for the funds imported from a statement. */
+    @GetMapping("/history")
+    public ResponseEntity<com.fintwin.service.PortfolioHealthService.History> history() {
+        return ResponseEntity.ok(health.history());
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<com.fintwin.service.PortfolioHealthService.Health> health() {
+        return ResponseEntity.ok(health.health());
+    }
+
+    /** Every holding in a CAS (CAMS/KFintech or NSDL/CDSL) at once, with its transactions. */
+    @PostMapping(value = "/import-cas", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<com.fintwin.service.CasImportService.Result> importCas(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "password", required = false) String password) {
+        return ResponseEntity.ok(casImport.importCas(file, password));
     }
 
     @GetMapping

@@ -1,9 +1,19 @@
 // One place for budget thresholds. The card used to colour its bar at 90/70,
 // label its warning box at 80, and take "exceeded" from the backend — three
 // different ideas of "in trouble" on the same card.
-export const BUDGET_SAFE = "#4ade80";
-export const BUDGET_WATCH = "#fbbf24";
-export const BUDGET_OVER = "#f87171";
+export const BUDGET_SAFE = "var(--good)";
+export const BUDGET_WATCH = "var(--warn)";
+export const BUDGET_OVER = "var(--bad)";
+export const BUDGET_UPCOMING = "var(--text-dim)";
+
+/** The ui kit tone for each status key. */
+export const BUDGET_TONE = { over: "bad", watch: "warn", paid: "good", safe: "good", upcoming: "neutral" };
+
+/** "1 Dec" from "2026-12-01". */
+export function startsLabel(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 
 export function budgetPercent(budget) {
   const limit = budget.limit || 0;
@@ -18,8 +28,16 @@ export function budgetPercent(budget) {
  */
 export function budgetStatus(budget) {
   const pct = budgetPercent(budget);
+  // Set up late in the month: this month's spending came before it existed
+  if (budget.startsOn) {
+    return { key: "upcoming", label: `Starts ${startsLabel(budget.startsOn)}`, color: BUDGET_UPCOMING, pct };
+  }
   if (budget.exceeded || pct > 100) {
     return { key: "over", label: "Over budget", color: BUDGET_OVER, pct };
+  }
+  // Rent or a bill paid in full is done for the month, not a warning
+  if (budget.fixedCost && pct >= 95) {
+    return { key: "paid", label: "Paid", color: BUDGET_SAFE, pct };
   }
   if (pct >= 70) {
     return { key: "watch", label: "Watch", color: BUDGET_WATCH, pct };
@@ -34,7 +52,9 @@ export function budgetStatus(budget) {
  * so the card under the cursor silently became a different budget.
  */
 export function sortByUrgency(budgets) {
+  const later = (b) => (b.startsOn ? 1 : 0);
   return [...budgets].sort((a, b) => {
+    if (later(a) !== later(b)) return later(a) - later(b);
     const byPct = budgetPercent(b) - budgetPercent(a);
     return byPct !== 0 ? byPct : (a.id || 0) - (b.id || 0);
   });

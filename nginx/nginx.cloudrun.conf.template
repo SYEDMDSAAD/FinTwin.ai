@@ -1,0 +1,102 @@
+# The front door on Google Cloud Run: serves the React app and proxies the
+# API to the other two Cloud Run services (fintwin-api and fintwin-auth).
+#
+# BACKEND_HOST and IDENTITY_HOST come from Cloud Run env vars and are
+# substituted into this template at container start (nginx's envsubst entrypoint
+# reads /etc/nginx/templates/*.template).
+
+server {
+    listen ${PORT};
+    server_name _;
+
+    # Resolve the other Cloud Run services per request using Google DNS.
+    resolver 8.8.8.8 1.1.1.1 valid=30s ipv6=off;
+    set $backend_host  ${BACKEND_HOST};
+    set $identity_host ${IDENTITY_HOST};
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    server_tokens off;
+
+    add_header X-Content-Type-Options "nosniff"                         always;
+    add_header X-Frame-Options        "DENY"                            always;
+    add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy     "camera=(self), microphone=(self), geolocation=()" always;
+    add_header X-XSS-Protection       "0"                               always;
+
+    # What the page may load and talk to. Scripts only from here (no inline
+    # script; the build has none) plus Google sign-in; WebAssembly for the
+    # on-device wake word; styles allow inline because React sets style
+    # attributes; mfapi.in is the fund search's direct call. Images may come
+    # from any https host (fund and stock logos). Nothing may frame the app.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.mfapi.in https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" always;
+
+    # Statement PDFs and receipt photos: matches the backend's 25 MB cap
+    client_max_body_size 27m;
+
+    # Health probe — answered here, not proxied
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Identity service — sign-up, login, 2FA, tokens, admin bootstrap
+    location ~ ^/api/(auth|2fa|token|admin)(/|$) {
+        proxy_pass         https://$identity_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $identity_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+    }
+
+    location /admin/ {
+        proxy_pass         https://$identity_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $identity_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+    }
+
+    # Everything else under /api goes to the main backend
+    location /api/ {
+        proxy_pass         https://$backend_host$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $backend_host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_ssl_server_name on;
+        proxy_hide_header  X-Powered-By;
+
+        proxy_read_timeout 100s;
+    }
+
+    # The backend's health endpoint, for checks from outside
+    location = /actuator/health {
+        proxy_pass         https://$backend_host/actuator/health;
+        proxy_set_header   Host $backend_host;
+        proxy_ssl_server_name on;
+        access_log off;
+    }
+
+    # React router — every other path is the app itself
+    # "Hey FinTwin" keyword spotter (WebAssembly + model, ~18 MB): served
+    # pre-compressed (~7.5 MB, see Dockerfile.cloudrun) and cached for a week.
+    # Fetched only when a user switches the wake word on.
+    location /voice/kws/ {
+        gzip_static on;
+        expires 7d;
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

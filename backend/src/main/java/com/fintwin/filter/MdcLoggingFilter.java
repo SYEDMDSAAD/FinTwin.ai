@@ -40,7 +40,7 @@ public class MdcLoggingFilter implements Filter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             try {
                 String email = jwtUtil.extractEmail(authHeader.substring(7));
-                if (email != null) MDC.put("userId", email);
+                if (email != null) MDC.put("userRef", userRef(email));
             } catch (Exception ignored) {
                 // Invalid/expired token — MDC userId left unset; Spring Security will reject it anyway
             }
@@ -51,5 +51,15 @@ public class MdcLoggingFilter implements Filter {
         } finally {
             MDC.clear();
         }
+    }
+
+    /**
+     * The user as logs show them: the first 12 characters of the keyed email
+     * hash stored in users.email_hash. Enough to follow one user's requests
+     * and to find them from the database, but the log names nobody.
+     */
+    static String userRef(String email) {
+        String h = com.fintwin.security.EmailHashUtil.hash(email);
+        return h == null ? null : h.substring(0, Math.min(12, h.length())).replace('+', '-').replace('/', '_');
     }
 }
